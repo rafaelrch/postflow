@@ -8,15 +8,34 @@
     "start": "next start"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.100.1",
+    "clsx": "^2.1.1",
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "immer": "^11.1.4",
+    "jszip": "^3.10.1",
+    "lucide-react": "^1.7.0",
     "next": "16.2.1",
+    "openai": "^6.33.0",
+    "pg": "^8.20.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "tailwind-merge": "^3.5.0",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
+    "@types/jszip": "^3.4.0",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
