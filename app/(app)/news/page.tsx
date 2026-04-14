@@ -15,6 +15,183 @@ import {
 import toast from 'react-hot-toast';
 import NewsCard, { NewsCardItem, DEFAULT_STYLE, parseNewsJSON } from '@/components/news/NewsCard';
 
+// ── Canvas export helpers ─────────────────────────────────────────────────────
+
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    // Only set crossOrigin for http URLs (blob: and data: don't need it)
+    if (src.startsWith('http')) img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Falha ao carregar imagem: ${src.slice(0, 60)}`));
+    img.src = src;
+  });
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width <= maxW) {
+      line = test;
+    } else {
+      if (line) lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
+async function captureCardToCanvas(item: NewsCardItem): Promise<HTMLCanvasElement> {
+  const W = 1080, H = 1350, DPR = 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(DPR, DPR);
+
+  // ── Clip to rounded card shape ──────────────────────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  const r = item.card_radius;
+  ctx.moveTo(r, 0);
+  ctx.lineTo(W - r, 0); ctx.arcTo(W, 0, W, r, r);
+  ctx.lineTo(W, H - r); ctx.arcTo(W, H, W - r, H, r);
+  ctx.lineTo(r, H);     ctx.arcTo(0, H, 0, H - r, r);
+  ctx.lineTo(0, r);     ctx.arcTo(0, 0, r, 0, r);
+  ctx.closePath();
+  ctx.fillStyle = '#0A0A0A';
+  ctx.fill();
+  ctx.clip();
+
+  // ── Background image ────────────────────────────────────────────────────────
+  const imgSrc = item.localImageUrl ?? item.imagem_url;
+  if (imgSrc) {
+    try {
+      // Proxy external URLs to avoid CORS taint
+      const fetchSrc = imgSrc.startsWith('http')
+        ? `/api/proxy-image?url=${encodeURIComponent(imgSrc)}`
+        : imgSrc;
+      const img = await loadImg(fetchSrc);
+
+      let dw: number, dh: number;
+      if (item.image_scale === 1) {
+        // CSS background-size: cover
+        const scale = Math.max(W / img.width, H / img.height);
+        dw = img.width * scale;
+        dh = img.height * scale;
+      } else {
+        // CSS background-size: N% (relative to container width)
+        dw = W * item.image_scale;
+        dh = (img.height / img.width) * dw;
+      }
+      // CSS background-position: calc(50% + image_x) calc(0% + image_y)
+      // 50% X means: (containerW - renderedW) * 0.5 + offset
+      // 0%  Y means: 0 + offset
+      const dx = (W - dw) * 0.5 + item.image_x;
+      const dy = item.image_y;
+      ctx.drawImage(img, dx, dy, dw, dh);
+    } catch {
+      // Fallback gradient when image can't be loaded
+      const fg = ctx.createLinearGradient(0, 0, W, H);
+      fg.addColorStop(0, '#1a1a2e'); fg.addColorStop(0.5, '#16213e'); fg.addColorStop(1, '#0f3460');
+      ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H);
+    }
+  } else {
+    const fg = ctx.createLinearGradient(0, 0, W, H);
+    fg.addColorStop(0, '#1a1a2e'); fg.addColorStop(0.5, '#16213e'); fg.addColorStop(1, '#0f3460');
+    ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H);
+  }
+
+  // ── Gradient overlay ────────────────────────────────────────────────────────
+  const hex = (item.gradient_color || '#000000').replace('#', '');
+  const cr = parseInt(hex.slice(0, 2), 16);
+  const cg = parseInt(hex.slice(2, 4), 16);
+  const cb = parseInt(hex.slice(4, 6), 16);
+  const op = (item.gradient_opacity ?? 97) / 100;
+  // Ensure sz >= dist to keep gradient stops in ascending order
+  const sz  = Math.min((item.gradient_size ?? 85), 100) / 100;
+  const dist = Math.min((item.gradient_distance ?? 55), (item.gradient_size ?? 85) * 0.95) / 100;
+
+  const og = ctx.createLinearGradient(0, H, 0, 0); // bottom → top
+  const stops: [number, number][] = [
+    [0,                         op],
+    [dist * 0.22,               Math.min(op * 0.96, 1)],
+    [dist * 0.45,               Math.min(op * 0.85, 1)],
+    [dist * 0.73,               op * 0.57],
+    [dist,                      op * 0.26],
+    [Math.min((dist + sz) / 2, sz * 0.99), op * 0.05],
+    [sz,                        0],
+  ];
+  // Clamp to [0,1] and deduplicate
+  const seen = new Set<number>();
+  for (const [pos, alpha] of stops) {
+    const p = Math.min(Math.max(pos, 0), 1);
+    if (!seen.has(p)) { seen.add(p); og.addColorStop(p, `rgba(${cr},${cg},${cb},${alpha})`); }
+  }
+  if (sz < 1) og.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+  ctx.fillStyle = og; ctx.fillRect(0, 0, W, H);
+
+  // ── Logo ────────────────────────────────────────────────────────────────────
+  try {
+    const logo = await loadImg('/theArkeNews-logo.png');
+    const lh = Math.round(46 * item.logo_size);
+    const lw = Math.round((logo.width / logo.height) * lh);
+    ctx.drawImage(logo, 52, item.logo_y, lw, lh);
+  } catch { /* logo not critical */ }
+
+  // ── Text ────────────────────────────────────────────────────────────────────
+  await document.fonts.ready;
+
+  const PAD = 52;
+  const maxTextW = W - PAD * 2; // 976px
+
+  const temaFont  = `italic 500 ${item.tema_size}px 'IvyOra Text', Georgia, serif`;
+  const titleFont = `${item.titulo_weight} ${item.titulo_size}px 'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif`;
+  const temaLineH  = item.tema_size * 1.2;
+  const titleLineH = item.titulo_size * 1.1;
+
+  // Apply letter-spacing before measuring so wrapText is accurate
+  if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${item.titulo_letter_spacing ?? 0}px`;
+
+  ctx.font = temaFont;
+  const temaLines  = item.tema       ? wrapText(ctx, item.tema, maxTextW)       : [];
+  ctx.font = titleFont;
+  const titleLines = item.titulo_card ? wrapText(ctx, item.titulo_card, maxTextW) : [];
+
+  const gap    = temaLines.length > 0 ? 12 : 0;
+  const temaH  = temaLines.length  * temaLineH;
+  const titleH = titleLines.length * titleLineH;
+  const blockBottom = H - item.text_y;
+  const blockTop    = blockBottom - temaH - gap - titleH;
+
+  ctx.textBaseline = 'top';
+
+  // Tema
+  if (temaLines.length) {
+    ctx.font = temaFont;
+    if ('letterSpacing' in ctx) (ctx as any).letterSpacing = '0px';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    temaLines.forEach((line, i) => ctx.fillText(line, PAD, blockTop + i * temaLineH));
+  }
+
+  // Title
+  if (titleLines.length) {
+    ctx.font = titleFont;
+    if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${item.titulo_letter_spacing ?? 0}px`;
+    ctx.fillStyle = '#ffffff';
+    const titleTop = blockTop + temaH + gap;
+    titleLines.forEach((line, i) => ctx.fillText(line, PAD, titleTop + i * titleLineH));
+  }
+
+  ctx.restore();
+  return canvas;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const THUMB_SCALE = 0.18;
@@ -108,46 +285,11 @@ export default function NewsPage() {
 
   // ── Export ────────────────────────────────────────────────────────────────
 
-  const captureCard = useCallback(async (item: NewsCardItem): Promise<HTMLCanvasElement> => {
-    const { default: html2canvas } = await import('html2canvas');
-
-    // Build a detached DOM node at full 1080×1350
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = `
-      position:fixed; top:-9999px; left:-9999px;
-      width:1080px; height:1350px; overflow:hidden; z-index:-1;
-    `;
-    document.body.appendChild(wrapper);
-
-    const { createRoot } = await import('react-dom/client');
-    const React = (await import('react')).default;
-    const { default: NC } = await import('@/components/news/NewsCard');
-
-    // Resolve image via proxy if it's an http URL (not blob)
-    let imageOverride: string | undefined;
-    const imgSrc = item.localImageUrl ?? item.imagem_url;
-    if (imgSrc && imgSrc.startsWith('http')) {
-      imageOverride = `/api/proxy-image?url=${encodeURIComponent(imgSrc)}`;
-    }
-
-    await new Promise<void>(resolve => {
-      const root = createRoot(wrapper);
-      root.render(React.createElement(NC, { item, imageOverride, scale: 1 }));
-      setTimeout(resolve, 300);
-    });
-
-    const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      width: 1080,
-      height: 1350,
-      backgroundColor: '#0A0A0A',
-    });
-
-    document.body.removeChild(wrapper);
-    return canvas;
-  }, []);
+  // captureCardToCanvas is defined above the component — pure canvas, no DOM/html2canvas
+  const captureCard = useCallback(
+    (item: NewsCardItem) => captureCardToCanvas(item),
+    []
+  );
 
   const downloadCard = async (idx: number) => {
     const item = items[idx];
@@ -155,10 +297,14 @@ export default function NewsPage() {
     toast.loading(`Gerando card ${item.numero}…`, { id: 'export' });
     try {
       const canvas = await captureCard(item);
+      const blob: Blob | null = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('Falha ao gerar imagem');
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = `arke-news-${String(item.numero).padStart(2, '0')}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = url;
       link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(`Card ${item.numero} baixado!`, { id: 'export' });
     } catch (err) {
       console.error(err);
@@ -172,18 +318,34 @@ export default function NewsPage() {
       const { default: JSZip } = await import('jszip');
       const { saveAs } = await import('file-saver');
       const zip = new JSZip();
+      let added = 0;
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         toast.loading(`Processando card ${i + 1} de ${items.length}…`, { id: 'zip' });
-        const canvas = await captureCard(item);
-        const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/png'));
-        zip.file(`arke-news-${String(item.numero).padStart(2, '0')}.png`, blob);
+        try {
+          const canvas = await captureCard(item);
+          const blob: Blob | null = await new Promise(res => canvas.toBlob(res, 'image/png'));
+          if (!blob) throw new Error('toBlob retornou null');
+          zip.file(`arke-news-${String(item.numero).padStart(2, '0')}.png`, blob);
+          added++;
+        } catch (cardErr) {
+          console.error(`Card ${item.numero} falhou:`, cardErr);
+          // continua com o próximo card em vez de abortar o zip inteiro
+        }
       }
+
+      if (added === 0) throw new Error('Nenhum card foi gerado');
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       saveAs(zipBlob, 'arke-news-cards.zip');
-      toast.success('ZIP baixado!', { id: 'zip' });
+      const skipped = items.length - added;
+      toast.success(
+        skipped > 0
+          ? `ZIP baixado! (${skipped} card(s) pulado(s) por erro)`
+          : 'ZIP baixado!',
+        { id: 'zip' }
+      );
     } catch (err) {
       console.error(err);
       toast.error('Erro ao gerar ZIP', { id: 'zip' });
@@ -627,6 +789,69 @@ export default function NewsPage() {
               className="w-full accent-gray-900 dark:accent-white" />
             <div className="flex justify-between text-[9px] text-gray-900/25 dark:text-white/25 mt-0.5">
               <span>↑ cima</span><span>baixo ↓</span>
+            </div>
+          </div>
+
+          <div className="h-px bg-black/[0.06] dark:bg-white/[0.06]" />
+
+          {/* ── DEGRADÊ ───────────────────────────────────────── */}
+          <p className="text-[10px] font-bold text-gray-900/30 dark:text-white/30 uppercase tracking-widest -mb-2">Degradê</p>
+
+          {/* Opacidade */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-semibold text-gray-900/40 dark:text-white/40 uppercase tracking-wider">Opacidade</label>
+              <span className="text-[10px] font-mono text-gray-900/50 dark:text-white/50">{selected.gradient_opacity}%</span>
+            </div>
+            <input type="range" min={0} max={100} step={1} value={selected.gradient_opacity}
+              onChange={(e) => updateItem(selectedIdx, { gradient_opacity: Number(e.target.value) })}
+              className="w-full accent-gray-900 dark:accent-white" />
+          </div>
+
+          {/* Tamanho */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-semibold text-gray-900/40 dark:text-white/40 uppercase tracking-wider">Tamanho</label>
+              <span className="text-[10px] font-mono text-gray-900/50 dark:text-white/50">{selected.gradient_size}%</span>
+            </div>
+            <input type="range" min={10} max={100} step={1} value={selected.gradient_size}
+              onChange={(e) => updateItem(selectedIdx, { gradient_size: Number(e.target.value) })}
+              className="w-full accent-gray-900 dark:accent-white" />
+            <div className="flex justify-between text-[9px] text-gray-900/25 dark:text-white/25 mt-0.5">
+              <span>pequeno</span><span>grande</span>
+            </div>
+          </div>
+
+          {/* Distância */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-semibold text-gray-900/40 dark:text-white/40 uppercase tracking-wider">Distância</label>
+              <span className="text-[10px] font-mono text-gray-900/50 dark:text-white/50">{selected.gradient_distance}%</span>
+            </div>
+            <input type="range" min={10} max={100} step={1} value={selected.gradient_distance}
+              onChange={(e) => updateItem(selectedIdx, { gradient_distance: Number(e.target.value) })}
+              className="w-full accent-gray-900 dark:accent-white" />
+            <div className="flex justify-between text-[9px] text-gray-900/25 dark:text-white/25 mt-0.5">
+              <span>compacto</span><span>espalhado</span>
+            </div>
+          </div>
+
+          {/* Cor */}
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-900/40 dark:text-white/40 uppercase tracking-wider mb-1.5">Cor</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={selected.gradient_color}
+                onChange={(e) => updateItem(selectedIdx, { gradient_color: e.target.value })}
+                className="w-8 h-8 rounded cursor-pointer border border-black/10 dark:border-white/10"
+              />
+              <input
+                type="text"
+                value={selected.gradient_color}
+                onChange={(e) => { if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) updateItem(selectedIdx, { gradient_color: e.target.value }); }}
+                className="flex-1 px-2 py-1.5 rounded-lg bg-[var(--surface)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-xs font-mono focus:outline-none"
+              />
             </div>
           </div>
 

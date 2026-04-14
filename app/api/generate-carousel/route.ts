@@ -5,8 +5,15 @@ import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
 
 export const maxDuration = 60;
 
+function sanitizeJson(str: string): string {
+  // Remove control characters inside JSON string values (ASCII 0x00–0x1F except \t \n \r)
+  return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ');
+}
+
 function parseAIJson(text: string): CarouselAIResponse {
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = sanitizeJson(
+    text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  );
   try {
     return JSON.parse(cleaned);
   } catch {

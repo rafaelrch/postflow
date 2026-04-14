@@ -12,7 +12,7 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useExport } from '@/hooks/useExport';
 import { createClient } from '@/lib/supabase';
-import { Slide, GlobalSettings, SlideStyle, ImageType } from '@/types';
+import { Slide, GlobalSettings, SlideStyle, ImageType, DEFAULT_GLOBAL_SETTINGS } from '@/types';
 import toast from 'react-hot-toast';
 
 export default function GeneratorClient() {
@@ -79,12 +79,22 @@ export default function GeneratorClient() {
           },
         }));
 
+      const globalSettings: GlobalSettings = {
+        theme:        (carousel.theme        as GlobalSettings['theme'])    || 'dark',
+        fontPair:     (carousel.font_pair    as GlobalSettings['fontPair']) || 'SF Pro Display + IvyOra Text',
+        accentColor:  (carousel.accent_color as string)                     || '#00CFFF',
+        corners:      (carousel.corners      as GlobalSettings['corners'])  || DEFAULT_GLOBAL_SETTINGS.corners,
+        profileBadge: (carousel.profile_badge as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
+      };
+
       loadCarousel({
-        id: carousel.id,
-        title: carousel.title,
-        style: carousel.style as SlideStyle,
-        slides: sortedSlides,
-        globalSettings: (carousel.global_settings as GlobalSettings) || undefined,
+        id:             carousel.id,
+        title:          carousel.title,
+        style:          carousel.style as SlideStyle,
+        slides:         sortedSlides,
+        globalSettings,
+        caption:        (carousel.caption   as string)   || '',
+        hashtags:       (carousel.hashtags  as string[]) || [],
       });
     };
     load();

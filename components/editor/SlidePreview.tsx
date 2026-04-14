@@ -17,14 +17,13 @@ interface SlidePreviewProps {
   onClick?: () => void;
   onUpdateProfile?: (updates: { name?: string; handle?: string }) => void;
   onUpdateText?: (updates: { title?: string; description?: string; subtitle?: string }) => void;
-  onUpdateTextPosition?: (x: number, y: number) => void;
 }
 
 const SLIDE_W = 1080;
 const SLIDE_H = 1350;
 
 const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function SlidePreview(
-  { slide, globalSettings, style, slideIndex, totalSlides, scale = 0.22, isActive = false, forExport = false, onClick, onUpdateProfile, onUpdateText, onUpdateTextPosition },
+  { slide, globalSettings, style, slideIndex, totalSlides, scale = 0.22, isActive = false, forExport = false, onClick, onUpdateProfile, onUpdateText },
   ref
 ) {
   const profileData = {
@@ -35,7 +34,8 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
   };
 
   // Enable pointer events when inline editing is possible (main canvas, profile style)
-  const innerPointerEvents = (onUpdateProfile || onUpdateText) ? 'auto' : 'none';
+  // Only profile slide needs pointer events (inline editable text + photo)
+  const innerPointerEvents = (style === 'profile' && (onUpdateProfile || onUpdateText)) ? 'auto' : 'none';
 
   return (
     <div
@@ -80,8 +80,6 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
             slideIndex={slideIndex}
             totalSlides={totalSlides}
             forExport={forExport}
-            onUpdateText={onUpdateText}
-            onUpdateTextPosition={onUpdateTextPosition}
           />
         )}
       </div>

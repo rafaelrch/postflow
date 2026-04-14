@@ -1,13 +1,370 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Sparkles, Download, RefreshCw, Archive, Upload, Clipboard, Wand2, Image, X } from 'lucide-react';
+import { useRef, useState, useEffect } from 'react';
+import { Sparkles, Download, RefreshCw, Archive, Upload, Clipboard, Wand2, Image, X, Underline } from 'lucide-react';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import Slider from './Slider';
 import Section from './Section';
 import { cn } from '@/lib/utils';
-import { TextPosition, ShadowStyle, CornerIcon, BadgeStyle, CtaStyle, FontPair } from '@/types';
+import { TextPosition, ShadowStyle, CornerIcon, BadgeStyle, CtaStyle, FontPair, TextHighlight, ElementFont } from '@/types';
 import toast from 'react-hot-toast';
+
+// ── ColorPicker: swatch + hex input ─────────────────────────────────────────
+
+interface ColorPickerProps {
+  label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}
+
+// ── ElementFontPicker ────────────────────────────────────────────────────────
+
+type FontFamily = 'SF Pro Display' | 'IvyOra Text' | 'Bebas Neue' | 'Montserrat';
+
+interface FontVariant { value: ElementFont; label: string; weight: number; style: 'normal' | 'italic' }
+
+const FONT_FAMILIES: { value: FontFamily; label: string; family: string; variants: FontVariant[] }[] = [
+  {
+    value: 'SF Pro Display',
+    label: 'SF Display',
+    family: "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif",
+    variants: [
+      { value: 'SF Pro Display Light',    label: 'Light',    weight: 300, style: 'normal' },
+      { value: 'SF Pro Display Regular',  label: 'Regular',  weight: 400, style: 'normal' },
+      { value: 'SF Pro Display Medium',   label: 'Medium',   weight: 500, style: 'normal' },
+      { value: 'SF Pro Display SemiBold', label: 'SemiBold', weight: 600, style: 'normal' },
+      { value: 'SF Pro Display Bold',     label: 'Bold',     weight: 700, style: 'normal' },
+    ],
+  },
+  {
+    value: 'IvyOra Text',
+    label: 'IvyOra Text',
+    family: "'IvyOra Text', Georgia, serif",
+    variants: [
+      { value: 'IvyOra Text Medium',        label: 'Medium',        weight: 500, style: 'normal' },
+      { value: 'IvyOra Text Medium Italic', label: 'Medium Italic', weight: 500, style: 'italic' },
+    ],
+  },
+  {
+    value: 'Bebas Neue',
+    label: 'Bebas Neue',
+    family: "'Bebas Neue', sans-serif",
+    variants: [
+      { value: 'Bebas Neue', label: 'Regular', weight: 400, style: 'normal' },
+    ],
+  },
+  {
+    value: 'Montserrat',
+    label: 'Montserrat',
+    family: "'Montserrat', sans-serif",
+    variants: [
+      { value: 'Montserrat', label: 'SemiBold', weight: 600, style: 'normal' },
+    ],
+  },
+];
+
+// Derive family + variant from an ElementFont value
+function splitElementFont(font: ElementFont | undefined): { family: FontFamily | null; variant: ElementFont | null } {
+  if (!font) return { family: null, variant: null };
+  for (const fam of FONT_FAMILIES) {
+    if (fam.variants.some((v) => v.value === font)) {
+      return { family: fam.value, variant: font };
+    }
+  }
+  return { family: null, variant: null };
+}
+
+interface ElementFontPickerProps {
+  value: ElementFont | undefined;
+  onChange: (v: ElementFont | undefined) => void;
+}
+
+function ElementFontPicker({ value, onChange }: ElementFontPickerProps) {
+  const { family: currentFamily, variant: currentVariant } = splitElementFont(value);
+  const selectedFam = FONT_FAMILIES.find((f) => f.value === currentFamily) ?? null;
+
+  const handleFamilyChange = (raw: string) => {
+    if (!raw) { onChange(undefined); return; }
+    const fam = FONT_FAMILIES.find((f) => f.value === raw);
+    if (!fam) return;
+    // Auto-select first variant (or keep current if same family)
+    const keep = fam.variants.find((v) => v.value === currentVariant);
+    onChange((keep ?? fam.variants[0]).value);
+  };
+
+  const handleVariantChange = (raw: string) => {
+    onChange(raw as ElementFont || undefined);
+  };
+
+  const selectCls = 'w-full px-2 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-xs focus:outline-none focus:border-black/30 dark:focus:border-white/30 cursor-pointer';
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {/* Família */}
+      <select value={currentFamily ?? ''} onChange={(e) => handleFamilyChange(e.target.value)} className={selectCls}
+        style={{ fontFamily: selectedFam?.family }}>
+        <option value="">Herdar global</option>
+        {FONT_FAMILIES.map((f) => (
+          <option key={f.value} value={f.value} style={{ fontFamily: f.family }}>{f.label}</option>
+        ))}
+      </select>
+
+      {/* Variante — só mostra se há família selecionada com mais de 1 opção */}
+      {selectedFam && selectedFam.variants.length > 1 && (
+        <select value={currentVariant ?? ''} onChange={(e) => handleVariantChange(e.target.value)} className={selectCls}
+          style={{ fontFamily: selectedFam.family, fontWeight: selectedFam.variants.find((v) => v.value === currentVariant)?.weight, fontStyle: selectedFam.variants.find((v) => v.value === currentVariant)?.style }}>
+          {selectedFam.variants.map((v) => (
+            <option key={v.value} value={v.value} style={{ fontWeight: v.weight, fontStyle: v.style }}>{v.label}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+// ── WordHighlightPicker ──────────────────────────────────────────────────────
+
+// Each token = one word occurrence with its position index in the original text
+interface Token { word: string; idx: number }
+
+function tokenizeAll(text: string): Token[] {
+  const tokens: Token[] = [];
+  let idx = 0;
+  for (const match of (text || '').matchAll(/\S+/g)) {
+    tokens.push({ word: match[0], idx });
+    idx++;
+  }
+  return tokens;
+}
+
+// A highlight keyed by word index so each occurrence is independent
+interface IndexedHighlight extends TextHighlight {
+  wordIdx: number; // which occurrence (0-based) of this word in the text
+}
+
+// Convert flat TextHighlight[] (stored in slide) to IndexedHighlight[]
+function toIndexed(text: string, highlights: TextHighlight[]): IndexedHighlight[] {
+  const tokens = tokenizeAll(text);
+  const result: IndexedHighlight[] = [];
+  // Count occurrences seen per normalised word
+  const seen: Record<string, number> = {};
+  for (const token of tokens) {
+    const lc = token.word.toLowerCase();
+    const occurrenceIdx = seen[lc] ?? 0;
+    seen[lc] = occurrenceIdx + 1;
+    const hl = highlights.find(
+      (h) => h.text.toLowerCase() === lc && (h as IndexedHighlight).wordIdx === occurrenceIdx
+    );
+    if (hl) result.push({ ...hl, wordIdx: occurrenceIdx });
+  }
+  return result;
+}
+
+// The stored highlights use wordIdx to distinguish occurrences of the same word
+function getHighlightForToken(highlights: TextHighlight[], word: string, wordIdx: number): TextHighlight | undefined {
+  return highlights.find(
+    (h) => h.text.toLowerCase() === word.toLowerCase() && (h as IndexedHighlight).wordIdx === wordIdx
+  );
+}
+
+interface WordHighlightPickerProps {
+  label: string;
+  text: string;
+  highlights: TextHighlight[];
+  onChange: (highlights: TextHighlight[]) => void;
+  accentColor: string;
+}
+
+function WordHighlightPicker({ label, text, highlights, onChange, accentColor }: WordHighlightPickerProps) {
+  // Selection = set of "word::idx" strings
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pendingColor, setPendingColor] = useState(accentColor);
+  const [pendingFont, setPendingFont] = useState<ElementFont | undefined>(undefined);
+  const [pendingUnderline, setPendingUnderline] = useState(false);
+
+  const tokens = tokenizeAll(text);
+
+  // Track occurrence index per word
+  const tokensWithIdx: Array<{ word: string; wordIdx: number; tokenIdx: number }> = (() => {
+    const seen: Record<string, number> = {};
+    return tokens.map((t, i) => {
+      const lc = t.word.toLowerCase();
+      const wordIdx = seen[lc] ?? 0;
+      seen[lc] = wordIdx + 1;
+      return { word: t.word, wordIdx, tokenIdx: i };
+    });
+  })();
+
+  const selKey = (word: string, wordIdx: number) => `${word.toLowerCase()}::${wordIdx}`;
+
+  const toggleToken = (word: string, wordIdx: number) => {
+    const key = selKey(word, wordIdx);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        const existing = getHighlightForToken(highlights, word, wordIdx);
+        if (existing) {
+          setPendingColor(existing.color);
+          setPendingFont(existing.font);
+          setPendingUnderline(existing.underline ?? false);
+        }
+      }
+      return next;
+    });
+  };
+
+  const applyHighlight = () => {
+    if (selected.size === 0) return;
+    const next = highlights.filter((h) => {
+      // Remove entries that are being overwritten
+      const ih = h as IndexedHighlight;
+      return !selected.has(selKey(h.text, ih.wordIdx ?? 0));
+    });
+    selected.forEach((key) => {
+      const [word, idxStr] = key.split('::');
+      const entry: IndexedHighlight = {
+        text: word,
+        color: pendingColor,
+        underline: pendingUnderline,
+        font: pendingFont,
+        wordIdx: parseInt(idxStr, 10),
+      };
+      next.push(entry);
+    });
+    onChange(next);
+    setSelected(new Set());
+  };
+
+  const removeSelected = () => {
+    if (selected.size === 0) return;
+    onChange(highlights.filter((h) => {
+      const ih = h as IndexedHighlight;
+      return !selected.has(selKey(h.text, ih.wordIdx ?? 0));
+    }));
+    setSelected(new Set());
+  };
+
+  if (tokensWithIdx.length === 0) return null;
+
+  const hasSelection = selected.size > 0;
+
+  return (
+    <div>
+      <span className="text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider block mb-1.5">{label}</span>
+
+      {/* Word chips — all tokens in order */}
+      <div className="flex flex-wrap gap-1 mb-2">
+        {tokensWithIdx.map(({ word, wordIdx, tokenIdx }) => {
+          const hl = getHighlightForToken(highlights, word, wordIdx);
+          const key = selKey(word, wordIdx);
+          const isSelected = selected.has(key);
+          return (
+            <button
+              key={tokenIdx}
+              onClick={() => toggleToken(word, wordIdx)}
+              className={cn(
+                'px-2 py-0.5 rounded-md text-[10px] border transition-all',
+                isSelected
+                  ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                  : 'border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:border-black/30 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white'
+              )}
+              style={hl && !isSelected ? { borderColor: hl.color + '90', backgroundColor: hl.color + '18', color: hl.color } : {}}
+            >
+              {word}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Options panel — only when tokens are selected */}
+      {hasSelection && (
+        <div className="border border-black/10 dark:border-white/10 rounded-lg p-2 flex flex-col gap-2 bg-black/5 dark:bg-white/5">
+          <span className="text-[10px] text-gray-900/50 dark:text-white/50">
+            {selected.size} palavra{selected.size > 1 ? 's' : ''} selecionada{selected.size > 1 ? 's' : ''}
+          </span>
+          <ColorPicker label="Cor" value={pendingColor} onChange={setPendingColor} />
+          <div>
+            <span className="text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider block mb-1">Fonte</span>
+            <ElementFontPicker value={pendingFont} onChange={setPendingFont} />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div onClick={() => setPendingUnderline((v) => !v)}
+              className={cn('w-8 h-4 rounded-full relative transition-colors', pendingUnderline ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
+              <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', pendingUnderline ? 'left-[18px]' : 'left-0.5')} />
+            </div>
+            <span className="text-[10px] text-gray-900/50 dark:text-white/50">Sublinhado</span>
+          </label>
+          <div className="flex gap-1.5">
+            <button onClick={applyHighlight}
+              className="flex-1 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-bold transition-colors hover:bg-gray-700 dark:hover:bg-white/90">
+              Aplicar
+            </button>
+            <button onClick={removeSelected}
+              className="px-3 py-1.5 rounded-lg border border-red-400/40 text-red-400/70 hover:text-red-400 hover:border-red-400 text-[10px] transition-colors">
+              Remover
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active highlights list */}
+      {highlights.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {highlights.map((hl, i) => (
+            <div key={i} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[9px]"
+              style={{ borderColor: hl.color + '60', background: hl.color + '15' }}>
+              <span style={{ color: hl.color }}>{hl.text}</span>
+              <button onClick={() => onChange(highlights.filter((_, j) => j !== i))}
+                className="text-gray-900/30 dark:text-white/30 hover:text-red-400 transition-colors ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColorPicker({ label, value, onChange, className }: ColorPickerProps) {
+  const [hex, setHex] = useState(value);
+  useEffect(() => { setHex(value); }, [value]);
+
+  const handleHex = (raw: string) => {
+    setHex(raw);
+    if (/^#[0-9A-Fa-f]{6}$/.test(raw)) onChange(raw);
+  };
+
+  return (
+    <div className={cn('flex items-center gap-1.5', className)}>
+      {label && <span className="text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider shrink-0">{label}</span>}
+      <label className="relative w-6 h-6 shrink-0 cursor-pointer">
+        <span
+          className="block w-6 h-6 rounded border border-black/20 dark:border-white/20"
+          style={{ background: /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : value }}
+        />
+        <input
+          type="color"
+          value={/^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : value}
+          onChange={(e) => { onChange(e.target.value); setHex(e.target.value); }}
+          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+        />
+      </label>
+      <input
+        type="text"
+        value={hex}
+        onChange={(e) => handleHex(e.target.value)}
+        className="w-[72px] px-2 py-1 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-[10px] font-mono focus:outline-none focus:border-black/30 dark:focus:border-white/30"
+        placeholder="#000000"
+        maxLength={7}
+      />
+    </div>
+  );
+}
 
 interface EditorSidebarProps {
   onOpenWizard: () => void;
@@ -287,6 +644,65 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                 step={0.1}
                 onChange={(v) => updateActiveSlide({ lineHeight: v })}
               />
+              <Slider
+                label="Espaço título → descrição"
+                value={slide.titleDescriptionGap ?? 16}
+                min={0}
+                max={80}
+                step={1}
+                onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
+                unit="px"
+              />
+              <Slider
+                label="Espaçamento de letras"
+                value={slide.titleLetterSpacing ?? -0.02}
+                min={-0.1}
+                max={0.3}
+                step={0.01}
+                onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
+                unit="em"
+              />
+              <div>
+                <span className={labelCls + ' block mb-1.5'}>Margens do texto</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Slider
+                    label="Topo"
+                    value={slide.textPadding?.top ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: v, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
+                    unit="px"
+                  />
+                  <Slider
+                    label="Bottom"
+                    value={slide.textPadding?.bottom ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: v, left: slide.textPadding?.left ?? 0 } })}
+                    unit="px"
+                  />
+                  <Slider
+                    label="Left"
+                    value={slide.textPadding?.left ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: v } })}
+                    unit="px"
+                  />
+                  <Slider
+                    label="Right"
+                    value={slide.textPadding?.right ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: v, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
+                    unit="px"
+                  />
+                </div>
+              </div>
             </Section>
 
             {/* 3. Mídia */}
@@ -419,54 +835,227 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                   </select>
                 </div>
                 <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
+                <Slider label="Tamanho" value={slide.shadow.size ?? 60} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
+                <ColorPicker
+                  label="Cor"
+                  value={slide.shadow.color || '#000000'}
+                  onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })}
+                />
               </Section>
 
               <Section title="Fundo do Slide">
-                <div className="flex items-center gap-2">
-                  <span className={labelCls}>Cor</span>
-                  <input
-                    type="color"
-                    value={slide.backgroundColor || '#111111'}
-                    onChange={(e) => updateActiveSlide({ backgroundColor: e.target.value })}
-                    className="w-8 h-7 rounded cursor-pointer bg-transparent border border-black/10 dark:border-white/10"
-                  />
-                </div>
+                <ColorPicker
+                  label="Cor"
+                  value={slide.backgroundColor || '#111111'}
+                  onChange={(v) => updateActiveSlide({ backgroundColor: v })}
+                />
               </Section>
             </Section>
 
             {/* TEXTO */}
             <Section title="Texto do Slide" defaultOpen>
+
+              {/* ── Título ── */}
               <div>
                 <span className={labelCls}>Título</span>
-                <input className={cn(inputCls, 'mt-1')} value={slide.title}
-                  onChange={(e) => updateActiveSlide({ title: e.target.value })} placeholder="Título do slide" />
+                <textarea
+                  className={cn(inputCls, 'mt-1 resize-none')}
+                  rows={3}
+                  value={slide.title}
+                  onChange={(e) => updateActiveSlide({ title: e.target.value })}
+                  placeholder="Título do slide"
+                />
               </div>
-              <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={120}
+              <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160}
                 onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })} unit="px" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker value={slide.titleColor || '#FFFFFF'} onChange={(v) => updateActiveSlide({ titleColor: v })} label="Cor" />
+                <button
+                  onClick={() => updateActiveSlide({ titleUnderline: !slide.titleUnderline })}
+                  title="Sublinhado"
+                  className={cn(
+                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+                    slide.titleUnderline
+                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black'
+                      : 'border-black/20 dark:border-white/20 text-gray-900/40 dark:text-white/40 hover:border-black/40 dark:hover:border-white/40'
+                  )}
+                >
+                  <Underline className="w-3 h-3" />
+                </button>
+              </div>
               <div>
+                <span className={labelCls + ' block mb-1'}>Fonte título</span>
+                <ElementFontPicker
+                  value={slide.titleFont}
+                  onChange={(v) => updateActiveSlide({ titleFont: v })}
+                />
+              </div>
+
+              {/* ── Descrição ── */}
+              <div className="mt-2">
                 <span className={labelCls}>Descrição</span>
                 <textarea className={cn(inputCls, 'mt-1 resize-none h-16')} value={slide.description || ''}
                   onChange={(e) => updateActiveSlide({ description: e.target.value })} placeholder="Descrição do slide" />
               </div>
+              <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80}
+                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, description: v } })} unit="px" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker value={slide.descriptionColor || 'rgba(255,255,255,0.7)'} onChange={(v) => updateActiveSlide({ descriptionColor: v })} label="Cor" />
+                <button
+                  onClick={() => updateActiveSlide({ descriptionUnderline: !slide.descriptionUnderline })}
+                  title="Sublinhado"
+                  className={cn(
+                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+                    slide.descriptionUnderline
+                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black'
+                      : 'border-black/20 dark:border-white/20 text-gray-900/40 dark:text-white/40 hover:border-black/40 dark:hover:border-white/40'
+                  )}
+                >
+                  <Underline className="w-3 h-3" />
+                </button>
+              </div>
+              <div>
+                <span className={labelCls + ' block mb-1'}>Fonte descrição</span>
+                <ElementFontPicker
+                  value={slide.descriptionFont}
+                  onChange={(v) => updateActiveSlide({ descriptionFont: v })}
+                />
+              </div>
+
+              {/* ── Subtítulo ── */}
               <div className="mt-2">
                 <span className={labelCls}>Texto extra (subtítulo)</span>
                 <input className={cn(inputCls, 'mt-1')} value={slide.subtitle || ''}
                   onChange={(e) => updateActiveSlide({ subtitle: e.target.value })} placeholder="Subtítulo opcional" />
               </div>
-              <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={60}
-                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, description: v } })} unit="px" />
-              <div>
-                <span className={labelCls}>Palavra em destaque</span>
-                <input className={cn(inputCls, 'mt-1')} value={slide.highlightWord || ''}
-                  onChange={(e) => updateActiveSlide({ highlightWord: e.target.value })} placeholder="palavra" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker value={slide.subtitleColor || 'rgba(255,255,255,0.7)'} onChange={(v) => updateActiveSlide({ subtitleColor: v })} label="Cor" />
+                <button
+                  onClick={() => updateActiveSlide({ subtitleUnderline: !slide.subtitleUnderline })}
+                  title="Sublinhado"
+                  className={cn(
+                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+                    slide.subtitleUnderline
+                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black'
+                      : 'border-black/20 dark:border-white/20 text-gray-900/40 dark:text-white/40 hover:border-black/40 dark:hover:border-white/40'
+                  )}
+                >
+                  <Underline className="w-3 h-3" />
+                </button>
               </div>
+              <div>
+                <span className={labelCls + ' block mb-1'}>Fonte subtítulo</span>
+                <ElementFontPicker
+                  value={slide.subtitleFont}
+                  onChange={(v) => updateActiveSlide({ subtitleFont: v })}
+                />
+              </div>
+
+              {/* ── Espaçamento entre título e descrição ── */}
+              <Slider
+                label="Espaço título → descrição"
+                value={slide.titleDescriptionGap ?? 16}
+                min={0}
+                max={80}
+                step={1}
+                onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
+                unit="px"
+              />
+
+              {/* ── Espaçamento de letras (título) ── */}
+              <Slider
+                label="Espaçamento de letras (título)"
+                value={slide.titleLetterSpacing ?? -0.02}
+                min={-0.1}
+                max={0.3}
+                step={0.01}
+                onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
+                unit="em"
+              />
+
+              {/* ── Margens do bloco de texto ── */}
+              <div>
+                <span className={labelCls + ' block mb-1.5'}>Margens do texto</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Slider
+                    label="Topo"
+                    value={slide.textPadding?.top ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: v, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
+                    unit="px"
+                  />
+                  <Slider
+                    label="Bottom"
+                    value={slide.textPadding?.bottom ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: v, left: slide.textPadding?.left ?? 0 } })}
+                    unit="px"
+                  />
+                  <Slider
+                    label="Left"
+                    value={slide.textPadding?.left ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: v } })}
+                    unit="px"
+                  />
+                  <Slider
+                    label="Right"
+                    value={slide.textPadding?.right ?? 0}
+                    min={0}
+                    max={120}
+                    step={1}
+                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: v, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
+                    unit="px"
+                  />
+                </div>
+              </div>
+
+              {/* ── Destaques título ── */}
+              <WordHighlightPicker
+                label="Destaques no título"
+                text={slide.title}
+                highlights={(slide.highlights || []).filter(h => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
+                onChange={(titleHls) => {
+                  const otherHls = (slide.highlights || []).filter(h => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
+                  updateActiveSlide({ highlights: [...otherHls, ...titleHls] });
+                }}
+                accentColor={accentColor}
+              />
+
+              {/* ── Destaques descrição ── */}
+              {slide.description && (
+                <WordHighlightPicker
+                  label="Destaques na descrição"
+                  text={slide.description}
+                  highlights={(slide.highlights || []).filter(h => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
+                  onChange={(descHls) => {
+                    const otherHls = (slide.highlights || []).filter(h => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
+                    updateActiveSlide({ highlights: [...otherHls, ...descHls] });
+                  }}
+                  accentColor={accentColor}
+                />
+              )}
+
               <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
                 onChange={(v) => updateActiveSlide({ lineHeight: v })} />
+
+              {/* ── Posição do texto ── */}
               <div>
                 <span className={labelCls + ' block mb-1.5'}>Posição do texto</span>
                 <div className="grid grid-cols-3 gap-1">
                   {TEXT_POSITIONS.map((pos) => (
-                    <button key={pos} onClick={() => updateActiveSlide({ textPosition: pos, textOffset: undefined })} title={pos}
+                    <button key={pos} onClick={() => {
+                      const autoAlign = (pos === 'top-center' || pos === 'center' || pos === 'bottom-center') ? 'center'
+                        : (pos === 'top-right' || pos === 'middle-right' || pos === 'bottom-right') ? 'right'
+                        : 'left';
+                      updateActiveSlide({ textPosition: pos, textOffset: undefined, textAlignment: autoAlign });
+                    }} title={pos}
                       className={cn('h-7 rounded text-[8px] transition-colors border',
                         slide.textPosition === pos ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white' : 'bg-black/5 dark:bg-white/5 text-gray-900/30 dark:text-white/30 border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30'
                       )}
@@ -477,15 +1066,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="mt-3">
-                <span className={labelCls + ' block mb-1.5'}>Posição livre (use os sliders ou arraste o texto)</span>
-                <Slider label="X (%)" value={slide.textOffset?.x ?? 15} min={0} max={100}
-                  onChange={(v) => updateActiveSlide({ textOffset: { x: v, y: slide.textOffset?.y ?? 80 } })} unit="%" />
-                <Slider label="Y (%)" value={slide.textOffset?.y ?? 80} min={0} max={100}
-                  onChange={(v) => updateActiveSlide({ textOffset: { x: slide.textOffset?.x ?? 15, y: v } })} unit="%" />
-                <div className="mt-2 grid grid-cols-3 gap-1">
+                <div className="mt-1.5 grid grid-cols-3 gap-1">
                   {(['left', 'center', 'right'] as const).map((align) => (
                     <button
                       key={align}
@@ -494,7 +1075,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                         slide.textAlignment === align ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white' : 'bg-black/5 dark:bg-white/5 text-gray-900/30 dark:text-white/30 border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30'
                       )}
                     >
-                      {align}
+                      {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
                     </button>
                   ))}
                 </div>
@@ -515,13 +1096,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
 
             {/* ESTILO GLOBAL */}
             <Section title="Estilo Global">
-              <div className="flex items-center gap-2">
-                <span className={labelCls}>Cor de destaque</span>
-                <input type="color" value={accentColor}
-                  onChange={(e) => updateGlobalSettings({ accentColor: e.target.value })}
-                  className="w-8 h-7 rounded cursor-pointer bg-transparent border border-black/10 dark:border-white/10" />
-                <span className="text-[10px] text-gray-900/40 dark:text-white/40 font-mono">{accentColor}</span>
-              </div>
+              <ColorPicker label="Cor de destaque" value={accentColor} onChange={(v) => updateGlobalSettings({ accentColor: v })} />
               <button onClick={applyLayoutToNext} className="w-full py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[10px] text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors">
                 Aplicar layout no próximo slide →
               </button>
@@ -578,10 +1153,22 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                       ))}
                     </div>
                   </div>
-                  <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={20} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
+                  <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
                   <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} onChange={(v) => updateCornersConfig({ borderDistance: v })} unit="px" />
                   <Slider label="Opacidade" value={corners.opacity} min={0} max={100} onChange={(v) => updateCornersConfig({ opacity: v })} unit="%" />
                   <Slider label="Arredondamento" value={corners.borderRadius} min={0} max={20} onChange={(v) => updateCornersConfig({ borderRadius: v })} unit="px" />
+                  <ColorPicker
+                    label="Cor"
+                    value={corners.color || '#FFFFFF'}
+                    onChange={(v) => updateCornersConfig({ color: v })}
+                  />
+                  <div>
+                    <span className={labelCls + ' block mb-1'}>Fonte</span>
+                    <ElementFontPicker
+                      value={corners.elementFont}
+                      onChange={(v) => updateCornersConfig({ elementFont: v })}
+                    />
+                  </div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <div onClick={() => updateCornersConfig({ glass: !corners.glass })} className={cn('w-8 h-4 rounded-full relative transition-colors', corners.glass ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
                       <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.glass ? 'left-[18px]' : 'left-0.5')} />

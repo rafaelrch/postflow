@@ -191,14 +191,16 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         title: sl.title,
         description: sl.description,
         highlightWord: sl.highlightWord,
+        highlights: [],
         backgroundImageUrl: '',
         gridImageUrl: '',
         imageType,
         imagePosition: { x: 50, y: 50, zoom: 175 },
         shadow: { style: 'base', opacity: 88 },
         backgroundColor: sl.backgroundColor || '#111111',
-        textPosition: 'bottom-left' as const,
-        fontSize: { title: 48, description: 18 },
+        textPosition: (i === 0 ? 'center' : 'bottom-left') as 'center' | 'bottom-left',
+        textAlignment: (i === 0 ? 'center' : 'left') as 'center' | 'left',
+        fontSize: { title: i === 0 ? 90 : 70, description: 30 },
         lineHeight: 1.2,
         ctaButton: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid' as const, position: 'bottom-center' as const },
       }));
@@ -220,15 +222,20 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
       const defaultTitle = slides[0]?.title || 'Novo Carrossel';
 
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Sessão não encontrada. Recarregue a página.');
+
         const { data: carousel, error: carouselError } = await supabase
           .from('carousels')
           .insert({
-            title: defaultTitle,
+            user_id:       user.id,
+            title:         defaultTitle,
             style,
-            theme: 'dark',
-            font_pair: fontPair,
-            accent_color: accentColor,
-            global_settings: globalSettings,
+            theme:         'dark',
+            font_pair:     fontPair,
+            accent_color:  accentColor,
+            corners:       globalSettings.corners,
+            profile_badge: globalSettings.profileBadge,
           })
           .select()
           .single();
@@ -249,11 +256,11 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           image_position: { x: 50, y: 50, zoom: 175 },
           shadow_style: 'base',
           shadow_opacity: 88,
-          text_position: 'bottom-left',
+          text_position: i === 0 ? 'center' : 'bottom-left',
           text_offset: null,
-          text_alignment: 'left',
+          text_alignment: i === 0 ? 'center' : 'left',
           subtitle: '',
-          font_size: { title: 48, description: 18 },
+          font_size: { title: i === 0 ? 90 : 70, description: 30 },
           line_height: 1.2,
           cta_button: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
           background_color: sl.backgroundColor || '#111111',

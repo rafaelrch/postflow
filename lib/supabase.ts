@@ -1,4 +1,4 @@
-import { createClient as _createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 // The project does not use generated Supabase DB types yet, so we keep the
 // browser client loosely typed to avoid breaking existing queries.
@@ -8,7 +8,7 @@ let browserClient: any = null;
 export function createClient() {
   if (browserClient) return browserClient;
 
-  browserClient = _createClient(
+  browserClient = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );

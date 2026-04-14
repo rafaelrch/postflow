@@ -59,12 +59,33 @@ body {
   font-style: italic;
   font-display: swap;
 }
+@font-face {
+  font-family: 'IvyOra Text';
+  src: local('IvyOra Text Medium Italic'), local('IvyOraText-MediumItalic');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
 
 /* ─── SF Pro Display — fonte nativa Apple ─── */
 @font-face {
   font-family: 'SF Pro Display';
+  src: local('SF Pro Display Light'), local('SFProDisplay-Light'), local('.SF Pro Display Light');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
   src: local('SF Pro Display'), local('SFProDisplay-Regular'), local('.SF Pro Display');
   font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Semibold'), local('SFProDisplay-Semibold'), local('.SF Pro Display Semibold');
+  font-weight: 600;
   font-style: normal;
   font-display: swap;
 }

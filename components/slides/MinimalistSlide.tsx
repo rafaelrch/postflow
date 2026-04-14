@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Slide, GlobalSettings, ShadowStyle, TextPosition, CornerIcon } from '@/types';
-import { getFontFamilies } from '@/lib/utils';
+import { Slide, GlobalSettings, ShadowStyle, TextPosition, CornerIcon, TextHighlight, ElementFont } from '@/types';
+import { getFontFamilies, getElementFontCSS } from '@/lib/utils';
 
 export interface MinimalistSlideProps {
   slide: Slide;
@@ -10,8 +10,6 @@ export interface MinimalistSlideProps {
   slideIndex: number;
   totalSlides: number;
   forExport?: boolean;
-  onUpdateText?: (updates: { title?: string; description?: string; subtitle?: string }) => void;
-  onUpdateTextPosition?: (x: number, y: number) => void;
 }
 
 // Grid layout constants — image at top, text below
@@ -20,21 +18,31 @@ const GRID_IMAGE_HEIGHT = 700;
 const GRID_IMAGE_MARGIN_X = 80;
 const GRID_TEXT_TOP = GRID_IMAGE_TOP + GRID_IMAGE_HEIGHT + 40; // 820px
 
-function getShadowGradient(style: ShadowStyle, opacity: number): string {
+function hexToRgb(hex: string): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `${r},${g},${b}`;
+}
+
+function getShadowGradient(style: ShadowStyle, opacity: number, color?: string, size?: number): string {
   const a = opacity / 100;
+  const rgb = hexToRgb(color || '#000000');
+  const sz = size ?? 60; // default 60%
   switch (style) {
     case 'base':
-      return `linear-gradient(to top, rgba(0,0,0,${a}) 0%, transparent 60%)`;
+      return `linear-gradient(to top, rgba(${rgb},${a}) 0%, transparent ${sz}%)`;
     case 'top-strong':
-      return `linear-gradient(to bottom, rgba(0,0,0,${a}) 0%, transparent 50%)`;
+      return `linear-gradient(to bottom, rgba(${rgb},${a}) 0%, transparent ${sz}%)`;
     case 'base-strong':
-      return `linear-gradient(to top, rgba(0,0,0,${Math.min(a * 1.3, 1)}) 0%, rgba(0,0,0,${a * 0.5}) 50%, transparent 80%)`;
+      return `linear-gradient(to top, rgba(${rgb},${Math.min(a * 1.3, 1)}) 0%, rgba(${rgb},${a * 0.5}) ${sz * 0.8}%, transparent ${sz * 1.3}%)`;
     case 'gradient-full':
-      return `linear-gradient(to bottom, rgba(0,0,0,${a * 0.7}) 0%, transparent 30%, rgba(0,0,0,${a}) 100%)`;
+      return `linear-gradient(to bottom, rgba(${rgb},${a * 0.7}) 0%, transparent ${sz * 0.5}%, rgba(${rgb},${a}) 100%)`;
     case 'none':
       return 'none';
     default:
-      return `linear-gradient(to top, rgba(0,0,0,${a}) 0%, transparent 60%)`;
+      return `linear-gradient(to top, rgba(${rgb},${a}) 0%, transparent ${sz}%)`;
   }
 }
 
@@ -73,27 +81,88 @@ function getTextBlockStyle(slide: Slide): React.CSSProperties {
   }
 
   const style = getTextPositionStyle(slide.textPosition);
-  const align = slide.textAlignment || (style.textAlign as 'left' | 'center' | 'right' | undefined) || 'left';
+  // Derive natural alignment from the position itself, use slide.textAlignment only as explicit override
+  const naturalAlign = (style.textAlign as 'left' | 'center' | 'right' | undefined) || 'left';
+  const align = slide.textAlignment ?? naturalAlign;
   return {
     ...style,
     textAlign: align,
     alignItems: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
-    maxWidth: '70%',
-    width: style.right || style.left === '50%' ? 'auto' : 'max-content',
+    maxWidth: slide.textPosition === 'center' || slide.textPosition === 'top-center' || slide.textPosition === 'bottom-center' ? '85%' : '70%',
+    width: 'auto',
   };
 }
 
-function renderTextWithHighlight(text: string, word: string, color: string, style: React.CSSProperties): React.ReactNode {
-  if (!word || !text) return <span style={style}>{text}</span>;
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+// Each highlight may carry a wordIdx to distinguish occurrences of the same word
+interface IndexedHighlight extends TextHighlight { wordIdx?: number }
+
+function renderTextWithHighlights(
+  text: string,
+  highlights: TextHighlight[],
+  fallbackWord: string,
+  fallbackColor: string,
+  style: React.CSSProperties,
+): React.ReactNode {
+  const effective = (highlights.length > 0
+    ? highlights
+    : (fallbackWord ? [{ text: fallbackWord, color: fallbackColor }] : [])) as IndexedHighlight[];
+
+  if (effective.length === 0 || !text) return <span style={style}>{text}</span>;
+
+  // Tokenise text into words+gaps preserving whitespace
+  // Each token = { raw: string, isWord: boolean }
+  interface Token { raw: string; isWord: boolean }
+  const tokens: Token[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    const wm = remaining.match(/^\S+/);
+    if (wm) { tokens.push({ raw: wm[0], isWord: true }); remaining = remaining.slice(wm[0].length); continue; }
+    const sm = remaining.match(/^\s+/);
+    if (sm) { tokens.push({ raw: sm[0], isWord: false }); remaining = remaining.slice(sm[0].length); continue; }
+    tokens.push({ raw: remaining[0], isWord: false }); remaining = remaining.slice(1);
+  }
+
+  // Count occurrence index per word (case-insensitive)
+  const seen: Record<string, number> = {};
+  const wordOccurrences: number[] = tokens.map((t) => {
+    if (!t.isWord) return -1;
+    const lc = t.raw.toLowerCase();
+    const occ = seen[lc] ?? 0;
+    seen[lc] = occ + 1;
+    return occ;
+  });
+
+  // Match each word token to a highlight
+  const getHl = (word: string, occIdx: number): IndexedHighlight | undefined => {
+    const lc = word.toLowerCase();
+    // Prefer occurrence-specific match, fall back to any highlight for this word (for legacy highlights without wordIdx)
+    return effective.find((h) => h.text.toLowerCase() === lc && h.wordIdx === occIdx)
+        ?? effective.find((h) => h.text.toLowerCase() === lc && h.wordIdx === undefined);
+  };
+
   return (
     <span style={style}>
-      {parts.map((part, i) =>
-        part.toLowerCase() === word.toLowerCase()
-          ? <span key={i} style={{ color }}>{part}</span>
-          : part
-      )}
+      {tokens.map((token, i) => {
+        if (!token.isWord) return token.raw;
+        const occ = wordOccurrences[i];
+        const hl = getHl(token.raw, occ);
+        if (!hl) return token.raw;
+        const hlFontCSS = hl.font ? getElementFontCSS(hl.font as ElementFont) : null;
+        return (
+          <span
+            key={i}
+            style={{
+              color: hl.color,
+              textDecoration: hl.underline ? 'underline' : undefined,
+              ...(hlFontCSS ? {
+                fontFamily: hlFontCSS.fontFamily,
+                fontWeight: hlFontCSS.fontWeight,
+                fontStyle: hlFontCSS.fontStyle,
+              } : {}),
+            }}
+          >{token.raw}</span>
+        );
+      })}
     </span>
   );
 }
@@ -105,36 +174,9 @@ const CORNER_ICON_MAP: Record<CornerIcon, string> = {
   heart: '♡',
 };
 
-export default function MinimalistSlide({ slide, globalSettings, slideIndex, totalSlides, forExport, onUpdateText, onUpdateTextPosition }: MinimalistSlideProps) {
+export default function MinimalistSlide({ slide, globalSettings, slideIndex, totalSlides, forExport }: MinimalistSlideProps) {
   const { corners, profileBadge, accentColor, fontPair, theme } = globalSettings;
-  const isEditable = !forExport && Boolean(onUpdateText);
   const slideContainerRef = React.useRef<HTMLDivElement>(null);
-  const isDraggingRef = React.useRef(false);
-
-  const handleTextMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || !onUpdateTextPosition || !slideContainerRef.current) return;
-    const rect = slideContainerRef.current.getBoundingClientRect();
-    const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
-    const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
-    onUpdateTextPosition(x, y);
-  };
-
-  const handleTextPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!onUpdateTextPosition || !isEditable) return;
-    isDraggingRef.current = true;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const handleTextPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-  };
-
-  const commitText = (updated: { title?: string; description?: string; subtitle?: string }) => {
-    if (!onUpdateText) return;
-    onUpdateText(updated);
-  };
 
   const fonts = getFontFamilies(fontPair);
   const isDark = theme === 'dark';
@@ -148,31 +190,75 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
   const textColor = isLightSlide ? '#0A0A0A' : '#FFFFFF';
   const textSecondary = isLightSlide ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
 
+  // Per-element font CSS (falls back to global font pair)
+  const titleFontCSS = slide.titleFont
+    ? getElementFontCSS(slide.titleFont)
+    : { fontFamily: fonts.title, fontWeight: 800, fontStyle: 'normal' as const };
+  const descFontCSS = slide.descriptionFont
+    ? getElementFontCSS(slide.descriptionFont)
+    : { fontFamily: fonts.body, fontWeight: 400, fontStyle: 'normal' as const };
+  const subtitleFontCSS = slide.subtitleFont
+    ? getElementFontCSS(slide.subtitleFont)
+    : { fontFamily: fonts.body, fontWeight: 400, fontStyle: 'italic' as const };
+  const cornerFontCSS = corners.elementFont
+    ? getElementFontCSS(corners.elementFont)
+    : { fontFamily: fonts.body, fontWeight: 400, fontStyle: 'normal' as const };
+
   const titleStyle: React.CSSProperties = {
-    fontFamily: fonts.title,
+    fontFamily: titleFontCSS.fontFamily,
+    fontWeight: titleFontCSS.fontWeight,
+    fontStyle: titleFontCSS.fontStyle,
     fontSize: `${slide.fontSize.title}px`,
-    fontWeight: 800,
     lineHeight: slide.lineHeight,
-    color: textColor,
+    color: slide.titleColor || textColor,
     margin: 0,
-    letterSpacing: '-0.02em',
+    letterSpacing: slide.titleLetterSpacing !== undefined ? `${slide.titleLetterSpacing}em` : '-0.02em',
+    textDecoration: slide.titleUnderline ? 'underline' : undefined,
   };
   const descStyle: React.CSSProperties = {
-    fontFamily: fonts.body,
+    fontFamily: descFontCSS.fontFamily,
+    fontWeight: descFontCSS.fontWeight,
+    fontStyle: descFontCSS.fontStyle,
     fontSize: `${slide.fontSize.description}px`,
     lineHeight: slide.lineHeight + 0.2,
-    color: textSecondary,
-    margin: '16px 0 0 0',
+    color: slide.descriptionColor || textSecondary,
+    margin: 0,
     maxWidth: '100%',
+    textDecoration: slide.descriptionUnderline ? 'underline' : undefined,
+  };
+  const subtitleStyle: React.CSSProperties = {
+    fontFamily: subtitleFontCSS.fontFamily,
+    fontWeight: subtitleFontCSS.fontWeight,
+    fontStyle: subtitleFontCSS.fontStyle,
+    fontSize: `${slide.fontSize.description}px`,
+    lineHeight: slide.lineHeight + 0.2,
+    color: slide.subtitleColor || textSecondary,
+    margin: 0,
+    maxWidth: '100%',
+    textDecoration: slide.subtitleUnderline ? 'underline' : undefined,
   };
 
-  const cornerTextColor = isLightSlide
-    ? `rgba(0,0,0,${corners.opacity / 100})`
-    : `rgba(255,255,255,${corners.opacity / 100})`;
+  const allHighlights: TextHighlight[] = slide.highlights?.length
+    ? slide.highlights
+    : (slide.highlightWord ? [{ text: slide.highlightWord, color: accentColor }] : []);
+
+  // Split highlights by which field they belong to
+  const titleHighlights = allHighlights.filter((h) =>
+    slide.title.toLowerCase().includes(h.text.toLowerCase())
+  );
+  const descHighlights = allHighlights.filter((h) =>
+    (slide.description || '').toLowerCase().includes(h.text.toLowerCase())
+  );
+
+  // Corner color: custom > auto-derived
+  const cornerTextColor = corners.color
+    || (isLightSlide ? `rgba(0,0,0,${corners.opacity / 100})` : `rgba(255,255,255,${corners.opacity / 100})`);
 
   const cornerStyle = (glass: boolean, br: number): React.CSSProperties => ({
     fontSize: `${corners.fontSize}px`,
-    fontFamily: fonts.body,
+    fontFamily: cornerFontCSS.fontFamily,
+    fontWeight: cornerFontCSS.fontWeight,
+    fontStyle: cornerFontCSS.fontStyle,
     color: cornerTextColor,
     borderRadius: `${br}px`,
     padding: glass ? '4px 8px' : undefined,
@@ -242,7 +328,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
           style={{
             position: 'absolute',
             inset: 0,
-            background: getShadowGradient(slide.shadow.style, slide.shadow.opacity),
+            background: getShadowGradient(slide.shadow.style, slide.shadow.opacity, slide.shadow.color, slide.shadow.size),
             pointerEvents: 'none',
           }}
         />
@@ -263,68 +349,26 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
             }
           : getTextBlockStyle(slide);
 
-        const interactiveStyle = {
-          ...textBlockStyle,
-          cursor: isEditable && onUpdateTextPosition ? 'grab' : 'default',
+        const tp = slide.textPadding;
+        const extraContainerStyle: React.CSSProperties = {
+          gap: slide.titleDescriptionGap !== undefined ? slide.titleDescriptionGap : 16,
+          paddingTop: tp ? tp.top : 0,
+          paddingRight: tp ? tp.right : 0,
+          paddingBottom: tp ? tp.bottom : 0,
+          paddingLeft: tp ? tp.left : 0,
         };
 
         return (
-          <div
-            style={interactiveStyle}
-            onPointerDown={handleTextPointerDown}
-            onPointerMove={handleTextMove}
-            onPointerUp={handleTextPointerUp}
-            onPointerLeave={handleTextPointerUp}
-            title={isEditable && onUpdateTextPosition ? 'Arraste para mover o texto' : undefined}
-          >
-            {isEditable ? (
-              <h1
-                style={{ ...titleStyle, cursor: 'text', userSelect: 'text', whiteSpace: 'pre-wrap' }}
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => commitText({ title: e.currentTarget.textContent?.trim() || '' })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLElement).blur();
-                  }
-                }}
-              >
-                {slide.title}
-              </h1>
-            ) : (
-              renderTextWithHighlight(slide.title, slide.highlightWord || '', accentColor, titleStyle)
-            )}
+          <div ref={slideContainerRef} style={{ ...textBlockStyle, ...extraContainerStyle, display: 'flex', flexDirection: 'column' }}>
+            {renderTextWithHighlights(slide.title, titleHighlights, slide.highlightWord || '', accentColor, { ...titleStyle, whiteSpace: 'pre-wrap', display: 'block' })}
 
-            {slide.description !== undefined && (
-              isEditable ? (
-                <p
-                  style={{ ...descStyle, cursor: 'text', userSelect: 'text', whiteSpace: 'pre-wrap' }}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e) => commitText({ description: e.currentTarget.textContent || '' })}
-                >
-                  {slide.description || ''}
-                </p>
-              ) : (
-                <p style={descStyle}>{slide.description}</p>
-              )
-            )}
+            {slide.description !== undefined && slide.description !== '' &&
+              renderTextWithHighlights(slide.description, descHighlights, '', accentColor, { ...descStyle, whiteSpace: 'pre-wrap', display: 'block' })
+            }
 
-            {slide.subtitle && (
-              isEditable ? (
-                <p
-                  style={{ ...descStyle, marginTop: 8, fontStyle: 'italic', cursor: 'text', userSelect: 'text', whiteSpace: 'pre-wrap' }}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e) => commitText({ subtitle: e.currentTarget.textContent || '' })}
-                >
-                  {slide.subtitle}
-                </p>
-              ) : (
-                <p style={{ ...descStyle, marginTop: 8, fontStyle: 'italic' }}>{slide.subtitle}</p>
-              )
-            )}
+            {slide.subtitle &&
+              <p style={{ ...subtitleStyle, whiteSpace: 'pre-wrap' }}>{slide.subtitle}</p>
+            }
           </div>
         );
       })()}

@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { v4 as uuidv4 } from 'uuid';
-import { Slide, DEFAULT_SLIDE } from '@/types';
+import { Slide, DEFAULT_SLIDE, ElementFont } from '@/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -76,6 +76,31 @@ export function getFontGoogleUrl(fontPair: string): string {
       'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap',
   };
   return urls[fontPair] ?? '';
+}
+
+export interface ElementFontCSS {
+  fontFamily: string;
+  fontWeight: number;
+  fontStyle: 'normal' | 'italic';
+}
+
+export function getElementFontCSS(font: ElementFont): ElementFontCSS {
+  const SF = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
+  const IVY = "'IvyOra Text', 'Georgia', serif";
+  const BEBAS = "'Bebas Neue', sans-serif";
+  const MONT = "'Montserrat', sans-serif";
+
+  switch (font) {
+    case 'SF Pro Display Light':    return { fontFamily: SF,    fontWeight: 300, fontStyle: 'normal' };
+    case 'SF Pro Display Regular':  return { fontFamily: SF,    fontWeight: 400, fontStyle: 'normal' };
+    case 'SF Pro Display Medium':   return { fontFamily: SF,    fontWeight: 500, fontStyle: 'normal' };
+    case 'SF Pro Display SemiBold': return { fontFamily: SF,    fontWeight: 600, fontStyle: 'normal' };
+    case 'SF Pro Display Bold':     return { fontFamily: SF,    fontWeight: 700, fontStyle: 'normal' };
+    case 'IvyOra Text Medium':         return { fontFamily: IVY,  fontWeight: 500, fontStyle: 'normal' };
+    case 'IvyOra Text Medium Italic':  return { fontFamily: IVY,  fontWeight: 500, fontStyle: 'italic' };
+    case 'Bebas Neue':              return { fontFamily: BEBAS, fontWeight: 400, fontStyle: 'normal' };
+    case 'Montserrat':              return { fontFamily: MONT,  fontWeight: 600, fontStyle: 'normal' };
+  }
 }
 
 export function highlightWord(text: string, word: string, color: string): string {

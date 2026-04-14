@@ -42,11 +42,6 @@ export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
     updateActiveSlide(updates);
   };
 
-  const handleUpdateTextPosition = style === 'minimalist'
-    ? (x: number, y: number) => {
-        updateActiveSlide({ textOffset: { x, y } });
-      }
-    : undefined;
 
   const goPrev = () => setActiveSlideIndex(Math.max(0, activeSlideIndex - 1));
   const goNext = () => setActiveSlideIndex(Math.min(slides.length - 1, activeSlideIndex + 1));
@@ -119,7 +114,6 @@ export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
               onClick={() => {}}
               onUpdateProfile={handleUpdateProfile}
               onUpdateText={handleUpdateText}
-              onUpdateTextPosition={handleUpdateTextPosition}
             />
           </div>
         )}

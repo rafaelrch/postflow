@@ -1,25 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit2, Copy, Trash2, Calendar, Layers } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import CreateWizard from '@/components/editor/CreateWizard';
 import { createClient } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-
-interface CarouselCard {
-  id: string;
-  title: string;
-  style: string;
-  accent_color: string;
-  created_at: string;
-  updated_at: string;
-  slides: { count: number }[];
-}
+import {
+  Slide, GlobalSettings, ImageType, SlideStyle,
+  DEFAULT_GLOBAL_SETTINGS,
+} from '@/types';
+import MinimalistSlide from '@/components/slides/MinimalistSlide';
+import ProfileSlide from '@/components/slides/ProfileSlide';
+import type { DashboardCarousel } from './page';
 
 interface DashboardClientProps {
-  initialCarousels: CarouselCard[];
+  initialCarousels: DashboardCarousel[];
 }
 
 function formatDate(dateStr: string) {
@@ -28,6 +25,90 @@ function formatDate(dateStr: string) {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function mapDbSlide(sl: Record<string, unknown>): Slide {
+  return {
+    id: sl.id as string,
+    position: sl.position as number,
+    title: (sl.title as string) || '',
+    description: (sl.description as string) || '',
+    highlightWord: (sl.highlight_word as string) || '',
+    highlights: (sl.highlights as Slide['highlights']) || [],
+    backgroundImageUrl: (sl.background_image_url as string) || '',
+    gridImageUrl: (sl.grid_image_url as string) || '',
+    imageType: (sl.image_type as ImageType) || 'grid',
+    imagePosition: (sl.image_position as Slide['imagePosition']) || { x: 50, y: 50, zoom: 175 },
+    shadow: {
+      style: ((sl.shadow_style as string) || 'base') as Slide['shadow']['style'],
+      opacity: (sl.shadow_opacity as number) ?? 88,
+    },
+    backgroundColor: (sl.background_color as string) || '#111111',
+    textPosition: ((sl.text_position as string) || 'bottom-left') as Slide['textPosition'],
+    textOffset: (sl.text_offset as Slide['textOffset']) || undefined,
+    textAlignment: ((sl.text_alignment as string) || 'left') as Slide['textAlignment'],
+    subtitle: (sl.subtitle as string) || '',
+    fontSize: (sl.font_size as Slide['fontSize']) || { title: 70, description: 30 },
+    lineHeight: (sl.line_height as number) || 1.2,
+    ctaButton: (sl.cta_button as Slide['ctaButton']) || { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
+    titleColor: (sl.title_color as string) || undefined,
+    descriptionColor: (sl.description_color as string) || undefined,
+    subtitleColor: (sl.subtitle_color as string) || undefined,
+    titleFont: (sl.title_font as Slide['titleFont']) || undefined,
+    descriptionFont: (sl.description_font as Slide['descriptionFont']) || undefined,
+    subtitleFont: (sl.subtitle_font as Slide['subtitleFont']) || undefined,
+  };
+}
+
+function buildGlobalSettings(carousel: DashboardCarousel): GlobalSettings {
+  return {
+    theme: (carousel.theme as GlobalSettings['theme']) || 'dark',
+    fontPair: (carousel.font_pair as GlobalSettings['fontPair']) || 'SF Pro Display + IvyOra Text',
+    accentColor: carousel.accent_color || '#00CFFF',
+    corners: (carousel.corners as GlobalSettings['corners']) || DEFAULT_GLOBAL_SETTINGS.corners,
+    profileBadge: (carousel.profile_badge as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
+  };
+}
+
+function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setScale(containerRef.current.offsetWidth / 1080);
+    }
+  }, []);
+
+  if (!carousel.coverSlide) return null;
+
+  const slide = mapDbSlide(carousel.coverSlide);
+  const globalSettings = buildGlobalSettings(carousel);
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden">
+      {scale > 0 && (
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: 1080, height: 1350 }}>
+          {(carousel.style as SlideStyle) === 'profile' ? (
+            <ProfileSlide
+              slide={slide}
+              globalSettings={globalSettings}
+              profileData={{ photo: globalSettings.profileBadge.photo || '', name: globalSettings.profileBadge.name || '', handle: globalSettings.profileBadge.handle || '' }}
+              slideIndex={0}
+              totalSlides={carousel.slides?.[0]?.count ?? 1}
+            />
+          ) : (
+            <MinimalistSlide
+              slide={slide}
+              globalSettings={globalSettings}
+              slideIndex={0}
+              totalSlides={carousel.slides?.[0]?.count ?? 1}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardClient({ initialCarousels }: DashboardClientProps) {
@@ -52,7 +133,6 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
 
   const handleDuplicate = async (id: string) => {
     const supabase = createClient();
-    // Fetch full carousel
     const { data: carousel } = await supabase
       .from('carousels')
       .select('*, slides(*)')
@@ -87,7 +167,7 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
 
     toast.success('Carrossel duplicado');
     router.refresh();
-    setCarousels((prev) => [{ ...newCarousel, slides: carousel.slides }, ...prev]);
+    setCarousels((prev) => [{ ...newCarousel, slides: carousel.slides, coverSlide: null }, ...prev]);
   };
 
   const handleEdit = (id: string) => {
@@ -142,18 +222,24 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
               >
                 {/* Thumbnail */}
                 <div
-                  className="aspect-[4/5] flex items-center justify-center cursor-pointer"
+                  className="aspect-[4/5] relative cursor-pointer"
                   style={{ background: `linear-gradient(135deg, var(--surface-elevated) 0%, var(--surface) 100%)` }}
                   onClick={() => handleEdit(carousel.id)}
                 >
-                  <div className="text-center p-4">
-                    <div
-                      className="w-2 h-2 rounded-full mx-auto mb-3"
-                      style={{ background: carousel.accent_color || '#00CFFF' }}
-                    />
-                    <p className="text-gray-900/60 dark:text-white/60 text-xs font-medium line-clamp-3">{carousel.title}</p>
-                    <p className="text-gray-900/20 dark:text-white/20 text-xs mt-2 uppercase tracking-wider">{carousel.style}</p>
-                  </div>
+                  {carousel.coverSlide ? (
+                    <SlideThumbnail carousel={carousel} />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center p-4">
+                        <div
+                          className="w-2 h-2 rounded-full mx-auto mb-3"
+                          style={{ background: carousel.accent_color || '#00CFFF' }}
+                        />
+                        <p className="text-gray-900/60 dark:text-white/60 text-xs font-medium line-clamp-3">{carousel.title}</p>
+                        <p className="text-gray-900/20 dark:text-white/20 text-xs mt-2 uppercase tracking-wider">{carousel.style}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}

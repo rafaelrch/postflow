@@ -1,4 +1,23 @@
 export type SlideStyle = 'minimalist' | 'profile';
+
+export interface TextHighlight {
+  text: string;
+  color: string;
+  underline?: boolean;
+  font?: ElementFont;
+}
+
+// Fontes disponíveis para elementos individuais (título, subtítulo, cantos)
+export type ElementFont =
+  | 'SF Pro Display Light'
+  | 'SF Pro Display Regular'
+  | 'SF Pro Display Medium'
+  | 'SF Pro Display SemiBold'
+  | 'SF Pro Display Bold'
+  | 'IvyOra Text Medium'
+  | 'IvyOra Text Medium Italic'
+  | 'Bebas Neue'
+  | 'Montserrat';
 export type SlideTheme = 'dark' | 'light';
 export type ImageType = 'background' | 'grid' | 'mixed';
 export type TextPosition =
@@ -45,6 +64,8 @@ export interface CornersConfig {
   opacity: number;
   glass: boolean;
   borderRadius: number;
+  color?: string;
+  elementFont?: ElementFont;
 }
 
 export interface ProfileBadge {
@@ -70,6 +91,8 @@ export interface CtaButton {
 export interface ShadowConfig {
   style: ShadowStyle;
   opacity: number;
+  color?: string;   // hex, default '#000000'
+  size?: number;    // 0–100, controls how far the gradient extends (default 60)
 }
 
 export interface ProfileData {
@@ -86,6 +109,7 @@ export interface Slide {
   title: string;
   description?: string;
   highlightWord?: string;
+  highlights?: TextHighlight[];
   backgroundImageUrl?: string;
   gridImageUrl?: string;
   imageType: ImageType;
@@ -99,6 +123,19 @@ export interface Slide {
   fontSize: FontSize;
   lineHeight: number;
   ctaButton: CtaButton;
+  // Per-element text styling
+  titleColor?: string;
+  descriptionColor?: string;
+  subtitleColor?: string;
+  titleFont?: ElementFont;
+  descriptionFont?: ElementFont;
+  subtitleFont?: ElementFont;
+  titleUnderline?: boolean;
+  descriptionUnderline?: boolean;
+  subtitleUnderline?: boolean;
+  titleLetterSpacing?: number;
+  titleDescriptionGap?: number;
+  textPadding?: { top: number; right: number; bottom: number; left: number };
 }
 
 export interface GlobalSettings {
@@ -198,6 +235,7 @@ export const DEFAULT_SLIDE: Omit<Slide, 'id' | 'position'> = {
   title: 'Título do slide',
   description: 'Descrição do slide aqui.',
   highlightWord: '',
+  highlights: [],
   backgroundImageUrl: '',
   gridImageUrl: '',
   imageType: 'grid',
@@ -205,7 +243,7 @@ export const DEFAULT_SLIDE: Omit<Slide, 'id' | 'position'> = {
   shadow: { style: 'base', opacity: 88 },
   backgroundColor: '#111111',
   textPosition: 'bottom-left',
-  fontSize: { title: 48, description: 18 },
+  fontSize: { title: 70, description: 30 },
   lineHeight: 1.2,
   subtitle: '',
   textOffset: undefined,
