@@ -21,9 +21,10 @@ export interface ProfileSlideProps {
 }
 
 const CONTENT_WIDTH = 864;
-const AVATAR_SIZE = 70;
+const AVATAR_SIZE = 84;
 const VERIFIED_BLUE = '#1d9bf0';
 const MEDIA_HEIGHT = 510;
+const MAX_BODY_FONT = 40;
 
 // Theme palettes
 const LIGHT = {
@@ -43,21 +44,16 @@ const DARK = {
   avatarText: '#AAAAAA',
 };
 
-function VerifiedBadge() {
+function VerifiedBadge({ size = 28 }: { size?: number }) {
   return (
-    <svg
-      width="34"
-      height="34"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      style={{ display: 'block', flexShrink: 0 }}
-    >
-      <circle cx="12" cy="12" r="7.8" fill={VERIFIED_BLUE} />
-      <path
-        d="M10.4 14.65 8.2 12.5l-1.05 1.05 3.25 3.25 6.45-6.45-1.05-1.05-5.4 5.35Z"
-        fill="#FFFFFF"
-      />
-    </svg>
+    <img
+      src="/selo_insta.png"
+      alt=""
+      width={size}
+      height={size}
+      crossOrigin="anonymous"
+      style={{ display: 'block', flexShrink: 0, width: size, height: size }}
+    />
   );
 }
 
@@ -75,8 +71,10 @@ export default function ProfileSlide({
     ? `${slide.title}\n\n${slide.description.trim()}`
     : slide.title;
   const avatarFallback = (profileData.name || 'P').trim().charAt(0).toUpperCase();
-  const bodyFontSize = slide.fontSize.title;
-  const headerFontSize = globalSettings.profileBadge.headerFontSize ?? 26;
+  const bodyFontSize = Math.min(slide.fontSize.title, MAX_BODY_FONT);
+  const headerFontSize = globalSettings.profileBadge.headerFontSize ?? 30;
+  const badgeSize = Math.round(headerFontSize * 1.05);
+  const handleFontSize = Math.round(headerFontSize * 0.82);
   const isEditable = Boolean(onUpdateProfile || onUpdateText) && !forExport;
 
   // Theme colours
@@ -146,103 +144,21 @@ export default function ProfileSlide({
         overflow: 'hidden',
         backgroundColor: C.bg,
         fontFamily: fonts.title,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        position: 'relative',
       }}
     >
       <div
         style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           width: CONTENT_WIDTH,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
         }}
       >
-        {/* Profile header */}
-        {forExport ? (
-          /* ── Export layout: table cells for reliable html2canvas vertical centering ── */
-          <div style={{ display: 'table' }}>
-            <div style={{ display: 'table-row' }}>
-              {/* Avatar cell */}
-              <div style={{ display: 'table-cell', verticalAlign: 'middle', paddingRight: 22 }}>
-                <div
-                  style={{
-                    width: AVATAR_SIZE,
-                    height: AVATAR_SIZE,
-                    borderRadius: '50%',
-                    overflow: 'hidden',
-                    backgroundColor: C.avatarBg,
-                    position: 'relative',
-                  }}
-                >
-                  {profileData.photo ? (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        backgroundImage: `url(${profileData.photo})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}
-                    />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'table' }}>
-                      <div style={{ display: 'table-cell', verticalAlign: 'middle', textAlign: 'center' }}>
-                        <span style={{ fontSize: headerFontSize, fontWeight: 700, color: C.avatarText, fontFamily: fonts.title }}>
-                          {avatarFallback}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Name + handle cell */}
-              <div style={{ display: 'table-cell', verticalAlign: 'middle' }}>
-                {/* Name + badge row */}
-                <div style={{ display: 'table' }}>
-                  <div style={{ display: 'table-row' }}>
-                    <div style={{ display: 'table-cell', verticalAlign: 'middle' }}>
-                      <span
-                        style={{
-                          fontSize: headerFontSize,
-                          lineHeight: 1.05,
-                          fontWeight: 700,
-                          color: C.text,
-                          letterSpacing: '-0.03em',
-                          display: 'block',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {profileData.name || 'Seu Nome'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'table-cell', verticalAlign: 'middle', paddingLeft: 8 }}>
-                      <VerifiedBadge />
-                    </div>
-                  </div>
-                </div>
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 2,
-                    fontSize: Math.round(headerFontSize * 0.8),
-                    lineHeight: 1.1,
-                    fontWeight: 400,
-                    color: C.handle,
-                    letterSpacing: '-0.02em',
-                  }}
-                >
-                  {profileData.handle || '@handle'}
-                </span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* ── Preview layout: flex (looks great in browser) ── */
-          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+        {/* Profile header — flex with explicit sizes (no gap, no vertical-align)
+            so html2canvas renders it identically to the browser preview */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           {/* Avatar */}
           <div
             style={{
@@ -251,11 +167,9 @@ export default function ProfileSlide({
               borderRadius: '50%',
               overflow: 'hidden',
               backgroundColor: C.avatarBg,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               flexShrink: 0,
               position: 'relative',
+              marginRight: 22,
             }}
           >
             {profileData.photo ? (
@@ -270,55 +184,68 @@ export default function ProfileSlide({
                 }}
               />
             ) : (
-              <span
-                style={{
-                  fontSize: headerFontSize,
-                  fontWeight: 700,
-                  color: C.avatarText,
-                  fontFamily: fonts.title,
-                }}
-              >
-                {avatarFallback}
-              </span>
+              <div style={{ width: '100%', height: '100%', display: 'table' }}>
+                <div style={{ display: 'table-cell', verticalAlign: 'middle', textAlign: 'center' }}>
+                  <span style={{ fontSize: headerFontSize, fontWeight: 700, color: C.avatarText, fontFamily: fonts.title }}>
+                    {avatarFallback}
+                  </span>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Name + handle */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, lineHeight: 0 }}>
+          {/* Name + handle column */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            {/* Row 1: name + spacer + badge, explicit height so html2canvas centers cleanly */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                height: Math.round(headerFontSize * 1.1),
+              }}
+            >
               <span
                 ref={nameRef}
                 {...editableProps('name')}
                 style={{
                   fontSize: headerFontSize,
-                  lineHeight: 1.05,
+                  lineHeight: 1,
                   fontWeight: 700,
                   color: C.text,
                   letterSpacing: '-0.03em',
-                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  ...(isEditable ? { outline: 'none', cursor: 'text', minWidth: 40 } : {}),
                 }}
               >
                 {profileData.name || 'Seu Nome'}
               </span>
-              <VerifiedBadge />
+              <div style={{ width: 8, flexShrink: 0 }} />
+              <VerifiedBadge size={badgeSize} />
             </div>
+
+            {/* Row 2: handle */}
             <span
               ref={handleRef}
               {...editableProps('handle')}
               style={{
-                marginTop: 2,
-                fontSize: Math.round(headerFontSize * 0.8),
+                display: 'block',
+                marginTop: 6,
+                fontSize: handleFontSize,
                 lineHeight: 1.1,
                 fontWeight: 400,
                 color: C.handle,
                 letterSpacing: '-0.02em',
+                whiteSpace: 'nowrap',
+                ...(isEditable ? { outline: 'none', cursor: 'text', minWidth: 40 } : {}),
               }}
             >
               {profileData.handle || '@handle'}
             </span>
           </div>
         </div>
-        )}
+
+        {/* Spacer — explicit height avoids html2canvas margin-collapse issues */}
+        <div style={{ height: 42 }} />
 
         {/* Body text — editable when onUpdateText is provided */}
         <div
@@ -327,7 +254,6 @@ export default function ProfileSlide({
           suppressContentEditableWarning
           onBlur={isEditable ? handleBodyBlur : undefined}
           style={{
-            marginTop: 42,
             fontFamily: fonts.title,
             fontSize: bodyFontSize,
             fontWeight: 400,
@@ -344,16 +270,15 @@ export default function ProfileSlide({
         </div>
 
         {/* Media: video or image */}
+        {hasMedia && <div style={{ height: 54 }} />}
         {hasMedia && (
           <div
             style={{
-              marginTop: 54,
               width: '100%',
               height: MEDIA_HEIGHT,
               borderRadius: 34,
               overflow: 'hidden',
               backgroundColor: C.mediaBg,
-              flexShrink: 0,
             }}
           >
             {imageUrl ? (

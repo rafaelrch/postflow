@@ -2,93 +2,9 @@
 
 import { useState } from 'react';
 import { CheckCircle, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { POSTFLOW_DATABASE_SCHEMA } from '@/lib/database-schema';
 
-const SQL = `-- PostFlow Schema — cole e execute no Supabase SQL Editor
-
-CREATE TABLE IF NOT EXISTS profiles (
-  id UUID REFERENCES auth.users PRIMARY KEY,
-  name TEXT,
-  handle TEXT,
-  photo_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS carousels (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  title TEXT NOT NULL,
-  style TEXT NOT NULL DEFAULT 'minimalist',
-  theme TEXT DEFAULT 'dark',
-  font_pair TEXT DEFAULT 'Space Grotesk + Inter',
-  accent_color TEXT DEFAULT '#00CFFF',
-  global_settings JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS slides (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  carousel_id UUID REFERENCES carousels(id) ON DELETE CASCADE,
-  position INTEGER NOT NULL DEFAULT 0,
-  title TEXT,
-  description TEXT,
-  highlight_word TEXT,
-  background_image_url TEXT,
-  grid_image_url TEXT,
-  image_type TEXT DEFAULT 'grid',
-  image_position JSONB DEFAULT '{"x": 50, "y": 50, "zoom": 175}',
-  shadow_style TEXT DEFAULT 'base',
-  shadow_opacity INTEGER DEFAULT 88,
-  text_position TEXT DEFAULT 'bottom-left',
-  text_offset JSONB,
-  text_alignment TEXT DEFAULT 'left',
-  subtitle TEXT,
-  font_size JSONB DEFAULT '{"title": 48, "description": 18}',
-  line_height FLOAT DEFAULT 1.2,
-  cta_button JSONB DEFAULT '{"show": false}',
-  background_color TEXT DEFAULT '#111111',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE carousels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE slides ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='profiles_own') THEN
-    CREATE POLICY profiles_own ON profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-  END IF;
-END $$;
-
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='carousels' AND policyname='carousels_own') THEN
-    CREATE POLICY carousels_own ON carousels FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-  END IF;
-END $$;
-
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='slides' AND policyname='slides_own') THEN
-    CREATE POLICY slides_own ON slides FOR ALL USING (
-      auth.uid() = (SELECT user_id FROM carousels WHERE id = carousel_id)
-    );
-  END IF;
-END $$;
-
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, name)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'name')
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-`.trim();
+const SQL = POSTFLOW_DATABASE_SCHEMA;
 
 export default function SetupPage() {
   const [copied, setCopied] = useState(false);

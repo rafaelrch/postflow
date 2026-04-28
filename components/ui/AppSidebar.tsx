@@ -1,91 +1,294 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Zap, LayoutDashboard, Sun, Moon, Newspaper } from 'lucide-react';
+import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import {
+  LayoutGrid,
+  Newspaper,
+  Calendar,
+  Sun,
+  Moon,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
+import { createClient } from '@/lib/supabase';
 
 const XIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.623L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
   </svg>
 );
 
-const navItems = [
-  {
-    href: '/dashboard',
-    label: 'Carrosséis',
-    icon: LayoutDashboard,
-  },
-  {
-    href: '/twitter',
-    label: 'Twitter / X',
-    icon: XIcon,
-  },
-  {
-    href: '/news',
-    label: 'Notícias',
-    icon: Newspaper,
-  },
+type NavKind = 'primary' | 'new';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  kind?: NavKind;
+  hint?: string;
+}
+
+const navItems: NavItem[] = [
+  { href: '/dashboard', label: 'Carrosséis',  icon: LayoutGrid, hint: 'Feed' },
+  { href: '/twitter',   label: 'Twitter / X',  icon: XIcon,     hint: 'Threads' },
+  { href: '/news',      label: 'Notícias',     icon: Newspaper, hint: 'Daily' },
+  { href: '/agenda',    label: 'Agenda',       icon: Calendar,  kind: 'new', hint: 'Beta' },
 ];
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('sidebar_collapsed') === '1') setCollapsed(true);
+    } catch { /* localStorage unavailable */ }
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('sidebar_collapsed', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    supabase.auth.getUser().then(({ data }: { data: { user: { id: string; email?: string; user_metadata?: { name?: string } } | null } }) => {
+      const user = data.user;
+      if (!user || !active) return;
+
+      setUserEmail(user.email || '');
+      const metaName = user.user_metadata?.name?.trim();
+      if (metaName) setUserName(metaName);
+
+      supabase
+        .from('profiles')
+        .select('name, brand_name')
+        .eq('id', user.id)
+        .single()
+        .then(({ data: profile }: { data: { name: string | null; brand_name: string | null } | null }) => {
+          if (!active) return;
+          const resolved = profile?.name?.trim() || metaName || profile?.brand_name?.trim() || '';
+          if (resolved) setUserName(resolved);
+        });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace('/login');
+    router.refresh();
+  };
+
+  const initial = (userName || userEmail || '?').trim().charAt(0).toUpperCase();
 
   return (
-    <aside className="w-[220px] shrink-0 h-screen flex flex-col bg-[var(--surface)] border-r border-black/[0.06] dark:border-white/[0.06]">
-      {/* Logo */}
-      <div className="h-14 flex items-center px-4 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-            <Zap className="w-4 h-4 text-white dark:text-black" />
-          </div>
-          <span className="font-bold text-gray-900 dark:text-white text-sm tracking-tight">PostFlow</span>
+    <aside
+      className={cn(
+        'shrink-0 h-screen flex flex-col border-r relative transition-[width] duration-200 ease-out',
+        collapsed ? 'w-[76px]' : 'w-[240px]'
+      )}
+      style={{
+        background: 'var(--paper-2)',
+        borderColor: 'var(--line)',
+      }}
+    >
+      {/* Brand */}
+      <div
+        className={cn(
+          'h-24 flex items-center border-b relative',
+          collapsed ? 'justify-center px-2' : 'px-5'
+        )}
+        style={{ borderColor: 'var(--line)' }}
+      >
+        <Link
+          href="/dashboard"
+          className={cn('flex items-center group', collapsed ? '' : 'w-full')}
+          aria-label="Creatools"
+        >
+          {collapsed ? (
+            <Image
+              src="/ICON_SEMFUNDO.png"
+              alt="Creatools"
+              width={48}
+              height={48}
+              priority
+              className="h-10 w-10 object-contain dark:invert"
+            />
+          ) : (
+            <Image
+              src="/LOGO_SEMFUNDO.png"
+              alt="Creatools"
+              width={268}
+              height={80}
+              priority
+              className="h-20 w-auto object-contain dark:invert"
+            />
+          )}
         </Link>
+
+        <button
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+          title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+          className="absolute top-1/2 -translate-y-1/2 -right-3 z-10 grid place-items-center w-6 h-6 rounded-full transition-colors hover:opacity-100 opacity-80"
+          style={{
+            background: 'var(--paper-2)',
+            border: '1.5px solid var(--line-strong, var(--line))',
+            color: 'var(--ink-dim)',
+          }}
+        >
+          {collapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+        </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-0.5">
-        <p className="text-[10px] font-semibold text-gray-900/30 dark:text-white/30 uppercase tracking-wider px-2 mb-1">
-          Ferramentas
-        </p>
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
+      {/* Nav */}
+      <nav
+        className={cn(
+          'flex-1 overflow-y-auto py-5 flex flex-col gap-0.5',
+          collapsed ? 'px-2' : 'px-3'
+        )}
+      >
+        {!collapsed && (
+          <p
+            className="font-mono text-[10px] uppercase tracking-[0.14em] px-3 mb-2"
+            style={{ color: 'var(--ink-dim)' }}
+          >
+            Ferramentas
+          </p>
+        )}
+
+        {navItems.map(({ href, label, icon: Icon, kind, hint }) => {
+          const isActive =
+            pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
+              title={collapsed ? label : undefined}
+              aria-label={collapsed ? label : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
-                  : 'text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                'group relative flex items-center rounded-[10px] text-[13.5px] font-medium transition-all duration-150',
+                collapsed ? 'justify-center h-11 w-11 mx-auto' : 'gap-3 px-3 py-2.5',
+                isActive ? 'brand-card interactive' : 'hover:translate-x-[-1px]'
               )}
+              style={{
+                background: isActive ? 'white' : 'transparent',
+                color: isActive ? 'black' : 'var(--ink-dim)',
+                border: isActive ? '1.5px solid black' : '1.5px solid transparent',
+                boxShadow: isActive ? '3px 3px 0 0 black' : 'none',
+              }}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              {label}
+              {!collapsed && (
+                <>
+                  <span className="flex-1">{label}</span>
+                  {kind === 'new' && (
+                    <span className="chip filled text-[9px] py-[1px] px-[5px]">novo</span>
+                  )}
+                  {hint && kind !== 'new' && (
+                    <span
+                      className="font-mono text-[9.5px] uppercase tracking-[0.12em] opacity-60 group-hover:opacity-100 transition-opacity"
+                    >
+                      {hint}
+                    </span>
+                  )}
+                </>
+              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer: Theme toggle */}
-      <div className="shrink-0 px-2 py-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+      {/* Footer: theme toggle */}
+      <div
+        className={cn('shrink-0 py-3 border-t', collapsed ? 'px-2' : 'px-3')}
+        style={{ borderColor: 'var(--line)' }}
+      >
+        <div
+          className={cn(
+            'flex items-center mb-2 rounded-[10px]',
+            collapsed ? 'justify-center p-1.5' : 'gap-3 px-2 py-2.5'
+          )}
+          style={{ background: 'var(--paper)', border: '1.5px solid var(--line)' }}
+          title={collapsed ? `${userName || 'Usuário'}${userEmail ? ` · ${userEmail}` : ''}` : undefined}
+        >
+          <span
+            className="grid place-items-center w-8 h-8 rounded-full shrink-0 font-semibold text-[13px]"
+            style={{
+              background: 'var(--ink)',
+              color: 'var(--paper)',
+            }}
+            aria-hidden
+          >
+            {initial}
+          </span>
+          {!collapsed && (
+            <div className="flex flex-col min-w-0 leading-tight">
+              <span
+                className="text-[13px] font-semibold truncate"
+                style={{ color: 'var(--ink)' }}
+                title={userName || 'Usuário'}
+              >
+                {userName || 'Usuário'}
+              </span>
+              <span
+                className="text-[11px] truncate"
+                style={{ color: 'var(--ink-dim)' }}
+                title={userEmail}
+              >
+                {userEmail || '—'}
+              </span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={handleSignOut}
+          className={cn('brand-btn ghost w-full mb-2', collapsed ? 'justify-center' : 'justify-start')}
+          style={{ padding: '9px 12px', color: 'var(--ink-dim)' }}
+          title={collapsed ? 'Sair' : undefined}
+          aria-label="Sair"
+        >
+          <LogOut className="w-4 h-4" />
+          {!collapsed && <span>Sair</span>}
+        </button>
         <button
           onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          className={cn('brand-btn outline w-full', collapsed ? 'justify-center' : 'justify-between')}
+          style={{ padding: '9px 12px' }}
+          title={collapsed ? (theme === 'light' ? 'Tema escuro' : 'Tema claro') : undefined}
+          aria-label={theme === 'light' ? 'Tema escuro' : 'Tema claro'}
         >
-          {theme === 'light' ? (
-            <>
-              <Moon className="w-4 h-4 shrink-0" />
-              Tema escuro
-            </>
+          {collapsed ? (
+            theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />
           ) : (
             <>
-              <Sun className="w-4 h-4 shrink-0" />
-              Tema claro
+              <span className="flex items-center gap-2">
+                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                <span>{theme === 'light' ? 'Tema escuro' : 'Tema claro'}</span>
+              </span>
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-dim)' }}>
+                ⌘ .
+              </span>
             </>
           )}
         </button>

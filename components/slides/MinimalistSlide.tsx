@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Slide, GlobalSettings, ShadowStyle, TextPosition, CornerIcon, TextHighlight, ElementFont } from '@/types';
+import { Slide, GlobalSettings, ShadowStyle, TextPosition, TextHighlight, ElementFont } from '@/types';
 import { getFontFamilies, getElementFontCSS } from '@/lib/utils';
 
 export interface MinimalistSlideProps {
@@ -84,11 +84,14 @@ function getTextBlockStyle(slide: Slide): React.CSSProperties {
   // Derive natural alignment from the position itself, use slide.textAlignment only as explicit override
   const naturalAlign = (style.textAlign as 'left' | 'center' | 'right' | undefined) || 'left';
   const align = slide.textAlignment ?? naturalAlign;
+  // Positions that already set both left+right constrain the width via CSS layout — adding maxWidth
+  // on top would only narrow the container further, causing unnecessary line-wrapping.
+  const hasBothSides = 'left' in style && 'right' in style;
   return {
     ...style,
     textAlign: align,
     alignItems: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
-    maxWidth: slide.textPosition === 'center' || slide.textPosition === 'top-center' || slide.textPosition === 'bottom-center' ? '85%' : '70%',
+    ...(hasBothSides ? {} : { maxWidth: '70%' }),
     width: 'auto',
   };
 }
@@ -166,13 +169,6 @@ function renderTextWithHighlights(
     </span>
   );
 }
-
-const CORNER_ICON_MAP: Record<CornerIcon, string> = {
-  none: '',
-  bookmark: '🔖',
-  arrow: '→',
-  heart: '♡',
-};
 
 export default function MinimalistSlide({ slide, globalSettings, slideIndex, totalSlides, forExport }: MinimalistSlideProps) {
   const { corners, profileBadge, accentColor, fontPair, theme } = globalSettings;
@@ -254,17 +250,15 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
   const cornerTextColor = corners.color
     || (isLightSlide ? `rgba(0,0,0,${corners.opacity / 100})` : `rgba(255,255,255,${corners.opacity / 100})`);
 
-  const cornerStyle = (glass: boolean, br: number): React.CSSProperties => ({
+  const cornerStyle = (br: number): React.CSSProperties => ({
     fontSize: `${corners.fontSize}px`,
+    lineHeight: 1,
+    display: 'inline-block',
     fontFamily: cornerFontCSS.fontFamily,
     fontWeight: cornerFontCSS.fontWeight,
     fontStyle: cornerFontCSS.fontStyle,
     color: cornerTextColor,
     borderRadius: `${br}px`,
-    padding: glass ? '4px 8px' : undefined,
-    background: glass ? (isLightSlide ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)') : undefined,
-    backdropFilter: glass ? 'blur(8px)' : undefined,
-    WebkitBackdropFilter: glass ? 'blur(8px)' : undefined,
   });
 
   const dotInactive = isLightSlide ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.3)';
@@ -351,7 +345,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
 
         const tp = slide.textPadding;
         const extraContainerStyle: React.CSSProperties = {
-          gap: slide.titleDescriptionGap !== undefined ? slide.titleDescriptionGap : 16,
+          gap: slide.titleDescriptionGap !== undefined ? slide.titleDescriptionGap : 20,
           paddingTop: tp ? tp.top : 0,
           paddingRight: tp ? tp.right : 0,
           paddingBottom: tp ? tp.bottom : 0,
@@ -442,24 +436,13 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
       {corners.show && (
         <>
           {corners.topLeft.visible && (
-            <div style={{ position: 'absolute', top: bd, left: bd, ...cornerStyle(corners.glass, corners.borderRadius) }}>
+            <div style={{ position: 'absolute', top: bd, left: bd, ...cornerStyle(corners.borderRadius) }}>
               {corners.topLeft.text}
             </div>
           )}
           {corners.topRight.visible && (
-            <div style={{ position: 'absolute', top: bd, right: bd, ...cornerStyle(corners.glass, corners.borderRadius) }}>
+            <div style={{ position: 'absolute', top: bd, right: bd, ...cornerStyle(corners.borderRadius) }}>
               {corners.topRight.text}
-            </div>
-          )}
-          {corners.bottomLeft.visible && (
-            <div style={{ position: 'absolute', bottom: bd, left: bd, ...cornerStyle(corners.glass, corners.borderRadius) }}>
-              {corners.bottomLeft.text}
-            </div>
-          )}
-          {corners.bottomRight.visible && (
-            <div style={{ position: 'absolute', bottom: bd, right: bd, ...cornerStyle(corners.glass, corners.borderRadius), display: 'flex', alignItems: 'center', gap: 6 }}>
-              {corners.bottomRight.icon !== 'none' && CORNER_ICON_MAP[corners.bottomRight.icon]}
-              {corners.bottomRight.text}
             </div>
           )}
         </>

@@ -1,4 +1,5 @@
-export type SlideStyle = 'minimalist' | 'profile';
+export type SlideStyle = 'minimalist' | 'profile' | 'editorial';
+export type ContentLayout = 'cover' | 'text-image-text' | 'text-text-image' | 'image-text-text' | 'text-only';
 
 export interface TextHighlight {
   text: string;
@@ -17,7 +18,32 @@ export type ElementFont =
   | 'IvyOra Text Medium'
   | 'IvyOra Text Medium Italic'
   | 'Bebas Neue'
-  | 'Montserrat';
+  | 'Montserrat'
+  | 'Anton'
+  | 'Archivo Black'
+  | 'Fjalla One'
+  | 'Oswald Bold'
+  | 'Oswald SemiBold'
+  | 'Montserrat Bold'
+  | 'Montserrat ExtraBold'
+  | 'Poppins Regular'
+  | 'Poppins SemiBold'
+  | 'Poppins Bold'
+  | 'Raleway Bold'
+  | 'Raleway ExtraBold'
+  | 'Inter Regular'
+  | 'Inter Bold'
+  | 'Inter Black'
+  | 'Barlow Condensed Bold'
+  | 'Barlow Condensed ExtraBold'
+  | 'Playfair Display Bold'
+  | 'Playfair Display ExtraBold'
+  | 'Cormorant Garamond Regular'
+  | 'Cormorant Garamond SemiBold'
+  | 'Cormorant Garamond Bold'
+  | 'Lora Regular'
+  | 'Lora Bold'
+  | 'DM Serif Display';
 export type SlideTheme = 'dark' | 'light';
 export type ImageType = 'background' | 'grid' | 'mixed';
 export type TextPosition =
@@ -27,7 +53,6 @@ export type TextPosition =
 export type CtaStyle = 'solid' | 'outline' | 'glass';
 export type BadgeStyle = 'solid' | 'minimal' | 'glass';
 export type ShadowStyle = 'base' | 'top-strong' | 'base-strong' | 'gradient-full' | 'none';
-export type CornerIcon = 'none' | 'bookmark' | 'arrow' | 'heart';
 export type FontPair =
   | 'SF Pro Display + IvyOra Text'
   | 'Space Grotesk + Inter'
@@ -56,13 +81,10 @@ export interface CornerConfig {
 export interface CornersConfig {
   topLeft: CornerConfig;
   topRight: CornerConfig;
-  bottomLeft: CornerConfig;
-  bottomRight: CornerConfig & { icon: CornerIcon };
   show: boolean;
   fontSize: number;
   borderDistance: number;
   opacity: number;
-  glass: boolean;
   borderRadius: number;
   color?: string;
   elementFont?: ElementFont;
@@ -136,6 +158,17 @@ export interface Slide {
   titleLetterSpacing?: number;
   titleDescriptionGap?: number;
   textPadding?: { top: number; right: number; bottom: number; left: number };
+  contentLayout?: ContentLayout;
+  editorialTitleOffsetY?: number;
+  editorialDescOffsetY?: number;
+  editorialImageOffsetY?: number;
+}
+
+export interface MetaBar {
+  show: boolean;
+  left: string;
+  center: string;
+  right: string;
 }
 
 export interface GlobalSettings {
@@ -144,6 +177,7 @@ export interface GlobalSettings {
   accentColor: string;
   fontPair: FontPair;
   theme: SlideTheme;
+  metaBar?: MetaBar;
 }
 
 export interface Carousel {
@@ -193,13 +227,10 @@ export interface CarouselAIResponse {
 export const DEFAULT_CORNERS: CornersConfig = {
   topLeft: { text: '@handle', visible: true },
   topRight: { text: 'Título do carrossel', visible: true },
-  bottomLeft: { text: 'PostFlow', visible: true },
-  bottomRight: { text: 'arrasta →', visible: true, icon: 'arrow' },
   show: true,
   fontSize: 12,
   borderDistance: 24,
   opacity: 80,
-  glass: false,
   borderRadius: 6,
 };
 
@@ -229,6 +260,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   accentColor: '#00CFFF',
   fontPair: 'SF Pro Display + IvyOra Text',
   theme: 'dark',
+  metaBar: { show: false, left: '', center: '', right: '' },
 };
 
 export const DEFAULT_SLIDE: Omit<Slide, 'id' | 'position'> = {

@@ -2,182 +2,340 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─────────────────────────────────────────────────────────────
+   CREATOOLS · DESIGN SYSTEM
+   Brutalist · Paper-first · Hard 3D shadows matching brand logo
+   ──────────────────────────────────────────────────────────── */
+
 :root {
-  /* Light theme (default) */
-  --background: #FFFFFF;
-  --foreground: #0A0A0A;
-  --surface: #F5F5F5;
-  --surface-elevated: #EBEBEB;
-  --border: rgba(0, 0, 0, 0.08);
-  --text-secondary: rgba(0, 0, 0, 0.5);
-  --accent: #00CFFF;
+  /* Paper (light — default) */
+  --paper:        #FAFAF7;
+  --paper-2:      #F2F1EC;
+  --paper-3:      #E9E7E0;
+  --ink:          #0A0A0A;
+  --ink-2:        #1F1F1D;
+  --ink-dim:      #6F6E68;
+  --ink-muted:    #A8A69C;
+  --line:         #E2DFD4;
+  --line-strong:  #CFCBBC;
+
+  /* Brand accent — coral / terracota (strategic contrast on paper) */
+  --accent:       #E4572E;
+  --accent-ink:   #8C2A10;
+  --accent-soft:  #FCE5DB;
+
+  --success:      #2B7A4B;
+  --warn:         #C98A2B;
+  --danger:       #C0392B;
+
+  /* Shadow direction — depends on theme */
+  --shadow-hue: 10, 10, 10;        /* black shadow on light */
+  --shadow-color: rgba(var(--shadow-hue), 1);
+
+  /* Hard 3D (brand) shadows — mirror the cube-dropped-shadow on the logo */
+  --sh-1: 2px 2px 0 0 var(--ink);
+  --sh-2: 4px 4px 0 0 var(--ink);
+  --sh-3: 6px 6px 0 0 var(--ink);
+  --sh-press: 0px 0px 0 0 var(--ink);
+  --sh-soft: 0 12px 30px -14px rgba(var(--shadow-hue), 0.25);
+
+  /* Foreground token aliases (kept for backwards compat with current code) */
+  --background:        var(--paper);
+  --foreground:        var(--ink);
+  --surface:           var(--paper-2);
+  --surface-elevated:  var(--paper-3);
+  --border:            var(--line);
+  --text-secondary:    var(--ink-dim);
+
+  /* Geometry */
+  --radius:     10px;
+  --radius-lg:  14px;
+  --radius-sm:  6px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --ease:        cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Typography — NextFont vars injected at root layout */
+  --font-display: var(--font-instrument-serif), 'Instrument Serif', 'Times New Roman', serif;
+  --font-ui:      var(--font-inter-tight), 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), 'JetBrains Mono', 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 html.dark {
-  --background: #0A0A0A;
-  --foreground: #FFFFFF;
-  --surface: #111111;
-  --surface-elevated: #1A1A1A;
-  --border: rgba(255, 255, 255, 0.08);
-  --text-secondary: rgba(255, 255, 255, 0.5);
-  --accent: #00CFFF;
+  /* Invert to ink-first dark (shadows become WHITE, as requested) */
+  --paper:        #0A0A0A;
+  --paper-2:      #141412;
+  --paper-3:      #1C1C1A;
+  --ink:          #FAFAF7;
+  --ink-2:        #E9E7E0;
+  --ink-dim:      #9A998F;
+  --ink-muted:    #5E5D56;
+  --line:         #24241F;
+  --line-strong:  #3A3933;
+
+  --accent:       #F26B3D;
+  --accent-ink:   #F9B99E;
+  --accent-soft:  #2A1810;
+
+  --shadow-hue: 250, 250, 247;
+  --shadow-color: rgba(var(--shadow-hue), 1);
+  --sh-1: 2px 2px 0 0 var(--ink);
+  --sh-2: 4px 4px 0 0 var(--ink);
+  --sh-3: 6px 6px 0 0 var(--ink);
+  --sh-press: 0px 0px 0 0 var(--ink);
+  --sh-soft: 0 12px 30px -14px rgba(var(--shadow-hue), 0.12);
+
+  --background:        var(--paper);
+  --foreground:        var(--ink);
+  --surface:           var(--paper-2);
+  --surface-elevated:  var(--paper-3);
+  --border:            var(--line);
+  --text-secondary:    var(--ink-dim);
 }
+
+/* Global reset */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  transition: background 0.2s ease, color 0.2s ease;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  transition: background 160ms var(--ease), color 160ms var(--ease);
 }
 
-/* ─── IvyOra Text — carregada como fonte do sistema / local ─── */
+::selection { background: var(--ink); color: var(--paper); }
+
+/* ─── Web fonts (local + Google fallback in layout) ─────────── */
+
 @font-face {
   font-family: 'IvyOra Text';
   src: local('IvyOra Text Regular'), local('IvyOraText-Regular'), local('IvyOra Text');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 400; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'IvyOra Text';
   src: local('IvyOra Text Medium'), local('IvyOraText-Medium');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 500; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'IvyOra Text';
   src: local('IvyOra Text Bold'), local('IvyOraText-Bold');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 700; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'IvyOra Text';
   src: local('IvyOra Text Regular Italic'), local('IvyOraText-Italic');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'IvyOra Text';
-  src: local('IvyOra Text Medium Italic'), local('IvyOraText-MediumItalic');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-
-/* ─── SF Pro Display — fonte nativa Apple ─── */
-@font-face {
-  font-family: 'SF Pro Display';
-  src: local('SF Pro Display Light'), local('SFProDisplay-Light'), local('.SF Pro Display Light');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 400; font-style: italic; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: local('SF Pro Display'), local('SFProDisplay-Regular'), local('.SF Pro Display');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: local('SF Pro Display Semibold'), local('SFProDisplay-Semibold'), local('.SF Pro Display Semibold');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 400; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: local('SF Pro Display Medium'), local('SFProDisplay-Medium');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Semibold'), local('SFProDisplay-Semibold'), local('.SF Pro Display Semibold');
+  font-weight: 600; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: local('SF Pro Display Bold'), local('SFProDisplay-Bold');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 700; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: local('SF Pro Display Heavy'), local('SFProDisplay-Heavy');
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 800; font-style: normal; font-display: swap;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+/* ─── Utility classes ───────────────────────────────────────── */
+
+.font-display { font-family: var(--font-display); letter-spacing: -0.02em; font-weight: 400; }
+.font-ui      { font-family: var(--font-ui); }
+.font-mono    { font-family: var(--font-mono); letter-spacing: 0; }
+
+/* Hard brand shadow utilities */
+.sh-1   { box-shadow: var(--sh-1); }
+.sh-2   { box-shadow: var(--sh-2); }
+.sh-3   { box-shadow: var(--sh-3); }
+
+/* Shadowed surface — the signature Creatools card */
+.brand-card {
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--sh-2);
+  transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+.brand-card.interactive { cursor: pointer; }
+.brand-card.interactive:hover { transform: translate(-2px, -2px); box-shadow: var(--sh-3); }
+.brand-card.interactive:active { transform: translate(2px, 2px); box-shadow: var(--sh-press); }
+
+/* Brutalist button — signature */
+.brand-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 16px;
+  font-size: 13px; font-weight: 600;
+  line-height: 1;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--sh-2);
+  transition: transform 120ms var(--ease), box-shadow 120ms var(--ease), background 160ms var(--ease);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
+.brand-btn:hover { transform: translate(-1px, -1px); box-shadow: var(--sh-3); }
+.brand-btn:active { transform: translate(2px, 2px); box-shadow: var(--sh-press); }
+.brand-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: var(--sh-1); }
+
+.brand-btn.primary { background: var(--ink); color: var(--paper); }
+.brand-btn.primary:hover { background: var(--ink-2); }
+.brand-btn.accent { background: var(--accent); color: #fff; border-color: var(--ink); }
+.brand-btn.ghost  { box-shadow: none; border-color: transparent; background: transparent; }
+.brand-btn.ghost:hover { background: var(--paper-2); transform: none; box-shadow: none; }
+.brand-btn.outline { background: transparent; }
+.brand-btn.sm { padding: 7px 11px; font-size: 12px; border-radius: var(--radius-sm); }
+.brand-btn.icon { padding: 0; width: 34px; height: 34px; }
+.brand-btn.pill { border-radius: 999px; }
+
+/* Chip */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 9px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 500;
 }
-html.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+.chip.filled { background: var(--ink); color: var(--paper); }
+.chip.soft   { border-color: var(--line-strong); color: var(--ink-dim); }
+
+/* Section title (display serif + hairline) */
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.2vw, 44px);
+  letter-spacing: -0.025em;
+  line-height: 1;
+  margin: 0;
+}
+.section-kicker {
+  font-family: var(--font-mono); font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--ink-dim);
 }
 
-/* Range slider styles */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(0, 0, 0, 0.15);
+/* Hairline (brand-style divider) */
+.hairline { height: 1.5px; background: var(--ink); border: 0; }
+.hairline.soft { background: var(--line); height: 1px; }
+
+/* Inputs with hard shadow when focused */
+.brand-input, .brand-textarea, .brand-select {
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13px;
   outline: none;
+  width: 100%;
+  transition: box-shadow 140ms var(--ease), transform 140ms var(--ease);
 }
-html.dark input[type="range"] {
-  background: rgba(255, 255, 255, 0.15);
+.brand-input:focus, .brand-textarea:focus, .brand-select:focus {
+  box-shadow: var(--sh-2); transform: translate(-2px, -2px);
+}
+.brand-textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
+
+/* Tag dot (live indicator) */
+.dot-live {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Motion presets */
+.fade-in { animation: fadeUp 440ms var(--ease) both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ─── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 2px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-dim); }
+
+/* ─── Range slider ──────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  height: 3px; border-radius: 2px;
+  background: var(--line-strong); outline: none;
 }
 input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #0A0A0A;
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--ink); border: 2px solid var(--paper);
+  box-shadow: var(--sh-1);
   cursor: pointer;
-}
-html.dark input[type="range"]::-webkit-slider-thumb {
-  background: white;
 }
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #0A0A0A;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--ink); border: 2px solid var(--paper);
+  box-shadow: var(--sh-1);
   cursor: pointer;
-  border: none;
-}
-html.dark input[type="range"]::-moz-range-thumb {
-  background: white;
 }
 
-/* Glass effect utility */
+/* ─── Glass (kept for any legacy uses; rebranded to paper-glass) ── */
 .glass {
-  background: rgba(0, 0, 0, 0.04);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-html.dark .glass {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
 }
 
-/* Slide render area */
-.slide-preview-wrapper {
-  transform-origin: top left;
+/* ─── Slide render area ─────────────────────────────────────── */
+.slide-preview-wrapper { transform-origin: top left; }
+
+/* ─── Grid background for editor / landing ──────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(10,10,10,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10,10,10,0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
 }
+html.dark .grid-bg {
+  background-image:
+    linear-gradient(rgba(250,250,247,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(250,250,247,0.05) 1px, transparent 1px);
+}
+
+/* ─── Brand mark container (icon chip) ──────────────────────── */
+.brand-mark {
+  width: 32px; height: 32px;
+  display: inline-grid; place-items: center;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  flex-shrink: 0;
+  box-shadow: var(--sh-1);
+}
+.brand-mark.sm { width: 26px; height: 26px; border-radius: 6px; }
+.brand-mark.lg { width: 44px; height: 44px; border-radius: 10px; box-shadow: var(--sh-2); }
+.brand-mark img { width: 62%; height: 62%; object-fit: contain; filter: invert(1); }
+html.dark .brand-mark img { filter: none; }

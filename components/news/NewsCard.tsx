@@ -12,7 +12,9 @@ export interface NewsCardItem {
   titulo_size: number;
   titulo_weight: number;
   titulo_letter_spacing: number;
+  titulo_font?: string;
   tema_size: number;
+  tema_font?: string;
   // Layout
   card_radius: number;
   logo_y: number;          // top offset for logo (px at 1080 scale)
@@ -28,13 +30,26 @@ export interface NewsCardItem {
   gradient_color: string;    // hex color
   gradient_size: number;     // 0–100, how far gradient extends upward (%)
   gradient_distance: number; // 0–100, where the transparent part starts (%)
+  // Circular inset element
+  inset_enabled: boolean;
+  inset_image_url?: string;       // uploaded blob URL or remote URL
+  inset_size: number;             // diameter in px at 1080 scale
+  inset_x: number;                // left position in px at 1080 scale
+  inset_y: number;                // top position in px at 1080 scale
+  inset_image_zoom: number;       // 1 = cover, >1 zoom in
+  inset_image_x: number;          // horizontal offset of image inside circle (px)
+  inset_image_y: number;          // vertical offset of image inside circle (px)
+  // Brand logo — URL of the user's default brand logo; when empty, no logo is rendered
+  logo_url?: string;
 }
 
 export const DEFAULT_STYLE: Omit<NewsCardItem, 'numero' | 'tema' | 'titulo_card' | 'imagem_url' | 'legenda'> = {
   titulo_size: 61,
   titulo_weight: 700,
   titulo_letter_spacing: -0.5,
+  titulo_font: "'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif",
   tema_size: 35,
+  tema_font: "'IvyOra Text', Georgia, 'Times New Roman', serif",
   card_radius: 8,
   logo_y: 60,
   logo_size: 4.0,
@@ -46,6 +61,17 @@ export const DEFAULT_STYLE: Omit<NewsCardItem, 'numero' | 'tema' | 'titulo_card'
   gradient_color: '#000000',
   gradient_size: 85,
   gradient_distance: 55,
+  // Circular inset — off by default, positioned upper-left like the reference
+  inset_enabled: false,
+  inset_image_url: undefined,
+  inset_size: 290,
+  inset_x: 72,
+  inset_y: 290,
+  inset_image_zoom: 1.0,
+  inset_image_x: 0,
+  inset_image_y: 0,
+  // Brand logo — undefined = user hasn't set a brand logo yet (nothing rendered)
+  logo_url: undefined,
 };
 
 export function parseNewsJSON(raw: string): NewsCardItem[] {
@@ -97,8 +123,6 @@ export function parseNewsJSON(raw: string): NewsCardItem[] {
 
   return buildItems(JSON.parse(out));
 }
-
-// ── Arke News Logo (default) ────────────────────────────────────────────────
 
 // ── News Card ───────────────────────────────────────────────────────────────
 
@@ -185,15 +209,45 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
           );
         })()}
 
-        {/* Logo — use explicit dimensions instead of transform:scale to ensure
-            html2canvas captures it at the correct size */}
-        <div style={{ position: 'absolute', top: item.logo_y, left: 52 }}>
-          <img
-            src="/theArkeNews-logo.png"
-            alt="the arke news"
-            style={{ display: 'block', height: Math.round(46 * item.logo_size), width: 'auto', objectFit: 'contain' }}
-          />
-        </div>
+        {/* Brand logo — only rendered when the user has a saved logo */}
+        {item.logo_url && (
+          <div style={{ position: 'absolute', top: item.logo_y, left: 52 }}>
+            <img
+              src={item.logo_url}
+              alt="logo"
+              style={{ display: 'block', height: Math.round(46 * item.logo_size), width: 'auto', objectFit: 'contain' }}
+            />
+          </div>
+        )}
+
+        {/* Circular inset element */}
+        {item.inset_enabled && item.inset_image_url && (
+          <div
+            style={{
+              position: 'absolute',
+              left: item.inset_x,
+              top: item.inset_y,
+              width: item.inset_size,
+              height: item.inset_size,
+              borderRadius: '50%',
+              border: '3px solid #ffffff',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url(${item.inset_image_url})`,
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: `${item.inset_image_zoom * 100}%`,
+                backgroundPosition: `calc(50% + ${item.inset_image_x}px) calc(50% + ${item.inset_image_y}px)`,
+              }}
+            />
+          </div>
+        )}
 
         {/* Bottom text block */}
         <div
@@ -210,7 +264,7 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
                 margin: 0,
                 marginBottom: 12,
                 color: 'white',
-                fontFamily: "'IvyOra Text', Georgia, 'Times New Roman', serif",
+                fontFamily: item.tema_font || "'IvyOra Text', Georgia, 'Times New Roman', serif",
                 fontStyle: 'italic',
                 fontWeight: 500,
                 fontSize: item.tema_size,
@@ -226,7 +280,7 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
             style={{
               margin: 0,
               color: 'white',
-              fontFamily: "'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif",
+              fontFamily: item.titulo_font || "'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif",
               fontWeight: item.titulo_weight,
               fontSize: item.titulo_size,
               lineHeight: 1.1,

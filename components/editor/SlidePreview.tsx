@@ -4,6 +4,7 @@ import { forwardRef } from 'react';
 import { Slide, GlobalSettings, SlideStyle } from '@/types';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
+import EditorialSlide from '@/components/slides/EditorialSlide';
 
 interface SlidePreviewProps {
   slide: Slide;
@@ -72,6 +73,14 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
             forExport={forExport}
             onUpdateProfile={onUpdateProfile}
             onUpdateText={onUpdateText}
+          />
+        ) : style === 'editorial' ? (
+          <EditorialSlide
+            slide={slide}
+            globalSettings={globalSettings}
+            slideIndex={slideIndex}
+            totalSlides={totalSlides}
+            forExport={forExport}
           />
         ) : (
           <MinimalistSlide

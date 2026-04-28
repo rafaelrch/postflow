@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Copy, Trash2, Calendar, Layers } from 'lucide-react';
+import { Plus, Edit2, Copy, Trash2, Calendar, Layers, Search } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import CreateWizard from '@/components/editor/CreateWizard';
 import { createClient } from '@/lib/supabase';
@@ -65,8 +65,8 @@ function buildGlobalSettings(carousel: DashboardCarousel): GlobalSettings {
     theme: (carousel.theme as GlobalSettings['theme']) || 'dark',
     fontPair: (carousel.font_pair as GlobalSettings['fontPair']) || 'SF Pro Display + IvyOra Text',
     accentColor: carousel.accent_color || '#00CFFF',
-    corners: (carousel.corners as GlobalSettings['corners']) || DEFAULT_GLOBAL_SETTINGS.corners,
-    profileBadge: (carousel.profile_badge as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
+    corners: (carousel.corners as unknown as GlobalSettings['corners']) || DEFAULT_GLOBAL_SETTINGS.corners,
+    profileBadge: (carousel.profile_badge as unknown as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
   };
 }
 
@@ -116,6 +116,13 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
   const [carousels, setCarousels] = useState(initialCarousels);
   const [showWizard, setShowWizard] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return carousels;
+    const q = query.toLowerCase();
+    return carousels.filter((c) => c.title.toLowerCase().includes(q));
+  }, [carousels, query]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Deletar este carrossel? Esta ação não pode ser desfeita.')) return;
@@ -174,121 +181,299 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
     router.push(`/generator?id=${id}`);
   };
 
+  const total = carousels.length;
+
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--background)]">
-      <main className="max-w-6xl mx-auto w-full px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Meus Carrosséis</h1>
-            <p className="text-gray-900/40 dark:text-white/40 text-sm mt-1">{carousels.length} carrossel{carousels.length !== 1 ? 'is' : ''}</p>
-          </div>
-          <Button size="lg" onClick={() => setShowWizard(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Criar novo carrossel
-          </Button>
-        </div>
+    <div
+      className="flex-1 overflow-y-auto"
+      style={{ background: 'var(--paper)' }}
+    >
+      <main className="max-w-[1320px] mx-auto w-full px-8 py-10">
+        {/* Hero / header */}
+        <header className="mb-10 flex flex-col gap-3">
+          <span className="section-kicker flex items-center gap-2">
+            <span className="dot-live" aria-hidden />
+            Studio · Carrosséis
+          </span>
 
-        {carousels.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center mb-4">
-              <Layers className="w-8 h-8 text-gray-900/20 dark:text-white/20" />
-            </div>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Nenhum carrossel ainda</h2>
-            <p className="text-gray-900/40 dark:text-white/40 text-sm mb-6 max-w-xs">
-              Crie seu primeiro carrossel com IA e comece a crescer no Instagram.
-            </p>
-            <Button onClick={() => setShowWizard(true)}>
-              <Plus className="w-4 h-4" />
-              Criar primeiro carrossel
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {/* Create new card */}
-            <button
-              onClick={() => setShowWizard(true)}
-              className="aspect-[4/5] rounded-2xl border-2 border-dashed border-black/10 dark:border-white/10 flex flex-col items-center justify-center gap-3 text-gray-900/30 dark:text-white/30 hover:text-gray-900/60 dark:hover:text-white/60 hover:border-black/20 dark:hover:border-white/20 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl border-2 border-dashed border-current flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Plus className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-medium">Novo carrossel</span>
-            </button>
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <h1 className="section-title" style={{ fontSize: 'clamp(38px, 5vw, 64px)' }}>
+              Seus carrosséis
+              <span className="italic" style={{ color: 'var(--accent)' }}> virais</span>
+            </h1>
 
-            {carousels.map((carousel) => (
-              <div
-                key={carousel.id}
-                className="group relative bg-[var(--surface)] border border-black/8 dark:border-white/8 rounded-2xl overflow-hidden hover:border-black/20 dark:hover:border-white/20 transition-all"
+            <div className="flex items-center gap-3">
+              {/* Search */}
+              <label
+                className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-[12.5px]"
+                style={{
+                  background: 'var(--paper-2)',
+                  border: '1.5px solid var(--ink)',
+                  boxShadow: 'var(--sh-1)',
+                  color: 'var(--ink)',
+                  minWidth: 240,
+                }}
               >
-                {/* Thumbnail */}
+                <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-dim)' }} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar…"
+                  className="bg-transparent outline-none flex-1 placeholder:text-[var(--ink-muted)]"
+                  style={{ color: 'var(--ink)' }}
+                />
+                <span
+                  className="font-mono text-[9.5px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded"
+                  style={{ color: 'var(--ink-dim)', border: '1px solid var(--line-strong)' }}
+                >
+                  ⌘K
+                </span>
+              </label>
+
+              <Button variant="primary" size="md" onClick={() => setShowWizard(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Novo carrossel
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-8 mt-2">
+            <Stat label="Total" value={total} />
+            <Stat label="Rascunho" value={Math.max(0, total - 1)} />
+            <Stat label="Publicados" value={0} accent />
+            <span className="hairline soft flex-1" />
+          </div>
+        </header>
+
+        {total === 0 ? (
+          <EmptyState onCreate={() => setShowWizard(true)} />
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <p className="section-kicker">
+                {filtered.length} {filtered.length === 1 ? 'item' : 'itens'}
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="chip soft">grid</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {/* Create card — dashed brutalist */}
+              <button
+                onClick={() => setShowWizard(true)}
+                className="
+                  aspect-[4/5] rounded-[14px] flex flex-col items-center justify-center gap-3
+                  transition-all duration-150 group
+                "
+                style={{
+                  background: 'transparent',
+                  border: '1.5px dashed var(--ink)',
+                  color: 'var(--ink-dim)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translate(-2px,-2px)';
+                  e.currentTarget.style.boxShadow = 'var(--sh-2)';
+                  e.currentTarget.style.background = 'var(--paper-2)';
+                  e.currentTarget.style.color = 'var(--ink)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = '';
+                  e.currentTarget.style.boxShadow = '';
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--ink-dim)';
+                }}
+              >
                 <div
-                  className="aspect-[4/5] relative cursor-pointer"
-                  style={{ background: `linear-gradient(135deg, var(--surface-elevated) 0%, var(--surface) 100%)` }}
+                  className="w-12 h-12 rounded-[10px] grid place-items-center transition-transform group-hover:scale-110"
+                  style={{ border: '1.5px solid currentColor' }}
+                >
+                  <Plus className="w-5 h-5" />
+                </div>
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em]">Novo carrossel</span>
+              </button>
+
+              {filtered.map((carousel) => (
+                <div
+                  key={carousel.id}
+                  className="group relative overflow-hidden brand-card interactive"
+                  style={{ padding: 0 }}
                   onClick={() => handleEdit(carousel.id)}
                 >
-                  {carousel.coverSlide ? (
-                    <SlideThumbnail carousel={carousel} />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center p-4">
-                        <div
-                          className="w-2 h-2 rounded-full mx-auto mb-3"
-                          style={{ background: carousel.accent_color || '#00CFFF' }}
-                        />
-                        <p className="text-gray-900/60 dark:text-white/60 text-xs font-medium line-clamp-3">{carousel.title}</p>
-                        <p className="text-gray-900/20 dark:text-white/20 text-xs mt-2 uppercase tracking-wider">{carousel.style}</p>
+                  {/* Thumbnail */}
+                  <div
+                    className="aspect-[4/5] relative"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, var(--paper-3) 0%, var(--paper-2) 100%)',
+                    }}
+                  >
+                    {carousel.coverSlide ? (
+                      <SlideThumbnail carousel={carousel} />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center p-4">
+                          <div
+                            className="w-2 h-2 rounded-full mx-auto mb-3"
+                            style={{ background: carousel.accent_color || 'var(--accent)' }}
+                          />
+                          <p className="text-[12px] font-medium line-clamp-3" style={{ color: 'var(--ink)' }}>
+                            {carousel.title}
+                          </p>
+                          <p
+                            className="font-mono text-[9.5px] uppercase tracking-[0.12em] mt-2"
+                            style={{ color: 'var(--ink-dim)' }}
+                          >
+                            {carousel.style}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {/* Info */}
-                <div className="p-3 border-t border-black/6 dark:border-white/6">
-                  <p className="text-gray-900 dark:text-white text-sm font-medium line-clamp-1">{carousel.title}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-gray-900/30 dark:text-white/30 text-xs">
-                      <Layers className="w-3 h-3" />
-                      {carousel.slides?.[0]?.count ?? 0} slides
-                    </span>
-                    <span className="flex items-center gap-1 text-gray-900/30 dark:text-white/30 text-xs">
-                      <Calendar className="w-3 h-3" />
-                      {formatDate(carousel.updated_at)}
-                    </span>
+                    {/* Hover actions */}
+                    <div
+                      className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <IconActionButton onClick={() => handleEdit(carousel.id)} title="Editar">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </IconActionButton>
+                      <IconActionButton onClick={() => handleDuplicate(carousel.id)} title="Duplicar">
+                        <Copy className="w-3.5 h-3.5" />
+                      </IconActionButton>
+                      <IconActionButton
+                        onClick={() => handleDelete(carousel.id)}
+                        disabled={deleting === carousel.id}
+                        title="Deletar"
+                        danger
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </IconActionButton>
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div
+                    className="p-3.5 flex flex-col gap-1.5"
+                    style={{ borderTop: '1.5px solid var(--ink)' }}
+                  >
+                    <p
+                      className="font-display text-[18px] leading-[1.1] line-clamp-1"
+                      style={{ color: 'var(--ink)' }}
+                    >
+                      {carousel.title}
+                    </p>
+                    <div
+                      className="flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.08em]"
+                      style={{ color: 'var(--ink-dim)' }}
+                    >
+                      <span className="flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        {carousel.slides?.[0]?.count ?? 0} slides
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {formatDate(carousel.updated_at)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-
-                {/* Hover actions */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleEdit(carousel.id)}
-                    className="p-1.5 rounded-lg bg-black/60 backdrop-blur text-white/60 hover:text-white transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDuplicate(carousel.id)}
-                    className="p-1.5 rounded-lg bg-black/60 backdrop-blur text-white/60 hover:text-white transition-colors"
-                    title="Duplicar"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(carousel.id)}
-                    disabled={deleting === carousel.id}
-                    className="p-1.5 rounded-lg bg-black/60 backdrop-blur text-white/60 hover:text-red-400 transition-colors"
-                    title="Deletar"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </main>
 
       {showWizard && <CreateWizard onClose={() => setShowWizard(false)} />}
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="font-display text-[34px] leading-none"
+        style={{ color: accent ? 'var(--accent)' : 'var(--ink)' }}
+      >
+        {String(value).padStart(2, '0')}
+      </span>
+      <span
+        className="font-mono text-[10px] uppercase tracking-[0.14em]"
+        style={{ color: 'var(--ink-dim)' }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function IconActionButton({
+  children,
+  onClick,
+  title,
+  disabled,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title: string;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      className="w-8 h-8 grid place-items-center rounded-[6px] transition-all"
+      style={{
+        background: 'var(--paper)',
+        color: danger ? 'var(--danger)' : 'var(--ink)',
+        border: '1.5px solid var(--ink)',
+        boxShadow: 'var(--sh-1)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translate(-1px,-1px)';
+        e.currentTarget.style.boxShadow = 'var(--sh-2)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.boxShadow = 'var(--sh-1)';
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div
+      className="relative grid-bg rounded-[14px] px-8 py-20 text-center flex flex-col items-center gap-5"
+      style={{
+        border: '1.5px dashed var(--ink)',
+        background: 'var(--paper-2)',
+      }}
+    >
+      <span className="chip">Nada por aqui</span>
+      <h2
+        className="section-title max-w-xl"
+        style={{ fontSize: 'clamp(32px, 4vw, 52px)' }}
+      >
+        Comece <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>agora</span>
+        <br />
+        seu primeiro carrossel
+      </h2>
+      <p className="text-[13.5px] max-w-sm leading-relaxed" style={{ color: 'var(--ink-dim)' }}>
+        Descreva um tema. A IA monta slides coesos em segundos.
+        Você revisa, ajusta e publica.
+      </p>
+      <Button variant="primary" size="lg" onClick={onCreate} className="mt-2">
+        <Plus className="w-4 h-4" />
+        Criar primeiro carrossel
+      </Button>
     </div>
   );
 }

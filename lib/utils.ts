@@ -42,40 +42,37 @@ export function debounce<T extends (...args: any[]) => void>(
 }
 
 export function getFontFamilies(fontPair: string): { title: string; body: string } {
+  const SF = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
+  const IVY = "'IvyOra Text', 'Georgia', serif";
   const pairs: Record<string, { title: string; body: string }> = {
-    // SF Pro Display é a fonte nativa da Apple (sistema). IvyOra Text via local()
-    'SF Pro Display + IvyOra Text': {
-      title: "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif",
-      body: "'IvyOra Text', 'Georgia', serif",
-    },
+    // Originais
+    'SF Pro Display + IvyOra Text': { title: SF, body: IVY },
     'Space Grotesk + Inter': { title: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif" },
     'Playfair Display + Lato': { title: "'Playfair Display', serif", body: "'Lato', sans-serif" },
     'Oswald + Roboto': { title: "'Oswald', sans-serif", body: "'Roboto', sans-serif" },
     'Montserrat + Open Sans': { title: "'Montserrat', sans-serif", body: "'Open Sans', sans-serif" },
     'Bebas Neue + Inter': { title: "'Bebas Neue', sans-serif", body: "'Inter', sans-serif" },
     'Syne + DM Sans': { title: "'Syne', sans-serif", body: "'DM Sans', sans-serif" },
+    // Novos — editoriais
+    'Anton + Lora': { title: "'Anton', sans-serif", body: "'Lora', serif" },
+    'Barlow Condensed + Inter': { title: "'Barlow Condensed', sans-serif", body: "'Inter', sans-serif" },
+    'Archivo Black + Poppins': { title: "'Archivo Black', sans-serif", body: "'Poppins', sans-serif" },
+    'Cormorant Garamond + DM Sans': { title: "'Cormorant Garamond', serif", body: "'DM Sans', sans-serif" },
+    'Poppins + Lora': { title: "'Poppins', sans-serif", body: "'Lora', serif" },
+    'Raleway + Cormorant Garamond': { title: "'Raleway', sans-serif", body: "'Cormorant Garamond', serif" },
+    'Fjalla One + Open Sans': { title: "'Fjalla One', sans-serif", body: "'Open Sans', sans-serif" },
   };
   return pairs[fontPair] ?? pairs['SF Pro Display + IvyOra Text'];
 }
 
+// URL única que carrega TODAS as fontes Google usadas no app
+export const ALL_GOOGLE_FONTS_URL =
+  'https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@700;800&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=Fjalla+One&family=Inter:wght@400;700;900&family=Lato:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;600;700&family=Raleway:wght@700;800&family=Roboto:wght@400;500&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap';
+
 export function getFontGoogleUrl(fontPair: string): string {
-  // SF Pro Display + IvyOra: fontes do sistema/locais, sem Google Fonts
-  const urls: Record<string, string> = {
-    'SF Pro Display + IvyOra Text': '',
-    'Space Grotesk + Inter':
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&display=swap',
-    'Playfair Display + Lato':
-      'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;700&display=swap',
-    'Oswald + Roboto':
-      'https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto:wght@400;500&display=swap',
-    'Montserrat + Open Sans':
-      'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Open+Sans:wght@400;600&display=swap',
-    'Bebas Neue + Inter':
-      'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap',
-    'Syne + DM Sans':
-      'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap',
-  };
-  return urls[fontPair] ?? '';
+  // Retorna a URL única com todas as fontes — ignora o par específico
+  if (fontPair === 'SF Pro Display + IvyOra Text') return '';
+  return ALL_GOOGLE_FONTS_URL;
 }
 
 export interface ElementFontCSS {
@@ -85,21 +82,63 @@ export interface ElementFontCSS {
 }
 
 export function getElementFontCSS(font: ElementFont): ElementFontCSS {
-  const SF = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
-  const IVY = "'IvyOra Text', 'Georgia', serif";
+  const SF    = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
+  const IVY   = "'IvyOra Text', 'Georgia', serif";
   const BEBAS = "'Bebas Neue', sans-serif";
-  const MONT = "'Montserrat', sans-serif";
+  const MONT  = "'Montserrat', sans-serif";
+  const ANTON = "'Anton', sans-serif";
+  const ARCH  = "'Archivo Black', sans-serif";
+  const BARLC = "'Barlow Condensed', sans-serif";
+  const CORM  = "'Cormorant Garamond', serif";
+  const DMSRF = "'DM Serif Display', serif";
+  const FJAL  = "'Fjalla One', sans-serif";
+  const INTER = "'Inter', sans-serif";
+  const LORA  = "'Lora', serif";
+  const OSWD  = "'Oswald', sans-serif";
+  const PLAY  = "'Playfair Display', serif";
+  const POPP  = "'Poppins', sans-serif";
+  const RALE  = "'Raleway', sans-serif";
 
   switch (font) {
-    case 'SF Pro Display Light':    return { fontFamily: SF,    fontWeight: 300, fontStyle: 'normal' };
-    case 'SF Pro Display Regular':  return { fontFamily: SF,    fontWeight: 400, fontStyle: 'normal' };
-    case 'SF Pro Display Medium':   return { fontFamily: SF,    fontWeight: 500, fontStyle: 'normal' };
-    case 'SF Pro Display SemiBold': return { fontFamily: SF,    fontWeight: 600, fontStyle: 'normal' };
-    case 'SF Pro Display Bold':     return { fontFamily: SF,    fontWeight: 700, fontStyle: 'normal' };
-    case 'IvyOra Text Medium':         return { fontFamily: IVY,  fontWeight: 500, fontStyle: 'normal' };
-    case 'IvyOra Text Medium Italic':  return { fontFamily: IVY,  fontWeight: 500, fontStyle: 'italic' };
-    case 'Bebas Neue':              return { fontFamily: BEBAS, fontWeight: 400, fontStyle: 'normal' };
-    case 'Montserrat':              return { fontFamily: MONT,  fontWeight: 600, fontStyle: 'normal' };
+    // SF Pro Display
+    case 'SF Pro Display Light':           return { fontFamily: SF,    fontWeight: 300, fontStyle: 'normal' };
+    case 'SF Pro Display Regular':         return { fontFamily: SF,    fontWeight: 400, fontStyle: 'normal' };
+    case 'SF Pro Display Medium':          return { fontFamily: SF,    fontWeight: 500, fontStyle: 'normal' };
+    case 'SF Pro Display SemiBold':        return { fontFamily: SF,    fontWeight: 600, fontStyle: 'normal' };
+    case 'SF Pro Display Bold':            return { fontFamily: SF,    fontWeight: 700, fontStyle: 'normal' };
+    // IvyOra
+    case 'IvyOra Text Medium':             return { fontFamily: IVY,   fontWeight: 500, fontStyle: 'normal' };
+    case 'IvyOra Text Medium Italic':      return { fontFamily: IVY,   fontWeight: 500, fontStyle: 'italic' };
+    // Display/Bold
+    case 'Anton':                          return { fontFamily: ANTON, fontWeight: 400, fontStyle: 'normal' };
+    case 'Archivo Black':                  return { fontFamily: ARCH,  fontWeight: 900, fontStyle: 'normal' };
+    case 'Bebas Neue':                     return { fontFamily: BEBAS, fontWeight: 400, fontStyle: 'normal' };
+    case 'Fjalla One':                     return { fontFamily: FJAL,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Oswald Bold':                    return { fontFamily: OSWD,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Oswald SemiBold':                return { fontFamily: OSWD,  fontWeight: 600, fontStyle: 'normal' };
+    // Sans-serif
+    case 'Montserrat':                     return { fontFamily: MONT,  fontWeight: 600, fontStyle: 'normal' };
+    case 'Montserrat Bold':                return { fontFamily: MONT,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Montserrat ExtraBold':           return { fontFamily: MONT,  fontWeight: 800, fontStyle: 'normal' };
+    case 'Poppins Regular':                return { fontFamily: POPP,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Poppins SemiBold':               return { fontFamily: POPP,  fontWeight: 600, fontStyle: 'normal' };
+    case 'Poppins Bold':                   return { fontFamily: POPP,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Raleway Bold':                   return { fontFamily: RALE,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Raleway ExtraBold':              return { fontFamily: RALE,  fontWeight: 800, fontStyle: 'normal' };
+    case 'Inter Regular':                  return { fontFamily: INTER, fontWeight: 400, fontStyle: 'normal' };
+    case 'Inter Bold':                     return { fontFamily: INTER, fontWeight: 700, fontStyle: 'normal' };
+    case 'Inter Black':                    return { fontFamily: INTER, fontWeight: 900, fontStyle: 'normal' };
+    case 'Barlow Condensed Bold':          return { fontFamily: BARLC, fontWeight: 700, fontStyle: 'normal' };
+    case 'Barlow Condensed ExtraBold':     return { fontFamily: BARLC, fontWeight: 800, fontStyle: 'normal' };
+    // Serif
+    case 'Playfair Display Bold':          return { fontFamily: PLAY,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Playfair Display ExtraBold':     return { fontFamily: PLAY,  fontWeight: 900, fontStyle: 'normal' };
+    case 'Cormorant Garamond Regular':     return { fontFamily: CORM,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Cormorant Garamond SemiBold':    return { fontFamily: CORM,  fontWeight: 600, fontStyle: 'normal' };
+    case 'Cormorant Garamond Bold':        return { fontFamily: CORM,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Lora Regular':                   return { fontFamily: LORA,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Lora Bold':                      return { fontFamily: LORA,  fontWeight: 700, fontStyle: 'normal' };
+    case 'DM Serif Display':               return { fontFamily: DMSRF, fontWeight: 400, fontStyle: 'normal' };
   }
 }
 

@@ -51,15 +51,22 @@ Retorne APENAS JSON válido sem markdown:
 
 export async function POST(req: NextRequest) {
   try {
-    const { project, update, tone, context } = await req.json();
+    const { project, projectDescription, projectNiche, projectAudience, update, tone, context } = await req.json();
 
     if (!update?.trim()) {
       return NextResponse.json({ error: 'Descreva o que aconteceu' }, { status: 400 });
     }
 
-    const userPrompt = `Projeto: ${project || 'minha startup'}
-${context ? `Contexto adicional: ${context}` : ''}
+    const projectBlock = [
+      `Projeto: ${project || 'minha startup'}`,
+      projectDescription ? `Sobre o projeto: ${projectDescription}` : '',
+      projectNiche ? `Nicho: ${projectNiche}` : '',
+      projectAudience ? `Público-alvo: ${projectAudience}` : '',
+    ].filter(Boolean).join('\n');
+
+    const userPrompt = `${projectBlock}
 Tom desejado: ${tone || 'honesto'}
+${context ? `\nContexto adicional: ${context}` : ''}
 
 O que aconteceu / o que quero compartilhar:
 ${update}

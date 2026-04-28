@@ -96,10 +96,9 @@ function buildUserPrompt(body: GenerateCarouselInput): string {
 Tema: "${body.prompt}"
 ${body.profileData ? `Perfil: ${body.profileData.name} (${body.profileData.handle})` : ''}
 
-Crie 1 slide em formato de mini-parágrafo humano, com texto fluido e natural sobre esse tema.
-Use contraste. Sem clichês motivacionais.
-Não escreva em frases picadas ou linhas soltas: quero um bloco curto, mas com cara de texto escrito por uma pessoa.
-A ideia precisa tocar em branding, posicionamento, percepção de marca ou conexão com a audiência — nunca ser só uma observação genérica.`;
+Crie 1 slide com 2-3 frases contraintuitivas e diretas sobre esse tema.
+Use contraste: "não é X, é Y". Sem clichês motivacionais.
+Deve revelar algo que o leitor não esperava — factual, provocativo, memorável.`;
     }
 
     return `FORMATO B — Thread Completa
@@ -109,21 +108,19 @@ Número de slides: ${body.slideCount}
 ${body.imageDirection ? `Direcionamento visual: ${body.imageDirection}` : ''}
 ${body.profileData ? `Perfil: ${body.profileData.name} (${body.profileData.handle})` : ''}
 
-Crie uma thread completa no estilo carrossel do Instagram com a estrutura: hook, contexto, tensão/fracassos, virada, revelação, síntese e punchline final.
-Mas existe uma regra central: mesmo que o tema seja negócio, produto, tecnologia ou história de empresa, a análise precisa sempre convergir para branding, posicionamento, construção de marca e conexão com audiência.
-Não conte a história pela história. Extraia o mecanismo de marca por trás dela.
-Escreva cada slide como um parágrafo coeso, natural e humano, evitando frases telegráficas ou excessivamente curtas.
-Use números específicos e contraste, mas com fluidez de texto.
-O slide 1 deve prender sozinho. O slide final deve funcionar como tweet standalone e deixar um princípio claro de branding ou posicionamento.`;
+Crie uma thread completa com a estrutura: hook, contexto, tensão/fracassos, virada, síntese e punchline final.
+OBRIGATÓRIO: máximo 2-3 frases por slide. Cada description é curta e densa — proibido parágrafo longo.
+Use números específicos e contraste. O slide 1 deve prender sozinho. O slide final deve encerrar com punch e CTA.`;
   }
 
-  return `Crie um carrossel editorial de análise de marca sobre: "${body.prompt}"
+  return `Crie um carrossel sobre: "${body.prompt}"
 
 Número de slides: ${body.slideCount}
 Tipo de imagem: ${body.imageType}
 ${body.imageDirection ? `Direcionamento visual: ${body.imageDirection}` : ''}
 
-Siga a estrutura obrigatória: capa com hook forte nomeando a marca, contexto do case, mecanismo estratégico, insights, aprofundamento, slide de risco/limitação, análise estruturada numerada, fechamento filosófico em fundo azul royal, universalização do princípio e virada para o leitor com CTA.
-Use vocabulário de branding estratégico. Tom analítico de sênior. Interprete — não descreva. Revele o mecanismo invisível.
-Quero descrições em parágrafos bem escritos, com fluidez e cara de texto humano, e não uma sequência de frases curtas e picadas.`;
+Estrutura: hook irresistível na capa → desenvolvimento progressivo (1 ponto por slide) → CTA no final.
+OBRIGATÓRIO: description de cada slide = máximo 2 frases. Curto, direto, sem enchimento.
+title de cada slide = máximo 7 palavras.
+O leitor deve querer ir para o próximo slide em cada etapa.`;
 }

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CloudCheck, CloudOff, Loader2, Save, Sparkles } from 'lucide-react';
+import { CalendarPlus, CloudCheck, CloudOff, Loader2, Save, Sparkles } from 'lucide-react';
 import EditorSidebar from '@/components/editor/EditorSidebar';
 import SlideCanvas from '@/components/editor/SlideCanvas';
 import HiddenSlides from '@/components/editor/HiddenSlides';
 import CreateWizard from '@/components/editor/CreateWizard';
 import CaptionModal from '@/components/editor/CaptionModal';
+import ScheduleModal from '@/components/editor/ScheduleModal';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useExport } from '@/hooks/useExport';
@@ -27,6 +28,7 @@ export default function GeneratorClient() {
 
   const [showWizard, setShowWizard] = useState(false);
   const [showCaptionModal, setShowCaptionModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const { saveNow } = useAutoSave();
   const { registerSlideRef, downloadSlide, downloadAll } = useExport();
@@ -153,6 +155,16 @@ export default function GeneratorClient() {
         <Save className="w-3 h-3" />
         Salvar
       </button>
+
+      {/* Schedule button */}
+      <button
+        onClick={() => setShowScheduleModal(true)}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-[13px] font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors shadow-sm ring-1 ring-black/10 dark:ring-white/10"
+        title="Agendar publicação na agenda"
+      >
+        <CalendarPlus className="w-4 h-4" />
+        Agendar
+      </button>
     </div>
   );
 
@@ -190,6 +202,12 @@ export default function GeneratorClient() {
 
       {showWizard && <CreateWizard onClose={() => setShowWizard(false)} />}
       {showCaptionModal && <CaptionModal onClose={() => setShowCaptionModal(false)} />}
+      {showScheduleModal && (
+        <ScheduleModal
+          onClose={() => setShowScheduleModal(false)}
+          onSaveFirst={saveNow}
+        />
+      )}
     </div>
   );
 }

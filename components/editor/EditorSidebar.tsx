@@ -1,12 +1,13 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Sparkles, Download, RefreshCw, Archive, Upload, Clipboard, Wand2, Image, X, Underline } from 'lucide-react';
+import { Download, RefreshCw, Archive, Upload, Clipboard, Wand2, Image, X, Underline, Sparkles } from 'lucide-react';
 import { useEditorStore } from '@/hooks/useEditorStore';
+import { useGenerateCarouselImages } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Section from './Section';
 import { cn } from '@/lib/utils';
-import { TextPosition, ShadowStyle, CornerIcon, BadgeStyle, CtaStyle, FontPair, TextHighlight, ElementFont } from '@/types';
+import { TextPosition, ShadowStyle, BadgeStyle, CtaStyle, FontPair, TextHighlight, ElementFont } from '@/types';
 import toast from 'react-hot-toast';
 
 // ── ColorPicker: swatch + hex input ─────────────────────────────────────────
@@ -254,9 +255,9 @@ function WordHighlightPicker({ label, text, highlights, onChange, accentColor }:
 
   return (
     <div>
-      <span className="text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider block mb-1.5">{label}</span>
+      <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] block mb-2">{label}</span>
 
-      {/* Word chips — all tokens in order */}
+      {/* Word chips */}
       <div className="flex flex-wrap gap-1 mb-2">
         {tokensWithIdx.map(({ word, wordIdx, tokenIdx }) => {
           const hl = getHighlightForToken(highlights, word, wordIdx);
@@ -267,12 +268,12 @@ function WordHighlightPicker({ label, text, highlights, onChange, accentColor }:
               key={tokenIdx}
               onClick={() => toggleToken(word, wordIdx)}
               className={cn(
-                'px-2 py-0.5 rounded-md text-[10px] border transition-all',
+                'px-2 py-0.5 rounded-lg text-[10px] border transition-all font-medium',
                 isSelected
-                  ? 'border-blue-500 bg-blue-500/20 text-blue-400'
-                  : 'border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:border-black/30 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white'
+                  ? 'border-blue-500/60 bg-blue-500/15 text-blue-500 dark:text-blue-400'
+                  : 'border-black/[0.07] dark:border-white/[0.07] text-gray-900/50 dark:text-white/40 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white bg-[var(--surface-elevated)]'
               )}
-              style={hl && !isSelected ? { borderColor: hl.color + '90', backgroundColor: hl.color + '18', color: hl.color } : {}}
+              style={hl && !isSelected ? { borderColor: hl.color + '80', backgroundColor: hl.color + '15', color: hl.color } : {}}
             >
               {word}
             </button>
@@ -280,31 +281,31 @@ function WordHighlightPicker({ label, text, highlights, onChange, accentColor }:
         })}
       </div>
 
-      {/* Options panel — only when tokens are selected */}
+      {/* Options panel */}
       {hasSelection && (
-        <div className="border border-black/10 dark:border-white/10 rounded-lg p-2 flex flex-col gap-2 bg-black/5 dark:bg-white/5">
-          <span className="text-[10px] text-gray-900/50 dark:text-white/50">
+        <div className="rounded-xl border border-black/[0.07] dark:border-white/[0.07] p-3 flex flex-col gap-2.5 bg-[var(--surface-elevated)]">
+          <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35">
             {selected.size} palavra{selected.size > 1 ? 's' : ''} selecionada{selected.size > 1 ? 's' : ''}
           </span>
           <ColorPicker label="Cor" value={pendingColor} onChange={setPendingColor} />
           <div>
-            <span className="text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider block mb-1">Fonte</span>
+            <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] block mb-1.5">Fonte</span>
             <ElementFontPicker value={pendingFont} onChange={setPendingFont} />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <div onClick={() => setPendingUnderline((v) => !v)}
-              className={cn('w-8 h-4 rounded-full relative transition-colors', pendingUnderline ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-              <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', pendingUnderline ? 'left-[18px]' : 'left-0.5')} />
+              className={cn('w-8 h-4 rounded-full relative transition-colors shrink-0', pendingUnderline ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
+              <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all', pendingUnderline ? 'left-[18px]' : 'left-0.5')} />
             </div>
-            <span className="text-[10px] text-gray-900/50 dark:text-white/50">Sublinhado</span>
+            <span className="text-[10px] text-gray-900/50 dark:text-white/40">Sublinhado</span>
           </label>
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             <button onClick={applyHighlight}
-              className="flex-1 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-bold transition-colors hover:bg-gray-700 dark:hover:bg-white/90">
+              className="flex-1 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-bold transition-colors hover:bg-gray-700 dark:hover:bg-white/90">
               Aplicar
             </button>
             <button onClick={removeSelected}
-              className="px-3 py-1.5 rounded-lg border border-red-400/40 text-red-400/70 hover:text-red-400 hover:border-red-400 text-[10px] transition-colors">
+              className="px-3 py-2 rounded-xl border border-red-400/30 text-red-400/60 hover:text-red-400 hover:border-red-400/60 text-[10px] font-medium transition-colors">
               Remover
             </button>
           </div>
@@ -313,10 +314,10 @@ function WordHighlightPicker({ label, text, highlights, onChange, accentColor }:
 
       {/* Active highlights list */}
       {highlights.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap gap-1">
           {highlights.map((hl, i) => (
-            <div key={i} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[9px]"
-              style={{ borderColor: hl.color + '60', background: hl.color + '15' }}>
+            <div key={i} className="flex items-center gap-1 px-1.5 py-1 rounded-lg border text-[9px] font-medium"
+              style={{ borderColor: hl.color + '50', background: hl.color + '12' }}>
               <span style={{ color: hl.color }}>{hl.text}</span>
               <button onClick={() => onChange(highlights.filter((_, j) => j !== i))}
                 className="text-gray-900/30 dark:text-white/30 hover:text-red-400 transition-colors ml-0.5">
@@ -339,17 +340,23 @@ function ColorPicker({ label, value, onChange, className }: ColorPickerProps) {
     if (/^#[0-9A-Fa-f]{6}$/.test(raw)) onChange(raw);
   };
 
+  const validHex = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : value;
+
   return (
-    <div className={cn('flex items-center gap-1.5', className)}>
-      {label && <span className="text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider shrink-0">{label}</span>}
-      <label className="relative w-6 h-6 shrink-0 cursor-pointer">
+    <div className={cn('flex items-center gap-2', className)}>
+      {label && (
+        <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] shrink-0">
+          {label}
+        </span>
+      )}
+      <label className="relative shrink-0 cursor-pointer group">
         <span
-          className="block w-6 h-6 rounded border border-black/20 dark:border-white/20"
-          style={{ background: /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : value }}
+          className="block w-7 h-7 rounded-lg border border-black/10 dark:border-white/10 shadow-sm group-hover:scale-105 transition-transform"
+          style={{ background: validHex }}
         />
         <input
           type="color"
-          value={/^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : value}
+          value={validHex}
           onChange={(e) => { onChange(e.target.value); setHex(e.target.value); }}
           className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
         />
@@ -358,7 +365,7 @@ function ColorPicker({ label, value, onChange, className }: ColorPickerProps) {
         type="text"
         value={hex}
         onChange={(e) => handleHex(e.target.value)}
-        className="w-[72px] px-2 py-1 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-[10px] font-mono focus:outline-none focus:border-black/30 dark:focus:border-white/30"
+        className="w-[76px] px-2 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[10px] font-mono focus:outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
         placeholder="#000000"
         maxLength={7}
       />
@@ -387,13 +394,6 @@ const SHADOW_STYLES: { value: ShadowStyle; label: string }[] = [
   { value: 'none', label: 'Sem Sombra' },
 ];
 
-const CORNER_ICONS: { value: CornerIcon; label: string }[] = [
-  { value: 'none', label: '—' },
-  { value: 'bookmark', label: '🔖' },
-  { value: 'arrow', label: '→' },
-  { value: 'heart', label: '♡' },
-];
-
 const FONT_PAIRS: { value: FontPair; label: string }[] = [
   { value: 'SF Pro Display + IvyOra Text', label: 'SF Pro + IvyOra' },
   { value: 'Space Grotesk + Inter', label: 'Space Grotesk' },
@@ -404,11 +404,11 @@ const FONT_PAIRS: { value: FontPair; label: string }[] = [
   { value: 'Syne + DM Sans', label: 'Syne + DM Sans' },
 ];
 
-export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloadAll, onRefreshSlide }: EditorSidebarProps) {
+export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefreshSlide }: EditorSidebarProps) {
   const {
     slides, activeSlideIndex, style, globalSettings,
     updateActiveSlide, updateGlobalSettings, updateCornersConfig,
-    applyLayoutToNext, setStyle,
+    applyLayoutToNext,
   } = useEditorStore();
 
   const slide = slides[activeSlideIndex];
@@ -421,26 +421,29 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
   const [refineInstruction, setRefineInstruction] = useState('');
   const [refining, setRefining] = useState(false);
 
+  const { generateAll, generateOne, generating, progress } = useGenerateCarouselImages();
+
   if (!slide) return null;
 
-  const handleImageFile = (file: File, type: 'background' | 'grid') => {
+  const handleImageFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const url = e.target?.result as string;
-      if (type === 'background') updateActiveSlide({ backgroundImageUrl: url });
-      else updateActiveSlide({ gridImageUrl: url });
+      // Sync both fields so templates that read either one (editorial prefers
+      // gridImageUrl, minimalist switches on imageType) stay consistent.
+      updateActiveSlide({ backgroundImageUrl: url, gridImageUrl: url });
     };
     reader.readAsDataURL(file);
   };
 
-  const handlePasteImage = async (type: 'background' | 'grid') => {
+  const handlePasteImage = async () => {
     try {
       const items = await navigator.clipboard.read();
       for (const item of items) {
         const imgType = item.types.find((t) => t.startsWith('image/'));
         if (imgType) {
           const blob = await item.getType(imgType);
-          handleImageFile(new File([blob], 'paste.png', { type: imgType }), type);
+          handleImageFile(new File([blob], 'paste.png', { type: imgType }));
           return;
         }
       }
@@ -476,8 +479,8 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
     finally { setRefining(false); }
   };
 
-  const labelCls = 'text-[10px] text-gray-900/40 dark:text-white/40 uppercase tracking-wider';
-  const inputCls = 'w-full px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-xs placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:border-black/30 dark:focus:border-white/30';
+  const labelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
+  const inputCls = 'w-full px-3 py-2 rounded-xl bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-black/[0.06] dark:focus:ring-white/[0.06] focus:border-black/20 dark:focus:border-white/20 transition-all';
 
   /* ─────────────────────────────────────────────────────────────────────────
      Hidden file inputs (used by both modes)
@@ -485,9 +488,9 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
   const fileInputs = (
     <>
       <input ref={bgImageRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0], 'background')} />
+        onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
       <input ref={gridImageRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0], 'grid')} />
+        onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
       <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -500,57 +503,29 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
   );
 
   return (
-    <div className="w-[290px] shrink-0 bg-[var(--surface)] border-r border-black/[0.06] dark:border-white/[0.06] flex flex-col h-full overflow-hidden">
+    <div className="w-[300px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
       {fileInputs}
 
-      {/* Style tabs */}
-      <div className="flex border-b border-black/[0.06] dark:border-white/[0.06]">
-        {(['minimalist', 'profile'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              setStyle(s);
-              // Profile defaults to light theme; minimalist defaults to dark
-              if (s === 'profile') updateGlobalSettings({ theme: 'light' });
-              else updateGlobalSettings({ theme: 'dark' });
-            }}
-            className={cn(
-              'flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors',
-              style === s ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white' : 'text-gray-900/30 dark:text-white/30 hover:text-gray-900/60 dark:hover:text-white/60'
-            )}
-          >
-            {s === 'minimalist' ? 'Minimalista' : 'Profile'}
-          </button>
-        ))}
-      </div>
-
-      {/* Theme toggle — slide content theme (dark/light slide) */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-black/[0.06] dark:border-white/[0.06]">
-        <span className={labelCls}>Tema do slide</span>
-        <div className="flex rounded-lg overflow-hidden border border-black/10 dark:border-white/10">
-          <button
-            onClick={() => updateGlobalSettings({ theme: 'dark' })}
-            className={cn('px-2.5 py-1 text-[10px] transition-colors', theme === 'dark' ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white')}
-          >
-            Escuro
-          </button>
-          <button
-            onClick={() => updateGlobalSettings({ theme: 'light' })}
-            className={cn('px-2.5 py-1 text-[10px] transition-colors', theme === 'light' ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white')}
-          >
-            Claro
-          </button>
+      {/* Theme toggle — only for profile (Twitter) style */}
+      {style === 'profile' && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.05] dark:border-white/[0.05]">
+          <span className={labelCls}>Tema do slide</span>
+          <div className="flex rounded-lg overflow-hidden bg-black/[0.05] dark:bg-white/[0.05] p-0.5 gap-0.5">
+            <button
+              onClick={() => updateGlobalSettings({ theme: 'dark' })}
+              className={cn('px-3 py-1 text-[9px] font-semibold rounded-md transition-all', theme === 'dark' ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900/70 dark:hover:text-white/70')}
+            >
+              Escuro
+            </button>
+            <button
+              onClick={() => updateGlobalSettings({ theme: 'light' })}
+              className={cn('px-3 py-1 text-[9px] font-semibold rounded-md transition-all', theme === 'light' ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900/70 dark:hover:text-white/70')}
+            >
+              Claro
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Generate with AI */}
-      <button
-        onClick={onOpenWizard}
-        className="flex items-center gap-2 px-3 py-2.5 text-xs text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/[0.06] dark:border-white/[0.06] w-full text-left"
-      >
-        <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-        Gerar com IA
-      </button>
+      )}
 
       {/* ── SCROLLABLE CONTENT ── */}
       <div className="flex-1 overflow-y-auto">
@@ -662,92 +637,73 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                 onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
                 unit="em"
               />
-              <div>
-                <span className={labelCls + ' block mb-1.5'}>Margens do texto</span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Slider
-                    label="Topo"
-                    value={slide.textPadding?.top ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: v, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
-                    unit="px"
-                  />
-                  <Slider
-                    label="Bottom"
-                    value={slide.textPadding?.bottom ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: v, left: slide.textPadding?.left ?? 0 } })}
-                    unit="px"
-                  />
-                  <Slider
-                    label="Left"
-                    value={slide.textPadding?.left ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: v } })}
-                    unit="px"
-                  />
-                  <Slider
-                    label="Right"
-                    value={slide.textPadding?.right ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: v, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
-                    unit="px"
-                  />
-                </div>
-              </div>
             </Section>
 
             {/* 3. Mídia */}
             <Section title="Imagem / Vídeo">
               {/* Image upload */}
               <div
-                className="border border-dashed border-black/20 dark:border-white/20 rounded-lg p-3 text-center text-xs text-gray-900/30 dark:text-white/30 cursor-pointer hover:border-black/40 dark:hover:border-white/40 hover:text-gray-900/50 dark:hover:text-white/50 transition-colors"
+                className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
                 onClick={() => bgImageRef.current?.click()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
                   const f = e.dataTransfer.files[0];
-                  if (f?.type.startsWith('image/')) handleImageFile(f, 'background');
+                  if (f?.type.startsWith('image/')) handleImageFile(f);
                 }}
               >
-                <div className="flex items-center justify-center gap-3 text-gray-900/20 dark:text-white/20 mb-1">
-                  <Image className="w-4 h-4" />
-                </div>
-                <span className="text-[10px]">Arraste ou clique para adicionar</span>
+                <Image className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
+                <span className="text-[10px] font-medium text-gray-900/35 dark:text-white/35">Arraste ou clique para adicionar</span>
               </div>
 
               {/* Quick actions row */}
-              <div className="flex gap-1">
+              <div className="flex gap-2">
                 <button
                   onClick={() => bgImageRef.current?.click()}
-                  className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[10px] text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/35 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
                 >
                   <Image className="w-3 h-3" /> Imagem
                 </button>
                 <button
-                  onClick={() => handlePasteImage('background')}
-                  className="py-1.5 px-2 rounded-lg border border-black/10 dark:border-white/10 text-[10px] text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+                  onClick={() => handlePasteImage()}
+                  className="py-2 px-3 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] text-gray-900/40 dark:text-white/35 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
                   title="Colar do clipboard"
                 >
                   <Clipboard className="w-3 h-3" />
                 </button>
               </div>
 
+              {/* AI image generation */}
+              <div className="flex flex-col gap-1.5 pt-1">
+                <button
+                  onClick={() => generateOne(activeSlideIndex, 'openai')}
+                  disabled={generating}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {generating
+                    ? (progress.total > 1 ? `Gerando ${progress.done}/${progress.total}…` : 'Gerando…')
+                    : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
+                </button>
+                <button
+                  onClick={() => generateAll('openai')}
+                  disabled={generating}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {generating && progress.total > 1
+                    ? `Gerando ${progress.done}/${progress.total}…`
+                    : `Gerar para todos os ${slides.length} slides`}
+                </button>
+              </div>
+
               {/* Current media status */}
               {(slide.backgroundImageUrl || slide.gridImageUrl) && (
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-green-400/80">Imagem carregada</span>
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
                   <button
                     onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })}
-                    className="text-[10px] text-red-400/60 hover:text-red-400 transition-colors flex items-center gap-1"
+                    className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1"
                   >
                     <X className="w-3 h-3" /> Remover
                   </button>
@@ -789,32 +745,66 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
              MINIMALIST SIDEBAR — full editor
              ════════════════════════════════ */
           <>
-            {/* IMAGEM DE FUNDO */}
+            {/* IMAGEM */}
             <Section title={`Conteúdo — Slide ${activeSlideIndex + 1}`} defaultOpen>
-              <Section title="Imagem de Fundo" defaultOpen>
+              <Section title="Imagem" defaultOpen>
                 <div
-                  className="border border-dashed border-black/20 dark:border-white/20 rounded-lg p-3 text-center text-xs text-gray-900/30 dark:text-white/30 cursor-pointer hover:border-black/40 dark:hover:border-white/40 hover:text-gray-900/50 dark:hover:text-white/50 transition-colors"
+                  className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
                   onClick={() => bgImageRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
                     const f = e.dataTransfer.files[0];
-                    if (f) handleImageFile(f, 'background');
+                    if (f) handleImageFile(f);
                   }}
                 >
-                  <Upload className="w-4 h-4 mx-auto mb-1 opacity-50" />
-                  Clique ou arraste
+                  <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
+                  <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
                 </div>
-                <button onClick={() => handlePasteImage('background')} className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-white/10 text-[10px] text-white/40 hover:text-white hover:border-white/30 transition-colors">
+                <button onClick={() => handlePasteImage()} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
                   <Clipboard className="w-3 h-3" /> Colar do clipboard
                 </button>
-                {slide.backgroundImageUrl && (
-                  <div className="flex gap-1">
-                    <button onClick={() => updateActiveSlide({ gridImageUrl: slide.backgroundImageUrl, backgroundImageUrl: '' })} className="flex-1 text-[10px] text-gray-900/40 dark:text-white/40 hover:text-gray-900/60 dark:hover:text-white/60 transition-colors text-left">
-                      → Aplicar ao Fundo
-                    </button>
-                    <button onClick={() => updateActiveSlide({ backgroundImageUrl: '' })} className="text-[10px] text-red-400/60 hover:text-red-400 transition-colors">
-                      Limpar
+
+                {/* AI image generation */}
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={() => generateOne(activeSlideIndex, 'openai')}
+                    disabled={generating}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {generating
+                      ? (progress.total > 1 ? `Gerando ${progress.done}/${progress.total}…` : 'Gerando…')
+                      : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
+                  </button>
+                  <button
+                    onClick={() => generateAll('openai')}
+                    disabled={generating}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {generating && progress.total > 1
+                      ? `Gerando ${progress.done}/${progress.total}…`
+                      : `Gerar para todos os ${slides.length} slides`}
+                  </button>
+                </div>
+
+                <div>
+                  <span className={labelCls + ' block mb-1'}>URL da imagem</span>
+                  <input
+                    type="text"
+                    className={inputCls}
+                    placeholder="https://..."
+                    value={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+                    onChange={(e) => updateActiveSlide({ backgroundImageUrl: e.target.value, gridImageUrl: e.target.value })}
+                    spellCheck={false}
+                  />
+                </div>
+                {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
+                    <button onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1">
+                      <X className="w-3 h-3" /> Limpar
                     </button>
                   </div>
                 )}
@@ -876,8 +866,8 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                   className={cn(
                     'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
                     slide.titleUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black'
-                      : 'border-black/20 dark:border-white/20 text-gray-900/40 dark:text-white/40 hover:border-black/40 dark:hover:border-white/40'
+                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
                   )}
                 >
                   <Underline className="w-3 h-3" />
@@ -907,8 +897,8 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                   className={cn(
                     'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
                     slide.descriptionUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black'
-                      : 'border-black/20 dark:border-white/20 text-gray-900/40 dark:text-white/40 hover:border-black/40 dark:hover:border-white/40'
+                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
                   )}
                 >
                   <Underline className="w-3 h-3" />
@@ -919,35 +909,6 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                 <ElementFontPicker
                   value={slide.descriptionFont}
                   onChange={(v) => updateActiveSlide({ descriptionFont: v })}
-                />
-              </div>
-
-              {/* ── Subtítulo ── */}
-              <div className="mt-2">
-                <span className={labelCls}>Texto extra (subtítulo)</span>
-                <input className={cn(inputCls, 'mt-1')} value={slide.subtitle || ''}
-                  onChange={(e) => updateActiveSlide({ subtitle: e.target.value })} placeholder="Subtítulo opcional" />
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <ColorPicker value={slide.subtitleColor || 'rgba(255,255,255,0.7)'} onChange={(v) => updateActiveSlide({ subtitleColor: v })} label="Cor" />
-                <button
-                  onClick={() => updateActiveSlide({ subtitleUnderline: !slide.subtitleUnderline })}
-                  title="Sublinhado"
-                  className={cn(
-                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-                    slide.subtitleUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black'
-                      : 'border-black/20 dark:border-white/20 text-gray-900/40 dark:text-white/40 hover:border-black/40 dark:hover:border-white/40'
-                  )}
-                >
-                  <Underline className="w-3 h-3" />
-                </button>
-              </div>
-              <div>
-                <span className={labelCls + ' block mb-1'}>Fonte subtítulo</span>
-                <ElementFontPicker
-                  value={slide.subtitleFont}
-                  onChange={(v) => updateActiveSlide({ subtitleFont: v })}
                 />
               </div>
 
@@ -972,49 +933,6 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                 onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
                 unit="em"
               />
-
-              {/* ── Margens do bloco de texto ── */}
-              <div>
-                <span className={labelCls + ' block mb-1.5'}>Margens do texto</span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Slider
-                    label="Topo"
-                    value={slide.textPadding?.top ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: v, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
-                    unit="px"
-                  />
-                  <Slider
-                    label="Bottom"
-                    value={slide.textPadding?.bottom ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: v, left: slide.textPadding?.left ?? 0 } })}
-                    unit="px"
-                  />
-                  <Slider
-                    label="Left"
-                    value={slide.textPadding?.left ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: slide.textPadding?.right ?? 0, bottom: slide.textPadding?.bottom ?? 0, left: v } })}
-                    unit="px"
-                  />
-                  <Slider
-                    label="Right"
-                    value={slide.textPadding?.right ?? 0}
-                    min={0}
-                    max={120}
-                    step={1}
-                    onChange={(v) => updateActiveSlide({ textPadding: { top: slide.textPadding?.top ?? 0, right: v, bottom: slide.textPadding?.bottom ?? 0, left: slide.textPadding?.left ?? 0 } })}
-                    unit="px"
-                  />
-                </div>
-              </div>
 
               {/* ── Destaques título ── */}
               <WordHighlightPicker
@@ -1057,7 +975,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                       updateActiveSlide({ textPosition: pos, textOffset: undefined, textAlignment: autoAlign });
                     }} title={pos}
                       className={cn('h-7 rounded text-[8px] transition-colors border',
-                        slide.textPosition === pos ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white' : 'bg-black/5 dark:bg-white/5 text-gray-900/30 dark:text-white/30 border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30'
+                        slide.textPosition === pos ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
                       )}
                     >
                       {pos === 'top-left' ? '↖' : pos === 'top-center' ? '↑' : pos === 'top-right' ? '↗'
@@ -1072,24 +990,42 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                       key={align}
                       onClick={() => updateActiveSlide({ textAlignment: align })}
                       className={cn('h-7 rounded text-[8px] transition-colors border',
-                        slide.textAlignment === align ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white' : 'bg-black/5 dark:bg-white/5 text-gray-900/30 dark:text-white/30 border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30'
+                        slide.textAlignment === align ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
                       )}
                     >
                       {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
                     </button>
                   ))}
                 </div>
+                {style === 'editorial' && (
+                  <div className="mt-3 space-y-2">
+                    <Slider
+                      label="Mover título ↕"
+                      value={slide.editorialTitleOffsetY ?? 0}
+                      min={-500} max={500} step={1}
+                      onChange={(v) => updateActiveSlide({ editorialTitleOffsetY: v })}
+                      unit="px"
+                    />
+                    <Slider
+                      label="Mover descrição ↕"
+                      value={slide.editorialDescOffsetY ?? 0}
+                      min={-500} max={500} step={1}
+                      onChange={(v) => updateActiveSlide({ editorialDescOffsetY: v })}
+                      unit="px"
+                    />
+                  </div>
+                )}
               </div>
             </Section>
 
             {/* REFINAR COM IA */}
             <Section title="Refinar com IA">
-              <textarea className={cn(inputCls, 'resize-none h-14')}
+              <textarea className={cn(inputCls, 'resize-none h-16')}
                 placeholder="Ex: deixe mais resumido, tom humorístico..."
                 value={refineInstruction} onChange={(e) => setRefineInstruction(e.target.value)} />
               <button onClick={handleRefine} disabled={refining}
-                className="w-full py-1.5 rounded-lg bg-black/10 dark:bg-white/10 text-gray-900 dark:text-white text-[10px] font-bold hover:bg-black/20 dark:hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1">
-                <Wand2 className="w-3 h-3" />
+                className="w-full py-2.5 rounded-xl bg-[var(--surface-elevated)] text-gray-900 dark:text-white text-[10px] font-semibold hover:bg-black/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5 border border-black/[0.07] dark:border-white/[0.07]">
+                <Wand2 className="w-3.5 h-3.5" />
                 {refining ? 'Refinando...' : 'Refinar slide'}
               </button>
             </Section>
@@ -1097,7 +1033,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
             {/* ESTILO GLOBAL */}
             <Section title="Estilo Global">
               <ColorPicker label="Cor de destaque" value={accentColor} onChange={(v) => updateGlobalSettings({ accentColor: v })} />
-              <button onClick={applyLayoutToNext} className="w-full py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[10px] text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors">
+              <button onClick={applyLayoutToNext} className="w-full py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/35 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
                 Aplicar layout no próximo slide →
               </button>
             </Section>
@@ -1108,7 +1044,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                 {FONT_PAIRS.map((fp) => (
                   <button key={fp.value} onClick={() => updateGlobalSettings({ fontPair: fp.value })}
                     className={cn('w-full px-2.5 py-1.5 rounded-lg text-[10px] text-left transition-colors border',
-                      fontPair === fp.value ? 'bg-white text-black border-white font-semibold' : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white'
+                      fontPair === fp.value ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white font-semibold shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/50 dark:text-white/40 border-black/[0.07] dark:border-white/[0.07] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white'
                     )}
                   >
                     {fp.label}
@@ -1127,7 +1063,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
               </label>
               {corners.show && (
                 <>
-                  {(['topLeft', 'topRight', 'bottomLeft'] as const).map((key) => (
+                  {(['topLeft', 'topRight'] as const).map((key) => (
                     <div key={key} className="flex items-center gap-2">
                       <div onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
                         className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0', corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
@@ -1137,22 +1073,6 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                         onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} placeholder={key} />
                     </div>
                   ))}
-                  <div className="flex items-center gap-1.5">
-                    <div onClick={() => updateCornersConfig({ bottomRight: { ...corners.bottomRight, visible: !corners.bottomRight.visible } })}
-                      className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0', corners.bottomRight.visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
-                      {corners.bottomRight.visible && <span className="text-black text-[8px] font-bold">✓</span>}
-                    </div>
-                    <input className={cn(inputCls, 'flex-1 text-[10px]')} value={corners.bottomRight.text}
-                      onChange={(e) => updateCornersConfig({ bottomRight: { ...corners.bottomRight, text: e.target.value } })} />
-                    <div className="flex gap-0.5">
-                      {CORNER_ICONS.map((ic) => (
-                        <button key={ic.value} onClick={() => updateCornersConfig({ bottomRight: { ...corners.bottomRight, icon: ic.value } })}
-                          className={cn('w-6 h-6 rounded text-[10px] transition-colors', corners.bottomRight.icon === ic.value ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'bg-black/5 dark:bg-white/5 text-gray-900/40 dark:text-white/40 hover:bg-black/10 dark:hover:bg-white/10')}>
-                          {ic.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
                   <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} onChange={(v) => updateCornersConfig({ borderDistance: v })} unit="px" />
                   <Slider label="Opacidade" value={corners.opacity} min={0} max={100} onChange={(v) => updateCornersConfig({ opacity: v })} unit="%" />
@@ -1169,12 +1089,6 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                       onChange={(v) => updateCornersConfig({ elementFont: v })}
                     />
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <div onClick={() => updateCornersConfig({ glass: !corners.glass })} className={cn('w-8 h-4 rounded-full relative transition-colors', corners.glass ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-                      <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.glass ? 'left-[18px]' : 'left-0.5')} />
-                    </div>
-                    <span className="text-[10px] text-gray-900/50 dark:text-white/50">Efeito glass</span>
-                  </label>
                 </>
               )}
             </Section>
@@ -1202,7 +1116,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                   <div className="flex gap-1">
                     {(['solid', 'minimal', 'glass'] as BadgeStyle[]).map((s) => (
                       <button key={s} onClick={() => updateGlobalSettings({ profileBadge: { ...profileBadge, style: s } })}
-                        className={cn('flex-1 py-1 rounded text-[9px] capitalize transition-colors', profileBadge.style === s ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'bg-black/5 dark:bg-white/5 text-gray-900/40 dark:text-white/40 hover:bg-black/10 dark:hover:bg-white/10')}>
+                        className={cn('flex-1 py-1 rounded text-[9px] capitalize transition-colors', profileBadge.style === s ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white')}>
                         {s}
                       </button>
                     ))}
@@ -1230,7 +1144,7 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
                   <div className="flex gap-1">
                     {(['solid', 'outline', 'glass'] as CtaStyle[]).map((s) => (
                       <button key={s} onClick={() => updateActiveSlide({ ctaButton: { ...slide.ctaButton, style: s } })}
-                        className={cn('flex-1 py-1 rounded text-[9px] capitalize transition-colors', slide.ctaButton.style === s ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'bg-black/5 dark:bg-white/5 text-gray-900/40 dark:text-white/40 hover:bg-black/10 dark:hover:bg-white/10')}>
+                        className={cn('flex-1 py-1 rounded text-[9px] capitalize transition-colors', slide.ctaButton.style === s ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white')}>
                         {s}
                       </button>
                     ))}
@@ -1243,19 +1157,19 @@ export default function EditorSidebar({ onOpenWizard, onDownloadSlide, onDownloa
       </div>
 
       {/* Footer */}
-      <div className="border-t border-black/[0.06] dark:border-white/[0.06] p-3 flex flex-col gap-2">
+      <div className="border-t border-black/[0.05] dark:border-white/[0.05] px-4 py-4 flex flex-col gap-2.5 bg-[var(--surface)]">
         <button
           onClick={onDownloadSlide}
-          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-bold hover:bg-gray-700 dark:hover:bg-white/90 active:scale-[0.98] transition-all shadow-sm"
         >
           <Download className="w-3.5 h-3.5" />
           Baixar Slide {activeSlideIndex + 1}
         </button>
         <div className="flex gap-2">
-          <button onClick={onRefreshSlide} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[10px] text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors">
+          <button onClick={onRefreshSlide} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
             <RefreshCw className="w-3 h-3" /> Atualizar
           </button>
-          <button onClick={onDownloadAll} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[10px] text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors">
+          <button onClick={onDownloadAll} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
             <Archive className="w-3 h-3" /> ZIP ({slides.length})
           </button>
         </div>

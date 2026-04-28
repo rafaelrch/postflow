@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const protectedPrefixes = ['/dashboard', '/generator', '/agenda', '/news', '/twitter', '/setup', '/onboarding'];
+const authPrefixes = ['/login', '/cadastro'];
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -24,7 +27,27 @@ export async function proxy(request: NextRequest) {
   );
 
   // Refresh session so it doesn't expire
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+  const isProtected = protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  const isAuthRoute = authPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+
+  if (!user && isProtected) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('next', pathname + request.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isAuthRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = request.nextUrl.searchParams.get('next') || '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
