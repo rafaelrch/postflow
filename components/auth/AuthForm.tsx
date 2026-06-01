@@ -11,7 +11,17 @@ import { createClient } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'signup';
 
-export default function AuthForm({ mode }: { mode: AuthMode }) {
+export default function AuthForm({
+  mode,
+  lockedEmail,
+  planLabel,
+}: {
+  mode: AuthMode;
+  /** E-mail pago no checkout — quando presente, fica travado no form. */
+  lockedEmail?: string;
+  /** Rótulo do plano assinado (Mensal/Anual) exibido acima do form. */
+  planLabel?: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '/dashboard';
@@ -19,16 +29,13 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(lockedEmail ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
 
   const title = isSignup ? 'Criar conta' : 'Entrar';
-  const subtitle = isSignup
-    ? 'Crie seu acesso. Depois disso vamos completar o branding da marca antes de liberar o studio.'
-    : 'Entre para acessar seu studio e manter todos os conteúdos vinculados ao seu usuário.';
 
   const redirectTo = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
@@ -93,67 +100,35 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
   };
 
   return (
-    <main className="min-h-screen grid lg:grid-cols-[minmax(0,1fr)_520px]" style={{ background: 'var(--paper)' }}>
-      <section className="hidden lg:flex relative overflow-hidden border-r" style={{ borderColor: 'var(--line)' }}>
-        <div className="absolute inset-0 grid-bg opacity-70" />
-        <div className="relative z-10 flex flex-col justify-between w-full p-10">
-          <Link href="/" className="flex items-center gap-3 self-start">
-            <span className="brand-mark sm">
-              <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={26} height={26} priority />
-            </span>
-            <div className="flex flex-col leading-none">
-              <span className="font-semibold tracking-tight text-[15px]" style={{ color: 'var(--ink)' }}>creatools</span>
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] mt-0.5" style={{ color: 'var(--ink-dim)' }}>
-                Studio SaaS
-              </span>
-            </div>
-          </Link>
+    <main className="min-h-screen flex flex-col items-center px-5 py-10" style={{ background: 'var(--paper)' }}>
+      <Link href="/" className="flex items-center" aria-label="Creatools">
+        <Image
+          src="/LOGO_SEMFUNDO.png"
+          alt="Creatools"
+          width={268}
+          height={80}
+          priority
+          className="h-16 w-auto object-contain dark:invert"
+        />
+      </Link>
 
-          <div className="max-w-[640px]">
-            <p className="section-kicker flex items-center gap-2 mb-5">
-              <span className="dot-live" />
-              Workspace privado
-            </p>
-            <h1 className="section-title" style={{ fontSize: 'clamp(52px, 7vw, 92px)' }}>
-              Seu conteúdo com{' '}
-              <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>dono certo.</span>
-            </h1>
-            <p className="mt-6 max-w-[520px] text-[15px] leading-7" style={{ color: 'var(--ink-dim)' }}>
-              Cada projeto, carrossel, notícia, tweet, template e agendamento fica salvo no Supabase e relacionado ao usuário autenticado.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 max-w-[620px]">
-            {['Projetos', 'Templates', 'Agenda'].map((item) => (
-              <div key={item} className="brand-card" style={{ padding: 16, boxShadow: 'var(--sh-1)' }}>
-                <CheckCircle2 className="w-4 h-4 mb-3" style={{ color: 'var(--accent)' }} />
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: 'var(--ink-dim)' }}>{item}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="flex min-h-screen items-center justify-center px-5 py-10">
+      <div className="flex-1 w-full flex items-center justify-center">
         <div className="w-full max-w-[420px]">
-          <div className="lg:hidden mb-8 flex items-center gap-3">
-            <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={28} height={28} priority />
-            <span className="font-semibold tracking-tight">creatools</span>
-          </div>
-
-          <div className="mb-8">
-            <p className="section-kicker mb-3">{isSignup ? 'Novo workspace' : 'Acesso ao studio'}</p>
-            <h1 className="section-title" style={{ fontSize: 46 }}>{title}</h1>
-            <p className="mt-4 text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>{subtitle}</p>
+          <div className="mb-6 text-center">
+            <h1 className="section-title" style={{ fontSize: 40 }}>{title}</h1>
+            {isSignup && planLabel && (
+              <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-dim)' }}>
+                Plano <strong style={{ color: 'var(--accent)' }}>{planLabel}</strong> ativado — crie sua conta para acessar.
+              </p>
+            )}
           </div>
 
           {confirmationSent ? (
             <div className="brand-card" style={{ padding: 24 }}>
               <CheckCircle2 className="w-8 h-8 mb-4" style={{ color: 'var(--success)' }} />
-              <h2 className="font-display text-[30px] leading-none mb-3">Confirme seu e-mail</h2>
+              <h2 className="font-display text-[26px] leading-none mb-3">Confirme seu e-mail</h2>
               <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
                 Se a confirmação por e-mail estiver ativa no Supabase, o link foi enviado para <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
-                Se nada chegar, confira Auth → Providers → Email e SMTP no painel do Supabase.
               </p>
               <Button className="mt-6 w-full" onClick={() => router.push(`/login?next=${encodeURIComponent(next)}`)}>
                 Ir para login
@@ -169,12 +144,12 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                 </>
               )}
 
-              <Field icon={Mail} label="E-mail" value={email} onChange={setEmail} placeholder="voce@email.com" type="email" autoComplete="email" required />
+              <Field icon={Mail} label="E-mail" value={email} onChange={setEmail} placeholder="voce@email.com" type="email" autoComplete="email" required readOnly={!!lockedEmail} />
 
               <div>
                 <label className="section-kicker block mb-2">Senha</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--ink-dim)' }} />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--ink-dim)' }} />
                   <input
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -183,7 +158,8 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                     required
                     autoComplete={isSignup ? 'new-password' : 'current-password'}
                     placeholder="mínimo 6 caracteres"
-                    className="brand-input pl-10 pr-11"
+                    className="brand-input"
+                    style={{ paddingLeft: 40, paddingRight: 44 }}
                   />
                   <button
                     type="button"
@@ -211,7 +187,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
             </Link>
           </p>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
@@ -232,11 +208,17 @@ function Field({
     <div>
       <label className="section-kicker block mb-2">{label}</label>
       <div className="relative">
-        {Icon ? <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--ink-dim)' }} /> : null}
+        {Icon ? (
+          <Icon
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+            style={{ color: 'var(--ink-dim)' }}
+          />
+        ) : null}
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={Icon ? 'brand-input pl-10' : 'brand-input'}
+          className="brand-input"
+          style={Icon ? { paddingLeft: 40 } : undefined}
           {...props}
         />
       </div>

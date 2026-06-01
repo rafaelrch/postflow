@@ -275,7 +275,7 @@ export const DEFAULT_SLIDE: Omit<Slide, 'id' | 'position'> = {
   shadow: { style: 'base', opacity: 88 },
   backgroundColor: '#111111',
   textPosition: 'bottom-left',
-  fontSize: { title: 70, description: 30 },
+  fontSize: { title: 70, description: 36 },
   lineHeight: 1.2,
   subtitle: '',
   textOffset: undefined,

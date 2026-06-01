@@ -47,6 +47,8 @@ export default function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -84,6 +86,24 @@ export default function AppSidebar() {
           if (!active) return;
           const resolved = profile?.name?.trim() || metaName || profile?.brand_name?.trim() || '';
           if (resolved) setUserName(resolved);
+        });
+
+      supabase
+        .from('user_active_subscription')
+        .select('plan_interval')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }: { data: { plan_interval: string | null } | null }) => {
+          if (active && data?.plan_interval) setPlanLabel(data.plan_interval === 'year' ? 'Anual' : 'Mensal');
+        });
+
+      supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }: { data: { balance: number | null } | null }) => {
+          if (active && typeof data?.balance === 'number') setCredits(data.balance);
         });
     });
 
@@ -224,13 +244,14 @@ export default function AppSidebar() {
         className={cn('shrink-0 py-3 border-t', collapsed ? 'px-2' : 'px-3')}
         style={{ borderColor: 'var(--line)' }}
       >
-        <div
+        <Link
+          href="/conta"
           className={cn(
-            'flex items-center mb-2 rounded-[10px]',
+            'flex items-center mb-2 rounded-[10px] transition-colors hover:border-[var(--ink)]',
             collapsed ? 'justify-center p-1.5' : 'gap-3 px-2 py-2.5'
           )}
           style={{ background: 'var(--paper)', border: '1.5px solid var(--line)' }}
-          title={collapsed ? `${userName || 'Usuário'}${userEmail ? ` · ${userEmail}` : ''}` : undefined}
+          title={collapsed ? `Conta — ${userName || 'Usuário'}` : 'Ver conta e assinatura'}
         >
           <span
             className="grid place-items-center w-8 h-8 rounded-full shrink-0 font-semibold text-[13px]"
@@ -258,9 +279,19 @@ export default function AppSidebar() {
               >
                 {userEmail || '—'}
               </span>
+              {planLabel && (
+                <span className="mt-1.5 flex items-center gap-1.5">
+                  <span className="chip filled text-[9px] py-[1px] px-[6px]">{planLabel}</span>
+                  {credits !== null && (
+                    <span className="font-mono text-[10px]" style={{ color: 'var(--ink-dim)' }}>
+                      {credits} créditos
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
           )}
-        </div>
+        </Link>
         <button
           onClick={handleSignOut}
           className={cn('brand-btn ghost w-full mb-2', collapsed ? 'justify-center' : 'justify-start')}

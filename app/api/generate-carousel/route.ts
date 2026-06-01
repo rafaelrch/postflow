@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT } from '@/lib/openai';
+import { requireCredits, refundCredits } from '@/lib/subscription';
+import { CREDIT_COSTS } from '@/lib/credits';
 import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
 
 export const maxDuration = 60;
@@ -24,8 +26,17 @@ function parseAIJson(text: string): CarouselAIResponse {
 }
 
 export async function POST(req: NextRequest) {
+  let userId: string | null = null;
+  let charged = 0;
   try {
     const body: GenerateCarouselInput & { manual?: boolean } = await req.json();
+
+    // Geração manual (esqueleto vazio) não consome créditos; só exige assinatura.
+    const cost = body.manual ? 0 : CREDIT_COSTS.carousel;
+    const guard = await requireCredits(cost);
+    if (!guard.ok) return guard.response;
+    userId = guard.userId;
+    charged = cost;
 
     if (body.manual) {
       const slides = Array.from({ length: body.slideCount }, (_, i) => ({
@@ -78,6 +89,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(aiData);
   } catch (err) {
+    // Geração falhou após debitar: estorna os créditos.
+    if (userId && charged > 0) await refundCredits(userId, charged);
     console.error('[generate-carousel]', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erro interno' },

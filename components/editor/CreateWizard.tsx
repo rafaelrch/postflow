@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
@@ -165,9 +165,30 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   const [slideCount, setSlideCount] = useState(6);
   const [imageType, setImageType] = useState<ImageType>('mixed');
   const [twitterFormat, setTwitterFormat] = useState<TwitterFormat>('B');
-  const [referenceImageBase64, setReferenceImageBase64] = useState<string | null>(null);
   const [fontPair, setFontPair] = useState<FontPair>('SF Pro Display + IvyOra Text');
-  const [accentColor] = useState('#00CFFF');
+  // Brand palette loaded from profile: [dark, paper/light, accent]
+  const DEFAULT_BRAND_PALETTE = ['#0A0A0A', '#FAFAF7', '#00CFFF'];
+  const [brandPalette, setBrandPalette] = useState<string[]>(DEFAULT_BRAND_PALETTE);
+  const accentColor = brandPalette[2] || '#00CFFF';
+  const brandDarkBg = brandPalette[0] || '#0A0A0A';
+  const brandLightBg = brandPalette[1] || '#FFFFFF';
+
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('brand_palette')
+        .eq('id', user.id)
+        .single();
+      if (data?.brand_palette && Array.isArray(data.brand_palette) && data.brand_palette.length >= 3) {
+        setBrandPalette(data.brand_palette);
+      }
+    };
+    load();
+  }, []);
   const [profileData, setProfileData] = useState<ProfileData>({
     handle: '',
     name: '',
@@ -178,32 +199,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   const [manualSlides, setManualSlides] = useState<ManualSlide[]>(makeDefaultManualSlides(6));
   const [loading, setLoading] = useState(false);
 
-  const fileRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
-
-  const handleImageUpload = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => setReferenceImageBase64(e.target?.result as string);
-    reader.readAsDataURL(file);
-  }, []);
-
-  const handlePasteImage = useCallback(async () => {
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imgType = item.types.find((t) => t.startsWith('image/'));
-        if (imgType) {
-          const blob = await item.getType(imgType);
-          handleImageUpload(new File([blob], 'paste.png', { type: imgType }));
-          return;
-        }
-      }
-      toast.error('Nenhuma imagem no clipboard');
-    } catch {
-      toast.error('Não foi possível acessar o clipboard');
-    }
-  }, [handleImageUpload]);
 
   // Sync manual slides count with slideCount slider
   const updateSlideCount = (n: number) => {
@@ -276,7 +273,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             generateImages: false,
             fontPair,
             accentColor,
-            referenceImageBase64: referenceImageBase64 || undefined,
             profileData: style === 'profile' ? profileData : undefined,
             twitterFormat: style === 'profile' ? twitterFormat : undefined,
           }),
@@ -322,7 +318,13 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         } : {}),
       };
 
-      const editorSlides = slides.map((sl, i) => ({
+      const editorSlides = slides.map((sl, i) => {
+        // Map AI's hardcoded background to the user's brand palette,
+        // preserving the dark/light intent the AI chose for the slide.
+        const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
+        const aiWantsLight = aiBg === '#FFFFFF';
+        const slideBg = aiWantsLight ? brandLightBg : brandDarkBg;
+        return ({
         id: `tmp-${i}-${Date.now()}`,
         position: i,
         title: sl.title,
@@ -334,15 +336,16 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         imageType,
         imagePosition: { x: 50, y: 50, zoom: 175 },
         shadow: { style: 'base', opacity: 88 },
-        backgroundColor: sl.backgroundColor || '#111111',
+        backgroundColor: slideBg,
         textPosition: (i === 0 ? 'bottom-center' : 'bottom-left') as 'bottom-center' | 'bottom-left',
         textAlignment: (i === 0 ? 'center' : 'left') as 'center' | 'left',
         fontSize: style === 'profile'
           ? { title: 32, description: 26 }
-          : { title: i === 0 ? 90 : 70, description: 30 },
+          : { title: i === 0 ? 90 : 70, description: 36 },
         lineHeight: 1.2,
         ctaButton: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid' as const, position: 'bottom-center' as const },
-      }));
+        });
+      });
 
       const openEditor = (carouselId: string | null, carouselTitle: string) => {
         loadCarousel({
@@ -385,7 +388,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           throw new Error(carouselError?.message || 'Falha ao salvar carrossel');
         }
 
-        const slidesPayload = slides.map((sl, i) => ({
+        const slidesPayload = slides.map((sl, i) => {
+          const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
+          const slideBg = aiBg === '#FFFFFF' ? brandLightBg : brandDarkBg;
+          return ({
           carousel_id: carousel.id,
           position: i,
           title: sl.title,
@@ -397,17 +403,18 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           image_position: { x: 50, y: 50, zoom: 175 },
           shadow_style: 'base',
           shadow_opacity: 88,
-          text_position: i === 0 ? 'center' : 'bottom-left',
+          text_position: i === 0 ? 'bottom-center' : 'bottom-left',
           text_offset: null,
           text_alignment: i === 0 ? 'center' : 'left',
           subtitle: '',
           font_size: style === 'profile'
             ? { title: 32, description: 26 }
-            : { title: i === 0 ? 90 : 70, description: 30 },
+            : { title: i === 0 ? 90 : 70, description: 36 },
           line_height: 1.2,
           cta_button: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
-          background_color: sl.backgroundColor || '#111111',
-        }));
+          background_color: slideBg,
+          });
+        });
 
         const { error: slidesError } = await supabase.from('slides').insert(slidesPayload);
         if (slidesError) {
@@ -629,25 +636,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                     onChange={(e) => setPrompt(e.target.value)}
                     autoFocus
                   />
-                  {/* Imagem de referência */}
-                  <div>
-                    <p className="text-xs text-gray-900/40 dark:text-white/40 mb-2">Imagem de referência para IA (opcional)</p>
-                    <div className="flex gap-2">
-                      <button onClick={handlePasteImage} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 text-xs transition-colors">
-                        <Clipboard className="w-3.5 h-3.5" /> Colar do clipboard
-                      </button>
-                      <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 text-xs transition-colors">
-                        <Upload className="w-3.5 h-3.5" /> Upload
-                      </button>
-                      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
-                    </div>
-                    {referenceImageBase64 && (
-                      <div className="relative mt-2 rounded-lg overflow-hidden h-20">
-                        <img src={referenceImageBase64} alt="ref" className="w-full h-full object-cover" />
-                        <button onClick={() => setReferenceImageBase64(null)} className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded text-white text-xs flex items-center justify-center">×</button>
-                      </div>
-                    )}
-                  </div>
                   {/* Nº de slides — hidden for Twitter Format A */}
                   {!(style === 'profile' && twitterFormat === 'A') && (
                     <div className="flex items-center gap-3">
@@ -796,6 +784,26 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           {/* ── STEP 3: Visual ── */}
           {step === 3 && (
             <div className="flex flex-col gap-5 mt-2">
+              <div>
+                <p className="text-xs text-gray-900/40 dark:text-white/40 mb-3 uppercase tracking-wider">Cores da marca</p>
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-black/10 dark:border-white/10">
+                  <div className="flex gap-1.5 shrink-0">
+                    {brandPalette.slice(0, 3).map((c, i) => (
+                      <span
+                        key={i}
+                        className="w-7 h-7 rounded-md border border-black/10 dark:border-white/10"
+                        style={{ background: c }}
+                        title={['Fundo escuro', 'Fundo claro', 'Destaque'][i] + ': ' + c}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-gray-900/50 dark:text-white/50 leading-tight">
+                      O carrossel será criado usando estas cores. Edite no <a href="/onboarding" className="underline">onboarding</a> pra alterar.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div>
                 <p className="text-xs text-gray-900/40 dark:text-white/40 mb-3 uppercase tracking-wider">Combinação de fontes</p>
                 <div className="grid grid-cols-2 gap-2">

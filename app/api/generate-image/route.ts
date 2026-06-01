@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { openai, buildImagePrompt } from '@/lib/openai';
 import { generateGeminiImage } from '@/lib/nanobanana';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { requireActiveSubscription } from '@/lib/subscription';
 
 export const maxDuration = 120;
 
@@ -34,11 +35,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'slideId e title são obrigatórios' }, { status: 400 });
   }
 
+  const guard = await requireActiveSubscription();
+  if (!guard.ok) return guard.response;
+
   const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
 
   const prompt = buildImagePrompt({ imagePrompt, title, description, isCover, isFinal });
 
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(b64, 'base64');
   const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
-  const path = `${user.id}/carousel-images/${slideId}-${provider}-${Date.now()}.${ext}`;
+  const path = `${guard.userId}/carousel-images/${slideId}-${provider}-${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('postflow-assets')

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openai } from '@/lib/openai';
+import { requireCredits, refundCredits } from '@/lib/subscription';
+import { CREDIT_COSTS } from '@/lib/credits';
 
 export const maxDuration = 30;
 
@@ -50,12 +52,18 @@ Retorne APENAS JSON válido sem markdown:
 }`;
 
 export async function POST(req: NextRequest) {
+  let userId: string | null = null;
+  const charged = CREDIT_COSTS.tweet;
   try {
     const { project, projectDescription, projectNiche, projectAudience, update, tone, context } = await req.json();
 
     if (!update?.trim()) {
       return NextResponse.json({ error: 'Descreva o que aconteceu' }, { status: 400 });
     }
+
+    const guard = await requireCredits(charged);
+    if (!guard.ok) return guard.response;
+    userId = guard.userId;
 
     const projectBlock = [
       `Projeto: ${project || 'minha startup'}`,
@@ -97,6 +105,7 @@ Gere 3 versões de tweet para isso no estilo Build in Public.`;
 
     return NextResponse.json(parsed);
   } catch (err) {
+    if (userId) await refundCredits(userId, charged);
     const message = err instanceof Error ? err.message : 'Erro ao gerar tweet';
     return NextResponse.json({ error: message }, { status: 500 });
   }

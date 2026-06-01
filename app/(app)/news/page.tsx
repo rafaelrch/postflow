@@ -333,8 +333,8 @@ export default function NewsPage() {
   // ── Template state ────────────────────────────────────────────────────────
   const [newsTemplate, setNewsTemplate] = useState<NewsTemplateStyle>({ ...DEFAULT_TEMPLATE });
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [modalTemplateId, setModalTemplateId] = useState<string | null>(null);
 
   // ── JSON import state ─────────────────────────────────────────────────────
   const [jsonInput, setJsonInput] = useState('');
@@ -703,7 +703,7 @@ export default function NewsPage() {
 
   if (step === 'choose') {
     const hasTemplates = savedTemplates.length > 0;
-    const selectedTemplate = savedTemplates.find(t => t.id === selectedTemplateId) ?? null;
+    const modalTemplate = savedTemplates.find(t => t.id === modalTemplateId) ?? null;
 
     const previewItemFor = (style: NewsTemplateStyle): NewsCardItem => ({
       numero: 1,
@@ -727,9 +727,8 @@ export default function NewsPage() {
 
     const CARD_PREVIEW_SCALE = 0.18;
 
-    const handleSelectTemplate = (tpl: SavedTemplate) => {
-      setSelectedTemplateId(tpl.id);
-      setNewsTemplate({ ...tpl.style });
+    const handleOpenTemplateModal = (tpl: SavedTemplate) => {
+      setModalTemplateId(tpl.id);
     };
 
     const handleEditTemplate = (tpl: SavedTemplate) => {
@@ -741,7 +740,7 @@ export default function NewsPage() {
     const handleDeleteTemplate = (tpl: SavedTemplate) => {
       const next = savedTemplates.filter(t => t.id !== tpl.id);
       persistTemplates(next);
-      if (selectedTemplateId === tpl.id) setSelectedTemplateId(null);
+      if (modalTemplateId === tpl.id) setModalTemplateId(null);
       toast.success('Template removido');
     };
 
@@ -749,6 +748,12 @@ export default function NewsPage() {
       setEditingTemplateId(null);
       setNewsTemplate({ ...DEFAULT_TEMPLATE });
       setStep('template');
+    };
+
+    const handleChooseMode = (mode: 'manual' | 'import') => {
+      if (modalTemplate) setNewsTemplate({ ...modalTemplate.style });
+      setModalTemplateId(null);
+      setStep(mode);
     };
 
     return (
@@ -763,9 +768,7 @@ export default function NewsPage() {
           </h1>
           <p className="text-[14px] mb-10" style={{ color: 'var(--ink-dim)' }}>
             {hasTemplates
-              ? (selectedTemplate
-                  ? `Usando "${selectedTemplate.name}". Escolha como começar.`
-                  : 'Selecione um template salvo ou crie um novo.')
+              ? 'Selecione um template salvo ou crie um novo.'
               : 'Comece salvando o template da sua marca. Ele define fonte, gradiente, logo e cor — e passa a ser o padrão de todos os cards.'}
           </p>
 
@@ -776,21 +779,17 @@ export default function NewsPage() {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {savedTemplates.map((tpl) => {
-                  const isSelected = selectedTemplateId === tpl.id;
                   const previewW = 1080 * CARD_PREVIEW_SCALE;
                   const previewH = 1350 * CARD_PREVIEW_SCALE;
                   return (
                     <div
                       key={tpl.id}
                       className="brand-card interactive p-3 flex flex-col gap-3"
-                      onClick={() => handleSelectTemplate(tpl)}
+                      onClick={() => handleOpenTemplateModal(tpl)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectTemplate(tpl); } }}
-                      style={{
-                        cursor: 'pointer',
-                        border: isSelected ? '1.5px solid var(--ink)' : undefined,
-                      }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenTemplateModal(tpl); } }}
+                      style={{ cursor: 'pointer' }}
                     >
                       <div
                         style={{
@@ -894,46 +893,6 @@ export default function NewsPage() {
             </div>
           ) : (
             <>
-              {selectedTemplate && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-                  <button
-                    onClick={() => setStep('manual')}
-                    className="brand-card interactive text-left flex flex-col items-start gap-4 p-6"
-                  >
-                    <span className="brand-mark lg">
-                      <Newspaper className="w-5 h-5" />
-                    </span>
-                    <div>
-                      <p className="font-display text-[22px] leading-tight" style={{ color: 'var(--ink)' }}>
-                        Criar manualmente
-                      </p>
-                      <p className="text-[12.5px] mt-1.5" style={{ color: 'var(--ink-dim)' }}>
-                        Escolha a quantidade e preencha cada notícia no ritmo do dia.
-                      </p>
-                    </div>
-                    <span className="chip mt-auto">Recomendado</span>
-                  </button>
-
-                  <button
-                    onClick={() => setStep('import')}
-                    className="brand-card interactive text-left flex flex-col items-start gap-4 p-6"
-                  >
-                    <span className="brand-mark lg">
-                      <FileJson className="w-5 h-5" />
-                    </span>
-                    <div>
-                      <p className="font-display text-[22px] leading-tight" style={{ color: 'var(--ink)' }}>
-                        Importar JSON
-                      </p>
-                      <p className="text-[12.5px] mt-1.5" style={{ color: 'var(--ink-dim)' }}>
-                        Cole ou carregue um arquivo .json com as notícias e deixe o layout pronto.
-                      </p>
-                    </div>
-                    <span className="chip soft mt-auto">Batch</span>
-                  </button>
-                </div>
-              )}
-
               <button
                 onClick={handleCreateNew}
                 className="w-full flex items-center justify-between px-5 py-4 rounded-[14px] transition-all"
@@ -970,23 +929,100 @@ export default function NewsPage() {
                 </svg>
               </button>
 
-              {!selectedTemplate && (
-                <div
-                  className="mt-4 p-4 rounded-[14px] flex items-center gap-3 opacity-70"
-                  style={{ background: 'var(--paper-2)', border: '1.5px dashed var(--line-strong)' }}
-                >
-                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--ink-dim)' }}>
-                    <rect x="3" y="11" width="18" height="10" rx="2" />
-                    <path d="M7 11V7a5 5 0 0110 0v4" />
-                  </svg>
-                  <p className="text-[12.5px]" style={{ color: 'var(--ink-dim)' }}>
-                    Selecione um template acima para liberar as opções de criação.
-                  </p>
-                </div>
-              )}
             </>
           )}
         </div>
+
+        {modalTemplate && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
+            onClick={() => setModalTemplateId(null)}
+          >
+            <div
+              className="relative w-full max-w-[760px] rounded-[18px] p-7"
+              style={{ background: 'var(--paper)', border: '1.5px solid var(--line-strong)', boxShadow: 'var(--sh-2)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setModalTemplateId(null)}
+                aria-label="Fechar"
+                className="absolute top-4 right-4 w-8 h-8 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                style={{ color: 'var(--ink-dim)' }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex flex-col sm:flex-row gap-6 items-stretch">
+                <div
+                  className="shrink-0 mx-auto sm:mx-0"
+                  style={{
+                    width: 1080 * 0.18,
+                    aspectRatio: '1080 / 1350',
+                    overflow: 'hidden',
+                    borderRadius: 10,
+                    background: '#0A0A0A',
+                    position: 'relative',
+                  }}
+                >
+                  <div style={{ position: 'absolute', inset: 0, width: 1080 * 0.18, height: 1350 * 0.18 }}>
+                    <div style={{ transform: `scale(${0.18})`, transformOrigin: 'top left' }}>
+                      <NewsCard item={previewItemFor(modalTemplate.style)} scale={1} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex flex-col">
+                  <p className="section-kicker mb-2">Template</p>
+                  <h2 className="font-display text-[28px] leading-tight mb-2" style={{ color: 'var(--ink)' }}>
+                    {modalTemplate.name}
+                  </h2>
+                  <p className="text-[13px] mb-5" style={{ color: 'var(--ink-dim)' }}>
+                    Como você quer criar os cards de hoje usando este template?
+                  </p>
+
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => handleChooseMode('manual')}
+                      className="brand-card interactive text-left flex items-center gap-4 p-4"
+                    >
+                      <span className="brand-mark lg shrink-0">
+                        <Newspaper className="w-5 h-5" />
+                      </span>
+                      <div className="flex-1">
+                        <p className="font-display text-[18px] leading-tight" style={{ color: 'var(--ink)' }}>
+                          Criar manualmente
+                        </p>
+                        <p className="text-[12px] mt-1" style={{ color: 'var(--ink-dim)' }}>
+                          Escolha a quantidade e preencha cada notícia.
+                        </p>
+                      </div>
+                      <span className="chip">Recomendado</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleChooseMode('import')}
+                      className="brand-card interactive text-left flex items-center gap-4 p-4"
+                    >
+                      <span className="brand-mark lg shrink-0">
+                        <FileJson className="w-5 h-5" />
+                      </span>
+                      <div className="flex-1">
+                        <p className="font-display text-[18px] leading-tight" style={{ color: 'var(--ink)' }}>
+                          Importar JSON
+                        </p>
+                        <p className="text-[12px] mt-1" style={{ color: 'var(--ink-dim)' }}>
+                          Cole ou carregue um arquivo .json com as notícias.
+                        </p>
+                      </div>
+                      <span className="chip soft">Batch</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1048,7 +1084,6 @@ export default function NewsPage() {
                     createdAt: new Date().toISOString(),
                   };
                   persistTemplates([...savedTemplates, newTemplate]);
-                  setSelectedTemplateId(id);
                   toast.success('Template salvo!');
                 }
                 setEditingTemplateId(null);

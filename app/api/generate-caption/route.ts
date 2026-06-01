@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openai, CAPTION_SYSTEM_PROMPT } from '@/lib/openai';
+import { requireActiveSubscription } from '@/lib/subscription';
 import { Slide } from '@/types';
 
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {
+    const guard = await requireActiveSubscription();
+    if (!guard.ok) return guard.response;
+
     const { slides, style } = await req.json() as { slides: Slide[]; style: string };
 
     const slideSummary = slides

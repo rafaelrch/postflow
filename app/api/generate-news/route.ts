@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openai } from '@/lib/openai';
+import { requireCredits, refundCredits } from '@/lib/subscription';
+import { CREDIT_COSTS } from '@/lib/credits';
 
 export const maxDuration = 30;
 
@@ -29,12 +31,18 @@ Retorne APENAS JSON válido sem markdown:
 }`;
 
 export async function POST(req: NextRequest) {
+  let userId: string | null = null;
+  const charged = CREDIT_COSTS.news;
   try {
     const { assunto } = await req.json();
 
     if (!assunto?.trim()) {
       return NextResponse.json({ error: 'Informe o assunto da notícia' }, { status: 400 });
     }
+
+    const guard = await requireCredits(charged);
+    if (!guard.ok) return guard.response;
+    userId = guard.userId;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -60,6 +68,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(parsed);
   } catch (err) {
+    if (userId) await refundCredits(userId, charged);
     const message = err instanceof Error ? err.message : 'Erro ao gerar notícia';
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -1,27 +1,37 @@
 import type { Metadata } from 'next';
-import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
-const interTight = Inter_Tight({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+// Fontes self-hosted (woff2 em app/fonts/). Evita o download de runtime do
+// next/font/google, que trava a compilação quando a rede ao Google Fonts falha.
+const interTight = localFont({
   variable: '--font-inter-tight',
   display: 'swap',
+  src: [
+    { path: './fonts/InterTight-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/InterTight-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/InterTight-600.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/InterTight-700.woff2', weight: '700', style: 'normal' },
+  ],
 });
 
-const instrumentSerif = Instrument_Serif({
-  subsets: ['latin'],
-  weight: ['400'],
-  style: ['normal', 'italic'],
+const instrumentSerif = localFont({
   variable: '--font-instrument-serif',
   display: 'swap',
+  src: [
+    { path: './fonts/InstrumentSerif-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/InstrumentSerif-400-italic.woff2', weight: '400', style: 'italic' },
+  ],
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+const jetbrainsMono = localFont({
   variable: '--font-jetbrains-mono',
   display: 'swap',
+  src: [
+    { path: './fonts/JetBrainsMono-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/JetBrainsMono-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/JetBrainsMono-600.woff2', weight: '600', style: 'normal' },
+  ],
 });
 
 export const metadata: Metadata = {

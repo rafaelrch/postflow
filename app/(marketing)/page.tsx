@@ -1,9 +1,11 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, useInView, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { startStripeCheckout } from '@/lib/start-checkout';
 import {
   Sparkles, Download, ArrowRight, Check, X,
   ChevronDown, Star, LayoutTemplate, Type, Image as ImageIcon,
@@ -440,10 +442,39 @@ function Testimonials() {
 // ─── Pricing ─────────────────────────────────────────────────────────────────
 
 function Pricing() {
+  const [loadingInterval, setLoadingInterval] = useState<'month' | 'year' | null>(null);
+
+  async function handleSubscribe(interval: 'month' | 'year') {
+    setLoadingInterval(interval);
+    try {
+      await startStripeCheckout(interval, { nextPath: '/#pricing' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao iniciar checkout');
+      setLoadingInterval(null);
+    }
+  }
+
   const plans = [
-    { name: 'Semanal', desc: 'Experimente por 7 dias',           price: 'R$37',  sub: '/semana',       highlight: false },
-    { name: 'Mensal',  desc: 'Acesso completo, sem fidelidade',  price: 'R$67',  sub: '/mês',          highlight: false },
-    { name: 'Anual',   desc: 'Melhor custo-benefício',           price: 'R$197', sub: '/ano (~R$16/mês)', highlight: true  },
+    {
+      name: 'Mensal',
+      desc: 'Sem fidelidade. Cancele quando quiser.',
+      price: 'R$59,50',
+      sub: '/mês',
+      footnote: 'Cobrança recorrente mensal',
+      highlight: false,
+      badge: null as string | null,
+      interval: 'month' as const,
+    },
+    {
+      name: 'Anual',
+      desc: 'Compromisso anual com o melhor preço.',
+      price: 'R$499',
+      sub: '/ano',
+      footnote: 'Equivalente a R$41,58/mês — economize R$215 no ano',
+      highlight: true,
+      badge: 'Economize 30%',
+      interval: 'year' as const,
+    },
   ];
 
   const perks = [
@@ -453,32 +484,32 @@ function Pricing() {
     'Agenda de postagem',
     'Editor premium',
     'Exportação Full HD',
-    'Imagens com fator viral',
-    'Cancele quando quiser',
+    'Imagens com IA (GPT-image)',
+    'Acesso ao roadmap e updates',
   ];
 
   return (
     <section id="pricing" className="py-24 px-4" style={{ background: 'var(--paper)' }}>
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <FadeUp className="text-center mb-14">
           <p className="font-mono text-[10.5px] tracking-[0.18em] uppercase mb-3" style={{ color: 'var(--ink-dim)' }}>
             Preços
           </p>
           <h2 className="font-display mb-4" style={{ fontSize: 'clamp(36px, 5vw, 60px)', letterSpacing: '-0.025em', color: 'var(--ink)' }}>
-            Comece <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>hoje</span>
+            Um plano. Você <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>escolhe o ritmo.</span>
           </h2>
           <p className="text-[13.5px]" style={{ color: 'var(--ink-dim)' }}>
-            Ferramentas separadas custariam mais de R$650/mês. Aqui, tudo em um só estúdio.
+            Tudo incluído. A diferença é só o ciclo de cobrança.
           </p>
         </FadeUp>
 
-        <div className="grid md:grid-cols-3 gap-5 mb-10">
+        <div className="grid md:grid-cols-2 gap-5 mb-10">
           {plans.map((plan, i) => (
             <FadeUp key={i} delay={i * 0.1}>
               <motion.div
                 whileHover={{ y: -6 }}
                 transition={{ duration: 0.3 }}
-                className="relative rounded-[14px] p-6 flex flex-col"
+                className="relative rounded-[14px] p-7 flex flex-col h-full"
                 style={{
                   background: plan.highlight ? 'var(--ink)' : 'var(--paper)',
                   color: plan.highlight ? 'var(--paper)' : 'var(--ink)',
@@ -486,22 +517,25 @@ function Pricing() {
                   boxShadow: plan.highlight ? 'var(--sh-3)' : 'var(--sh-2)',
                 }}
               >
-                {plan.highlight && (
+                {plan.badge && (
                   <div
-                    className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.14em] uppercase px-3 py-1 rounded-full"
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.14em] uppercase px-3 py-1 rounded-full whitespace-nowrap"
                     style={{ background: 'var(--accent)', color: '#fff', border: '1.5px solid var(--ink)', boxShadow: 'var(--sh-1)' }}
                   >
-                    Mais escolhido
+                    {plan.badge}
                   </div>
                 )}
-                <p className="text-[14px] font-semibold mb-1">{plan.name}</p>
-                <p className="text-[11.5px] mb-6" style={{ opacity: 0.65 }}>{plan.desc}</p>
-                <div className="mb-6">
-                  <span className="font-display" style={{ fontSize: 48, lineHeight: 1 }}>{plan.price}</span>
-                  <span className="ml-1 text-[12px] font-mono" style={{ opacity: 0.6 }}>{plan.sub}</span>
+                <p className="text-[15px] font-semibold mb-1">{plan.name}</p>
+                <p className="text-[12px] mb-6" style={{ opacity: 0.7 }}>{plan.desc}</p>
+                <div className="mb-2 flex items-baseline">
+                  <span className="font-display" style={{ fontSize: 56, lineHeight: 1 }}>{plan.price}</span>
+                  <span className="ml-1.5 text-[13px] font-mono" style={{ opacity: 0.6 }}>{plan.sub}</span>
                 </div>
-                <Link
-                  href="/dashboard"
+                <p className="text-[11px] mb-6" style={{ opacity: 0.55 }}>{plan.footnote}</p>
+                <button
+                  type="button"
+                  onClick={() => handleSubscribe(plan.interval)}
+                  disabled={loadingInterval !== null}
                   className="brand-btn mt-auto justify-center"
                   style={
                     plan.highlight
@@ -509,8 +543,14 @@ function Pricing() {
                       : { background: 'var(--ink)', color: 'var(--paper)' }
                   }
                 >
-                  Começar agora
-                </Link>
+                  {loadingInterval === plan.interval && (
+                    <span
+                      className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
+                      aria-hidden
+                    />
+                  )}
+                  Assinar plano {plan.name.toLowerCase()}
+                </button>
               </motion.div>
             </FadeUp>
           ))}

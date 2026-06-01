@@ -66,6 +66,11 @@ export default function OnboardingPage() {
     setPalette((current) => current.map((color, i) => (i === index ? value : color)));
   };
 
+  const removeColor = (index: number) => {
+    if (palette.length <= 1) return;
+    setPalette((current) => current.filter((_, i) => i !== index));
+  };
+
   const addColor = () => {
     if (palette.length >= 6) return;
     setPalette((current) => [...current, '#FFFFFF']);
@@ -173,7 +178,7 @@ export default function OnboardingPage() {
             <span className="dot-live" />
             Setup da marca
           </p>
-          <h1 className="section-title mt-3" style={{ fontSize: 'clamp(42px, 6vw, 76px)' }}>
+          <h1 className="section-title mt-3" style={{ fontSize: 'clamp(22px, 6vw, 56px)' }}>
             Antes do studio, vamos entender sua{' '}
             <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>marca.</span>
           </h1>
@@ -201,27 +206,57 @@ export default function OnboardingPage() {
 
             <Block icon={Palette} title="Branding visual">
               <div className="flex flex-wrap gap-3">
-                {palette.map((color, index) => (
-                  <label key={`${color}-${index}`} className="flex items-center gap-2 rounded-[10px] px-2 py-2" style={{ border: '1.5px solid var(--ink)' }}>
-                    <span className="w-7 h-7 rounded-[6px] border" style={{ background: color, borderColor: 'var(--line-strong)' }} />
-                    <input
-                      type="text"
-                      value={color}
-                      onChange={(e) => updateColor(index, e.target.value)}
-                      className="bg-transparent outline-none w-[86px] font-mono text-[12px]"
-                      style={{ color: 'var(--ink)' }}
-                    />
-                    <input
-                      type="color"
-                      value={/^#[0-9A-Fa-f]{6}$/.test(color) ? color : '#000000'}
-                      onChange={(e) => updateColor(index, e.target.value)}
-                      className="w-7 h-7 opacity-0 absolute"
-                      aria-label={`Cor ${index + 1}`}
-                    />
-                  </label>
-                ))}
-                <button type="button" className="brand-btn outline sm" onClick={addColor}>Adicionar cor</button>
+                {palette.map((color, index) => {
+                  const safeColor = /^#[0-9A-Fa-f]{6}$/.test(color) ? color : '#000000';
+                  return (
+                    <div
+                      key={`color-${index}`}
+                      className="flex items-center gap-2 rounded-[10px] px-2 py-2"
+                      style={{ border: '1.5px solid var(--ink)' }}
+                    >
+                      <label
+                        className="relative w-7 h-7 rounded-[6px] border cursor-pointer overflow-hidden shrink-0"
+                        style={{ background: color, borderColor: 'var(--line-strong)' }}
+                        title="Clique para abrir o seletor de cor"
+                      >
+                        <input
+                          type="color"
+                          value={safeColor}
+                          onChange={(e) => updateColor(index, e.target.value.toUpperCase())}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          aria-label={`Cor ${index + 1}`}
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        value={color}
+                        onChange={(e) => updateColor(index, e.target.value)}
+                        className="bg-transparent outline-none w-[86px] font-mono text-[12px] uppercase"
+                        style={{ color: 'var(--ink)' }}
+                        spellCheck={false}
+                      />
+                      {palette.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeColor(index)}
+                          className="w-5 h-5 grid place-items-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0"
+                          style={{ color: 'var(--ink-dim)' }}
+                          aria-label={`Remover cor ${index + 1}`}
+                          title="Remover"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {palette.length < 6 && (
+                  <button type="button" className="brand-btn outline sm" onClick={addColor}>Adicionar cor</button>
+                )}
               </div>
+              <p className="text-[11.5px] mt-2" style={{ color: 'var(--ink-dim)' }}>
+                Clique no quadrado pra abrir o seletor de cor, ou edite o hexadecimal direto.
+              </p>
             </Block>
 
             <Block title="Estratégia">

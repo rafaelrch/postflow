@@ -240,28 +240,45 @@ function ProjectsModal({ projects, onClose, onSelect, onAdd, onUpdate, onDelete 
                 </div>
               ) : projects.map(p => (
                 <div key={p.id} className="rounded-xl border border-black/8 dark:border-white/8 overflow-hidden">
-                  <button
-                    className="w-full flex items-start gap-3 p-4 text-left hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
-                    onClick={() => { onSelect(p); onClose(); }}
-                  >
-                    <div className="flex-1 min-w-0">
+                  <div className="w-full flex items-start gap-3 p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="flex-1 min-w-0 text-left cursor-pointer"
+                      onClick={() => { onSelect(p); onClose(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelect(p);
+                          onClose();
+                        }
+                      }}
+                    >
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-gray-900 dark:text-white">{p.name}</span>
                         {p.niche && <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-gray-900/50 dark:text-white/50">{p.niche}</span>}
                       </div>
                       {p.description && <p className="text-xs text-gray-900/50 dark:text-white/50 mt-0.5 line-clamp-1">{p.description}</p>}
                     </div>
-                    <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setMode({ type: 'edit', project: p })}
-                        className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-900/30 dark:text-white/30 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setMode({ type: 'edit', project: p })}
+                        className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-900/30 dark:text-white/30 hover:text-gray-900 dark:hover:text-white transition-colors"
+                        aria-label="Editar projeto"
+                      >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => setConfirmDelete(p.id)}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-900/30 dark:text-white/30 hover:text-red-500 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(p.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-900/30 dark:text-white/30 hover:text-red-500 transition-colors"
+                        aria-label="Remover projeto"
+                      >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </button>
+                  </div>
 
                   {confirmDelete === p.id && (
                     <div className="flex items-center justify-between px-4 py-2.5 border-t border-black/6 dark:border-white/6 bg-red-500/5">
