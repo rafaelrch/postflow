@@ -34,6 +34,12 @@ async function execSQLAdmin(sql: string) {
 }
 
 export async function GET() {
+  // Utilitário de desenvolvimento: nunca expor em produção (roda SQL com a
+  // service role e devolve detalhes do banco).
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const schema = POSTFLOW_DATABASE_SCHEMA;
 
   try {

@@ -369,24 +369,92 @@ export default function NewsPage() {
       const savedLogo = (profile?.brand_logo_url as string | undefined)?.trim();
       if (savedLogo) setBrandLogoUrl(savedLogo);
 
-      try {
-        const raw = localStorage.getItem(TEMPLATES_LS_KEY(user.id));
-        if (raw) {
-          const parsed = JSON.parse(raw) as SavedTemplate[];
-          if (Array.isArray(parsed)) setSavedTemplates(parsed);
-        }
-      } catch { /* localStorage unavailable or corrupt — ignore */ }
+      // Templates na tabela `templates` (RLS por usuário).
+      const { data: tplRows } = await supabase
+        .from('templates')
+        .select('id, name, content_schema, created_at')
+        .eq('kind', 'news')
+        .order('created_at', { ascending: true });
+      if (!active) return;
+
+      let templates: SavedTemplate[] = (tplRows || []).map((row: { id: string; name: string; content_schema: NewsTemplateStyle; created_at: string }) => ({
+        id: row.id,
+        name: row.name,
+        style: { ...DEFAULT_TEMPLATE, ...(row.content_schema || {}) },
+        createdAt: row.created_at,
+      }));
+
+      // Migração one-time: templates antigos do localStorage sobem pro banco.
+      if (templates.length === 0) {
+        try {
+          const raw = localStorage.getItem(TEMPLATES_LS_KEY(user.id));
+          const legacy = raw ? (JSON.parse(raw) as SavedTemplate[]) : [];
+          if (Array.isArray(legacy) && legacy.length > 0) {
+            const { data: inserted } = await supabase
+              .from('templates')
+              .insert(legacy.map((t) => ({
+                name: t.name || 'Template',
+                kind: 'news',
+                content_schema: t.style || {},
+              })))
+              .select('id, name, content_schema, created_at');
+            if (inserted?.length) {
+              templates = (inserted as { id: string; name: string; content_schema: NewsTemplateStyle; created_at: string }[]).map((row) => ({
+                id: row.id,
+                name: row.name,
+                style: { ...DEFAULT_TEMPLATE, ...(row.content_schema || {}) },
+                createdAt: row.created_at,
+              }));
+              localStorage.removeItem(TEMPLATES_LS_KEY(user.id));
+            }
+          }
+        } catch { /* localStorage indisponível — segue sem migrar */ }
+      }
+
+      if (active) setSavedTemplates(templates);
     };
     load();
     return () => { active = false; };
   }, []);
 
-  const persistTemplates = useCallback((next: SavedTemplate[]) => {
-    setSavedTemplates(next);
-    if (!userId) return;
-    try { localStorage.setItem(TEMPLATES_LS_KEY(userId), JSON.stringify(next)); }
-    catch { /* localStorage unavailable — state still updates */ }
-  }, [userId]);
+  const createTemplateInDb = useCallback(async (style: NewsTemplateStyle): Promise<SavedTemplate | null> => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('templates')
+      .insert({ name: `Template ${savedTemplates.length + 1}`, kind: 'news', content_schema: style })
+      .select('id, name, content_schema, created_at')
+      .single();
+    if (error || !data) {
+      console.error('[news-templates] create', error);
+      toast.error('Erro ao salvar template');
+      return null;
+    }
+    const tpl: SavedTemplate = { id: data.id, name: data.name, style: { ...DEFAULT_TEMPLATE, ...(data.content_schema || {}) }, createdAt: data.created_at };
+    setSavedTemplates((prev) => [...prev, tpl]);
+    return tpl;
+  }, [savedTemplates.length]);
+
+  const updateTemplateInDb = useCallback(async (id: string, style: NewsTemplateStyle) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('templates').update({ content_schema: style }).eq('id', id);
+    if (error) {
+      console.error('[news-templates] update', error);
+      toast.error('Erro ao atualizar template');
+      return;
+    }
+    setSavedTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, style: { ...style } } : t)));
+  }, []);
+
+  const deleteTemplateInDb = useCallback(async (id: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('templates').delete().eq('id', id);
+    if (error) {
+      console.error('[news-templates] delete', error);
+      toast.error('Erro ao remover template');
+      return;
+    }
+    setSavedTemplates((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   // ── Editor state ──────────────────────────────────────────────────────────
   const [items, setItems] = useState<NewsCardItem[]>([]);
@@ -509,7 +577,7 @@ export default function NewsPage() {
 
   // ── Create cards from manual form ─────────────────────────────────────────
 
-  const handleCreateManual = () => {
+  const handleCreateManual = async () => {
     const built: NewsCardItem[] = manualCards.slice(0, manualCount).map((c, i) => ({
       numero: i + 1,
       tema: c.tema,
@@ -520,21 +588,23 @@ export default function NewsPage() {
       ...newsTemplate,
       logo_url: brandLogoUrl,
     }));
-    setItems(built);
+    const saved = await persistNewBatch(built);
+    setItems(saved);
     setSelectedIdx(0);
     setLocalImages({});
     setStep('editor');
-    toast.success(`${built.length} cards criados!`);
+    toast.success(`${saved.length} cards criados!`);
   };
 
   // ── Import ────────────────────────────────────────────────────────────────
 
-  const handleParse = () => {
+  const handleParse = async () => {
     try {
       const parsed = parseNewsJSON(jsonInput.trim());
       if (parsed.length === 0) throw new Error('Array vazio');
       const withLogo = parsed.map(it => ({ ...DEFAULT_STYLE, ...it, ...newsTemplate, logo_url: brandLogoUrl }));
-      setItems(withLogo);
+      const saved = await persistNewBatch(withLogo);
+      setItems(saved);
       setSelectedIdx(0);
       setLocalImages({});
       setStep('editor');
@@ -555,10 +625,120 @@ export default function NewsPage() {
     reader.readAsText(file);
   };
 
-  // ── Item updater ──────────────────────────────────────────────────────────
+  // ── Persistência dos cards em news_entries (por usuário, via RLS) ─────────
+
+  const itemsRef = useRef<NewsCardItem[]>([]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  const saveTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const currentBatchIdRef = useRef<string | null>(null);
+  const [resumeEntries, setResumeEntries] = useState<NewsCardItem[]>([]);
+
+  // blob: URLs morrem no reload — não vão para o banco.
+  const sanitizeForPayload = (item: NewsCardItem): Record<string, unknown> => {
+    const { dbId: _dbId, localImageUrl: _local, ...rest } = item;
+    const payload = { ...rest } as Record<string, unknown>;
+    if (typeof payload.inset_image_url === 'string' && (payload.inset_image_url as string).startsWith('blob:')) {
+      delete payload.inset_image_url;
+    }
+    return payload;
+  };
+
+  /** Insere um lote novo de cards e devolve os itens com dbId preenchido. */
+  const persistNewBatch = useCallback(async (built: NewsCardItem[]): Promise<NewsCardItem[]> => {
+    try {
+      const supabase = createClient();
+      const batchId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+        ? crypto.randomUUID()
+        : `b_${Date.now()}`;
+      const { data, error } = await supabase
+        .from('news_entries')
+        .insert(built.map((it) => ({
+          title: it.titulo_card || '',
+          topic: it.tema || '',
+          image_url: it.imagem_url || '',
+          caption: it.legenda || '',
+          status: 'draft',
+          raw_payload: { batch_id: batchId, ...sanitizeForPayload(it) },
+        })))
+        .select('id');
+      if (error || !data) {
+        console.error('[news] erro ao salvar lote:', error);
+        toast.error('Cards criados, mas não foi possível salvar no banco.');
+        return built;
+      }
+      currentBatchIdRef.current = batchId;
+      return built.map((it, i) => ({ ...it, dbId: (data[i] as { id: string } | undefined)?.id }));
+    } catch (err) {
+      console.error('[news] erro inesperado ao salvar lote:', err);
+      return built;
+    }
+  }, []);
+
+  /** Carrega o lote mais recente de rascunhos para "continuar de onde parou". */
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('news_entries')
+        .select('id, title, topic, image_url, caption, raw_payload, created_at')
+        .eq('status', 'draft')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (!active || error || !data?.length) return;
+
+      type EntryRow = { id: string; title: string; topic: string; image_url: string; caption: string; raw_payload: Record<string, unknown> | null; created_at: string };
+      const rows = data as EntryRow[];
+      const latestBatch = (rows[0].raw_payload?.batch_id as string | undefined) ?? null;
+      const batchRows = latestBatch
+        ? rows.filter((r) => r.raw_payload?.batch_id === latestBatch)
+        : [rows[0]];
+
+      const mapped: NewsCardItem[] = batchRows
+        .map((r, i) => ({
+          ...DEFAULT_STYLE,
+          numero: i + 1,
+          ...(r.raw_payload || {}),
+          dbId: r.id,
+          titulo_card: r.title,
+          tema: r.topic,
+          imagem_url: r.image_url,
+          legenda: r.caption,
+        } as NewsCardItem))
+        .sort((a, b) => a.numero - b.numero);
+
+      setResumeEntries(mapped);
+      if (latestBatch) currentBatchIdRef.current = latestBatch;
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  // ── Item updater (com sync debounced pro banco) ───────────────────────────
 
   const updateItem = useCallback((idx: number, patch: Partial<NewsCardItem>) => {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
+
+    if (saveTimersRef.current[idx]) clearTimeout(saveTimersRef.current[idx]);
+    saveTimersRef.current[idx] = setTimeout(async () => {
+      const item = itemsRef.current[idx];
+      if (!item?.dbId) return;
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('news_entries')
+        .update({
+          title: item.titulo_card || '',
+          topic: item.tema || '',
+          image_url: item.imagem_url || '',
+          caption: item.legenda || '',
+          raw_payload: {
+            ...(currentBatchIdRef.current ? { batch_id: currentBatchIdRef.current } : {}),
+            ...sanitizeForPayload(item),
+          },
+        })
+        .eq('id', item.dbId);
+      if (error) console.error('[news] erro ao sincronizar card:', error);
+    }, 2000);
   }, []);
 
   // ── Image upload per card ────────────────────────────────────────────────
@@ -737,9 +917,8 @@ export default function NewsPage() {
       setStep('template');
     };
 
-    const handleDeleteTemplate = (tpl: SavedTemplate) => {
-      const next = savedTemplates.filter(t => t.id !== tpl.id);
-      persistTemplates(next);
+    const handleDeleteTemplate = async (tpl: SavedTemplate) => {
+      await deleteTemplateInDb(tpl.id);
       if (modalTemplateId === tpl.id) setModalTemplateId(null);
       toast.success('Template removido');
     };
@@ -771,6 +950,29 @@ export default function NewsPage() {
               ? 'Selecione um template salvo ou crie um novo.'
               : 'Comece salvando o template da sua marca. Ele define fonte, gradiente, logo e cor — e passa a ser o padrão de todos os cards.'}
           </p>
+
+          {resumeEntries.length > 0 && (
+            <button
+              onClick={() => {
+                setItems(resumeEntries);
+                setSelectedIdx(0);
+                setLocalImages({});
+                setStep('editor');
+                toast.success('Última edição carregada');
+              }}
+              className="brand-card interactive w-full flex items-center justify-between gap-3 px-5 py-4 mb-8 text-left"
+            >
+              <div>
+                <p className="text-[13.5px] font-semibold" style={{ color: 'var(--ink)' }}>
+                  Continuar última edição
+                </p>
+                <p className="text-[12px] mt-0.5" style={{ color: 'var(--ink-dim)' }}>
+                  {resumeEntries.length} card{resumeEntries.length === 1 ? '' : 's'} salvo{resumeEntries.length === 1 ? '' : 's'} na sua conta
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-dim)' }} />
+            </button>
+          )}
 
           {hasTemplates && (
             <div className="mb-8">
@@ -1066,24 +1268,13 @@ export default function NewsPage() {
               {editingTemplateId ? 'Editar template' : 'Novo template'}
             </h1>
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (editingTemplateId) {
-                  const next = savedTemplates.map(t =>
-                    t.id === editingTemplateId ? { ...t, style: { ...newsTemplate } } : t
-                  );
-                  persistTemplates(next);
+                  await updateTemplateInDb(editingTemplateId, { ...newsTemplate });
                   toast.success('Template atualizado!');
                 } else {
-                  const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-                    ? crypto.randomUUID()
-                    : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-                  const newTemplate: SavedTemplate = {
-                    id,
-                    name: `Template ${savedTemplates.length + 1}`,
-                    style: { ...newsTemplate },
-                    createdAt: new Date().toISOString(),
-                  };
-                  persistTemplates([...savedTemplates, newTemplate]);
+                  const created = await createTemplateInDb({ ...newsTemplate });
+                  if (!created) return;
                   toast.success('Template salvo!');
                 }
                 setEditingTemplateId(null);

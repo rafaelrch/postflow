@@ -38,7 +38,8 @@ export default async function CadastroPage({
   const { data: sub } = await admin
     .from('subscriptions')
     .select('plan_interval, status')
-    .ilike('email', email)
+    // Escapa curingas do ilike — e-mail vem da Stripe, mas % e _ são válidos em e-mails.
+    .ilike('email', email.replace(/([%_\\])/g, '\\$1'))
     .in('status', ['active', 'trialing'])
     .order('current_period_end', { ascending: false, nullsFirst: false })
     .limit(1)

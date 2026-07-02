@@ -92,7 +92,12 @@ export default function AuthForm({
       router.replace(next);
       router.refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Não foi possível autenticar.';
+      let message = err instanceof Error ? err.message : 'Não foi possível autenticar.';
+      // O gate "pagamento primeiro" (trigger no banco) chega aqui como um
+      // erro genérico do Supabase Auth — traduz para uma mensagem acionável.
+      if (isSignup && /database error|subscription_required/i.test(message)) {
+        message = 'Esse e-mail ainda não tem uma assinatura ativa. Assine um plano em /precos antes de criar a conta (use o mesmo e-mail do pagamento).';
+      }
       toast.error(message);
     } finally {
       setLoading(false);

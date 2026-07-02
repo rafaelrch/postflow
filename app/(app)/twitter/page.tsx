@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Sparkles, Copy, Check, RefreshCw, ChevronDown,
-  Plus, X, Pencil, Trash2, Briefcase, ChevronUp,
+  Plus, X, Pencil, Trash2, Briefcase, ChevronUp, History,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase';
 import { useProjects, Project } from '@/hooks/useProjects';
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -140,30 +141,42 @@ function ProjectsModal({ projects, onClose, onSelect, onAdd, onUpdate, onDelete 
   projects: Project[];
   onClose: () => void;
   onSelect: (p: Project) => void;
-  onAdd: (data: Omit<Project, 'id' | 'createdAt'>) => Project;
-  onUpdate: (id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>) => void;
-  onDelete: (id: string) => void;
+  onAdd: (data: Omit<Project, 'id' | 'createdAt'>) => Promise<Project>;
+  onUpdate: (id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const [mode, setMode] = useState<ModalMode>({ type: projects.length === 0 ? 'create' : 'list' });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const handleCreate = (form: FormData) => {
-    const p = onAdd(form);
-    toast.success('Projeto criado!');
-    onSelect(p);
-    onClose();
+  const handleCreate = async (form: FormData) => {
+    try {
+      const p = await onAdd(form);
+      toast.success('Projeto criado!');
+      onSelect(p);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao criar projeto');
+    }
   };
 
-  const handleUpdate = (id: string, form: FormData) => {
-    onUpdate(id, form);
-    toast.success('Projeto atualizado!');
-    setMode({ type: 'list' });
+  const handleUpdate = async (id: string, form: FormData) => {
+    try {
+      await onUpdate(id, form);
+      toast.success('Projeto atualizado!');
+      setMode({ type: 'list' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar projeto');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    onDelete(id);
-    setConfirmDelete(null);
-    toast.success('Projeto removido');
+  const handleDelete = async (id: string) => {
+    try {
+      await onDelete(id);
+      setConfirmDelete(null);
+      toast.success('Projeto removido');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao remover projeto');
+    }
   };
 
   const title = mode?.type === 'create' ? 'Novo projeto'
@@ -348,6 +361,15 @@ function TweetCard({ tweet, index }: { tweet: Tweet; index: number }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
+interface TweetHistoryEntry {
+  id: string;
+  prompt: string;
+  tone: string;
+  project: string;
+  variations: Tweet[];
+  created_at: string;
+}
+
 export default function TwitterPage() {
   const { projects, addProject, updateProject, deleteProject } = useProjects();
 
@@ -359,6 +381,29 @@ export default function TwitterPage() {
   const [loading, setLoading] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
   const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [history, setHistory] = useState<TweetHistoryEntry[]>([]);
+
+  // Histórico de gerações do usuário (tabela tweets — RLS filtra pela conta).
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+    supabase
+      .from('tweets')
+      .select('id, prompt, tone, project, variations, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data, error }: { data: TweetHistoryEntry[] | null; error: unknown }) => {
+        if (active && !error && data) setHistory(data);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const deleteHistoryEntry = async (id: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('tweets').delete().eq('id', id);
+    if (error) { toast.error('Erro ao remover do histórico'); return; }
+    setHistory((prev) => prev.filter((h) => h.id !== id));
+  };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) ?? null;
 
@@ -396,7 +441,32 @@ export default function TwitterPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao gerar tweets');
-      setTweets(data.tweets || []);
+      const generated: Tweet[] = data.tweets || [];
+      setTweets(generated);
+
+      // Persiste a geração na conta do usuário (best-effort — não trava a UI).
+      if (generated.length > 0) {
+        const supabase = createClient();
+        const { data: saved, error: saveError } = await supabase
+          .from('tweets')
+          .insert({
+            project_id: selectedProject?.id ?? null,
+            project: selectedProject?.name || '',
+            title: update.trim().slice(0, 80),
+            tone: selectedTone,
+            prompt: update.trim(),
+            context: extraContext.trim() || null,
+            variations: generated,
+            status: 'draft',
+          })
+          .select('id, prompt, tone, project, variations, created_at')
+          .single();
+        if (saveError) {
+          console.error('[twitter] erro ao salvar geração:', saveError);
+        } else if (saved) {
+          setHistory((prev) => [saved as TweetHistoryEntry, ...prev].slice(0, 10));
+        }
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao gerar tweets');
     } finally {
@@ -593,6 +663,53 @@ export default function TwitterPage() {
           <div className="mt-10 text-center py-12 border border-dashed border-black/10 dark:border-white/10 rounded-2xl">
             <XIcon className="w-8 h-8 text-gray-900/15 dark:text-white/15 mx-auto mb-3" />
             <p className="text-sm text-gray-900/30 dark:text-white/30">Descreva o que aconteceu e gere seus tweets</p>
+          </div>
+        )}
+
+        {/* Histórico de gerações (salvo na conta) */}
+        {history.length > 0 && (
+          <div className="mt-10 flex flex-col gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900/60 dark:text-white/60 uppercase tracking-wider">
+              <History className="w-4 h-4" />
+              Histórico
+            </h2>
+            <div className="flex flex-col gap-2">
+              {history.map((h) => (
+                <div
+                  key={h.id}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-black/8 dark:border-white/8 bg-[var(--surface)] hover:border-black/20 dark:hover:border-white/20 transition-colors"
+                >
+                  <button
+                    type="button"
+                    className="flex-1 min-w-0 text-left"
+                    onClick={() => {
+                      setTweets(h.variations || []);
+                      setUpdate(h.prompt);
+                      setSelectedTone(h.tone || 'honesto');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      toast.success('Geração carregada do histórico');
+                    }}
+                    title="Carregar essa geração"
+                  >
+                    <p className="text-sm text-gray-900 dark:text-white truncate">{h.prompt || 'Sem descrição'}</p>
+                    <p className="text-[10px] text-gray-900/40 dark:text-white/40 mt-0.5">
+                      {[h.project, h.tone, new Date(h.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      {` · ${(h.variations || []).length} versões`}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteHistoryEntry(h.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-900/30 dark:text-white/30 hover:text-red-500 transition-colors shrink-0"
+                    aria-label="Remover do histórico"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -1,14 +1,20 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useEditorStore } from './useEditorStore';
 import { createClient } from '@/lib/supabase';
+import { mapSlideToDbRow } from '@/lib/slide-mapper';
 
 export function useAutoSave() {
   const setSaveStatus = useEditorStore((s) => s.setSaveStatus);
   const setCarouselId = useEditorStore((s) => s.setCarouselId);
 
-  const saveNow = useCallback(async () => {
+  // Mutex: o save faz delete+insert dos slides — dois saves simultâneos
+  // corromperiam os dados. Se chegar pedido durante um save, roda de novo no fim.
+  const savingRef = useRef(false);
+  const queuedRef = useRef(false);
+
+  const doSave = useCallback(async () => {
     const store = useEditorStore.getState();
 
     setSaveStatus('saving');
@@ -26,6 +32,7 @@ export function useAutoSave() {
         accent_color:  store.globalSettings.accentColor,
         corners:       store.globalSettings.corners,
         profile_badge: store.globalSettings.profileBadge,
+        global_settings: { metaBar: store.globalSettings.metaBar ?? null },
         caption:       store.caption       ?? '',
         hashtags:      store.hashtags      ?? [],
       };
@@ -60,27 +67,9 @@ export function useAutoSave() {
       }
 
       // ── Substitui todos os slides (delete + insert) ────────────────────
-      const slidePayload = store.slides.map((slide, i) => ({
-        carousel_id:          id,
-        position:             i,
-        title:                slide.title                ?? '',
-        description:          slide.description          ?? '',
-        subtitle:             slide.subtitle             ?? '',
-        highlight_word:       slide.highlightWord        ?? '',
-        background_image_url: slide.backgroundImageUrl   ?? '',
-        grid_image_url:       slide.gridImageUrl         ?? '',
-        image_type:           slide.imageType,
-        image_position:       slide.imagePosition,
-        background_color:     slide.backgroundColor,
-        shadow_style:         slide.shadow.style,
-        shadow_opacity:       slide.shadow.opacity,
-        text_position:        slide.textPosition,
-        text_offset:          slide.textOffset           ?? null,
-        text_alignment:       slide.textAlignment        ?? 'left',
-        font_size:            slide.fontSize,
-        line_height:          slide.lineHeight,
-        cta_button:           slide.ctaButton,
-      }));
+      // Mapeamento completo em lib/slide-mapper — persiste também cores/fontes
+      // por elemento, highlights, sombra custom, paddings e offsets editoriais.
+      const slidePayload = store.slides.map((slide, i) => mapSlideToDbRow(slide, id!, i));
 
       const { error: delError } = await supabase
         .from('slides')
@@ -103,6 +92,22 @@ export function useAutoSave() {
       setSaveStatus('unsaved');
     }
   }, [setSaveStatus, setCarouselId]);
+
+  const saveNow = useCallback(async () => {
+    if (savingRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+    savingRef.current = true;
+    try {
+      do {
+        queuedRef.current = false;
+        await doSave();
+      } while (queuedRef.current);
+    } finally {
+      savingRef.current = false;
+    }
+  }, [doSave]);
 
   return { saveNow };
 }

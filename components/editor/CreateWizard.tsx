@@ -397,8 +397,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           title: sl.title,
           description: sl.description,
           highlight_word: sl.highlightWord,
-          background_image_url: sl.imageUrl || null,
-          grid_image_url: sl.imageUrl || null,
+          background_image_url: sl.imageUrl || '',
+          grid_image_url: sl.imageUrl || '',
           image_type: imageType,
           image_position: { x: 50, y: 50, zoom: 175 },
           shadow_style: 'base',
@@ -418,11 +418,14 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
         const { error: slidesError } = await supabase.from('slides').insert(slidesPayload);
         if (slidesError) {
+          // Não deixa um carrossel órfão (sem slides) para trás no banco.
+          await supabase.from('carousels').delete().eq('id', carousel.id);
           throw new Error(slidesError.message || 'Falha ao salvar slides');
         }
 
         openEditor(carousel.id, carousel.title);
-      } catch {
+      } catch (persistErr) {
+        console.error('[create-wizard] falha ao persistir, abrindo editor local:', persistErr);
         openEditor(null, defaultTitle);
       }
     } catch (err) {

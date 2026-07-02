@@ -3,6 +3,8 @@ import React from 'react';
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export interface NewsCardItem {
+  /** id da linha em news_entries quando o card está salvo no Supabase */
+  dbId?: string;
   numero: number;
   tema: string;
   titulo_card: string;

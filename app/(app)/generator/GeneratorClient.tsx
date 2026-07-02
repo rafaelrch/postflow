@@ -13,7 +13,8 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useExport } from '@/hooks/useExport';
 import { createClient } from '@/lib/supabase';
-import { Slide, GlobalSettings, SlideStyle, ImageType, DEFAULT_GLOBAL_SETTINGS } from '@/types';
+import { Slide, SlideStyle } from '@/types';
+import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import toast from 'react-hot-toast';
 
 export default function GeneratorClient() {
@@ -50,44 +51,9 @@ export default function GeneratorClient() {
         .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
           (a.position as number) - (b.position as number)
         )
-        .map((sl: Record<string, unknown>) => ({
-          id: sl.id as string,
-          position: sl.position as number,
-          title: sl.title as string,
-          description: (sl.description as string) || '',
-          highlightWord: (sl.highlight_word as string) || '',
-          backgroundImageUrl: (sl.background_image_url as string) || '',
-          gridImageUrl: (sl.grid_image_url as string) || '',
-          imageType: sl.image_type as ImageType,
-          imagePosition: (sl.image_position as { x: number; y: number; zoom: number }) || { x: 50, y: 50, zoom: 175 },
-          shadow: {
-            style: (sl.shadow_style as string) || 'base',
-            opacity: (sl.shadow_opacity as number) ?? 88,
-          },
-          backgroundColor: (sl.background_color as string) || '#111111',
-          textPosition: (sl.text_position as string) || 'bottom-left',
-          textOffset: (sl.text_offset as { x: number; y: number }) || undefined,
-          textAlignment: (sl.text_alignment as 'left' | 'center' | 'right') || 'left',
-          subtitle: (sl.subtitle as string) || '',
-          fontSize: (sl.font_size as { title: number; description: number }) || { title: 48, description: 18 },
-          lineHeight: (sl.line_height as number) || 1.2,
-          ctaButton: (sl.cta_button as Record<string, unknown>) || {
-            show: false,
-            text: 'Comenta FLUXO',
-            fontSize: 16,
-            borderRadius: 12,
-            style: 'solid',
-            position: 'bottom-center',
-          },
-        }));
+        .map((sl: Record<string, unknown>) => mapDbSlideToSlide(sl));
 
-      const globalSettings: GlobalSettings = {
-        theme:        (carousel.theme        as GlobalSettings['theme'])    || 'dark',
-        fontPair:     (carousel.font_pair    as GlobalSettings['fontPair']) || 'SF Pro Display + IvyOra Text',
-        accentColor:  (carousel.accent_color as string)                     || '#00CFFF',
-        corners:      (carousel.corners      as GlobalSettings['corners'])  || DEFAULT_GLOBAL_SETTINGS.corners,
-        profileBadge: (carousel.profile_badge as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
-      };
+      const globalSettings = mapDbCarouselToGlobalSettings(carousel);
 
       loadCarousel({
         id:             carousel.id,
@@ -103,6 +69,21 @@ export default function GeneratorClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carouselIdParam]);
 
+  // ── Auto-save: 2,5s após a última edição, salva sozinho ──────────────────
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = useEditorStore.subscribe((state) => {
+      if (state.saveStatus !== 'unsaved') return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { saveNow(); }, 2500);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsub();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -110,11 +91,25 @@ export default function GeneratorClient() {
         e.preventDefault();
         useEditorStore.getState().undo();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        saveNow().then(() => toast.success('Carrossel salvo!'));
+        return;
+      }
+
+      // Setas só trocam de slide fora de campos de texto (senão brigam com o cursor).
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      );
+      if (isTyping) return;
+
       if (e.key === 'ArrowLeft') setActiveSlideIndex(Math.max(0, activeSlideIndex - 1));
       if (e.key === 'ArrowRight') setActiveSlideIndex(Math.min(slides.length - 1, activeSlideIndex + 1));
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSlideIndex, slides.length, setActiveSlideIndex]);
 
   // ── Manual save ───────────────────────────────────────────────────────────

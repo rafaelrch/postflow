@@ -5,6 +5,7 @@ export type DashboardCarousel = {
   id: string;
   title: string;
   style: string;
+  status: string;
   accent_color: string;
   theme: string;
   font_pair: string;
@@ -37,7 +38,7 @@ export default async function DashboardPage() {
   const carouselsQuery = Promise.resolve(
     supabase
       .from('carousels')
-      .select('id, title, style, accent_color, theme, font_pair, corners, profile_badge, created_at, updated_at, slides(count)')
+      .select('id, title, style, status, accent_color, theme, font_pair, corners, profile_badge, global_settings, created_at, updated_at, slides(count)')
       .order('updated_at', { ascending: false })
   );
 

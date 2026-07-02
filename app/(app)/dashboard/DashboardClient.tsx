@@ -7,10 +7,8 @@ import Button from '@/components/ui/Button';
 import CreateWizard from '@/components/editor/CreateWizard';
 import { createClient } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import {
-  Slide, GlobalSettings, ImageType, SlideStyle,
-  DEFAULT_GLOBAL_SETTINGS,
-} from '@/types';
+import { SlideStyle } from '@/types';
+import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import type { DashboardCarousel } from './page';
@@ -27,49 +25,6 @@ function formatDate(dateStr: string) {
   });
 }
 
-function mapDbSlide(sl: Record<string, unknown>): Slide {
-  return {
-    id: sl.id as string,
-    position: sl.position as number,
-    title: (sl.title as string) || '',
-    description: (sl.description as string) || '',
-    highlightWord: (sl.highlight_word as string) || '',
-    highlights: (sl.highlights as Slide['highlights']) || [],
-    backgroundImageUrl: (sl.background_image_url as string) || '',
-    gridImageUrl: (sl.grid_image_url as string) || '',
-    imageType: (sl.image_type as ImageType) || 'grid',
-    imagePosition: (sl.image_position as Slide['imagePosition']) || { x: 50, y: 50, zoom: 175 },
-    shadow: {
-      style: ((sl.shadow_style as string) || 'base') as Slide['shadow']['style'],
-      opacity: (sl.shadow_opacity as number) ?? 88,
-    },
-    backgroundColor: (sl.background_color as string) || '#111111',
-    textPosition: ((sl.text_position as string) || 'bottom-left') as Slide['textPosition'],
-    textOffset: (sl.text_offset as Slide['textOffset']) || undefined,
-    textAlignment: ((sl.text_alignment as string) || 'left') as Slide['textAlignment'],
-    subtitle: (sl.subtitle as string) || '',
-    fontSize: (sl.font_size as Slide['fontSize']) || { title: 70, description: 30 },
-    lineHeight: (sl.line_height as number) || 1.2,
-    ctaButton: (sl.cta_button as Slide['ctaButton']) || { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
-    titleColor: (sl.title_color as string) || undefined,
-    descriptionColor: (sl.description_color as string) || undefined,
-    subtitleColor: (sl.subtitle_color as string) || undefined,
-    titleFont: (sl.title_font as Slide['titleFont']) || undefined,
-    descriptionFont: (sl.description_font as Slide['descriptionFont']) || undefined,
-    subtitleFont: (sl.subtitle_font as Slide['subtitleFont']) || undefined,
-  };
-}
-
-function buildGlobalSettings(carousel: DashboardCarousel): GlobalSettings {
-  return {
-    theme: (carousel.theme as GlobalSettings['theme']) || 'dark',
-    fontPair: (carousel.font_pair as GlobalSettings['fontPair']) || 'SF Pro Display + IvyOra Text',
-    accentColor: carousel.accent_color || '#00CFFF',
-    corners: (carousel.corners as unknown as GlobalSettings['corners']) || DEFAULT_GLOBAL_SETTINGS.corners,
-    profileBadge: (carousel.profile_badge as unknown as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
-  };
-}
-
 function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
@@ -82,8 +37,8 @@ function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
 
   if (!carousel.coverSlide) return null;
 
-  const slide = mapDbSlide(carousel.coverSlide);
-  const globalSettings = buildGlobalSettings(carousel);
+  const slide = mapDbSlideToSlide(carousel.coverSlide);
+  const globalSettings = mapDbCarouselToGlobalSettings(carousel as unknown as Record<string, unknown>);
 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden">
@@ -182,6 +137,8 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
   };
 
   const total = carousels.length;
+  const published = carousels.filter((c) => c.status === 'published').length;
+  const drafts = total - published;
 
   return (
     <div
@@ -240,8 +197,8 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
           {/* Stats row */}
           <div className="flex items-center gap-8 mt-2">
             <Stat label="Total" value={total} />
-            <Stat label="Rascunho" value={Math.max(0, total - 1)} />
-            <Stat label="Publicados" value={0} accent />
+            <Stat label="Rascunho" value={drafts} />
+            <Stat label="Publicados" value={published} accent />
             <span className="hairline soft flex-1" />
           </div>
         </header>

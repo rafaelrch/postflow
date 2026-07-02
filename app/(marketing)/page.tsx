@@ -478,7 +478,7 @@ function Pricing() {
   ];
 
   const perks = [
-    'Carrosséis ilimitados',
+    'Créditos de IA todo mês (200 no mensal, 300 no anual)',
     'Threads e tweets no seu tom',
     'News Cards editoriais',
     'Agenda de postagem',

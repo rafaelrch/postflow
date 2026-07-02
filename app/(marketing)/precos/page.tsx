@@ -12,12 +12,12 @@ const YEARLY_PRICE = 'R$ 499';
 const YEARLY_MONTHLY_EQUIV = 'R$ 41,58/mês';
 
 const FEATURES = [
-  'Geração ilimitada de carrosséis',
-  'Threads para X/Twitter',
-  'Posts de notícias e editorial',
+  'Créditos de IA todo mês (200 no mensal, 300 no anual)',
+  'Editor visual de carrosséis com export PNG/ZIP',
+  'Threads e tweets para X/Twitter',
+  'Cards de notícias e editorial',
   'Calendário de conteúdo',
-  'Templates e biblioteca de assets',
-  'Imagens com IA (Nano Banana)',
+  'Imagens com IA (OpenAI e Nano Banana) sem custo de créditos',
 ];
 
 export default function PrecosPage() {
