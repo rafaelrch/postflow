@@ -3,6 +3,34 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─────────────────────────────────────────────────────────────
+   Cursor global — tudo clicável usa pointer, sem precisar declarar
+   cursor-pointer em cada componente. Respeita disabled/readonly e
+   qualquer classe cursor-* explícita (ela vem depois no cascade
+   das utilities do Tailwind e vence por especificidade igual).
+   ──────────────────────────────────────────────────────────── */
+button:not(:disabled),
+a[href],
+select:not(:disabled),
+label[for],
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="range"]:not(:disabled),
+input[type="color"]:not(:disabled),
+input[type="file"]:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"],
+[role="switch"],
+[role="menuitem"],
+[role="option"],
+[onclick],
+summary {
+  cursor: pointer;
+}
+
+/* ─────────────────────────────────────────────────────────────
    CREATOOLS · DESIGN SYSTEM
    Brutalist · Paper-first · Hard 3D shadows matching brand logo
    ──────────────────────────────────────────────────────────── */

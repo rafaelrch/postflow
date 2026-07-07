@@ -12,12 +12,6 @@ export interface MinimalistSlideProps {
   forExport?: boolean;
 }
 
-// Grid layout constants — image at top, text below
-const GRID_IMAGE_TOP = 80;
-const GRID_IMAGE_HEIGHT = 700;
-const GRID_IMAGE_MARGIN_X = 80;
-const GRID_TEXT_TOP = GRID_IMAGE_TOP + GRID_IMAGE_HEIGHT + 40; // 820px
-
 function hexToRgb(hex: string): string {
   const h = hex.replace('#', '');
   const r = parseInt(h.substring(0, 2), 16);
@@ -177,8 +171,10 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
   const fonts = getFontFamilies(fontPair);
   const isDark = theme === 'dark';
 
-  const hasBackground = !!slide.backgroundImageUrl && (slide.imageType === 'background' || slide.imageType === 'mixed');
-  const hasGrid = !!slide.gridImageUrl && (slide.imageType === 'grid' || slide.imageType === 'mixed');
+  // A imagem é sempre fundo full-bleed (o modo "grade" foi removido junto com
+  // o seletor "Tipo de imagem"); slides antigos com grid_image_url continuam
+  // funcionando porque a sidebar sincroniza os dois campos.
+  const bgImageUrl = slide.backgroundImageUrl || slide.gridImageUrl || '';
 
   // Per-slide color derived from backgroundColor (AI sets this per slide)
   const isLightSlide = slide.backgroundColor?.toLowerCase() === '#ffffff';
@@ -278,12 +274,12 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
       }}
     >
       {/* Background image */}
-      {hasBackground && slide.backgroundImageUrl && (
+      {bgImageUrl && (
         <div
           style={{
             position: 'absolute',
             inset: 0,
-            backgroundImage: `url(${slide.backgroundImageUrl})`,
+            backgroundImage: `url(${bgImageUrl})`,
             backgroundSize: `${slide.imagePosition.zoom}%`,
             backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
             backgroundRepeat: 'no-repeat',
@@ -291,33 +287,8 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
         />
       )}
 
-      {/* Grid image — fixed top zone */}
-      {hasGrid && slide.gridImageUrl && (
-        <div style={{
-          position: 'absolute',
-          top: GRID_IMAGE_TOP,
-          left: GRID_IMAGE_MARGIN_X,
-          right: GRID_IMAGE_MARGIN_X,
-          height: GRID_IMAGE_HEIGHT,
-          borderRadius: 24,
-          overflow: 'hidden',
-        }}>
-          <img
-            src={slide.gridImageUrl}
-            alt=""
-            crossOrigin={forExport ? 'anonymous' : undefined}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
-            }}
-          />
-        </div>
-      )}
-
-      {/* Shadow overlay — only for background image mode */}
-      {!hasGrid && slide.shadow.style !== 'none' && (
+      {/* Shadow overlay */}
+      {slide.shadow.style !== 'none' && (
         <div
           style={{
             position: 'absolute',
@@ -328,20 +299,9 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
         />
       )}
 
-      {/* Text block — below grid image, or standard position otherwise */}
+      {/* Text block — positioned by textPosition/textOffset */}
       {(() => {
-        const textBlockStyle = hasGrid && !slide.textOffset
-          ? {
-              position: 'absolute' as const,
-              top: GRID_TEXT_TOP,
-              left: GRID_IMAGE_MARGIN_X,
-              right: GRID_IMAGE_MARGIN_X,
-              display: 'flex',
-              flexDirection: 'column' as const,
-              alignItems: slide.textAlignment === 'center' ? 'center' : slide.textAlignment === 'right' ? 'flex-end' : 'flex-start',
-              textAlign: slide.textAlignment || 'left',
-            }
-          : getTextBlockStyle(slide);
+        const textBlockStyle = getTextBlockStyle(slide);
 
         const tp = slide.textPadding;
         const extraContainerStyle: React.CSSProperties = {

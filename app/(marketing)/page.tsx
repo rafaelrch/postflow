@@ -9,7 +9,7 @@ import { startStripeCheckout } from '@/lib/start-checkout';
 import {
   Sparkles, Download, ArrowRight, Check, X,
   ChevronDown, Star, LayoutTemplate, Type, Image as ImageIcon,
-  Calendar, Newspaper, MessageSquareText,
+  Calendar, Newspaper,
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ function Hero() {
           className="text-[17px] md:text-[19px] leading-relaxed max-w-xl mb-10"
           style={{ color: 'var(--ink-dim)' }}
         >
-          Creatools junta <b style={{ color: 'var(--ink)' }}>carrossel</b>, <b style={{ color: 'var(--ink)' }}>tweet</b>, <b style={{ color: 'var(--ink)' }}>news card</b> e <b style={{ color: 'var(--ink)' }}>agenda</b> num só estúdio. A IA escreve e desenha. Você só aprova.
+          Creatools junta <b style={{ color: 'var(--ink)' }}>carrossel</b>, <b style={{ color: 'var(--ink)' }}>news card</b> e <b style={{ color: 'var(--ink)' }}>agenda</b> num só estúdio. A IA escreve e desenha. Você só aprova.
         </motion.p>
 
         {/* CTA */}
@@ -201,7 +201,7 @@ function Hero() {
 function PreviewCards() {
   const slides = [
     { label: 'CARROSSEL', title: '5 erros que te impedem de vender no Instagram', bg: '#0A0A0A', fg: '#FAFAF7' },
-    { label: 'TWEET',     title: 'Descobri o que realmente prende atenção em 3s.', bg: '#E4572E', fg: '#FFFFFF' },
+    { label: 'AGENDA',    title: 'Seu mês de conteúdo planejado em um só lugar.', bg: '#E4572E', fg: '#FFFFFF' },
     { label: 'NEWS',      title: 'OpenAI capta US$ 122 bi — mercado reage em horas', bg: '#FAFAF7', fg: '#0A0A0A' },
   ];
 
@@ -339,7 +339,6 @@ function HowItWorks() {
 function Features() {
   const features = [
     { icon: Sparkles,          title: 'Carrosséis por IA',         desc: 'Diga o tema e tom. A IA monta slides prontos pra publicar.' },
-    { icon: MessageSquareText, title: 'Threads e tweets autorais', desc: 'Documente o que você constrói. A IA propõe 3 versões no seu tom.' },
     { icon: Newspaper,         title: 'News Cards editorial',      desc: 'Transforme manchetes em cards editoriais com gradient e foto.' },
     { icon: Calendar,          title: 'Agenda de postagem',        desc: 'Calendário visual: agende, mova e mantenha ritmo diário.' },
     { icon: LayoutTemplate,    title: 'Editor visual simples',     desc: 'Ajuste cores, fontes, imagem, espaçamento. Sem Canva.' },
@@ -479,7 +478,6 @@ function Pricing() {
 
   const perks = [
     'Créditos de IA todo mês (200 no mensal, 300 no anual)',
-    'Threads e tweets no seu tom',
     'News Cards editoriais',
     'Agenda de postagem',
     'Editor premium',

@@ -1,13 +1,13 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Download, RefreshCw, Archive, Upload, Clipboard, Wand2, Image, X, Underline, Sparkles } from 'lucide-react';
+import { Download, Archive, Upload, Clipboard, Image, X, Underline, Sparkles } from 'lucide-react';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useGenerateCarouselImages } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Section from './Section';
 import { cn } from '@/lib/utils';
-import { TextPosition, ShadowStyle, BadgeStyle, CtaStyle, FontPair, TextHighlight, ElementFont } from '@/types';
+import { TextPosition, ShadowStyle, BadgeStyle, TextHighlight, ElementFont } from '@/types';
 import toast from 'react-hot-toast';
 
 // ── ColorPicker: swatch + hex input ─────────────────────────────────────────
@@ -377,7 +377,6 @@ interface EditorSidebarProps {
   onOpenWizard: () => void;
   onDownloadSlide: () => void;
   onDownloadAll: () => void;
-  onRefreshSlide: () => void;
 }
 
 const TEXT_POSITIONS: TextPosition[] = [
@@ -394,32 +393,18 @@ const SHADOW_STYLES: { value: ShadowStyle; label: string }[] = [
   { value: 'none', label: 'Sem Sombra' },
 ];
 
-const FONT_PAIRS: { value: FontPair; label: string }[] = [
-  { value: 'SF Pro Display + IvyOra Text', label: 'SF Pro + IvyOra' },
-  { value: 'Space Grotesk + Inter', label: 'Space Grotesk' },
-  { value: 'Playfair Display + Lato', label: 'Playfair + Lato' },
-  { value: 'Oswald + Roboto', label: 'Oswald + Roboto' },
-  { value: 'Montserrat + Open Sans', label: 'Montserrat' },
-  { value: 'Bebas Neue + Inter', label: 'Bebas Neue' },
-  { value: 'Syne + DM Sans', label: 'Syne + DM Sans' },
-];
-
-export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefreshSlide }: EditorSidebarProps) {
+export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: EditorSidebarProps) {
   const {
     slides, activeSlideIndex, style, globalSettings,
     updateActiveSlide, updateGlobalSettings, updateCornersConfig,
-    applyLayoutToNext,
   } = useEditorStore();
 
   const slide = slides[activeSlideIndex];
-  const { corners, profileBadge, accentColor, fontPair, theme } = globalSettings;
+  const { corners, profileBadge, accentColor, theme } = globalSettings;
 
   const bgImageRef = useRef<HTMLInputElement>(null);
   const gridImageRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
-
-  const [refineInstruction, setRefineInstruction] = useState('');
-  const [refining, setRefining] = useState(false);
 
   const { generateAll, generateOne, generating, progress } = useGenerateCarouselImages();
 
@@ -449,34 +434,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
       }
       toast.error('Nenhuma imagem no clipboard');
     } catch { toast.error('Clipboard indisponível'); }
-  };
-
-  const handleRefine = async () => {
-    if (!refineInstruction.trim()) { toast.error('Digite uma instrução'); return; }
-    setRefining(true);
-    try {
-      const res = await fetch('/api/refine-slide', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slideId: activeSlideIndex + 1,
-          currentContent: `${slide.title}\n${slide.description}`,
-          instruction: refineInstruction,
-          allSlides: slides,
-        }),
-      });
-      const data = await res.json();
-      if (data.title) {
-        updateActiveSlide({
-          title: data.title,
-          description: data.description || slide.description,
-          highlightWord: data.highlightWord || slide.highlightWord,
-        });
-        setRefineInstruction('');
-        toast.success('Slide refinado!');
-      }
-    } catch { toast.error('Erro ao refinar'); }
-    finally { setRefining(false); }
   };
 
   const labelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
@@ -628,15 +585,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
                 onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
                 unit="px"
               />
-              <Slider
-                label="Espaçamento de letras"
-                value={slide.titleLetterSpacing ?? -0.02}
-                min={-0.1}
-                max={0.3}
-                step={0.01}
-                onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
-                unit="em"
-              />
             </Section>
 
             {/* 3. Mídia */}
@@ -654,23 +602,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
               >
                 <Image className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
                 <span className="text-[10px] font-medium text-gray-900/35 dark:text-white/35">Arraste ou clique para adicionar</span>
-              </div>
-
-              {/* Quick actions row */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => bgImageRef.current?.click()}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/35 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
-                >
-                  <Image className="w-3 h-3" /> Imagem
-                </button>
-                <button
-                  onClick={() => handlePasteImage()}
-                  className="py-2 px-3 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] text-gray-900/40 dark:text-white/35 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
-                  title="Colar do clipboard"
-                >
-                  <Clipboard className="w-3 h-3" />
-                </button>
               </div>
 
               {/* AI image generation */}
@@ -720,25 +651,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
               )}
             </Section>
 
-            {/* 4. Tipografia */}
-            <Section title="Tipografia">
-              <div className="flex flex-col gap-1">
-                {FONT_PAIRS.map((fp) => (
-                  <button
-                    key={fp.value}
-                    onClick={() => updateGlobalSettings({ fontPair: fp.value })}
-                    className={cn(
-                      'w-full px-2.5 py-1.5 rounded-lg text-[10px] text-left transition-colors border',
-                      fontPair === fp.value
-                        ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white font-semibold'
-                        : 'bg-black/5 dark:bg-white/5 text-gray-900/50 dark:text-white/50 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white'
-                    )}
-                  >
-                    {fp.label}
-                  </button>
-                ))}
-              </div>
-            </Section>
           </>
         ) : (
           /* ════════════════════════════════
@@ -1018,41 +930,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
               </div>
             </Section>
 
-            {/* REFINAR COM IA */}
-            <Section title="Refinar com IA">
-              <textarea className={cn(inputCls, 'resize-none h-16')}
-                placeholder="Ex: deixe mais resumido, tom humorístico..."
-                value={refineInstruction} onChange={(e) => setRefineInstruction(e.target.value)} />
-              <button onClick={handleRefine} disabled={refining}
-                className="w-full py-2.5 rounded-xl bg-[var(--surface-elevated)] text-gray-900 dark:text-white text-[10px] font-semibold hover:bg-black/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5 border border-black/[0.07] dark:border-white/[0.07]">
-                <Wand2 className="w-3.5 h-3.5" />
-                {refining ? 'Refinando...' : 'Refinar slide'}
-              </button>
-            </Section>
-
-            {/* ESTILO GLOBAL */}
-            <Section title="Estilo Global">
-              <ColorPicker label="Cor de destaque" value={accentColor} onChange={(v) => updateGlobalSettings({ accentColor: v })} />
-              <button onClick={applyLayoutToNext} className="w-full py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/35 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
-                Aplicar layout no próximo slide →
-              </button>
-            </Section>
-
-            {/* TIPOGRAFIA GLOBAL */}
-            <Section title="Tipografia">
-              <div className="flex flex-col gap-1">
-                {FONT_PAIRS.map((fp) => (
-                  <button key={fp.value} onClick={() => updateGlobalSettings({ fontPair: fp.value })}
-                    className={cn('w-full px-2.5 py-1.5 rounded-lg text-[10px] text-left transition-colors border',
-                      fontPair === fp.value ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white font-semibold shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/50 dark:text-white/40 border-black/[0.07] dark:border-white/[0.07] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white'
-                    )}
-                  >
-                    {fp.label}
-                  </button>
-                ))}
-              </div>
-            </Section>
-
             {/* CANTOS */}
             <Section title="Cantos">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -1125,33 +1002,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
               )}
             </Section>
 
-            {/* CTA */}
-            <Section title="Botão CTA">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div onClick={() => updateActiveSlide({ ctaButton: { ...slide.ctaButton, show: !slide.ctaButton.show } })} className={cn('w-8 h-4 rounded-full relative transition-colors', slide.ctaButton.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-                  <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.ctaButton.show ? 'left-[18px]' : 'left-0.5')} />
-                </div>
-                <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir CTA</span>
-              </label>
-              {slide.ctaButton.show && (
-                <>
-                  <input className={inputCls} placeholder="Texto do botão" value={slide.ctaButton.text}
-                    onChange={(e) => updateActiveSlide({ ctaButton: { ...slide.ctaButton, text: e.target.value } })} />
-                  <Slider label="Tamanho fonte" value={slide.ctaButton.fontSize} min={10} max={28}
-                    onChange={(v) => updateActiveSlide({ ctaButton: { ...slide.ctaButton, fontSize: v } })} unit="px" />
-                  <Slider label="Arredondamento" value={slide.ctaButton.borderRadius} min={0} max={30}
-                    onChange={(v) => updateActiveSlide({ ctaButton: { ...slide.ctaButton, borderRadius: v } })} unit="px" />
-                  <div className="flex gap-1">
-                    {(['solid', 'outline', 'glass'] as CtaStyle[]).map((s) => (
-                      <button key={s} onClick={() => updateActiveSlide({ ctaButton: { ...slide.ctaButton, style: s } })}
-                        className={cn('flex-1 py-1 rounded text-[9px] capitalize transition-colors', slide.ctaButton.style === s ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white')}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </Section>
           </>
         )}
       </div>
@@ -1165,14 +1015,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll, onRefres
           <Download className="w-3.5 h-3.5" />
           Baixar Slide {activeSlideIndex + 1}
         </button>
-        <div className="flex gap-2">
-          <button onClick={onRefreshSlide} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
-            <RefreshCw className="w-3 h-3" /> Atualizar
-          </button>
-          <button onClick={onDownloadAll} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
-            <Archive className="w-3 h-3" /> ZIP ({slides.length})
-          </button>
-        </div>
+        <button
+          onClick={onDownloadAll}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[11px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
+        >
+          <Archive className="w-3.5 h-3.5" />
+          Baixar todos os slides
+        </button>
       </div>
     </div>
   );

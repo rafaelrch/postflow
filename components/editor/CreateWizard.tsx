@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   X, ChevronRight, Sparkles, Image as ImageIcon,
-  Upload, Clipboard, Plus, Trash2, FileJson,
+  Upload, Plus, Trash2, FileJson,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { SlideStyle, ImageType, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData } from '@/types';
+import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import toast from 'react-hot-toast';
@@ -163,7 +163,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [slideCount, setSlideCount] = useState(6);
-  const [imageType, setImageType] = useState<ImageType>('mixed');
   const [twitterFormat, setTwitterFormat] = useState<TwitterFormat>('B');
   const [fontPair, setFontPair] = useState<FontPair>('SF Pro Display + IvyOra Text');
   // Brand palette loaded from profile: [dark, paper/light, accent]
@@ -226,7 +225,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     setManualSlides((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  const totalSteps = style === 'profile' ? 4 : 3;
+  // Twitter/X (profile) pula a etapa Visual: a tipografia do template é fixa
+  // e as cores vêm do tema claro/escuro do próprio Twitter.
+  const totalSteps = 3;
 
   const handleNext = () => {
     if (step === 2) {
@@ -256,6 +257,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
   const handleGenerate = async () => {
     setLoading(true);
+    // Twitter/X tem fonte única — ignora qualquer fontPair escolhido antes de
+    // trocar o estilo para 'profile'.
+    const effectiveFontPair: FontPair = style === 'profile' ? 'SF Pro Display + IvyOra Text' : fontPair;
     try {
       let slides: { title: string; description: string; highlightWord: string; backgroundColor: string; imageUrl?: string }[];
       let jsonCarouselTitle: string | undefined;
@@ -269,9 +273,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             prompt,
             style,
             slideCount,
-            imageType,
+            imageType: 'background',
             generateImages: false,
-            fontPair,
+            fontPair: effectiveFontPair,
             accentColor,
             profileData: style === 'profile' ? profileData : undefined,
             twitterFormat: style === 'profile' ? twitterFormat : undefined,
@@ -304,7 +308,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
       const globalSettings = {
         ...DEFAULT_GLOBAL_SETTINGS,
-        fontPair,
+        fontPair: effectiveFontPair,
         accentColor,
         theme: 'dark' as const,
         ...(style === 'profile' && profileData.name ? {
@@ -333,16 +337,17 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         highlights: [],
         backgroundImageUrl: sl.imageUrl || '',
         gridImageUrl: sl.imageUrl || '',
-        imageType,
+        imageType: 'background' as const,
         imagePosition: { x: 50, y: 50, zoom: 175 },
         shadow: { style: 'base', opacity: 88 },
         backgroundColor: slideBg,
         textPosition: (i === 0 ? 'bottom-center' : 'bottom-left') as 'bottom-center' | 'bottom-left',
         textAlignment: (i === 0 ? 'center' : 'left') as 'center' | 'left',
         fontSize: style === 'profile'
-          ? { title: 32, description: 26 }
+          ? { title: 47, description: 26 }
           : { title: i === 0 ? 90 : 70, description: 36 },
-        lineHeight: 1.2,
+        lineHeight: style === 'profile' ? 1.1 : 1.2,
+        titleDescriptionGap: style === 'profile' ? 41 : undefined,
         ctaButton: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid' as const, position: 'bottom-center' as const },
         });
       });
@@ -375,7 +380,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             title:         defaultTitle,
             style,
             theme:         'dark',
-            font_pair:     fontPair,
+            font_pair:     effectiveFontPair,
             accent_color:  accentColor,
             corners:       globalSettings.corners,
             profile_badge: globalSettings.profileBadge,
@@ -399,7 +404,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           highlight_word: sl.highlightWord,
           background_image_url: sl.imageUrl || '',
           grid_image_url: sl.imageUrl || '',
-          image_type: imageType,
+          image_type: 'background',
           image_position: { x: 50, y: 50, zoom: 175 },
           shadow_style: 'base',
           shadow_opacity: 88,
@@ -408,9 +413,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           text_alignment: i === 0 ? 'center' : 'left',
           subtitle: '',
           font_size: style === 'profile'
-            ? { title: 32, description: 26 }
+            ? { title: 47, description: 26 }
             : { title: i === 0 ? 90 : 70, description: 36 },
-          line_height: 1.2,
+          line_height: style === 'profile' ? 1.1 : 1.2,
+          title_description_gap: style === 'profile' ? 41 : null,
           cta_button: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
           background_color: slideBg,
           });
@@ -441,7 +447,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     }
   };
 
-  const stepLabel = ['Estilo', 'Conteúdo', 'Visual', ...(style === 'profile' ? ['Perfil'] : [])];
+  const stepLabel = ['Estilo', 'Conteúdo', style === 'profile' ? 'Perfil' : 'Visual'];
 
   const content = (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
@@ -654,21 +660,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       <span className="text-sm text-gray-900 dark:text-white font-medium w-4 text-center">{slideCount}</span>
                     </div>
                   )}
-                  {/* Tipo de imagem */}
-                  <div>
-                    <p className="text-xs text-gray-900/40 dark:text-white/40 mb-2">Tipo de imagem</p>
-                    <div className="flex gap-4">
-                      {([{ value: 'background', label: 'Fundo' }, { value: 'grid', label: 'Grade' }, { value: 'mixed', label: 'Intercalar' }] as { value: ImageType; label: string }[]).map((t) => (
-                        <label key={t.value} className="flex items-center gap-2 cursor-pointer">
-                          <div className={cn('w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors', imageType === t.value ? 'border-gray-900 dark:border-white' : 'border-black/30 dark:border-white/30')}>
-                            {imageType === t.value && <div className="w-2 h-2 rounded-full bg-gray-900 dark:bg-white" />}
-                          </div>
-                          <span className="text-xs text-gray-900/60 dark:text-white/60">{t.label}</span>
-                          <input type="radio" className="hidden" checked={imageType === t.value} onChange={() => setImageType(t.value)} />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <ImageIcon className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                     <p className="text-xs text-blue-300 leading-relaxed">
@@ -730,21 +721,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
                   <div className="flex gap-2">
                     <button
-                      onClick={async () => {
-                        try {
-                          const text = await navigator.clipboard.readText();
-                          if (!text) { toast.error('Clipboard vazio'); return; }
-                          setJsonInput(text);
-                          setJsonError(null);
-                        } catch {
-                          toast.error('Não foi possível acessar o clipboard');
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 text-xs transition-colors"
-                    >
-                      <Clipboard className="w-3.5 h-3.5" /> Colar do clipboard
-                    </button>
-                    <button
                       onClick={() => jsonFileRef.current?.click()}
                       className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 text-xs transition-colors"
                     >
@@ -784,8 +760,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             </div>
           )}
 
-          {/* ── STEP 3: Visual ── */}
-          {step === 3 && (
+          {/* ── STEP 3: Visual (não se aplica ao Twitter — tipografia fixa) ── */}
+          {step === 3 && style !== 'profile' && (
             <div className="flex flex-col gap-5 mt-2">
               <div>
                 <p className="text-xs text-gray-900/40 dark:text-white/40 mb-3 uppercase tracking-wider">Cores da marca</p>
@@ -834,8 +810,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             </div>
           )}
 
-          {/* ── STEP 4: Perfil (Twitter) ── */}
-          {step === 4 && style === 'profile' && (
+          {/* ── STEP 3: Perfil (Twitter) ── */}
+          {step === 3 && style === 'profile' && (
             <div className="flex flex-col gap-4 mt-2">
               <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-1">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 fill-[#1DA1F2] mt-0.5 shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.623z"/></svg>

@@ -183,10 +183,6 @@ export default function GeneratorClient() {
           onOpenWizard={() => setShowWizard(true)}
           onDownloadSlide={() => downloadSlide()}
           onDownloadAll={downloadAll}
-          onRefreshSlide={() => {
-            const store = useEditorStore.getState();
-            store.updateActiveSlide({ lineHeight: store.slides[store.activeSlideIndex].lineHeight });
-          }}
         />
 
         <SlideCanvas />

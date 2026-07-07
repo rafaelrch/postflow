@@ -37,7 +37,7 @@ const jetbrainsMono = localFont({
 export const metadata: Metadata = {
   title: 'Creatools — Ferramentas criativas para creators',
   description:
-    'Creatools: carrosséis, tweets, notícias e agenda de postagem em um só lugar. Criação assistida por IA com design brutalist e identidade forte.',
+    'Creatools: carrosséis, notícias e agenda de postagem em um só lugar. Criação assistida por IA com design brutalist e identidade forte.',
   icons: {
     icon: '/ICON_SEMFUNDO.png',
     shortcut: '/ICON_SEMFUNDO.png',

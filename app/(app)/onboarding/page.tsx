@@ -14,6 +14,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState('');
+  const [alreadyOnboarded, setAlreadyOnboarded] = useState(false);
 
   const [brandName, setBrandName] = useState('');
   const [instagramHandle, setInstagramHandle] = useState('');
@@ -39,7 +40,7 @@ export default function OnboardingPage() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('brand_name, workspace_name, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone')
+        .select('brand_name, workspace_name, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, onboarding_completed')
         .eq('id', user.id)
         .single();
 
@@ -54,6 +55,7 @@ export default function OnboardingPage() {
         setBrandStory(data.brand_story || '');
         setAudiencePains(data.audience_pains || '');
         setDefaultTone(data.default_tone || '');
+        setAlreadyOnboarded(Boolean(data.onboarding_completed));
       }
 
       setLoading(false);
@@ -151,9 +153,14 @@ export default function OnboardingPage() {
       const { error: projectError } = await projectQuery;
       if (projectError) throw projectError;
 
-      toast.success('Branding salvo. Studio liberado.');
-      router.replace('/dashboard');
-      router.refresh();
+      if (alreadyOnboarded) {
+        toast.success('Branding atualizado!');
+      } else {
+        toast.success('Branding salvo. Studio liberado.');
+        setAlreadyOnboarded(true);
+        router.replace('/dashboard');
+        router.refresh();
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Não foi possível salvar o onboarding.';
       toast.error(message);
@@ -183,7 +190,7 @@ export default function OnboardingPage() {
             <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>marca.</span>
           </h1>
           <p className="mt-4 max-w-[640px] text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
-            Essas respostas viram contexto para carrosséis, tweets, notícias, templates, legendas e agenda editorial.
+            Essas respostas viram contexto para carrosséis, notícias, templates, legendas e agenda editorial.
           </p>
         </header>
 
@@ -277,7 +284,7 @@ export default function OnboardingPage() {
             </p>
             <Button type="submit" className="w-full" disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-              Liberar studio
+              {alreadyOnboarded ? 'Salvar alterações' : 'Liberar studio'}
             </Button>
           </aside>
         </form>

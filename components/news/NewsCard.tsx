@@ -20,6 +20,7 @@ export interface NewsCardItem {
   // Layout
   card_radius: number;
   logo_y: number;          // top offset for logo (px at 1080 scale)
+  logo_x: number;          // left offset for logo (px at 1080 scale)
   logo_size: number;       // scale multiplier for logo
   text_y: number;          // bottom offset for text block (px at 1080 scale)
   // Background image controls
@@ -54,6 +55,7 @@ export const DEFAULT_STYLE: Omit<NewsCardItem, 'numero' | 'tema' | 'titulo_card'
   tema_font: "'IvyOra Text', Georgia, 'Times New Roman', serif",
   card_radius: 8,
   logo_y: 60,
+  logo_x: 52,
   logo_size: 4.0,
   text_y: 188,
   image_scale: 1,
@@ -79,14 +81,20 @@ export const DEFAULT_STYLE: Omit<NewsCardItem, 'numero' | 'tema' | 'titulo_card'
 export function parseNewsJSON(raw: string): NewsCardItem[] {
   function buildItems(parsed: unknown): NewsCardItem[] {
     if (!Array.isArray(parsed)) throw new Error('JSON deve ser um array');
-    return parsed.map((item: Record<string, unknown>, i: number) => ({
-      numero: (item.numero as number) ?? i + 1,
-      tema: String(item.tema ?? ''),
-      titulo_card: String(item.titulo_card ?? ''),
-      imagem_url: String(item.imagem_url ?? ''),
-      legenda: String(item.legenda ?? ''),
-      ...DEFAULT_STYLE,
-    }));
+    return parsed.map((item: Record<string, unknown>, i: number) => {
+      // Só aceita URLs de verdade — o JSON pode vir com texto tipo
+      // "nenhuma imagem encontrada", e isso não pode virar background.
+      const rawUrl = String(item.imagem_url ?? '').trim();
+      const imagem_url = /^(https?:\/\/|data:|blob:)/i.test(rawUrl) ? rawUrl : '';
+      return {
+        numero: (item.numero as number) ?? i + 1,
+        tema: String(item.tema ?? ''),
+        titulo_card: String(item.titulo_card ?? ''),
+        imagem_url,
+        legenda: String(item.legenda ?? ''),
+        ...DEFAULT_STYLE,
+      };
+    });
   }
 
   // Strip UTF-8 BOM
@@ -175,7 +183,7 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+              background: '#000000',
             }}
           />
         )}
@@ -213,7 +221,7 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
 
         {/* Brand logo — only rendered when the user has a saved logo */}
         {item.logo_url && (
-          <div style={{ position: 'absolute', top: item.logo_y, left: 52 }}>
+          <div style={{ position: 'absolute', top: item.logo_y, left: item.logo_x ?? 52 }}>
             <img
               src={item.logo_url}
               alt="logo"
@@ -222,8 +230,8 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
           </div>
         )}
 
-        {/* Circular inset element */}
-        {item.inset_enabled && item.inset_image_url && (
+        {/* Circular inset element — sem imagem vira um círculo branco de placeholder */}
+        {item.inset_enabled && (
           <div
             style={{
               position: 'absolute',
@@ -233,21 +241,24 @@ const NewsCard = React.forwardRef<HTMLDivElement, NewsCardProps>(
               height: item.inset_size,
               borderRadius: '50%',
               border: '3px solid #ffffff',
+              background: item.inset_image_url ? undefined : '#ffffff',
               overflow: 'hidden',
               boxSizing: 'border-box',
               flexShrink: 0,
             }}
           >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: `url(${item.inset_image_url})`,
-                backgroundRepeat: 'no-repeat',
-                backgroundSize: `${item.inset_image_zoom * 100}%`,
-                backgroundPosition: `calc(50% + ${item.inset_image_x}px) calc(50% + ${item.inset_image_y}px)`,
-              }}
-            />
+            {item.inset_image_url && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `url(${item.inset_image_url})`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: `${item.inset_image_zoom * 100}%`,
+                  backgroundPosition: `calc(50% + ${item.inset_image_x}px) calc(50% + ${item.inset_image_y}px)`,
+                }}
+              />
+            )}
           </div>
         )}
 

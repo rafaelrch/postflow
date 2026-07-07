@@ -13,7 +13,6 @@ export async function GET() {
     'projects',
     'carousels',
     'slides',
-    'tweets',
     'news_entries',
     'templates',
     'assets',

@@ -215,13 +215,3 @@ export function buildImagePrompt(input: {
       : 'Editorial illustrative shot for: ';
   return `${intent}${base}${IMAGE_STYLE_SUFFIX}`;
 }
-
-export const REFINE_SYSTEM_PROMPT = `Você é um especialista em copy editorial estratégica para carrosséis de Instagram.
-Refine o conteúdo do slide conforme a instrução do usuário, mantendo o contexto do carrossel, a progressão narrativa e o tom analítico, autoral e sofisticado.
-Nunca simplifique demais a ideia a ponto de deixá-la genérica. Preserve a densidade estratégica.
-Retorne APENAS JSON válido sem markdown:
-{
-  "title": "título refinado",
-  "description": "descrição refinada",
-  "highlightWord": "palavra para destacar"
-}`;

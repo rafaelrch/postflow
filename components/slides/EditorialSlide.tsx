@@ -239,6 +239,13 @@ export default function EditorialSlide({
   const align = slide.textAlignment || 'left';
   const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
 
+  // Faixa vertical derivada de textPosition (top-* / middle-* ou center / bottom-*).
+  const vBand: 'top' | 'middle' | 'bottom' = slide.textPosition?.startsWith('top')
+    ? 'top'
+    : (slide.textPosition?.startsWith('middle') || slide.textPosition === 'center')
+      ? 'middle'
+      : 'bottom';
+
   const titleStyle: React.CSSProperties = {
     fontFamily: titleFontCSS.fontFamily,
     fontWeight: titleFontCSS.fontWeight,
@@ -288,10 +295,14 @@ export default function EditorialSlide({
     const coverBgUrl = slide.backgroundImageUrl || slide.gridImageUrl || '';
     const panelBg = slide.backgroundColor || '#111111';
     const gradientOpacity = (slide.shadow?.opacity ?? 88) / 100;
-    // Each block has its own fixed default position + independent offset
-    const titleTop = COVER_TEXT_DEFAULT_TOP + (slide.editorialTitleOffsetY ?? 0);
-    const descDefaultTop = Math.round(SLIDE_H * 0.80); // ~1080px — independent default
-    const descTop = descDefaultTop + (slide.editorialDescOffsetY ?? 0);
+    const coverGap = slide.titleDescriptionGap ?? 36;
+    // Bloco de texto (título + descrição) posicionado pela faixa vertical do
+    // seletor "Posição do texto"; os sliders de offset seguem funcionando.
+    const coverBlockPos: React.CSSProperties = vBand === 'top'
+      ? { top: CONTENT_TOP + 40 }
+      : vBand === 'middle'
+        ? { top: '50%', transform: 'translateY(-50%)' }
+        : { top: COVER_TEXT_DEFAULT_TOP };
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: panelBg }}>
@@ -361,41 +372,37 @@ export default function EditorialSlide({
           </div>
         )}
 
-        {/* Title — independently movable */}
+        {/* Text block — título e descrição fluem juntos com gap ajustável */}
         <div style={{
           position: 'absolute',
-          top: titleTop,
+          ...coverBlockPos,
           left: PAD_X, right: PAD_X,
           zIndex: 2,
           display: 'flex', flexDirection: 'column', alignItems,
+          gap: coverGap,
         }}>
-          {renderTextWithHighlights(
-            slide.title,
-            titleHighlights,
-            slide.highlightWord || '',
-            accentColor,
-            { ...titleStyle, color: slide.titleColor || '#FFFFFF', fontSize: `${slide.fontSize.title}px` },
-          )}
-        </div>
-
-        {/* Description — independently movable */}
-        {slide.description && (
-          <div style={{
-            position: 'absolute',
-            top: descTop,
-            left: PAD_X, right: PAD_X,
-            zIndex: 2,
-            display: 'flex', flexDirection: 'column', alignItems,
-          }}>
+          <div style={{ transform: `translateY(${slide.editorialTitleOffsetY ?? 0}px)`, display: 'flex', flexDirection: 'column', alignItems, width: '100%' }}>
             {renderTextWithHighlights(
-              slide.description,
-              descHighlights,
-              '',
+              slide.title,
+              titleHighlights,
+              slide.highlightWord || '',
               accentColor,
-              { ...descStyle, color: slide.descriptionColor || 'rgba(255,255,255,0.75)' },
+              { ...titleStyle, color: slide.titleColor || '#FFFFFF', fontSize: `${slide.fontSize.title}px` },
             )}
           </div>
-        )}
+
+          {slide.description && (
+            <div style={{ transform: `translateY(${slide.editorialDescOffsetY ?? 0}px)`, display: 'flex', flexDirection: 'column', alignItems, width: '100%' }}>
+              {renderTextWithHighlights(
+                slide.description,
+                descHighlights,
+                '',
+                accentColor,
+                { ...descStyle, color: slide.descriptionColor || 'rgba(255,255,255,0.75)' },
+              )}
+            </div>
+          )}
+        </div>
 
         <Corners corners={corners} bgIsLight={false} fontBody={fonts.body} />
       </div>
@@ -449,7 +456,8 @@ export default function EditorialSlide({
           right: PAD_X,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
+          // Faixa vertical do seletor "Posição do texto" move o grupo inteiro
+          justifyContent: vBand === 'top' ? 'flex-start' : vBand === 'bottom' ? 'flex-end' : 'center',
           gap,
         }}>
           <div style={{ transform: `translateY(${titleOffsetY}px)` }}>

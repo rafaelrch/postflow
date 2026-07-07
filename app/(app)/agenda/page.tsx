@@ -4,11 +4,10 @@ import AgendaClient from './AgendaClient';
 export type ScheduledPost = {
   id: string;
   scheduled_at: string;
-  kind: 'carousel' | 'tweet' | 'news' | 'note';
+  kind: 'carousel' | 'news' | 'note';
   title: string;
   note: string;
   carousel_id: string | null;
-  tweet_id: string | null;
   status: 'planned' | 'ready' | 'published' | 'skipped';
   created_at: string;
   updated_at: string;
@@ -35,7 +34,7 @@ export default async function AgendaPage() {
   const query = Promise.resolve(
     supabase
       .from('scheduled_posts')
-      .select('id, scheduled_at, kind, title, note, carousel_id, tweet_id, status, created_at, updated_at')
+      .select('id, scheduled_at, kind, title, note, carousel_id, status, created_at, updated_at')
       .order('scheduled_at', { ascending: true })
   );
 

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type Stripe from 'stripe';
 import { stripe, STRIPE_WEBHOOK_SECRET } from '@/lib/stripe';
 import { createAdminSupabaseClient } from '@/lib/supabase-admin';
+import { upsertSubscription } from '@/lib/stripe-sync';
 
 export const runtime = 'nodejs';
 // Garante que o handler não seja pré-renderizado / cacheado.
@@ -9,90 +10,7 @@ export const dynamic = 'force-dynamic';
 
 type Admin = ReturnType<typeof createAdminSupabaseClient>;
 
-function unixToIso(secs: number | null | undefined): string | null {
-  return secs ? new Date(secs * 1000).toISOString() : null;
-}
-
-// Em versões recentes da API Stripe, current_period_* migrou para o subscription item.
-function periodBounds(sub: Stripe.Subscription): { start: string | null; end: string | null } {
-  const subAny = sub as unknown as { current_period_start?: number; current_period_end?: number };
-  const item = sub.items?.data?.[0] as unknown as { current_period_start?: number; current_period_end?: number } | undefined;
-  return {
-    start: unixToIso(subAny.current_period_start ?? item?.current_period_start),
-    end: unixToIso(subAny.current_period_end ?? item?.current_period_end),
-  };
-}
-
-function customerIdOf(sub: Stripe.Subscription): string {
-  return typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? '';
-}
-
-/** user_id pode ser NULL no fluxo pagamento-primeiro (conta ainda não existe). */
-async function resolveUserId(admin: Admin, sub: Stripe.Subscription): Promise<string | null> {
-  const fromMeta = sub.metadata?.supabase_user_id;
-  if (fromMeta) return fromMeta;
-
-  const customerId = customerIdOf(sub);
-  if (!customerId) return null;
-  const { data } = await admin
-    .from('stripe_customers')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .maybeSingle();
-  return data?.user_id ?? null;
-}
-
-async function resolveEmail(sub: Stripe.Subscription, override?: string | null): Promise<string | null> {
-  if (override) return override;
-  const customerId = customerIdOf(sub);
-  if (!customerId) return null;
-  try {
-    const customer = await stripe.customers.retrieve(customerId);
-    if (customer.deleted) return null;
-    return customer.email ?? null;
-  } catch {
-    return null;
-  }
-}
-
 const PLAN_ALLOWANCE = (interval: string) => (interval === 'year' ? 300 : 200);
-
-type UpsertResult = { userId: string | null; interval: string; status: string };
-
-async function upsertSubscription(sub: Stripe.Subscription, emailOverride?: string | null): Promise<UpsertResult> {
-  const admin = createAdminSupabaseClient();
-  const userId = await resolveUserId(admin, sub);
-  const email = await resolveEmail(sub, emailOverride);
-
-  const item = sub.items?.data?.[0];
-  const price = item?.price;
-  const interval = price?.recurring?.interval ?? 'month';
-  const { start, end } = periodBounds(sub);
-
-  const row = {
-    id: sub.id,
-    user_id: userId,
-    email,
-    stripe_customer_id: customerIdOf(sub),
-    status: sub.status,
-    price_id: price?.id ?? '',
-    plan_interval: interval,
-    cancel_at_period_end: sub.cancel_at_period_end ?? false,
-    current_period_start: start,
-    current_period_end: end,
-    canceled_at: unixToIso(sub.canceled_at),
-    trial_end: unixToIso(sub.trial_end),
-    metadata: (sub.metadata ?? {}) as Record<string, string>,
-  };
-
-  const { error } = await admin.from('subscriptions').upsert(row, { onConflict: 'id' });
-  if (error) {
-    console.error('[stripe/webhook] erro ao upsert subscription:', error);
-    throw error;
-  }
-
-  return { userId, interval, status: sub.status };
-}
 
 /** Sincroniza/recarrega créditos. reset=true zera o ciclo (renovação mensal). */
 async function refreshCredits(admin: Admin, userId: string, interval: string, reset: boolean) {

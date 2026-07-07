@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Pencil,
   Trash2,
+  Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NewsCard, { NewsCardItem, DEFAULT_STYLE, parseNewsJSON } from '@/components/news/NewsCard';
@@ -99,15 +100,11 @@ async function captureCardToCanvas(item: NewsCardItem): Promise<HTMLCanvasElemen
       const dy = item.image_y;
       ctx.drawImage(img, dx, dy, dw, dh);
     } catch {
-      // Fallback gradient when image can't be loaded
-      const fg = ctx.createLinearGradient(0, 0, W, H);
-      fg.addColorStop(0, '#1a1a2e'); fg.addColorStop(0.5, '#16213e'); fg.addColorStop(1, '#0f3460');
-      ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H);
+      // Sem imagem carregável → fundo preto
+      ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
     }
   } else {
-    const fg = ctx.createLinearGradient(0, 0, W, H);
-    fg.addColorStop(0, '#1a1a2e'); fg.addColorStop(0.5, '#16213e'); fg.addColorStop(1, '#0f3460');
-    ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
   }
 
   // ── Gradient overlay ────────────────────────────────────────────────────────
@@ -145,7 +142,7 @@ async function captureCardToCanvas(item: NewsCardItem): Promise<HTMLCanvasElemen
       const logo = await loadImg(item.logo_url);
       const lh = Math.round(46 * item.logo_size);
       const lw = Math.round((logo.width / logo.height) * lh);
-      ctx.drawImage(logo, 52, item.logo_y, lw, lh);
+      ctx.drawImage(logo, item.logo_x ?? 52, item.logo_y, lw, lh);
     } catch { /* logo not critical */ }
   }
 
@@ -196,6 +193,17 @@ async function captureCardToCanvas(item: NewsCardItem): Promise<HTMLCanvasElemen
   ctx.restore();
 
   // ── Circular inset element ──────────────────────────────────────────────────
+  if (item.inset_enabled && !item.inset_image_url) {
+    // Placeholder: círculo branco sólido enquanto não há imagem
+    const cx = item.inset_x + item.inset_size / 2;
+    const cy = item.inset_y + item.inset_size / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, item.inset_size / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.restore();
+  }
   if (item.inset_enabled && item.inset_image_url) {
     const cx = item.inset_x + item.inset_size / 2;
     const cy = item.inset_y + item.inset_size / 2;
@@ -240,7 +248,7 @@ async function captureCardToCanvas(item: NewsCardItem): Promise<HTMLCanvasElemen
 type NewsTemplateStyle = Pick<NewsCardItem,
   | 'titulo_size' | 'titulo_weight' | 'titulo_letter_spacing' | 'titulo_font'
   | 'tema_size' | 'tema_font'
-  | 'card_radius' | 'logo_y' | 'logo_size'
+  | 'card_radius' | 'logo_y' | 'logo_x' | 'logo_size'
   | 'text_y' | 'gradient_opacity' | 'gradient_color'
   | 'gradient_size' | 'gradient_distance'
 >;
@@ -250,6 +258,13 @@ type SavedTemplate = {
   name: string;
   style: NewsTemplateStyle;
   createdAt: string;
+};
+
+/** Lote de cards salvos em news_entries (agrupados por batch_id). */
+type SavedNewsBatch = {
+  batchId: string | null;
+  createdAt: string;
+  items: NewsCardItem[];
 };
 
 const TEMPLATES_LS_KEY = (userId: string) => `news_templates_${userId}`;
@@ -263,6 +278,7 @@ const DEFAULT_TEMPLATE: NewsTemplateStyle = {
   tema_font: DEFAULT_STYLE.tema_font,
   card_radius: DEFAULT_STYLE.card_radius,
   logo_y: DEFAULT_STYLE.logo_y,
+  logo_x: DEFAULT_STYLE.logo_x,
   logo_size: DEFAULT_STYLE.logo_size,
   text_y: DEFAULT_STYLE.text_y,
   gradient_opacity: DEFAULT_STYLE.gradient_opacity,
@@ -327,6 +343,10 @@ const EXAMPLE_JSON = `[
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// Guarda em escopo de módulo: em dev o React monta o componente 2× (StrictMode)
+// e a migração do localStorage disparava dois inserts — duplicando templates.
+let legacyTemplateMigrationStarted = false;
+
 export default function NewsPage() {
   const [step, setStep] = useState<'choose' | 'import' | 'manual' | 'editor' | 'template'>('choose');
 
@@ -335,6 +355,7 @@ export default function NewsPage() {
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [modalTemplateId, setModalTemplateId] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // ── JSON import state ─────────────────────────────────────────────────────
   const [jsonInput, setJsonInput] = useState('');
@@ -385,7 +406,8 @@ export default function NewsPage() {
       }));
 
       // Migração one-time: templates antigos do localStorage sobem pro banco.
-      if (templates.length === 0) {
+      if (templates.length === 0 && !legacyTemplateMigrationStarted) {
+        legacyTemplateMigrationStarted = true;
         try {
           const raw = localStorage.getItem(TEMPLATES_LS_KEY(user.id));
           const legacy = raw ? (JSON.parse(raw) as SavedTemplate[]) : [];
@@ -631,7 +653,7 @@ export default function NewsPage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
   const saveTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const currentBatchIdRef = useRef<string | null>(null);
-  const [resumeEntries, setResumeEntries] = useState<NewsCardItem[]>([]);
+  const [savedBatches, setSavedBatches] = useState<SavedNewsBatch[]>([]);
 
   // blob: URLs morrem no reload — não vão para o banco.
   const sanitizeForPayload = (item: NewsCardItem): Record<string, unknown> => {
@@ -674,27 +696,31 @@ export default function NewsPage() {
     }
   }, []);
 
-  /** Carrega o lote mais recente de rascunhos para "continuar de onde parou". */
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('news_entries')
-        .select('id, title, topic, image_url, caption, raw_payload, created_at')
-        .eq('status', 'draft')
-        .order('created_at', { ascending: false })
-        .limit(30);
-      if (!active || error || !data?.length) return;
+  /** Carrega todos os lotes de cards salvos, agrupados por batch_id. */
+  const loadBatches = useCallback(async () => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('news_entries')
+      .select('id, title, topic, image_url, caption, raw_payload, created_at')
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error || !data) return;
 
-      type EntryRow = { id: string; title: string; topic: string; image_url: string; caption: string; raw_payload: Record<string, unknown> | null; created_at: string };
-      const rows = data as EntryRow[];
-      const latestBatch = (rows[0].raw_payload?.batch_id as string | undefined) ?? null;
-      const batchRows = latestBatch
-        ? rows.filter((r) => r.raw_payload?.batch_id === latestBatch)
-        : [rows[0]];
+    type EntryRow = { id: string; title: string; topic: string; image_url: string; caption: string; raw_payload: Record<string, unknown> | null; created_at: string };
+    const rows = data as EntryRow[];
 
-      const mapped: NewsCardItem[] = batchRows
+    const groups = new Map<string, EntryRow[]>();
+    for (const r of rows) {
+      const key = (r.raw_payload?.batch_id as string | undefined) || `single_${r.id}`;
+      const g = groups.get(key);
+      if (g) g.push(r); else groups.set(key, [r]);
+    }
+
+    const batches: SavedNewsBatch[] = Array.from(groups.entries()).map(([key, groupRows]) => ({
+      batchId: key.startsWith('single_') ? null : key,
+      createdAt: groupRows[groupRows.length - 1].created_at,
+      items: groupRows
         .map((r, i) => ({
           ...DEFAULT_STYLE,
           numero: i + 1,
@@ -705,14 +731,67 @@ export default function NewsPage() {
           imagem_url: r.image_url,
           legenda: r.caption,
         } as NewsCardItem))
-        .sort((a, b) => a.numero - b.numero);
-
-      setResumeEntries(mapped);
-      if (latestBatch) currentBatchIdRef.current = latestBatch;
-    };
-    load();
-    return () => { active = false; };
+        .sort((a, b) => a.numero - b.numero),
+    }));
+    setSavedBatches(batches);
   }, []);
+
+  // Recarrega a lista sempre que voltamos para a página principal.
+  useEffect(() => {
+    if (step === 'choose') loadBatches();
+  }, [step, loadBatches]);
+
+  /** Salva (upsert) todos os cards do lote atual no banco. */
+  const saveAllCards = useCallback(async () => {
+    const current = itemsRef.current;
+    if (!current.length) return;
+    toast.loading('Salvando notícias…', { id: 'save-news' });
+    try {
+      const supabase = createClient();
+      if (!currentBatchIdRef.current) {
+        currentBatchIdRef.current = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+          ? crypto.randomUUID()
+          : `b_${Date.now()}`;
+      }
+      const batchId = currentBatchIdRef.current;
+      const rowFor = (it: NewsCardItem) => ({
+        title: it.titulo_card || '',
+        topic: it.tema || '',
+        image_url: it.imagem_url || '',
+        caption: it.legenda || '',
+        status: 'draft',
+        raw_payload: { batch_id: batchId, ...sanitizeForPayload(it) },
+      });
+
+      await Promise.all(
+        current.filter((it) => it.dbId).map((it) =>
+          supabase.from('news_entries').update(rowFor(it)).eq('id', it.dbId!)),
+      );
+
+      const missing = current.map((it, idx) => ({ it, idx })).filter((x) => !x.it.dbId);
+      if (missing.length) {
+        const { data, error } = await supabase
+          .from('news_entries')
+          .insert(missing.map((x) => rowFor(x.it)))
+          .select('id');
+        if (error) throw error;
+        setItems((prev) => {
+          const next = [...prev];
+          missing.forEach((x, i) => {
+            const id = (data?.[i] as { id: string } | undefined)?.id;
+            if (id && next[x.idx]) next[x.idx] = { ...next[x.idx], dbId: id };
+          });
+          return next;
+        });
+      }
+
+      toast.success('Notícias salvas!', { id: 'save-news' });
+      loadBatches();
+    } catch (err) {
+      console.error('[news] erro ao salvar cards:', err);
+      toast.error('Erro ao salvar notícias', { id: 'save-news' });
+    }
+  }, [loadBatches]);
 
   // ── Item updater (com sync debounced pro banco) ───────────────────────────
 
@@ -935,6 +1014,17 @@ export default function NewsPage() {
       setStep(mode);
     };
 
+    const handleOpenBatch = (batch: SavedNewsBatch) => {
+      setItems(batch.items);
+      setSelectedIdx(0);
+      setLocalImages({});
+      currentBatchIdRef.current = batch.batchId;
+      setStep('editor');
+    };
+
+    const formatBatchDate = (iso: string) =>
+      new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
     return (
       <div className="flex-1 overflow-y-auto" style={{ background: 'var(--paper)' }}>
         <div className="max-w-3xl mx-auto px-8 py-14">
@@ -950,29 +1040,6 @@ export default function NewsPage() {
               ? 'Selecione um template salvo ou crie um novo.'
               : 'Comece salvando o template da sua marca. Ele define fonte, gradiente, logo e cor — e passa a ser o padrão de todos os cards.'}
           </p>
-
-          {resumeEntries.length > 0 && (
-            <button
-              onClick={() => {
-                setItems(resumeEntries);
-                setSelectedIdx(0);
-                setLocalImages({});
-                setStep('editor');
-                toast.success('Última edição carregada');
-              }}
-              className="brand-card interactive w-full flex items-center justify-between gap-3 px-5 py-4 mb-8 text-left"
-            >
-              <div>
-                <p className="text-[13.5px] font-semibold" style={{ color: 'var(--ink)' }}>
-                  Continuar última edição
-                </p>
-                <p className="text-[12px] mt-0.5" style={{ color: 'var(--ink-dim)' }}>
-                  {resumeEntries.length} card{resumeEntries.length === 1 ? '' : 's'} salvo{resumeEntries.length === 1 ? '' : 's'} na sua conta
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-dim)' }} />
-            </button>
-          )}
 
           {hasTemplates && (
             <div className="mb-8">
@@ -1046,6 +1113,36 @@ export default function NewsPage() {
                     </div>
                   );
                 })}
+
+                {/* Tile de criar novo template, dentro da própria grade */}
+                <button
+                  onClick={handleCreateNew}
+                  className="rounded-[14px] p-4 flex flex-col items-center justify-center gap-2 text-center transition-all"
+                  style={{ border: '1.5px dashed var(--line-strong)', background: 'transparent' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translate(-2px,-2px)';
+                    e.currentTarget.style.boxShadow = 'var(--sh-2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = '';
+                    e.currentTarget.style.boxShadow = '';
+                  }}
+                >
+                  <span
+                    className="w-9 h-9 rounded-[8px] grid place-items-center mb-1"
+                    style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </span>
+                  <p className="font-display text-[18px] leading-none" style={{ color: 'var(--ink)' }}>
+                    Criar novo template
+                  </p>
+                  <p className="text-[11.5px]" style={{ color: 'var(--ink-dim)' }}>
+                    Adicione mais um estilo à sua biblioteca
+                  </p>
+                </button>
               </div>
             </div>
           )}
@@ -1093,45 +1190,53 @@ export default function NewsPage() {
                 </p>
               </div>
             </div>
-          ) : (
-            <>
-              <button
-                onClick={handleCreateNew}
-                className="w-full flex items-center justify-between px-5 py-4 rounded-[14px] transition-all"
-                style={{ background: 'var(--paper-2)', border: '1.5px dashed var(--line-strong)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translate(-2px,-2px)';
-                  e.currentTarget.style.boxShadow = 'var(--sh-2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = '';
-                  e.currentTarget.style.boxShadow = '';
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-[8px] grid place-items-center"
-                    style={{ background: 'var(--ink)', color: 'var(--paper)' }}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-display text-[18px] leading-none" style={{ color: 'var(--ink)' }}>
-                      Criar novo template
-                    </p>
-                    <p className="text-[11.5px] mt-1" style={{ color: 'var(--ink-dim)' }}>
-                      Adicione mais um estilo à sua biblioteca
-                    </p>
-                  </div>
-                </div>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--ink-dim)' }}>
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
+          ) : null}
 
-            </>
+          {savedBatches.length > 0 && (
+            <div className="mt-2">
+              <div className="h-px mb-8" style={{ background: 'var(--line)' }} />
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--ink-dim)' }}>
+                Notícias salvas
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {savedBatches.map((batch) => (
+                  <div
+                    key={batch.batchId ?? batch.items[0]?.dbId}
+                    className="brand-card interactive p-3 flex flex-col gap-3"
+                    onClick={() => handleOpenBatch(batch)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBatch(batch); } }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1080 / 1350',
+                        overflow: 'hidden',
+                        borderRadius: 8,
+                        background: '#0A0A0A',
+                        position: 'relative',
+                      }}
+                    >
+                      <div style={{ position: 'absolute', inset: 0, width: 1080 * CARD_PREVIEW_SCALE, height: 1350 * CARD_PREVIEW_SCALE }}>
+                        <div style={{ transform: `scale(${CARD_PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
+                          <NewsCard item={batch.items[0]} scale={1} />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-medium truncate" style={{ color: 'var(--ink)' }}>
+                        {formatBatchDate(batch.createdAt)}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-dim)' }}>
+                        {batch.items.length} card{batch.items.length === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -1269,20 +1374,27 @@ export default function NewsPage() {
             </h1>
             <button
               onClick={async () => {
-                if (editingTemplateId) {
-                  await updateTemplateInDb(editingTemplateId, { ...newsTemplate });
-                  toast.success('Template atualizado!');
-                } else {
-                  const created = await createTemplateInDb({ ...newsTemplate });
-                  if (!created) return;
-                  toast.success('Template salvo!');
+                if (savingTemplate) return;
+                setSavingTemplate(true);
+                try {
+                  if (editingTemplateId) {
+                    await updateTemplateInDb(editingTemplateId, { ...newsTemplate });
+                    toast.success('Template atualizado!');
+                  } else {
+                    const created = await createTemplateInDb({ ...newsTemplate });
+                    if (!created) return;
+                    toast.success('Template salvo!');
+                  }
+                  setEditingTemplateId(null);
+                  setStep('choose');
+                } finally {
+                  setSavingTemplate(false);
                 }
-                setEditingTemplateId(null);
-                setStep('choose');
               }}
-              className="px-4 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors"
+              disabled={savingTemplate}
+              className="px-4 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors disabled:opacity-50"
             >
-              Salvar
+              {savingTemplate ? 'Salvando…' : 'Salvar'}
             </button>
           </div>
 
@@ -1337,6 +1449,19 @@ export default function NewsPage() {
               <input type="range" min={0} max={400} step={4} value={newsTemplate.logo_y}
                 onChange={(e) => updateTemplate({ logo_y: Number(e.target.value) })}
                 className="w-full accent-gray-900 dark:accent-white" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-semibold text-gray-900/40 dark:text-white/40 uppercase tracking-wider">Posição horizontal</label>
+                <span className="text-[10px] font-mono text-gray-900/50 dark:text-white/50">{newsTemplate.logo_x}px</span>
+              </div>
+              <input type="range" min={0} max={900} step={4} value={newsTemplate.logo_x}
+                onChange={(e) => updateTemplate({ logo_x: Number(e.target.value) })}
+                className="w-full accent-gray-900 dark:accent-white" />
+              <div className="flex justify-between text-[9px] text-gray-900/25 dark:text-white/25 mt-0.5">
+                <span>← esq</span><span>dir →</span>
+              </div>
             </div>
 
             <div className="h-px bg-black/[0.06] dark:bg-white/[0.06]" />
@@ -1719,8 +1844,15 @@ export default function NewsPage() {
           ))}
         </div>
 
-        {/* Download all */}
-        <div className="p-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+        {/* Save + Download all */}
+        <div className="p-3 border-t border-black/[0.06] dark:border-white/[0.06] flex flex-col gap-2">
+          <button
+            onClick={saveAllCards}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-xs font-bold text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:border-black/25 dark:hover:border-white/25 transition-colors"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Salvar cards
+          </button>
           <button
             onClick={downloadAll}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors"
@@ -1961,23 +2093,32 @@ export default function NewsPage() {
           {/* ── IMAGEM DE FUNDO ───────────────────────────────── */}
           <p className="text-[10px] font-bold text-gray-900/30 dark:text-white/30 uppercase tracking-widest -mb-2">Imagem de fundo</p>
 
-          {/* URL clicável */}
-          {selected.imagem_url && (
-            <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-[var(--surface)] border border-black/[0.06] dark:border-white/[0.06]">
-              <span className="text-[10px] text-gray-900/40 dark:text-white/40 truncate flex-1 font-mono">
-                {selected.imagem_url}
-              </span>
-              <a
-                href={selected.imagem_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors"
-                title="Abrir URL"
-              >
-                <ExternalLink className="w-3 h-3" />
-              </a>
+          {/* URL editável */}
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-900/40 dark:text-white/40 uppercase tracking-wider mb-1.5">
+              URL da imagem
+            </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                className="flex-1 min-w-0 px-2.5 py-2 rounded-lg bg-[var(--surface)] border border-black/10 dark:border-white/10 text-[10px] font-mono text-gray-900 dark:text-white placeholder-black/25 dark:placeholder-white/25 focus:outline-none focus:border-black/25 dark:focus:border-white/25 transition-colors"
+                placeholder="https://..."
+                value={selected.imagem_url}
+                onChange={(e) => updateItem(selectedIdx, { imagem_url: e.target.value })}
+                spellCheck={false}
+              />
+              {selected.imagem_url && (
+                <a
+                  href={selected.imagem_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  title="Abrir URL"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Local upload */}
           {selected.localImageUrl ? (

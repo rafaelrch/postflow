@@ -2,12 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Custo em créditos por tipo de geração. Ações não listadas são grátis
- * (legenda, imagem IA, refinar slide) — exigem apenas assinatura ativa.
+ * (legenda, imagem IA) — exigem apenas assinatura ativa.
  */
 export const CREDIT_COSTS = {
   carousel: 5,
   news: 3,
-  tweet: 3,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

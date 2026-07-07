@@ -26,15 +26,8 @@ import CarouselPreview from '@/components/editor/CarouselPreview';
 type Kind = ScheduledPost['kind'];
 type Status = ScheduledPost['status'];
 
-const XIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.623L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
-  </svg>
-);
-
 const KIND_META: Record<Kind, { label: string; tint: string; textOnTint: string; Icon: React.ComponentType<{ className?: string }> }> = {
   carousel: { label: 'Carrossel', tint: 'var(--ink)',         textOnTint: 'var(--paper)',  Icon: LayoutGrid },
-  tweet:    { label: 'Tweet',     tint: 'var(--accent)',      textOnTint: '#fff',          Icon: XIcon },
   news:     { label: 'News',      tint: 'var(--paper-3)',     textOnTint: 'var(--ink)',    Icon: Newspaper },
   note:     { label: 'Nota',      tint: 'var(--paper-2)',     textOnTint: 'var(--ink)',    Icon: StickyNote },
 };
@@ -232,7 +225,7 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
               </span>
             </h1>
             <p className="mt-3 text-[14px] max-w-[520px]" style={{ color: 'var(--ink-dim)' }}>
-              Planeje carrosséis, tweets e news cards em um único calendário. Clique em qualquer dia para agendar.
+              Planeje carrosséis e news cards em um único calendário. Clique em qualquer dia para agendar.
             </p>
           </div>
 
@@ -282,7 +275,6 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
 
               <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.14em]" style={{ color: 'var(--ink-dim)' }}>
                 <LegendDot color="var(--ink)"     label="Carrossel" />
-                <LegendDot color="var(--accent)"  label="Tweet" />
                 <LegendDot color="var(--paper-3)" label="News" border />
                 <LegendDot color="var(--paper-2)" label="Nota" border />
               </div>
@@ -541,7 +533,7 @@ function EditorDrawer({
 }) {
   const [title, setTitle] = useState(initial.title);
   const [note, setNote] = useState(initial.note);
-  const [kind, setKind] = useState<Kind>(initial.kind);
+  const kind = initial.kind;
   const [status, setStatus] = useState<Status>(initial.status);
   const [whenLocal, setWhenLocal] = useState<string>(() => toLocalInputValue(initial.scheduled_at));
   const [saving, setSaving] = useState(false);
@@ -617,36 +609,6 @@ function EditorDrawer({
               <CarouselPreview carouselId={initial.carousel_id} />
             </div>
           )}
-
-          {/* Kind selector */}
-          <div>
-            <label className="section-kicker block mb-2">Tipo</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.entries(KIND_META) as [Kind, typeof KIND_META[Kind]][]).map(([k, meta]) => {
-                const Icon = meta.Icon;
-                const active = kind === k;
-                return (
-                  <button
-                    key={k}
-                    onClick={() => setKind(k)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2.5 rounded-[10px] border-[1.5px] text-[13px] font-semibold transition-all',
-                      active ? 'translate-y-[-1px]' : ''
-                    )}
-                    style={{
-                      background: active ? meta.tint : 'var(--paper)',
-                      color: active ? meta.textOnTint : 'var(--ink)',
-                      borderColor: 'var(--ink)',
-                      boxShadow: active ? 'var(--sh-2)' : 'none',
-                    }}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{meta.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Title */}
           <div>

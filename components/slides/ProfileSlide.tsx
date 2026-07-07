@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Slide, GlobalSettings } from '@/types';
-import { getFontFamilies, getFontGoogleUrl } from '@/lib/utils';
 
 export interface ProfileSlideProps {
   slide: Slide;
@@ -67,9 +66,8 @@ export default function ProfileSlide({
 }: ProfileSlideProps) {
   const imageUrl = slide.gridImageUrl || slide.backgroundImageUrl;
   const hasMedia = Boolean(imageUrl);
-  const bodyText = slide.description?.trim()
-    ? `${slide.title}\n\n${slide.description.trim()}`
-    : slide.title;
+  const descText = slide.description?.trim() || '';
+  const titleDescGap = slide.titleDescriptionGap ?? 16;
   const avatarFallback = (profileData.name || 'P').trim().charAt(0).toUpperCase();
   const bodyFontSize = Math.min(slide.fontSize.title, MAX_BODY_FONT);
   const headerFontSize = globalSettings.profileBadge.headerFontSize ?? 30;
@@ -83,20 +81,9 @@ export default function ProfileSlide({
   const nameRef = useRef<HTMLSpanElement>(null);
   const handleRef = useRef<HTMLSpanElement>(null);
 
-  // Load Google Fonts when fontPair changes
-  const fonts = getFontFamilies(globalSettings.fontPair);
-  useEffect(() => {
-    if (forExport) return;
-    const url = getFontGoogleUrl(globalSettings.fontPair);
-    if (!url) return;
-    const id = `gf-${globalSettings.fontPair.replace(/\s+/g, '-')}`;
-    if (document.getElementById(id)) return;
-    const link = document.createElement('link');
-    link.id = id;
-    link.rel = 'stylesheet';
-    link.href = url;
-    document.head.appendChild(link);
-  }, [globalSettings.fontPair, forExport]);
+  // Tipografia fixa — o Twitter/X usa uma única fonte, então este template
+  // ignora o fontPair do carrossel.
+  const TWITTER_FONT = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
 
   // Name / handle inline edit helpers
   const editableProps = (field: 'name' | 'handle') => ({
@@ -121,17 +108,20 @@ export default function ProfileSlide({
       : undefined,
   });
 
-  // Body text blur handler — splits back into title + description on double-newline
+  // Body text blur handler — título e descrição são blocos separados, então o
+  // innerText traz a quebra entre eles; linha em branco (\n\n) tem prioridade.
   const handleBodyBlur = (e: React.FocusEvent<HTMLDivElement>) => {
     if (!onUpdateText) return;
-    const raw = e.currentTarget.textContent || '';
-    const idx = raw.indexOf('\n\n');
+    const raw = (e.currentTarget as HTMLElement).innerText || '';
+    const doubleIdx = raw.indexOf('\n\n');
+    const idx = doubleIdx !== -1 ? doubleIdx : raw.indexOf('\n');
+    const sepLen = doubleIdx !== -1 ? 2 : 1;
     if (idx === -1) {
       onUpdateText({ title: raw.trim(), description: '' });
     } else {
       onUpdateText({
         title: raw.slice(0, idx).trim(),
-        description: raw.slice(idx + 2).trim(),
+        description: raw.slice(idx + sepLen).trim(),
       });
     }
   };
@@ -143,7 +133,7 @@ export default function ProfileSlide({
         height: 1350,
         overflow: 'hidden',
         backgroundColor: C.bg,
-        fontFamily: fonts.title,
+        fontFamily: TWITTER_FONT,
         position: 'relative',
       }}
     >
@@ -186,7 +176,7 @@ export default function ProfileSlide({
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'table' }}>
                 <div style={{ display: 'table-cell', verticalAlign: 'middle', textAlign: 'center' }}>
-                  <span style={{ fontSize: headerFontSize, fontWeight: 700, color: C.avatarText, fontFamily: fonts.title }}>
+                  <span style={{ fontSize: headerFontSize, fontWeight: 700, color: C.avatarText, fontFamily: TWITTER_FONT }}>
                     {avatarFallback}
                   </span>
                 </div>
@@ -254,7 +244,7 @@ export default function ProfileSlide({
           suppressContentEditableWarning
           onBlur={isEditable ? handleBodyBlur : undefined}
           style={{
-            fontFamily: fonts.title,
+            fontFamily: TWITTER_FONT,
             fontSize: bodyFontSize,
             fontWeight: 400,
             lineHeight: slide.lineHeight + 0.12,
@@ -266,7 +256,10 @@ export default function ProfileSlide({
             cursor: isEditable && onUpdateText ? 'text' : 'default',
           }}
         >
-          {bodyText}
+          {slide.title}
+          {descText && (
+            <span style={{ display: 'block', marginTop: titleDescGap }}>{descText}</span>
+          )}
         </div>
 
         {/* Media: video or image */}

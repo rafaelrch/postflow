@@ -218,38 +218,6 @@ alter table public.slides add column if not exists editorial_image_offset_y smal
 alter table public.slides add column if not exists metadata jsonb not null default '{}'::jsonb;
 alter table public.slides add column if not exists updated_at timestamptz not null default now();
 
--- Tweets / X posts
-create table if not exists public.tweets (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  project_id uuid references public.projects(id) on delete set null,
-  carousel_id uuid references public.carousels(id) on delete set null,
-  title text not null default '',
-  project text not null default '',
-  tone text not null default 'honesto',
-  prompt text not null default '',
-  context text,
-  variations jsonb not null default '[]'::jsonb,
-  selected_content text not null default '',
-  published_index smallint,
-  status text not null default 'draft',
-  published_at timestamptz,
-  metadata jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint tweets_status_check check (status in ('draft', 'ready', 'published', 'archived'))
-);
-
-alter table public.tweets add column if not exists project_id uuid references public.projects(id) on delete set null;
-alter table public.tweets add column if not exists carousel_id uuid references public.carousels(id) on delete set null;
-alter table public.tweets add column if not exists title text not null default '';
-alter table public.tweets add column if not exists selected_content text not null default '';
-alter table public.tweets add column if not exists status text not null default 'draft';
-alter table public.tweets add column if not exists metadata jsonb not null default '{}'::jsonb;
-
-alter table public.tweets drop constraint if exists tweets_status_check;
-alter table public.tweets add constraint tweets_status_check check (status in ('draft', 'ready', 'published', 'archived'));
-
 -- News/editorial posts
 create table if not exists public.news_entries (
   id uuid primary key default gen_random_uuid(),
@@ -266,7 +234,6 @@ create table if not exists public.news_entries (
   raw_payload jsonb not null default '{}'::jsonb,
   status text not null default 'draft',
   related_carousel_id uuid references public.carousels(id) on delete set null,
-  related_tweet_id uuid references public.tweets(id) on delete set null,
   published_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -293,7 +260,7 @@ create table if not exists public.templates (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint templates_kind_check check (kind in ('carousel', 'slide', 'news', 'tweet')),
+  constraint templates_kind_check check (kind in ('carousel', 'slide', 'news')),
   constraint templates_visibility_check check (visibility in ('private', 'system')),
   constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial'))
 );
@@ -330,14 +297,13 @@ create table if not exists public.scheduled_posts (
   title text not null default '',
   note text not null default '',
   carousel_id uuid references public.carousels(id) on delete set null,
-  tweet_id uuid references public.tweets(id) on delete set null,
   news_entry_id uuid references public.news_entries(id) on delete set null,
   status text not null default 'planned',
   channel text not null default '',
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint scheduled_posts_kind_check check (kind in ('carousel', 'tweet', 'news', 'note')),
+  constraint scheduled_posts_kind_check check (kind in ('carousel', 'news', 'note')),
   constraint scheduled_posts_status_check check (status in ('planned', 'ready', 'published', 'skipped'))
 );
 
@@ -347,7 +313,7 @@ alter table public.scheduled_posts add column if not exists channel text not nul
 alter table public.scheduled_posts add column if not exists metadata jsonb not null default '{}'::jsonb;
 
 alter table public.scheduled_posts drop constraint if exists scheduled_posts_kind_check;
-alter table public.scheduled_posts add constraint scheduled_posts_kind_check check (kind in ('carousel', 'tweet', 'news', 'note'));
+alter table public.scheduled_posts add constraint scheduled_posts_kind_check check (kind in ('carousel', 'news', 'note'));
 alter table public.scheduled_posts drop constraint if exists scheduled_posts_status_check;
 alter table public.scheduled_posts add constraint scheduled_posts_status_check check (status in ('planned', 'ready', 'published', 'skipped'));
 
@@ -361,8 +327,8 @@ create table if not exists public.content_relations (
   target_id uuid not null,
   relation_type text not null default 'derived_from',
   created_at timestamptz not null default now(),
-  constraint content_relations_source_type_check check (source_type in ('carousel', 'tweet', 'news', 'template', 'asset', 'project')),
-  constraint content_relations_target_type_check check (target_type in ('carousel', 'tweet', 'news', 'template', 'asset', 'project'))
+  constraint content_relations_source_type_check check (source_type in ('carousel', 'news', 'template', 'asset', 'project')),
+  constraint content_relations_target_type_check check (target_type in ('carousel', 'news', 'template', 'asset', 'project'))
 );
 
 -- Triggers
@@ -379,8 +345,6 @@ drop trigger if exists set_carousels_updated on public.carousels;
 create trigger set_carousels_updated before update on public.carousels for each row execute function public.set_updated_at();
 drop trigger if exists set_slides_updated on public.slides;
 create trigger set_slides_updated before update on public.slides for each row execute function public.set_updated_at();
-drop trigger if exists set_tweets_updated on public.tweets;
-create trigger set_tweets_updated before update on public.tweets for each row execute function public.set_updated_at();
 drop trigger if exists set_news_entries_updated on public.news_entries;
 create trigger set_news_entries_updated before update on public.news_entries for each row execute function public.set_updated_at();
 drop trigger if exists set_templates_updated on public.templates;
@@ -395,8 +359,6 @@ create index if not exists idx_projects_user_updated on public.projects (user_id
 create index if not exists idx_carousels_user_updated on public.carousels (user_id, updated_at desc);
 create index if not exists idx_carousels_project_updated on public.carousels (project_id, updated_at desc);
 create index if not exists idx_slides_carousel_position on public.slides (carousel_id, position asc);
-create index if not exists idx_tweets_user_created on public.tweets (user_id, created_at desc);
-create index if not exists idx_tweets_project_created on public.tweets (project_id, created_at desc);
 create index if not exists idx_news_entries_user_created on public.news_entries (user_id, created_at desc);
 create index if not exists idx_news_entries_project_created on public.news_entries (project_id, created_at desc);
 create index if not exists idx_templates_user_kind on public.templates (user_id, kind, updated_at desc);
@@ -410,7 +372,6 @@ alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 alter table public.carousels enable row level security;
 alter table public.slides enable row level security;
-alter table public.tweets enable row level security;
 alter table public.news_entries enable row level security;
 alter table public.templates enable row level security;
 alter table public.assets enable row level security;
@@ -437,10 +398,6 @@ create policy slides_owner on public.slides
   with check (
     auth.uid() = (select c.user_id from public.carousels c where c.id = carousel_id)
   );
-
-drop policy if exists tweets_owner on public.tweets;
-create policy tweets_owner on public.tweets
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists news_entries_owner on public.news_entries;
 create policy news_entries_owner on public.news_entries

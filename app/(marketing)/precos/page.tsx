@@ -14,7 +14,6 @@ const YEARLY_MONTHLY_EQUIV = 'R$ 41,58/mês';
 const FEATURES = [
   'Créditos de IA todo mês (200 no mensal, 300 no anual)',
   'Editor visual de carrosséis com export PNG/ZIP',
-  'Threads e tweets para X/Twitter',
   'Cards de notícias e editorial',
   'Calendário de conteúdo',
   'Imagens com IA (OpenAI e Nano Banana) sem custo de créditos',

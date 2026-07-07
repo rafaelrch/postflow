@@ -3,7 +3,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '@/components/auth/AuthForm';
 import PendingPayment from '@/components/auth/PendingPayment';
+import type Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
+import { syncSubscriptionFromSession } from '@/lib/stripe-sync';
 import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
@@ -24,9 +26,10 @@ export default async function CadastroPage({
 
   if (!sessionId) return <Shell><NoSubscription /></Shell>;
 
+  let session: Stripe.Checkout.Session;
   let email: string | null = null;
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    session = await stripe.checkout.sessions.retrieve(sessionId);
     email = session.customer_details?.email ?? session.customer_email ?? null;
   } catch {
     return <Shell><NoSubscription /></Shell>;
@@ -45,9 +48,20 @@ export default async function CadastroPage({
     .limit(1)
     .maybeSingle();
 
-  if (!sub) return <Shell><PendingPayment /></Shell>;
+  let planInterval = sub?.plan_interval as PlanInterval | undefined;
 
-  const planLabel = (sub.plan_interval as PlanInterval) === 'year' ? 'Anual' : 'Mensal';
+  if (!sub) {
+    // Webhook ainda não chegou (dev sem `stripe listen`, ou atraso de entrega):
+    // sincroniza a assinatura direto da Stripe em vez de esperar para sempre.
+    const synced = await syncSubscriptionFromSession(session);
+    if (synced && (synced.status === 'active' || synced.status === 'trialing')) {
+      planInterval = synced.interval as PlanInterval;
+    }
+  }
+
+  if (!planInterval) return <Shell><PendingPayment /></Shell>;
+
+  const planLabel = planInterval === 'year' ? 'Anual' : 'Mensal';
 
   return (
     <Suspense fallback={null}>
