@@ -85,7 +85,6 @@ export interface CornersConfig {
   fontSize: number;
   borderDistance: number;
   opacity: number;
-  borderRadius: number;
   color?: string;
   elementFont?: ElementFont;
 }
@@ -114,7 +113,8 @@ export interface ShadowConfig {
   style: ShadowStyle;
   opacity: number;
   color?: string;   // hex, default '#000000'
-  size?: number;    // 0–100, controls how far the gradient extends (default 60)
+  size?: number;    // 0–100, how far up the gradient extends (default 85)
+  distance?: number; // 0–100, where the gradient starts fading (default 55)
 }
 
 export interface ProfileData {
@@ -136,6 +136,9 @@ export interface Slide {
   gridImageUrl?: string;
   imageType: ImageType;
   imagePosition: ImagePosition;
+  // Imagem de conteúdo — renderizada entre os textos (não é o fundo do slide)
+  contentImageUrl?: string;
+  contentImagePosition?: ImagePosition;
   shadow: ShadowConfig;
   backgroundColor: string;
   textPosition: TextPosition;
@@ -228,10 +231,11 @@ export const DEFAULT_CORNERS: CornersConfig = {
   topLeft: { text: '@handle', visible: true },
   topRight: { text: 'Título do carrossel', visible: true },
   show: true,
-  fontSize: 12,
-  borderDistance: 24,
+  fontSize: 27,
+  borderDistance: 49,
   opacity: 80,
-  borderRadius: 6,
+  color: '#FFFFFF',
+  elementFont: 'SF Pro Display SemiBold',
 };
 
 export const DEFAULT_PROFILE_BADGE: ProfileBadge = {

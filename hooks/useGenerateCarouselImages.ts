@@ -6,6 +6,8 @@ import { useEditorStore } from './useEditorStore';
 import { Slide } from '@/types';
 
 export type ImageProvider = 'openai' | 'gemini';
+/** Onde a imagem gerada é aplicada: fundo full-bleed do slide, ou imagem de conteúdo entre os textos. */
+export type ImageTarget = 'background' | 'content';
 
 interface GenerateImageResponse {
   url?: string;
@@ -46,7 +48,7 @@ export function useGenerateCarouselImages() {
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
-  const generateAll = useCallback(async (provider: ImageProvider = 'openai') => {
+  const generateAll = useCallback(async (provider: ImageProvider = 'openai', target: ImageTarget = 'background') => {
     if (slides.length === 0) return;
     if (generating) return;
 
@@ -64,11 +66,9 @@ export function useGenerateCarouselImages() {
       slides.map(async (slide, i) => {
         try {
           const url = await generateForSlide(slide, i, slides.length, provider);
-          updateSlide(i, {
-            backgroundImageUrl: url,
-            gridImageUrl: url,
-            imageType: 'background',
-          });
+          updateSlide(i, target === 'content'
+            ? { contentImageUrl: url }
+            : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Erro desconhecido';
           if (!firstError) firstError = msg;
@@ -92,7 +92,7 @@ export function useGenerateCarouselImages() {
     }
   }, [slides, generating, updateSlide]);
 
-  const generateOne = useCallback(async (index: number, provider: ImageProvider = 'openai') => {
+  const generateOne = useCallback(async (index: number, provider: ImageProvider = 'openai', target: ImageTarget = 'background') => {
     const slide = slides[index];
     if (!slide || generating) return;
 
@@ -103,11 +103,9 @@ export function useGenerateCarouselImages() {
 
     try {
       const url = await generateForSlide(slide, index, slides.length, provider);
-      updateSlide(index, {
-        backgroundImageUrl: url,
-        gridImageUrl: url,
-        imageType: 'background',
-      });
+      updateSlide(index, target === 'content'
+        ? { contentImageUrl: url }
+        : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
       toast.success(`Slide ${index + 1} pronto!`, { id: toastId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido';

@@ -2,17 +2,79 @@
 
 import { useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, useInView, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
+import { motion, useInView } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { startStripeCheckout } from '@/lib/start-checkout';
-import {
-  Sparkles, Download, ArrowRight, Check, X,
-  ChevronDown, Star, LayoutTemplate, Type, Image as ImageIcon,
-  Calendar, Newspaper,
-} from 'lucide-react';
+import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2 } from 'lucide-react';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+/* ────────────────────────────────────────────────────────────────
+   CREATOOLS · LANDING PAGE
+   Visual: Figma "LANDING PAGE - CREATOOLS" — branco/preto, pills,
+   sombra offset nos CTAs, seções dark de contraste.
+   Copy: COPY - CREATOOLS.md
+   ──────────────────────────────────────────────────────────────── */
+
+const LP_CSS = `
+  html:has(.lp) { scroll-behavior: smooth; }
+  .lp {
+    --lp-black: #0A0A0A;
+    --lp-gray: #9A9A96;
+    --lp-gray-2: #6E6E6A;
+    --lp-band: #F6F6F5;
+    --lp-line: #E8E8E6;
+    font-family: 'SF Pro Display', var(--font-inter-tight), 'Inter Tight', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #fff;
+    color: var(--lp-black);
+    letter-spacing: -0.01em;
+  }
+  .lp ::selection { background: var(--lp-black); color: #fff; }
+  .lp-h { font-weight: 700; letter-spacing: -0.04em; line-height: 1.04; }
+  .lp-badge {
+    display: inline-flex; align-items: center;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 9px 18px; border-radius: 999px;
+  }
+  .lp-badge.outline { border: 1px solid var(--lp-line); background: #fff; color: var(--lp-black); }
+  .lp-badge.soft { background: #EFEFED; color: var(--lp-black); }
+  .lp-badge.on-dark { border: 1px solid rgba(255,255,255,0.25); color: #fff; background: transparent; }
+
+  .lp-btn {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: 15px; font-weight: 600; line-height: 1;
+    border-radius: 999px; white-space: nowrap;
+    transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  }
+  .lp-btn.black {
+    background: var(--lp-black); color: #fff;
+    padding: 9px 9px 9px 24px;
+    box-shadow: 0 0 0 2px #fff, 6px 6px 0 0 var(--lp-black);
+  }
+  .lp-btn.black:hover { transform: translate(2px, 2px); box-shadow: 0 0 0 2px #fff, 3px 3px 0 0 var(--lp-black); }
+  .lp-btn.black:active { transform: translate(5px, 5px); box-shadow: 0 0 0 2px #fff, 0 0 0 0 var(--lp-black); }
+  .lp-btn.light { background: #F2F2F0; color: var(--lp-black); padding: 17px 26px; }
+  .lp-btn.light:hover { background: #EAEAE8; }
+  .lp-btn.white {
+    background: #fff; color: var(--lp-black);
+    padding: 9px 9px 9px 24px;
+    border: 1px solid var(--lp-line);
+  }
+  .lp-btn.white:hover { transform: translateY(-1px); }
+  .lp-btn:disabled { opacity: 0.55; pointer-events: none; }
+
+  .lp-arrow { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; }
+  .lp-arrow.on-black { background: rgba(255,255,255,0.16); color: #fff; }
+  .lp-arrow.on-white { background: #EFEFED; color: var(--lp-black); }
+
+  @keyframes lp-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .lp-marquee-track { display: flex; width: max-content; animation: lp-marquee 38s linear infinite; }
+  .lp-marquee:hover .lp-marquee-track { animation-play-state: paused; }
+`;
+
+/* ─── Motion helpers ─────────────────────────────────────────── */
 
 function FadeUp({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef(null);
@@ -20,7 +82,7 @@ function FadeUp({ children, delay = 0, className = '' }: { children: React.React
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 32 }}
+      initial={{ opacity: 0, y: 28 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay }}
       className={className}
@@ -30,415 +92,713 @@ function FadeUp({ children, delay = 0, className = '' }: { children: React.React
   );
 }
 
-function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
+function ArrowChip({ dark = false }: { dark?: boolean }) {
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0 }}
-      animate={inView ? { opacity: 1 } : {}}
-      transition={{ duration: 0.6, ease: 'easeOut', delay }}
-      className={className}
-    >
-      {children}
-    </motion.div>
+    <span className={`lp-arrow ${dark ? 'on-black' : 'on-white'}`}>
+      <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+    </span>
   );
 }
 
-// ─── Nav ────────────────────────────────────────────────────────────────────
+/* ─── Nav ─────────────────────────────────────────────────────── */
 
 function Nav() {
+  const links = [
+    { href: '#recursos', label: 'Recursos' },
+    { href: '#como-funciona', label: 'Como funciona' },
+    { href: '#planos', label: 'Planos' },
+    { href: '#faq', label: 'FAQ' },
+  ];
   return (
     <motion.header
-      initial={{ opacity: 0, y: -16 }}
+      initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4"
-      style={{
-        background: 'color-mix(in srgb, var(--paper) 85%, transparent)',
-        backdropFilter: 'blur(14px)',
-        borderBottom: '1px solid var(--line)',
-      }}
+      className="absolute top-0 left-0 right-0 z-50"
     >
-      <Link href="/" className="flex items-center gap-3">
-        <span className="brand-mark">
-          <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={32} height={32} className="object-contain" style={{ filter: 'invert(1)' }} />
-        </span>
-        <span className="font-semibold text-[15px] tracking-tight" style={{ color: 'var(--ink)' }}>
-          creatools
-        </span>
-      </Link>
+      <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={30} height={30} className="object-contain" />
+          <span className="font-bold text-[17px] tracking-tight">creatools</span>
+        </Link>
 
-      <nav className="hidden md:flex items-center gap-6 text-[13px]" style={{ color: 'var(--ink-dim)' }}>
-        <a href="#features" className="hover:opacity-70 transition-opacity">Ferramentas</a>
-        <a href="#how" className="hover:opacity-70 transition-opacity">Como funciona</a>
-        <a href="#pricing" className="hover:opacity-70 transition-opacity">Preços</a>
-      </nav>
+        <nav className="hidden md:flex items-center gap-8 text-[14.5px] font-medium" style={{ color: 'var(--lp-gray-2)' }}>
+          {links.map((l) => (
+            <a key={l.href} href={l.href} className="hover:text-black transition-colors">{l.label}</a>
+          ))}
+        </nav>
 
-      <Link href="/dashboard" className="brand-btn primary">
-        Começar grátis <ArrowRight className="w-3.5 h-3.5" />
-      </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/login" className="lp-btn light !py-[13px] !px-6 text-[14px]">Login</Link>
+          <Link href="/cadastro" className="lp-btn black !text-[14px] !pl-5 !py-[7px]">
+            Começar agora <ArrowChip dark />
+          </Link>
+        </div>
+      </div>
     </motion.header>
   );
 }
 
-// ─── Hero ────────────────────────────────────────────────────────────────────
+/* ─── Hero ────────────────────────────────────────────────────── */
+
+const HERO_SLIDES = [
+  { label: 'NEWS CARD', title: 'IA muda o jogo do marketing em 2026' },
+  { label: 'CARROSSEL', title: '5 erros que travam seu crescimento no Instagram' },
+  { label: 'EDITORIAL', title: 'Rotina de conteúdo em 30 min por dia' },
+  { label: 'THREAD X', title: 'Ninguém te conta isso sobre consistência' },
+  { label: 'AGENDA', title: 'Seu mês inteiro planejado num calendário' },
+];
 
 function Hero() {
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
-  const y = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
-  const opacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
-
   return (
-    <section
-      ref={ref}
-      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 pt-24 grid-bg"
-      style={{ background: 'var(--paper)' }}
-    >
-      <motion.div style={{ y, opacity }} className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto">
-        {/* Kicker */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="mb-8 chip"
-          style={{ borderRadius: 999, padding: '6px 12px', background: 'var(--paper)' }}
-        >
-          <span className="dot-live" aria-hidden />
-          IA treinada para conteúdo viral
-        </motion.div>
-
-        {/* Headline */}
+    <section className="relative overflow-hidden bg-white pt-40 pb-0">
+      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
         <motion.h1
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-          className="font-display leading-[0.92] mb-6"
-          style={{
-            fontSize: 'clamp(56px, 8vw, 120px)',
-            letterSpacing: '-0.035em',
-            color: 'var(--ink)',
-          }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+          className="lp-h"
+          style={{ fontSize: 'clamp(38px, 5.4vw, 64px)' }}
         >
-          Criativo no piloto <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>automático.</span>
+          <span style={{ color: 'var(--lp-gray)' }}>Seu conteúdo do Instagram</span>
           <br />
-          <span style={{ color: 'var(--ink-dim)' }}>Postagem todo dia.</span>
+          pronto em minutos, não em horas.
         </motion.h1>
 
-        {/* Subheadline */}
         <motion.p
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.35 }}
-          className="text-[17px] md:text-[19px] leading-relaxed max-w-xl mb-10"
-          style={{ color: 'var(--ink-dim)' }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.25 }}
+          className="mt-6 text-[17px] md:text-[19px] leading-relaxed max-w-2xl mx-auto"
+          style={{ color: 'var(--lp-gray)' }}
         >
-          Creatools junta <b style={{ color: 'var(--ink)' }}>carrossel</b>, <b style={{ color: 'var(--ink)' }}>news card</b> e <b style={{ color: 'var(--ink)' }}>agenda</b> num só estúdio. A IA escreve e desenha. Você só aprova.
+          Carrosséis, news cards e agenda num único estúdio de IA. Ela escreve, desenha e organiza — você só aprova.{' '}
+          <b style={{ color: 'var(--lp-black)' }}>Sem Canva. Sem designer. Sem bloqueio criativo.</b>
         </motion.p>
 
-        {/* CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="flex flex-col sm:flex-row items-center gap-3"
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <Link href="/dashboard" className="brand-btn primary" style={{ padding: '14px 22px', fontSize: 14 }}>
-            Abrir o estúdio
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link href="#how" className="brand-btn outline" style={{ padding: '14px 22px', fontSize: 14 }}>
-            Ver como funciona
-          </Link>
+          <a href="#planos" className="lp-btn black">
+            Quero criar meu primeiro carrossel <ArrowChip dark />
+          </a>
+          <a href="#como-funciona" className="lp-btn light">Ver como funciona</a>
         </motion.div>
 
-        {/* Social proof */}
-        <motion.div
+        <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="mt-10 flex items-center gap-3"
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="mt-6 text-[13.5px]"
+          style={{ color: 'var(--lp-gray)' }}
         >
-          <div className="flex -space-x-2">
-            {['#0a0a0a', '#2a2a27', '#6f6e68', '#a8a69c', '#e2dfd4'].map((bg, i) => (
-              <div key={i} className="w-7 h-7 rounded-full" style={{ background: bg, border: '2px solid var(--paper)' }} />
-            ))}
-          </div>
-          <p className="text-[12px]" style={{ color: 'var(--ink-dim)' }}>
-            Usado por <span className="font-medium" style={{ color: 'var(--ink)' }}>+2.000 creators</span>
-          </p>
-        </motion.div>
-      </motion.div>
+          Acesso imediato · Primeiro post pronto em menos de 5 minutos
+        </motion.p>
+      </div>
 
-      {/* Preview cards */}
+      {/* Mockups */}
       <motion.div
-        initial={{ opacity: 0, y: 40 }}
+        initial={{ opacity: 0, y: 48 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.8 }}
-        className="relative z-10 mt-16 w-full max-w-4xl mx-auto"
+        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.55 }}
+        className="relative mt-16 md:mt-20 flex items-start justify-center gap-5 md:gap-8 px-4"
       >
-        <PreviewCards />
-      </motion.div>
-
-      {/* Scroll hint */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
-        style={{ color: 'var(--ink-muted)' }}
-      >
-        <motion.div animate={{ y: [0, 6, 0] }} transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}>
-          <ChevronDown className="w-4 h-4" />
-        </motion.div>
+        {HERO_SLIDES.map((s, i) => {
+          const center = i === 2 || i === 1 || i === 3;
+          const isMain = i === 2;
+          return (
+            <div
+              key={i}
+              className={`relative shrink-0 rounded-[24px] md:rounded-[32px] overflow-hidden ${i === 0 || i === 4 ? 'hidden lg:block' : ''} ${i === 1 || i === 3 ? 'hidden sm:block' : ''}`}
+              style={{
+                width: isMain ? 340 : 280,
+                height: isMain ? 430 : 350,
+                marginTop: isMain ? 0 : 44,
+                background: '#0B0B0B',
+                border: '6px solid #161616',
+                boxShadow: '0 30px 60px -30px rgba(0,0,0,0.45)',
+                maskImage: i === 0 ? 'linear-gradient(90deg, transparent 0%, #000 55%)' : i === 4 ? 'linear-gradient(90deg, #000 45%, transparent 100%)' : undefined,
+                WebkitMaskImage: i === 0 ? 'linear-gradient(90deg, transparent 0%, #000 55%)' : i === 4 ? 'linear-gradient(90deg, #000 45%, transparent 100%)' : undefined,
+              }}
+            >
+              <div className="w-full h-full p-6 flex flex-col justify-between text-left">
+                <span className="text-[10px] font-semibold tracking-[0.22em] uppercase" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                  {s.label}
+                </span>
+                <p className="lp-h text-white" style={{ fontSize: isMain ? 26 : 20, lineHeight: 1.12 }}>{s.title}</p>
+                <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>@orafaelrocha_</span>
+              </div>
+              {center && !isMain && <div className="absolute inset-0" style={{ background: 'rgba(255,255,255,0.04)' }} />}
+            </div>
+          );
+        })}
       </motion.div>
     </section>
   );
 }
 
-function PreviewCards() {
-  const slides = [
-    { label: 'CARROSSEL', title: '5 erros que te impedem de vender no Instagram', bg: '#0A0A0A', fg: '#FAFAF7' },
-    { label: 'AGENDA',    title: 'Seu mês de conteúdo planejado em um só lugar.', bg: '#E4572E', fg: '#FFFFFF' },
-    { label: 'NEWS',      title: 'OpenAI capta US$ 122 bi — mercado reage em horas', bg: '#FAFAF7', fg: '#0A0A0A' },
-  ];
+/* ─── A verdade brutal ────────────────────────────────────────── */
 
+function Truth() {
   return (
-    <div className="relative h-60 flex items-end justify-center gap-6">
-      {slides.map((s, i) => {
-        const rotations = [-5, 0, 5];
-        const ys = [14, 0, 14];
-        return (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: ys[i] }}
-            transition={{ duration: 0.8, delay: 0.9 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ y: ys[i] - 8, rotate: 0, zIndex: 20, transition: { duration: 0.3 } }}
-            style={{ rotate: rotations[i], zIndex: i === 1 ? 10 : 1 }}
-            className="w-40 h-52 overflow-hidden cursor-pointer rounded-[14px]"
+    <section className="py-20 md:py-28 px-6" style={{ background: 'var(--lp-band)' }}>
+      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+        <FadeUp>
+          <div
+            className="aspect-square rounded-[32px] p-8 md:p-12 flex flex-col justify-between"
+            style={{ background: 'var(--lp-black)', color: '#fff' }}
           >
-            <div
-              className="w-full h-full p-4 flex flex-col justify-between"
-              style={{
-                background: s.bg,
-                color: s.fg,
-                border: '1.5px solid var(--ink)',
-                boxShadow: 'var(--sh-3)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className="font-mono text-[9px] uppercase tracking-[0.2em]"
-                  style={{ color: s.fg, opacity: 0.7 }}
-                >
-                  {s.label}
-                </span>
-                <span className="w-2 h-2 rounded-full" style={{ background: s.fg }} />
-              </div>
-              <p className="font-display text-[16px] leading-[1.1]">{s.title}</p>
+            <div className="flex items-center gap-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              <span className="w-2 h-2 rounded-full bg-white/60" /> @mosseri
             </div>
-          </motion.div>
-        );
-      })}
+            <p className="lp-h" style={{ fontSize: 'clamp(24px, 2.8vw, 36px)' }}>
+              “O algoritmo entrega carrosséis mais do que qualquer outro formato.”
+            </p>
+            <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>Adam Mosseri · CEO do Instagram</p>
+          </div>
+        </FadeUp>
+
+        <FadeUp delay={0.12}>
+          <span className="lp-badge" style={{ background: '#fff', color: 'var(--lp-black)' }}>A verdade que ninguém te conta</span>
+          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(32px, 4vw, 48px)' }}>
+            Aqui está a verdade <span style={{ color: 'var(--lp-gray)' }}>brutal</span>
+            <br className="hidden md:block" /> sobre o Instagram em 2026
+          </h2>
+          <div className="mt-6 space-y-4 text-[15.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
+            <p>
+              O próprio <b style={{ color: 'var(--lp-black)' }}>CEO do Instagram</b> já confirmou: o algoritmo entrega carrosséis mais do que qualquer
+              outro formato. Quem não posta carrossel com frequência, <b style={{ color: 'var(--lp-black)' }}>simplesmente não aparece</b>.
+            </p>
+            <p>
+              Mas tem uma segunda verdade que quase ninguém fala: <b style={{ color: 'var(--lp-black)' }}>frequência vence perfeição</b>. Enquanto você
+              passa 3 horas no Canva polindo um único post, seu concorrente publica o assunto do momento primeiro — e leva o alcance que era seu.
+            </p>
+            <p>
+              Quem cresce não é quem posta mais bonito. É quem publica rápido, todo dia, com padrão visual. É exatamente isso que o Creatools coloca na
+              sua mão: <b style={{ color: 'var(--lp-black)' }}>velocidade + consistência</b>, sem depender de inspiração.
+            </p>
+          </div>
+          <a href="#planos" className="lp-btn black mt-8">
+            Quero parar de perder tempo <ArrowChip dark />
+          </a>
+        </FadeUp>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Como funciona ───────────────────────────────────────────── */
+
+const STEPS = [
+  {
+    title: 'Diga o tema',
+    desc: 'Digite uma frase simples — “5 erros de quem começa a treinar” — e escolha o estilo: editorial, minimalista ou thread do X.',
+  },
+  {
+    title: 'A IA monta tudo',
+    desc: 'Texto persuasivo, layout, tipografia e as cores da sua marca. Em segundos o carrossel completo aparece no editor.',
+  },
+  {
+    title: 'Exporte e publique',
+    desc: 'Baixe em Full HD (PNG ou ZIP), agende no calendário e publique. Legenda com hashtags? A IA escreve junto.',
+  },
+];
+
+function HowItWorks() {
+  return (
+    <section id="como-funciona" className="py-24 md:py-32 px-6 bg-white">
+      <div className="max-w-5xl mx-auto text-center">
+        <FadeUp>
+          <span className="lp-badge outline">Em 3 passos</span>
+          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>Tão simples que parece mágica</h2>
+          <p className="mt-4 text-[17px]" style={{ color: 'var(--lp-gray)' }}>3 passos. Poucos minutos. Post pronto pra publicar.</p>
+        </FadeUp>
+
+        <div className="relative mt-16">
+          <div className="hidden md:block absolute top-7 left-[16%] right-[16%] h-px" style={{ background: 'var(--lp-line)' }} />
+          <div className="grid md:grid-cols-3 gap-10 md:gap-8">
+            {STEPS.map((s, i) => (
+              <FadeUp key={i} delay={i * 0.12}>
+                <div className="flex flex-col items-center">
+                  <div
+                    className="relative z-10 w-14 h-14 rounded-full grid place-items-center text-[20px] font-bold bg-white"
+                    style={{ border: '1px solid var(--lp-line)' }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="hidden md:block w-px h-8" style={{ background: 'var(--lp-line)' }} />
+                  <div className="mt-4 md:mt-0 w-full rounded-[24px] p-7" style={{ border: '1px solid var(--lp-line)' }}>
+                    <h3 className="text-[20px] font-bold tracking-tight">{s.title}</h3>
+                    <p className="mt-3 text-[14.5px] leading-relaxed" style={{ color: 'var(--lp-gray)' }}>{s.desc}</p>
+                  </div>
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+        </div>
+
+        <FadeUp delay={0.2} className="mt-14">
+          <a href="#planos" className="lp-btn black">
+            Quero criar meu carrossel <ArrowChip dark />
+          </a>
+        </FadeUp>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Recursos (tabs) ─────────────────────────────────────────── */
+
+type Feature = {
+  tab: string;
+  tag: string;
+  title: React.ReactNode;
+  body: string;
+  bullets: string[];
+  visual: React.ReactNode;
+};
+
+function MockCarousel() {
+  return (
+    <div className="flex flex-col gap-3 w-full max-w-[240px]">
+      {['Gancho que prende', 'Conteúdo que educa', 'CTA que converte'].map((t, i) => (
+        <div
+          key={i}
+          className="rounded-2xl px-5 py-4 text-left"
+          style={{ background: i === 0 ? '#0A0A0A' : '#F4F4F2', color: i === 0 ? '#fff' : '#0A0A0A' }}
+        >
+          <p className="text-[10px] font-semibold tracking-[0.18em] uppercase opacity-50">Slide {i + 1}</p>
+          <p className="text-[15px] font-bold tracking-tight mt-1">{t}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ─── Truth section ────────────────────────────────────────────────────────────
-
-function TruthSection() {
+function MockNews() {
   return (
-    <section className="py-20 px-4" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
-      <div className="max-w-5xl mx-auto">
-        <FadeUp>
-          <p className="font-mono text-[10.5px] tracking-[0.18em] uppercase mb-4" style={{ color: 'var(--ink-muted)' }}>
-            A verdade que ninguém conta
-          </p>
-          <h2 className="font-display leading-[0.95] mb-8" style={{ fontSize: 'clamp(36px, 5vw, 60px)', letterSpacing: '-0.025em' }}>
-            O algoritmo prioriza quem posta todo dia.
-            <br />
-            <span style={{ opacity: 0.5 }}>Quem improvisa, some.</span>
-          </h2>
-        </FadeUp>
-        <div className="grid md:grid-cols-3 gap-5 mt-12">
-          {[
-            { stat: '3h', label: 'tempo médio gasto no Canva por carrossel' },
-            { stat: '10×', label: 'mais rápido com IA calibrada para virais' },
-            { stat: '#1', label: 'formato com mais alcance orgânico em 2026' },
-          ].map((item, i) => (
-            <FadeUp key={i} delay={i * 0.1}>
-              <div
-                className="rounded-[14px] p-6"
-                style={{
-                  border: '1.5px solid var(--paper)',
-                  background: 'var(--ink-2)',
-                  boxShadow: '4px 4px 0 0 var(--paper)',
-                }}
-              >
-                <p className="font-display" style={{ fontSize: 56, lineHeight: 1 }}>{item.stat}</p>
-                <p className="text-[13px] leading-snug mt-3" style={{ opacity: 0.7 }}>{item.label}</p>
-              </div>
-            </FadeUp>
-          ))}
-        </div>
+    <div className="w-full max-w-[240px] rounded-2xl overflow-hidden text-left" style={{ border: '1px solid #ECECEA' }}>
+      <div className="h-28" style={{ background: 'linear-gradient(135deg, #1a1a1a, #3a3a38)' }} />
+      <div className="p-4 bg-white">
+        <span className="inline-block text-[9px] font-bold tracking-[0.16em] uppercase px-2 py-1 rounded bg-red-600 text-white">Notícia</span>
+        <p className="text-[14px] font-bold tracking-tight mt-2 leading-snug">IA generativa muda o jogo do marketing em 2026</p>
+        <p className="text-[10px] mt-2" style={{ color: '#9A9A96' }}>Gerado em segundos · 1080×1350</p>
       </div>
-    </section>
+    </div>
   );
 }
 
-// ─── How it works ────────────────────────────────────────────────────────────
-
-function HowItWorks() {
-  const steps = [
-    { n: '01', title: 'Descreva seu conteúdo',  desc: 'Digite o tema, nicho ou notícia. Uma frase como “5 dicas de marketing” já basta.', icon: Type },
-    { n: '02', title: 'A IA cria tudo',          desc: 'Texto, layout, thread e card de notícia gerados em segundos no seu tom.',         icon: Sparkles },
-    { n: '03', title: 'Agende e publique',       desc: 'Solte na agenda. O Creatools lembra quando é hora de postar e exporta em Full HD.', icon: Calendar },
+function MockTemplates() {
+  const pairs = [
+    ['SF Display', 'IvyOra'],
+    ['Space Grotesk', 'Inter'],
+    ['Playfair', 'Lato'],
+    ['Bebas', 'Inter'],
   ];
-
   return (
-    <section id="how" className="py-24 px-4 grid-bg" style={{ background: 'var(--paper-2)' }}>
-      <div className="max-w-5xl mx-auto">
-        <FadeUp className="text-center mb-16">
-          <p className="font-mono text-[10.5px] tracking-[0.18em] uppercase mb-3" style={{ color: 'var(--ink-dim)' }}>
-            Como funciona
-          </p>
-          <h2 className="font-display" style={{ fontSize: 'clamp(36px, 5vw, 60px)', letterSpacing: '-0.025em', color: 'var(--ink)' }}>
-            Simples <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>assustadoramente</span> rápido
-          </h2>
-        </FadeUp>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <FadeUp key={i} delay={i * 0.15}>
-                <div className="brand-card p-6 h-full flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <span className="brand-mark sm">
-                      <Icon className="w-4 h-4" />
-                    </span>
-                    <span className="font-mono text-[11px]" style={{ color: 'var(--ink-muted)' }}>{step.n}</span>
-                  </div>
-                  <h3 className="font-display text-[26px] leading-[1.1]" style={{ color: 'var(--ink)' }}>{step.title}</h3>
-                  <p className="text-[13.5px] leading-relaxed" style={{ color: 'var(--ink-dim)' }}>{step.desc}</p>
-                </div>
-              </FadeUp>
-            );
-          })}
+    <div className="grid grid-cols-2 gap-3 w-full max-w-[260px]">
+      {pairs.map(([a, b], i) => (
+        <div key={i} className="rounded-2xl p-4 bg-white text-left" style={{ border: '1px solid #ECECEA' }}>
+          <p style={{ fontSize: 24, fontWeight: 700, lineHeight: 1, color: '#0A0A0A' }}>Aa</p>
+          <p className="text-[10px] mt-2" style={{ color: '#9A9A96' }}>{a} · {b}</p>
         </div>
-      </div>
-    </section>
+      ))}
+    </div>
   );
 }
 
-// ─── Features ────────────────────────────────────────────────────────────────
+function MockAgenda() {
+  const scheduled = [3, 7, 10, 14, 17, 21, 24, 27];
+  return (
+    <div className="w-full max-w-[260px] rounded-2xl bg-white p-5 text-left" style={{ border: '1px solid #ECECEA' }}>
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] font-bold">Julho 2026</p>
+        <p className="text-[10px]" style={{ color: '#9A9A96' }}>8 posts</p>
+      </div>
+      <div className="grid grid-cols-7 gap-1.5 mt-4">
+        {Array.from({ length: 28 }, (_, i) => (
+          <div
+            key={i}
+            className="aspect-square rounded-md grid place-items-center text-[8px]"
+            style={{ background: scheduled.includes(i) ? '#0A0A0A' : '#F4F4F2', color: scheduled.includes(i) ? '#fff' : '#B5B5B0' }}
+          >
+            {i + 1}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MockPalette() {
+  const colors = ['#0A0A0A', '#E4572E', '#F5C300', '#2B7A4B', '#F4F4F2'];
+  return (
+    <div className="w-full max-w-[260px] rounded-2xl bg-white p-6 text-left" style={{ border: '1px solid #ECECEA' }}>
+      <p className="text-[12px] font-bold">Paleta da marca</p>
+      <div className="flex gap-2.5 mt-4">
+        {colors.map((c) => (
+          <div key={c} className="w-9 h-9 rounded-full" style={{ background: c, border: '1px solid #ECECEA' }} />
+        ))}
+      </div>
+      <p className="text-[10px] mt-4" style={{ color: '#9A9A96' }}>Aplicada automaticamente em cada geração</p>
+    </div>
+  );
+}
+
+function MockAiImages() {
+  return (
+    <div className="w-full max-w-[240px] text-left">
+      <div className="aspect-[4/5] rounded-2xl" style={{ background: 'conic-gradient(from 210deg at 50% 40%, #232323, #4a4a46, #17171a, #2e2e2a, #232323)' }} />
+      <div className="flex items-center justify-between mt-3">
+        <span className="text-[10px] font-semibold tracking-[0.14em] uppercase" style={{ color: '#9A9A96' }}>OpenAI · Nano Banana</span>
+        <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: '#0A0A0A', color: '#fff' }}>0 créditos</span>
+      </div>
+    </div>
+  );
+}
+
+const FEATURES: Feature[] = [
+  {
+    tab: 'Carrossel',
+    tag: 'O carro-chefe',
+    title: (<>Carrosséis completos <span style={{ color: '#8B8B87' }}>a partir de uma frase</span></>),
+    body: 'Você digita o tema, a IA escreve título, subtítulo e o texto de cada slide — com gancho de abertura e CTA de fechamento. Tudo editável num editor visual, slide por slide.',
+    bullets: [
+      '3 estilos prontos: Editorial, Minimalista e Thread do X',
+      'Gancho, desenvolvimento e CTA escritos pela IA',
+      'Legenda com hashtags gerada junto, sem custo extra',
+    ],
+    visual: <MockCarousel />,
+  },
+  {
+    tab: 'Notícias',
+    tag: 'Poste o assunto do momento',
+    title: (<>Transforme notícias em posts <span style={{ color: '#8B8B87' }}>antes de todo mundo</span></>),
+    body: 'Notícia quente do seu nicho vira news card pronto pra publicar em segundos. Formato jornalístico que passa autoridade — e pega o alcance de quem publica primeiro.',
+    bullets: [
+      'Card no formato ideal do feed (1080×1350)',
+      'Manchete, resumo e imagem montados pela IA',
+      'Edite qualquer texto antes de exportar',
+    ],
+    visual: <MockNews />,
+  },
+  {
+    tab: 'Templates',
+    tag: 'Escala com padrão',
+    title: (<>Estilos prontos, <span style={{ color: '#8B8B87' }}>identidade sempre igual</span></>),
+    body: 'Escolha entre os estilos do Creatools e 7 combinações profissionais de tipografia. Todo post sai com a mesma cara — consistência visual de quem está crescendo de verdade.',
+    bullets: [
+      'Editorial, Minimalista e formato thread do X',
+      '7 pares de fontes calibrados por designers',
+      'Mesmo padrão em todos os posts, sem esforço',
+    ],
+    visual: <MockTemplates />,
+  },
+  {
+    tab: 'Agenda de conteúdo',
+    tag: 'Nunca mais sem postar',
+    title: (<>Seu mês inteiro organizado <span style={{ color: '#8B8B87' }}>num calendário</span></>),
+    body: 'Planeje carrosséis e news cards num único calendário. Clique no dia, agende o post, veja o mês inteiro de uma vez. Acabou o “o que eu posto hoje?”.',
+    bullets: [
+      'Visão do mês com todos os posts planejados',
+      'Agende em qualquer dia com um clique',
+      'Carrosséis e news cards no mesmo lugar',
+    ],
+    visual: <MockAgenda />,
+  },
+  {
+    tab: 'Paleta de cor',
+    tag: 'Branding automático',
+    title: (<>As cores da sua marca <span style={{ color: '#8B8B87' }}>em todos os posts</span></>),
+    body: 'Defina a paleta da sua marca uma única vez. Todos os carrosséis gerados já saem com as suas cores — sem retrabalho, sem post fora da identidade.',
+    bullets: [
+      'Paleta salva no seu perfil',
+      'Aplicada automaticamente em cada geração',
+      'Consistência visual em todo o feed',
+    ],
+    visual: <MockPalette />,
+  },
+  {
+    tab: 'Imagens com IA',
+    tag: 'Sem banco de imagem genérico',
+    title: (<>Imagens geradas por IA — <span style={{ color: '#8B8B87' }}>sem gastar seus créditos</span></>),
+    body: 'Gere imagens exclusivas pros seus slides com as melhores IAs de imagem do mercado. E aqui está o diferencial: imagens não consomem créditos do seu plano.',
+    bullets: [
+      'Duas engines de imagem (OpenAI + Nano Banana)',
+      'Imagem sob medida pro contexto do slide',
+      'Uso incluso na assinatura, sem custo por imagem',
+    ],
+    visual: <MockAiImages />,
+  },
+];
 
 function Features() {
-  const features = [
-    { icon: Sparkles,          title: 'Carrosséis por IA',         desc: 'Diga o tema e tom. A IA monta slides prontos pra publicar.' },
-    { icon: Newspaper,         title: 'News Cards editorial',      desc: 'Transforme manchetes em cards editoriais com gradient e foto.' },
-    { icon: Calendar,          title: 'Agenda de postagem',        desc: 'Calendário visual: agende, mova e mantenha ritmo diário.' },
-    { icon: LayoutTemplate,    title: 'Editor visual simples',     desc: 'Ajuste cores, fontes, imagem, espaçamento. Sem Canva.' },
-    { icon: Download,          title: 'Export Full HD',            desc: 'PNG 1080px e ZIP do carrossel inteiro com um clique.' },
-    { icon: Type,              title: 'Copy pronta',               desc: 'Títulos, ganchos e copy dos slides sugeridos pela IA.' },
-    { icon: ImageIcon,         title: 'Imagens com fator viral',   desc: 'Fluxo calibrado para gerar imagens que se destacam no feed.' },
-  ];
+  const [active, setActive] = useState(2);
+  const f = FEATURES[active];
 
   return (
-    <section id="features" className="py-24 px-4" style={{ background: 'var(--paper)' }}>
+    <section id="recursos" className="py-24 md:py-32 px-6 bg-white">
       <div className="max-w-6xl mx-auto">
-        <FadeUp className="text-center mb-16">
-          <p className="font-mono text-[10.5px] tracking-[0.18em] uppercase mb-3" style={{ color: 'var(--ink-dim)' }}>
-            Tudo num só estúdio
-          </p>
-          <h2 className="font-display" style={{ fontSize: 'clamp(36px, 5vw, 60px)', letterSpacing: '-0.025em', color: 'var(--ink)' }}>
-            Um software. <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>Tudo</span> que você posta.
+        <FadeUp className="text-center">
+          <span className="lp-badge outline">Vários recursos exclusivos</span>
+          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+            Tudo que você precisa pra
+            <br />
+            <span style={{ color: 'var(--lp-gray)' }}>crescer no Instagram</span>
           </h2>
+          <p className="mt-4 text-[17px] max-w-xl mx-auto" style={{ color: 'var(--lp-gray)' }}>
+            Um estúdio completo dentro do Creatools. Veja os recursos mais usados em ação.
+          </p>
         </FadeUp>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {features.map((f, i) => {
-            const Icon = f.icon;
-            return (
-              <FadeUp key={i} delay={i * 0.06}>
-                <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.25 }} className="brand-card p-5 h-full flex flex-col gap-3">
-                  <span className="brand-mark sm">
-                    <Icon className="w-4 h-4" />
-                  </span>
-                  <h3 className="font-display text-[20px] leading-[1.15]" style={{ color: 'var(--ink)' }}>{f.title}</h3>
-                  <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--ink-dim)' }}>{f.desc}</p>
-                </motion.div>
-              </FadeUp>
-            );
-          })}
+        {/* Tabs */}
+        <FadeUp delay={0.1} className="mt-12 flex justify-center">
+          <div
+            className="inline-flex flex-wrap justify-center gap-1 p-1.5 rounded-[28px] md:rounded-full"
+            style={{ border: '1px solid var(--lp-line)' }}
+          >
+            {FEATURES.map((feat, i) => (
+              <button
+                key={feat.tab}
+                type="button"
+                onClick={() => setActive(i)}
+                className="px-4 md:px-5 py-2.5 rounded-full text-[11.5px] md:text-[12.5px] font-semibold uppercase tracking-[0.04em] transition-colors"
+                style={
+                  i === active
+                    ? { background: 'var(--lp-black)', color: '#fff' }
+                    : { color: 'var(--lp-gray-2)' }
+                }
+              >
+                {feat.tab}
+              </button>
+            ))}
+          </div>
+        </FadeUp>
+
+        {/* Feature card */}
+        <FadeUp delay={0.15} className="mt-8">
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="rounded-[36px] p-8 md:p-14 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center"
+            style={{ background: 'var(--lp-black)', color: '#fff' }}
+          >
+            <div>
+              <span className="lp-badge on-dark">{f.tag}</span>
+              <h3 className="lp-h mt-6" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>{f.title}</h3>
+              <p className="mt-5 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{f.body}</p>
+              <ul className="mt-6 space-y-2.5">
+                {f.bullets.map((b) => (
+                  <li key={b} className="flex items-start gap-2.5 text-[14.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-white/50 shrink-0" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-[24px] bg-white min-h-[360px] md:min-h-[420px] grid place-items-center p-8">
+              {f.visual}
+            </div>
+          </motion.div>
+        </FadeUp>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Marquee ─────────────────────────────────────────────────── */
+
+const MARQUEE_ITEMS = [
+  { ring: '#B5B5B0', emoji: '🧴' },
+  { ring: '#3B82F6', emoji: '💧' },
+  { ring: '#65A30D', emoji: '🌿' },
+  { ring: '#EA580C', emoji: '🍊' },
+  { ring: '#EC4899', emoji: '💗' },
+  { ring: '#8B5CF6', emoji: '💜' },
+  { ring: '#CA8A04', emoji: '✨' },
+  { ring: '#EF4444', emoji: '🍒' },
+];
+
+function Marquee() {
+  const items = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+  return (
+    <section className="lp-marquee py-16 overflow-hidden" style={{ background: 'var(--lp-band)' }}>
+      <div
+        className="lp-marquee-track"
+        style={{
+          maskImage: 'linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)',
+          WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)',
+        }}
+      >
+        {items.map((item, i) => (
+          <div key={i} className="flex flex-col items-center gap-3 mx-8 shrink-0">
+            <div
+              className="w-28 h-28 rounded-full grid place-items-center text-[40px] bg-white"
+              style={{ border: `3px solid ${item.ring}` }}
+            >
+              {item.emoji}
+            </div>
+            <span className="text-[13px]" style={{ color: 'var(--lp-gray)' }}>@orafaelrocha_</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─── Resultados reais ────────────────────────────────────────── */
+
+function Results() {
+  return (
+    <section className="py-24 md:py-32 px-6 bg-white">
+      <div className="max-w-6xl mx-auto text-center">
+        <FadeUp>
+          <span className="lp-badge soft">Resultados reais</span>
+          <h2 className="lp-h mt-6 max-w-3xl mx-auto" style={{ fontSize: 'clamp(30px, 3.8vw, 48px)' }}>
+            Veja o tipo de post que você vai criar <span style={{ color: 'var(--lp-gray)' }}>com o Creatools</span>
+          </h2>
+          <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
+            Carrosséis e news cards gerados dentro da plataforma — sem Canva, sem Photoshop, sem designer.
+          </p>
+        </FadeUp>
+
+        <div className="mt-14 grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+          {/* Editorial */}
+          <FadeUp delay={0}>
+            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#0A0A0A', color: '#fff' }}>
+              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase opacity-45">Editorial</span>
+              <p className="lp-h text-[19px] md:text-[22px]">5 erros que travam seu crescimento</p>
+              <span className="text-[10px] opacity-35">@orafaelrocha_</span>
+            </div>
+          </FadeUp>
+          {/* Minimalista */}
+          <FadeUp delay={0.07}>
+            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#F4F3EF' }}>
+              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: '#B5B5B0' }}>Minimalista</span>
+              <p className="lp-h text-[19px] md:text-[22px]">Rotina de conteúdo em 30 min por dia</p>
+              <span className="text-[10px]" style={{ color: '#B5B5B0' }}>@orafaelrocha_</span>
+            </div>
+          </FadeUp>
+          {/* Thread X */}
+          <FadeUp delay={0.14}>
+            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left bg-white" style={{ border: '1px solid var(--lp-line)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full" style={{ background: '#0A0A0A' }} />
+                <div>
+                  <p className="text-[12px] font-bold leading-none">Rafael Rocha</p>
+                  <p className="text-[10px] mt-1" style={{ color: '#9A9A96' }}>@orafaelrocha_</p>
+                </div>
+              </div>
+              <p className="text-[15px] md:text-[16px] font-medium leading-snug">
+                Ninguém te conta isso sobre consistência no Instagram: 🧵
+              </p>
+              <div className="flex items-center gap-4" style={{ color: '#B5B5B0' }}>
+                <MessageCircle className="w-3.5 h-3.5" />
+                <Repeat2 className="w-3.5 h-3.5" />
+                <Heart className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          </FadeUp>
+          {/* News */}
+          <FadeUp delay={0.21}>
+            <div className="aspect-[4/5] rounded-[20px] overflow-hidden flex flex-col text-left" style={{ border: '1px solid var(--lp-line)' }}>
+              <div className="flex-1" style={{ background: 'linear-gradient(135deg, #1a1a1a, #3d3d3a)' }} />
+              <div className="p-5 bg-white">
+                <span className="inline-block text-[8px] font-bold tracking-[0.16em] uppercase px-2 py-0.5 rounded bg-red-600 text-white">Notícia</span>
+                <p className="text-[14px] font-bold tracking-tight leading-snug mt-2">IA generativa muda o jogo do marketing</p>
+              </div>
+            </div>
+          </FadeUp>
         </div>
       </div>
     </section>
   );
 }
 
-// ─── Testimonials ────────────────────────────────────────────────────────────
+/* ─── Faça as contas ──────────────────────────────────────────── */
 
-function Testimonials() {
-  const testimonials = [
-    { name: 'Camila Alves',     role: 'Marketing B2B',  quote: 'Carrossel de funil bateu +48% de salvamentos vs. o resto do feed — sem fim de semana no Canva.' },
-    { name: 'Rafael Santos',    role: 'Infoprodutor',   quote: 'Lead perguntou qual agência fez o layout. Era eu no Creatools. Na terça fechou consultoria.' },
-    { name: 'Juliana Menezes',  role: 'Mentora',        quote: 'Agora o carrossel da semana sai no domingo — só adapto o gancho pro Reels.' },
-    { name: 'Lucas Pereira',    role: 'Fitness',        quote: 'Testei o gancho que a IA sugeriu: salvamentos 4% → 11%. Não foi sorte.' },
-    { name: 'Bianca Ferreira',  role: 'Estética',       quote: 'Mesmo template, skincare e contador — só troco paleta. Parecia rebranding.' },
-    { name: 'Diego Rocha',      role: 'Consultor',      quote: 'DMs com “quanto custa?” triplicaram. Coincidiu com Creatools. Não é viralidade aleatória.' },
-  ];
+const COSTS = [
+  { icon: '🎨', name: 'Canva Pro (design)', price: 'R$ 49,90/mês' },
+  { icon: '🤖', name: 'ChatGPT Plus (textos e ideias)', price: 'R$ 99,00/mês' },
+  { icon: '✦', name: 'Google Gemini (IA de imagem)', price: 'R$ 79,00/mês' },
+  { icon: 'Ps', name: 'Photoshop (editor profissional)', price: 'R$ 89,00/mês' },
+  { icon: '🧑‍🎨', name: 'Designer Freelancer (layout)', price: 'R$ 250/mês' },
+  { icon: '✍️', name: 'Copywriter Freelancer (roteiros)', price: 'R$ 85/mês' },
+];
 
+function DoTheMath() {
   return (
-    <section className="py-24 px-4" style={{ background: 'var(--paper-2)' }}>
-      <div className="max-w-6xl mx-auto">
-        <FadeUp className="text-center mb-16">
-          <p className="font-mono text-[10.5px] tracking-[0.18em] uppercase mb-3" style={{ color: 'var(--ink-dim)' }}>
-            Depoimentos
-          </p>
-          <h2 className="font-display" style={{ fontSize: 'clamp(36px, 5vw, 60px)', letterSpacing: '-0.025em', color: 'var(--ink)' }}>
-            Creators que publicam<br />
-            <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>sem travar</span>
+    <section className="py-24 md:py-32 px-6" style={{ background: '#000' }}>
+      <div className="max-w-3xl mx-auto text-center">
+        <FadeUp>
+          <span className="lp-badge on-dark">Faça as contas</span>
+          <h2 className="lp-h mt-6 text-white" style={{ fontSize: 'clamp(32px, 4.2vw, 52px)' }}>
+            Quanto você pagaria <span style={{ color: '#6E6E6A' }}>separado</span>
+            <br /> por tudo isso?
           </h2>
         </FadeUp>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {testimonials.map((t, i) => (
-            <FadeUp key={i} delay={i * 0.07}>
-              <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.25 }} className="brand-card p-6">
-                <div className="flex gap-0.5 mb-4">
-                  {[...Array(5)].map((_, j) => (
-                    <Star key={j} className="w-3.5 h-3.5" style={{ fill: 'var(--ink)', color: 'var(--ink)' }} />
-                  ))}
-                </div>
-                <p className="text-[14px] leading-relaxed mb-5" style={{ color: 'var(--ink-2)' }}>
-                  “{t.quote}”
-                </p>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-9 h-9 rounded-full grid place-items-center text-[12px] font-semibold"
-                    style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+        <FadeUp delay={0.1}>
+          <div className="mt-12 rounded-[24px] p-2" style={{ background: '#111110' }}>
+            {COSTS.map((c, i) => (
+              <div
+                key={c.name}
+                className="flex items-center justify-between gap-4 px-5 py-4"
+                style={{ borderBottom: i < COSTS.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+              >
+                <div className="flex items-center gap-4 text-left">
+                  <span
+                    className="w-10 h-10 rounded-xl grid place-items-center text-[16px] font-bold shrink-0"
+                    style={{ background: '#1E1E1D', color: '#fff' }}
                   >
-                    {t.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-[12.5px] font-semibold" style={{ color: 'var(--ink)' }}>{t.name}</p>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: 'var(--ink-dim)' }}>{t.role}</p>
-                  </div>
+                    {c.icon}
+                  </span>
+                  <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.85)' }}>{c.name}</span>
                 </div>
-              </motion.div>
-            </FadeUp>
-          ))}
-        </div>
+                <span className="text-[14px] line-through shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{c.price}</span>
+              </div>
+            ))}
+          </div>
+        </FadeUp>
+
+        <FadeUp delay={0.18}>
+          <div
+            className="mt-6 rounded-[24px] px-7 py-6 flex flex-col sm:flex-row items-center justify-between gap-6"
+            style={{ background: '#111110', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <div className="text-left">
+              <p className="text-[26px] font-bold line-through" style={{ color: 'rgba(255,255,255,0.35)' }}>~R$ 652/mês</p>
+              <p className="text-[14px] mt-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                No Creatools, tudo está reunido por menos de 10% desse valor.
+              </p>
+            </div>
+            <a href="#planos" className="lp-btn white shrink-0">
+              Ver planos <ArrowChip />
+            </a>
+          </div>
+        </FadeUp>
       </div>
     </section>
   );
 }
 
-// ─── Pricing ─────────────────────────────────────────────────────────────────
+/* ─── Planos ──────────────────────────────────────────────────── */
+
+const PLAN_FEATURES = [
+  'Carrosséis completos com IA (texto + layout + design)',
+  '3 estilos: Editorial, Minimalista e Thread do X',
+  'News cards: notícia vira post em segundos',
+  'Legendas com IA ilimitadas',
+  'Imagens com IA ilimitadas (não gastam créditos)',
+  'Editor visual slide a slide',
+  'Agenda de conteúdo',
+  'Export Full HD (PNG e ZIP)',
+];
 
 function Pricing() {
   const [loadingInterval, setLoadingInterval] = useState<'month' | 'year' | null>(null);
@@ -446,255 +806,322 @@ function Pricing() {
   async function handleSubscribe(interval: 'month' | 'year') {
     setLoadingInterval(interval);
     try {
-      await startStripeCheckout(interval, { nextPath: '/#pricing' });
+      await startStripeCheckout(interval, { nextPath: '/#planos' });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao iniciar checkout');
       setLoadingInterval(null);
     }
   }
 
-  const plans = [
-    {
-      name: 'Mensal',
-      desc: 'Sem fidelidade. Cancele quando quiser.',
-      price: 'R$59,50',
-      sub: '/mês',
-      footnote: 'Cobrança recorrente mensal',
-      highlight: false,
-      badge: null as string | null,
-      interval: 'month' as const,
-    },
-    {
-      name: 'Anual',
-      desc: 'Compromisso anual com o melhor preço.',
-      price: 'R$499',
-      sub: '/ano',
-      footnote: 'Equivalente a R$41,58/mês — economize R$215 no ano',
-      highlight: true,
-      badge: 'Economize 30%',
-      interval: 'year' as const,
-    },
-  ];
-
-  const perks = [
-    'Créditos de IA todo mês (200 no mensal, 300 no anual)',
-    'News Cards editoriais',
-    'Agenda de postagem',
-    'Editor premium',
-    'Exportação Full HD',
-    'Imagens com IA (GPT-image)',
-    'Acesso ao roadmap e updates',
-  ];
-
   return (
-    <section id="pricing" className="py-24 px-4" style={{ background: 'var(--paper)' }}>
-      <div className="max-w-4xl mx-auto">
-        <FadeUp className="text-center mb-14">
-          <p className="font-mono text-[10.5px] tracking-[0.18em] uppercase mb-3" style={{ color: 'var(--ink-dim)' }}>
-            Preços
-          </p>
-          <h2 className="font-display mb-4" style={{ fontSize: 'clamp(36px, 5vw, 60px)', letterSpacing: '-0.025em', color: 'var(--ink)' }}>
-            Um plano. Você <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>escolhe o ritmo.</span>
+    <section id="planos" className="py-24 md:py-32 px-6 bg-white">
+      <div className="max-w-5xl mx-auto">
+        <FadeUp className="text-center">
+          <span className="lp-badge soft">Comece agora</span>
+          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+            Escolha a melhor opção
+            <br />
+            <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
           </h2>
-          <p className="text-[13.5px]" style={{ color: 'var(--ink-dim)' }}>
-            Tudo incluído. A diferença é só o ciclo de cobrança.
+          <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
+            Checkout seguro (Stripe). Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 
-        <div className="grid md:grid-cols-2 gap-5 mb-10">
-          {plans.map((plan, i) => (
-            <FadeUp key={i} delay={i * 0.1}>
-              <motion.div
-                whileHover={{ y: -6 }}
-                transition={{ duration: 0.3 }}
-                className="relative rounded-[14px] p-7 flex flex-col h-full"
-                style={{
-                  background: plan.highlight ? 'var(--ink)' : 'var(--paper)',
-                  color: plan.highlight ? 'var(--paper)' : 'var(--ink)',
-                  border: '1.5px solid var(--ink)',
-                  boxShadow: plan.highlight ? 'var(--sh-3)' : 'var(--sh-2)',
-                }}
+        <div className="mt-14 grid md:grid-cols-2 gap-6 max-w-3xl mx-auto items-start">
+          {/* Mensal */}
+          <FadeUp>
+            <div className="rounded-[28px] p-8" style={{ background: 'var(--lp-band)' }}>
+              <span className="lp-badge" style={{ background: 'var(--lp-black)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
+                Plano Mensal
+              </span>
+              <div className="mt-5 flex items-baseline">
+                <span className="lp-h" style={{ fontSize: 56 }}>R$59</span>
+                <span className="text-[22px] font-bold" style={{ color: 'var(--lp-gray)' }}>,50</span>
+                <span className="ml-2 text-[14px]" style={{ color: 'var(--lp-gray)' }}>/mês</span>
+              </div>
+              <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
+                Cobrado mês a mês. Sem fidelidade.
+                <br />Equivale a ~R$1,98/dia
+              </p>
+              <div className="mt-6 -mx-8 px-8 py-3" style={{ background: '#EBEBE9' }}>
+                <p className="text-[13px] font-bold tracking-tight">200 CRÉDITOS TODO MÊS</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 carrosséis ou 66 news cards</p>
+              </div>
+              <ul className="mt-6 space-y-2.5">
+                {PLAN_FEATURES.map((perk) => (
+                  <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'var(--lp-gray-2)' }}>
+                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#C5C5C0' }} />
+                    {perk}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => handleSubscribe('month')}
+                disabled={loadingInterval !== null}
+                className="lp-btn white w-full justify-between mt-8 !bg-white"
               >
-                {plan.badge && (
-                  <div
-                    className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.14em] uppercase px-3 py-1 rounded-full whitespace-nowrap"
-                    style={{ background: 'var(--accent)', color: '#fff', border: '1.5px solid var(--ink)', boxShadow: 'var(--sh-1)' }}
-                  >
-                    {plan.badge}
-                  </div>
-                )}
-                <p className="text-[15px] font-semibold mb-1">{plan.name}</p>
-                <p className="text-[12px] mb-6" style={{ opacity: 0.7 }}>{plan.desc}</p>
-                <div className="mb-2 flex items-baseline">
-                  <span className="font-display" style={{ fontSize: 56, lineHeight: 1 }}>{plan.price}</span>
-                  <span className="ml-1.5 text-[13px] font-mono" style={{ opacity: 0.6 }}>{plan.sub}</span>
-                </div>
-                <p className="text-[11px] mb-6" style={{ opacity: 0.55 }}>{plan.footnote}</p>
-                <button
-                  type="button"
-                  onClick={() => handleSubscribe(plan.interval)}
-                  disabled={loadingInterval !== null}
-                  className="brand-btn mt-auto justify-center"
-                  style={
-                    plan.highlight
-                      ? { background: 'var(--paper)', color: 'var(--ink)' }
-                      : { background: 'var(--ink)', color: 'var(--paper)' }
-                  }
-                >
-                  {loadingInterval === plan.interval && (
-                    <span
-                      className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
-                      aria-hidden
-                    />
-                  )}
-                  Assinar plano {plan.name.toLowerCase()}
-                </button>
-              </motion.div>
-            </FadeUp>
-          ))}
+                {loadingInterval === 'month' ? 'Abrindo checkout…' : 'Assinar Plano Mensal'} <ArrowChip />
+              </button>
+            </div>
+          </FadeUp>
+
+          {/* Anual */}
+          <FadeUp delay={0.1}>
+            <div
+              className="rounded-[28px] p-8 relative"
+              style={{ background: 'var(--lp-black)', color: '#fff', boxShadow: '0 0 0 2px #fff, 10px 10px 0 0 var(--lp-black)' }}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="lp-badge" style={{ background: '#fff', color: 'var(--lp-black)', fontSize: 11, padding: '7px 14px' }}>
+                  Plano Anual
+                </span>
+                <span className="lp-badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
+                  3 meses grátis
+                </span>
+              </div>
+              <div className="mt-5 flex items-baseline">
+                <span className="lp-h" style={{ fontSize: 56 }}>R$499</span>
+                <span className="ml-2 text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>/ano</span>
+              </div>
+              <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                Equivale a ~R$41,58/mês — economize ~30%.
+                <br />O plano mais escolhido.
+              </p>
+              <div className="mt-6 -mx-8 px-8 py-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <p className="text-[13px] font-bold tracking-tight">300 CRÉDITOS TODO MÊS</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 carrosséis ou 100 news cards</p>
+              </div>
+              <ul className="mt-6 space-y-2.5">
+                {PLAN_FEATURES.map((perk) => (
+                  <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
+                    {perk}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => handleSubscribe('year')}
+                disabled={loadingInterval !== null}
+                className="lp-btn white w-full justify-between mt-8"
+              >
+                {loadingInterval === 'year' ? 'Abrindo checkout…' : 'Assinar Plano Anual'} <ArrowChip />
+              </button>
+            </div>
+          </FadeUp>
         </div>
 
-        <FadeIn>
-          <div
-            className="rounded-[14px] p-6"
-            style={{
-              background: 'var(--paper-2)',
-              border: '1.5px solid var(--ink)',
-              boxShadow: 'var(--sh-2)',
-            }}
-          >
-            <p className="section-kicker mb-4">Todos os planos incluem</p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {perks.map((perk, i) => (
-                <div key={i} className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--ink-2)' }}>
-                  <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
-                  {perk}
-                </div>
-              ))}
-            </div>
-          </div>
-        </FadeIn>
+        <FadeUp delay={0.15}>
+          <p className="mt-12 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
+            Precisa de ajuda? Fale com nosso suporte — respondemos rápido.
+          </p>
+        </FadeUp>
       </div>
     </section>
   );
 }
 
-// ─── Final CTA ───────────────────────────────────────────────────────────────
+/* ─── FAQ ─────────────────────────────────────────────────────── */
 
-function FinalCTA() {
-  const compare = [
-    { label: 'Continuar como está', icon: X,     items: ['Sem alcance orgânico', 'Sem clientes novos', 'Sem previsibilidade de vendas', 'Concorrentes crescendo enquanto você trava'], bad: true },
-    { label: 'Ativar o Creatools',  icon: Check, items: ['Conteúdo profissional todos os dias', 'Mais alcance e engajamento', 'Mais seguidores qualificados', 'Mais vendas no automático'], bad: false },
-  ];
+const FAQS = [
+  {
+    q: 'Preciso saber design?',
+    a: 'Não. A IA escreve o texto, escolhe o layout e aplica as cores da sua marca. Você só digita o tema — e, se quiser, ajusta qualquer detalhe no editor visual antes de exportar.',
+  },
+  {
+    q: 'Como funcionam os créditos?',
+    a: 'Cada plano vem com créditos mensais que renovam automaticamente (200 no mensal, 300 no anual). Um carrossel completo custa 5 créditos e um news card custa 3. Legendas e imagens com IA são ilimitadas — não consomem créditos.',
+  },
+  {
+    q: 'Quantos posts posso criar por mês?',
+    a: 'Com o plano mensal, até 40 carrosséis ou 66 news cards por mês (ou uma combinação dos dois). No anual, até 60 carrosséis ou 100 news cards. Pra quem posta todo dia, sobra crédito.',
+  },
+  {
+    q: 'Funciona para qualquer nicho?',
+    a: 'Sim. Marketing, fitness, nutrição, finanças, moda, educação, coaching — você define o tema e o tom, e a IA adapta o conteúdo ao seu nicho.',
+  },
+  {
+    q: 'O Creatools publica automaticamente no Instagram?',
+    a: 'O Creatools cria, organiza e agenda seus posts no calendário. A publicação você faz direto no Instagram com o arquivo exportado em Full HD — sem conectar sua conta a ferramentas de terceiros, sem risco pro seu perfil.',
+  },
+  {
+    q: 'Como funciona a geração de imagens com IA?',
+    a: 'Diferente de outras ferramentas, no Creatools as imagens com IA estão incluídas na assinatura e não consomem créditos. Gere quantas precisar pros seus slides.',
+  },
+  {
+    q: 'Preciso de ajuda com minha assinatura, como faço?',
+    a: 'Você gerencia tudo pelo portal de assinatura dentro da plataforma — trocar de plano, atualizar cartão ou cancelar. E nosso suporte responde rápido pra qualquer dúvida.',
+  },
+  {
+    q: 'Posso cancelar quando quiser?',
+    a: 'Sim. Sem fidelidade e sem multa. O acesso continua ativo até o fim do período já pago.',
+  },
+];
+
+function Faq() {
+  const [open, setOpen] = useState<number | null>(1);
 
   return (
-    <section className="py-24 px-4" style={{ background: 'var(--paper-2)' }}>
-      <div className="max-w-5xl mx-auto text-center">
-        <FadeUp>
-          <h2 className="font-display mb-4 leading-[1.05]" style={{ fontSize: 'clamp(36px, 5vw, 56px)', letterSpacing: '-0.025em', color: 'var(--ink)' }}>
-            Daqui a 6 meses, seu Instagram<br />
-            vai estar vendendo todos os dias<br />
-            <span style={{ fontStyle: 'italic', color: 'var(--ink-dim)' }}>ou vai continuar como está?</span>
+    <section id="faq" className="py-24 md:py-32 px-6 bg-white">
+      <div className="max-w-3xl mx-auto">
+        <FadeUp className="text-center">
+          <span className="lp-badge soft">FAQ</span>
+          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+            Perguntas <span style={{ color: 'var(--lp-gray)' }}>frequentes</span>
           </h2>
-          <p className="text-[13.5px] mb-14" style={{ color: 'var(--ink-dim)' }}>
-            A diferença entre esses dois cenários começa com uma decisão simples.
-          </p>
         </FadeUp>
 
-        <div className="grid md:grid-cols-2 gap-5 mb-14 text-left">
-          {compare.map((col, i) => (
-            <FadeUp key={i} delay={i * 0.15}>
-              <div
-                className="rounded-[14px] p-6"
-                style={{
-                  background: col.bad ? 'var(--paper)' : 'var(--ink)',
-                  color: col.bad ? 'var(--ink)' : 'var(--paper)',
-                  border: '1.5px solid var(--ink)',
-                  boxShadow: col.bad ? 'var(--sh-1)' : 'var(--sh-3)',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <col.icon className="w-4 h-4" style={{ color: col.bad ? 'var(--ink-dim)' : 'currentColor' }} />
-                  <p className="text-[13px] font-semibold" style={{ color: col.bad ? 'var(--ink-dim)' : 'currentColor' }}>
-                    {col.label}
-                  </p>
-                </div>
-                <ul className="space-y-3">
-                  {col.items.map((item, j) => (
-                    <li
-                      key={j}
-                      className="text-[13px] leading-snug"
-                      style={{
-                        color: col.bad ? 'var(--ink-dim)' : 'var(--paper)',
-                        textDecoration: col.bad ? 'line-through' : 'none',
-                        opacity: col.bad ? 0.7 : 0.9,
-                      }}
+        <div className="mt-12 space-y-3">
+          {FAQS.map((item, i) => {
+            const isOpen = open === i;
+            return (
+              <FadeUp key={i} delay={i * 0.04}>
+                <div
+                  className="rounded-[22px] overflow-hidden transition-colors"
+                  style={isOpen ? { background: '#fff', border: '1px solid var(--lp-line)' } : { background: 'var(--lp-band)', border: '1px solid transparent' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpen(isOpen ? null : i)}
+                    className="w-full flex items-center justify-between gap-4 px-7 py-5 text-left"
+                  >
+                    <span className="text-[16px] font-semibold tracking-tight">{item.q}</span>
+                    <span
+                      className="w-9 h-9 rounded-full grid place-items-center shrink-0"
+                      style={isOpen ? { border: '1px solid var(--lp-line)', color: 'var(--lp-black)' } : { background: 'var(--lp-black)', color: '#fff' }}
                     >
-                      {item}
+                      {isOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <p className="px-7 pb-6 text-[14.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
+                      {item.a}
+                    </p>
+                  )}
+                </div>
+              </FadeUp>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── CTA final ───────────────────────────────────────────────── */
+
+function FinalCTA() {
+  return (
+    <section className="py-24 md:py-32 px-6 text-center" style={{ background: 'var(--lp-band)' }}>
+      <FadeUp>
+        <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={56} height={56} className="mx-auto object-contain" />
+        <h2 className="lp-h mt-8" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+          Comece a publicar com
+          <br />
+          <span style={{ color: 'var(--lp-gray)' }}>consistência de verdade</span>
+        </h2>
+        <p className="mt-5 text-[16px] max-w-md mx-auto" style={{ color: 'var(--lp-gray)' }}>
+          Escolha o plano, a IA já está ativa. Em minutos você tem o primeiro carrossel pronto.
+        </p>
+        <div className="mt-9">
+          <a href="#planos" className="lp-btn black">
+            Ver planos e assinar <ArrowChip dark />
+          </a>
+        </div>
+        <p className="mt-6 text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
+          Acesso imediato · Conteúdo pronto em minutos!
+        </p>
+      </FadeUp>
+    </section>
+  );
+}
+
+/* ─── Footer ──────────────────────────────────────────────────── */
+
+const FOOTER_COLS = [
+  { title: 'Produto', links: [
+    { label: 'Como funciona', href: '#como-funciona' },
+    { label: 'Recursos', href: '#recursos' },
+    { label: 'Planos', href: '#planos' },
+  ]},
+  { title: 'Suporte', links: [
+    { label: 'FAQ', href: '#faq' },
+    { label: 'Suporte', href: '#faq' },
+    { label: 'Ativar acesso', href: '/login' },
+  ]},
+  { title: 'Legal', links: [
+    { label: 'Termos de uso', href: '#' },
+    { label: 'Privacidade', href: '#' },
+    { label: 'Reembolso', href: '#' },
+  ]},
+];
+
+function Footer() {
+  return (
+    <footer className="px-4 pb-4" style={{ background: 'var(--lp-band)' }}>
+      <div className="relative max-w-6xl mx-auto overflow-hidden rounded-[36px] pt-2 pb-16" style={{ background: '#EFEFED' }}>
+        {/* Watermark */}
+        <span
+          aria-hidden
+          className="absolute left-1/2 -translate-x-1/2 bottom-[-6vw] font-bold select-none pointer-events-none"
+          style={{ fontSize: '17vw', letterSpacing: '-0.05em', color: '#E3E3E0', lineHeight: 1 }}
+        >
+          creatools
+        </span>
+
+        <div className="relative z-10 mx-4 mt-4 rounded-[28px] bg-white p-8 md:p-12">
+          <div className="grid md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-10">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={28} height={28} className="object-contain" />
+                <span className="font-bold text-[17px] tracking-tight">creatools</span>
+              </div>
+              <p className="mt-3 text-[14px] leading-relaxed max-w-[220px]" style={{ color: 'var(--lp-gray)' }}>
+                IA para creators que levam conteúdo a sério.
+              </p>
+            </div>
+            {FOOTER_COLS.map((col) => (
+              <div key={col.title}>
+                <p className="text-[14.5px] font-bold">{col.title}</p>
+                <ul className="mt-4 space-y-2.5">
+                  {col.links.map((l) => (
+                    <li key={l.label}>
+                      <a href={l.href} className="text-[13.5px] hover:text-black transition-colors" style={{ color: 'var(--lp-gray)' }}>
+                        {l.label}
+                      </a>
                     </li>
                   ))}
                 </ul>
               </div>
-            </FadeUp>
-          ))}
-        </div>
-
-        <FadeUp>
-          <Link href="/dashboard" className="brand-btn primary" style={{ padding: '14px 24px', fontSize: 15 }}>
-            Criar meu primeiro post agora
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] mt-4" style={{ color: 'var(--ink-dim) ' }}>
-            Sem cartão de crédito · Acesso imediato
-          </p>
-        </FadeUp>
-      </div>
-    </section>
-  );
-}
-
-// ─── Footer ──────────────────────────────────────────────────────────────────
-
-function Footer() {
-  return (
-    <footer
-      className="py-10 px-4"
-      style={{
-        borderTop: '1.5px solid var(--ink)',
-        background: 'var(--paper)',
-      }}
-    >
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="brand-mark sm">
-            <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={26} height={26} style={{ filter: 'invert(1)' }} />
-          </span>
-          <span className="text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>creatools</span>
-        </div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-dim)' }}>
-          © 2026 Creatools · Todos os direitos reservados
-        </p>
-        <div className="flex items-center gap-4 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-dim)' }}>
-          <a href="#" className="hover:opacity-70">Privacidade</a>
-          <a href="#" className="hover:opacity-70">Termos</a>
+            ))}
+          </div>
+          <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--lp-line)' }}>
+            <p className="text-[13px]" style={{ color: 'var(--lp-gray)' }}>© 2026 Creatools. Todos os direitos reservados.</p>
+          </div>
         </div>
       </div>
     </footer>
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+/* ─── Page ────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen" style={{ background: 'var(--paper)' }}>
+    <div className="lp min-h-screen">
+      <style>{LP_CSS}</style>
       <Nav />
       <Hero />
-      <TruthSection />
+      <Truth />
       <HowItWorks />
       <Features />
-      <Testimonials />
+      <Marquee />
+      <Results />
+      <DoTheMath />
       <Pricing />
+      <Faq />
       <FinalCTA />
       <Footer />
     </div>

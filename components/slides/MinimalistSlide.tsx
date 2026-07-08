@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Slide, GlobalSettings, ShadowStyle, TextPosition, TextHighlight, ElementFont } from '@/types';
+import { Slide, GlobalSettings, TextPosition, TextHighlight, ElementFont } from '@/types';
 import { getFontFamilies, getElementFontCSS } from '@/lib/utils';
 
 export interface MinimalistSlideProps {
@@ -20,24 +20,24 @@ function hexToRgb(hex: string): string {
   return `${r},${g},${b}`;
 }
 
-function getShadowGradient(style: ShadowStyle, opacity: number, color?: string, size?: number): string {
-  const a = opacity / 100;
+// Degradê multi-stop (mesma fórmula do overlay dos cards de notícias) —
+// substitui o antigo modelo de 2 stops por "estilo", que deixava o slider
+// "Tamanho" com efeito quase imperceptível em boa parte da faixa.
+function getShadowGradient(opacity: number, color?: string, size?: number, distance?: number): string {
   const rgb = hexToRgb(color || '#000000');
-  const sz = size ?? 60; // default 60%
-  switch (style) {
-    case 'base':
-      return `linear-gradient(to top, rgba(${rgb},${a}) 0%, transparent ${sz}%)`;
-    case 'top-strong':
-      return `linear-gradient(to bottom, rgba(${rgb},${a}) 0%, transparent ${sz}%)`;
-    case 'base-strong':
-      return `linear-gradient(to top, rgba(${rgb},${Math.min(a * 1.3, 1)}) 0%, rgba(${rgb},${a * 0.5}) ${sz * 0.8}%, transparent ${sz * 1.3}%)`;
-    case 'gradient-full':
-      return `linear-gradient(to bottom, rgba(${rgb},${a * 0.7}) 0%, transparent ${sz * 0.5}%, rgba(${rgb},${a}) 100%)`;
-    case 'none':
-      return 'none';
-    default:
-      return `linear-gradient(to top, rgba(${rgb},${a}) 0%, transparent ${sz}%)`;
-  }
+  const op = opacity / 100;
+  const sz = size ?? 85;
+  const dist = distance ?? 55;
+  return `linear-gradient(
+    to top,
+    rgba(${rgb},${op}) 0%,
+    rgba(${rgb},${Math.min(op * 0.96, 1)}) ${Math.round(dist * 0.22)}%,
+    rgba(${rgb},${Math.min(op * 0.85, 1)}) ${Math.round(dist * 0.45)}%,
+    rgba(${rgb},${op * 0.57}) ${Math.round(dist * 0.73)}%,
+    rgba(${rgb},${op * 0.26}) ${dist}%,
+    rgba(${rgb},${op * 0.05}) ${Math.round((dist + sz) / 2)}%,
+    transparent ${sz}%
+  )`;
 }
 
 function getTextPositionStyle(pos: TextPosition): React.CSSProperties {
@@ -165,7 +165,7 @@ function renderTextWithHighlights(
 }
 
 export default function MinimalistSlide({ slide, globalSettings, slideIndex, totalSlides, forExport }: MinimalistSlideProps) {
-  const { corners, profileBadge, accentColor, fontPair, theme } = globalSettings;
+  const { corners, accentColor, fontPair, theme } = globalSettings;
   const slideContainerRef = React.useRef<HTMLDivElement>(null);
 
   const fonts = getFontFamilies(fontPair);
@@ -246,7 +246,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
   const cornerTextColor = corners.color
     || (isLightSlide ? `rgba(0,0,0,${corners.opacity / 100})` : `rgba(255,255,255,${corners.opacity / 100})`);
 
-  const cornerStyle = (br: number): React.CSSProperties => ({
+  const cornerStyle: React.CSSProperties = {
     fontSize: `${corners.fontSize}px`,
     lineHeight: 1,
     display: 'inline-block',
@@ -254,8 +254,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
     fontWeight: cornerFontCSS.fontWeight,
     fontStyle: cornerFontCSS.fontStyle,
     color: cornerTextColor,
-    borderRadius: `${br}px`,
-  });
+  };
 
   const dotInactive = isLightSlide ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.3)';
 
@@ -293,7 +292,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
           style={{
             position: 'absolute',
             inset: 0,
-            background: getShadowGradient(slide.shadow.style, slide.shadow.opacity, slide.shadow.color, slide.shadow.size),
+            background: getShadowGradient(slide.shadow.opacity, slide.shadow.color, slide.shadow.size, slide.shadow.distance),
             pointerEvents: 'none',
           }}
         />
@@ -316,6 +315,23 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
           <div ref={slideContainerRef} style={{ ...textBlockStyle, ...extraContainerStyle, display: 'flex', flexDirection: 'column' }}>
             {renderTextWithHighlights(slide.title, titleHighlights, slide.highlightWord || '', accentColor, { ...titleStyle, whiteSpace: 'pre-wrap', display: 'block' })}
 
+            {/* Imagem de conteúdo — entre os textos, distinta do fundo do slide */}
+            {slide.contentImageUrl && (
+              <div
+                style={{
+                  width: '100%',
+                  height: 420,
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  backgroundImage: `url(${slide.contentImageUrl})`,
+                  backgroundSize: `${slide.contentImagePosition?.zoom ?? 100}%`,
+                  backgroundPosition: `${slide.contentImagePosition?.x ?? 50}% ${slide.contentImagePosition?.y ?? 50}%`,
+                  backgroundRepeat: 'no-repeat',
+                }}
+              />
+            )}
+
             {slide.description !== undefined && slide.description !== '' &&
               renderTextWithHighlights(slide.description, descHighlights, '', accentColor, { ...descStyle, whiteSpace: 'pre-wrap', display: 'block' })
             }
@@ -326,39 +342,6 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
           </div>
         );
       })()}
-
-      {/* Profile badge */}
-      {profileBadge.show && (
-        <div style={{
-          position: 'absolute',
-          ...getBadgePosition(profileBadge.position, bd),
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: profileBadge.style !== 'minimal' ? '8px 14px' : '0',
-          borderRadius: profileBadge.style !== 'minimal' ? 60 : 0,
-          background: profileBadge.style === 'solid'
-            ? (isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)')
-            : profileBadge.style === 'glass'
-            ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
-            : 'transparent',
-          backdropFilter: profileBadge.style === 'glass' ? 'blur(12px)' : undefined,
-          WebkitBackdropFilter: profileBadge.style === 'glass' ? 'blur(12px)' : undefined,
-        }}>
-          {profileBadge.photo && (
-            <img
-              src={profileBadge.photo}
-              alt="Profile"
-              crossOrigin={forExport ? 'anonymous' : undefined}
-              style={{ width: profileBadge.size, height: profileBadge.size, borderRadius: '50%', objectFit: 'cover' }}
-            />
-          )}
-          <div>
-            {profileBadge.name && <div style={{ fontSize: 14, fontWeight: 700, color: textColor, fontFamily: fonts.title }}>{profileBadge.name}</div>}
-            {profileBadge.handle && <div style={{ fontSize: 12, color: textSecondary, fontFamily: fonts.body }}>{profileBadge.handle}</div>}
-          </div>
-        </div>
-      )}
 
       {/* CTA Button */}
       {slide.ctaButton.show && (
@@ -396,12 +379,12 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
       {corners.show && (
         <>
           {corners.topLeft.visible && (
-            <div style={{ position: 'absolute', top: bd, left: bd, ...cornerStyle(corners.borderRadius) }}>
+            <div style={{ position: 'absolute', top: bd, left: bd, ...cornerStyle }}>
               {corners.topLeft.text}
             </div>
           )}
           {corners.topRight.visible && (
-            <div style={{ position: 'absolute', top: bd, right: bd, ...cornerStyle(corners.borderRadius) }}>
+            <div style={{ position: 'absolute', top: bd, right: bd, ...cornerStyle }}>
               {corners.topRight.text}
             </div>
           )}
@@ -432,16 +415,6 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
       </div>
     </div>
   );
-}
-
-function getBadgePosition(pos: TextPosition, bd: number): React.CSSProperties {
-  switch (pos) {
-    case 'top-left': return { top: bd + 60, left: bd };
-    case 'top-right': return { top: bd + 60, right: bd };
-    case 'bottom-left': return { bottom: bd + 60, left: bd };
-    case 'bottom-right': return { bottom: bd + 60, right: bd };
-    default: return { top: bd + 60, left: bd };
-  }
 }
 
 function getCtaPosition(pos: TextPosition, bd: number): React.CSSProperties {

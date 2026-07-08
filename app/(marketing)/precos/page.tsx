@@ -3,8 +3,8 @@ import { Check, ArrowLeft } from 'lucide-react';
 import CheckoutButton from '@/components/billing/CheckoutButton';
 
 export const metadata = {
-  title: 'Planos e preços — PostFlow',
-  description: 'Assine o PostFlow: plano mensal ou anual.',
+  title: 'Planos e preços — Creatools',
+  description: 'Assine o Creatools: plano mensal ou anual.',
 };
 
 const MONTHLY_PRICE = 'R$ 59,50';

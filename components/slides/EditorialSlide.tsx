@@ -24,7 +24,6 @@ const META_H = 60;          // total vertical footprint of meta bar area
 
 // Cover layout — text group default top (~58% down)
 const COVER_TEXT_DEFAULT_TOP = Math.round(SLIDE_H * 0.58); // ~783
-const COVER_BADGE_BOTTOM = 180; // distance from bottom for badge
 
 // Content layouts — zone boundaries (absolute pixels from slide top)
 const CONTENT_TOP = META_TOP + META_H; // ~96
@@ -181,7 +180,6 @@ function Corners({
     fontWeight: cornerFontCSS.fontWeight,
     fontStyle: cornerFontCSS.fontStyle,
     color: cornerTextColor,
-    borderRadius: `${corners.borderRadius}px`,
     zIndex: 20,
   });
 
@@ -209,7 +207,7 @@ function Corners({
 export default function EditorialSlide({
   slide, globalSettings, slideIndex, totalSlides, forExport,
 }: EditorialSlideProps) {
-  const { profileBadge, accentColor, fontPair, metaBar, corners } = globalSettings;
+  const { accentColor, fontPair, metaBar, corners } = globalSettings;
   const fonts = getFontFamilies(fontPair);
 
   const layout: ContentLayout = slide.contentLayout ?? (slideIndex === 0 ? 'cover' : 'text-image-text');
@@ -276,19 +274,44 @@ export default function EditorialSlide({
     textAlign: align,
   };
 
-  const imgUrl = slide.gridImageUrl || slide.backgroundImageUrl || '';
-  const hasImage = !!imgUrl && layout !== 'text-only';
+  // "Imagem" — shape fixo, posicionado pelo layout, entre os textos. Distinto
+  // do "Fundo do Slide" (cor ou imagem full-bleed atrás de tudo, ver bgImageUrl).
+  const contentImgUrl = slide.contentImageUrl || '';
+  // No editor mostramos o shape vazio (placeholder tracejado) mesmo sem imagem,
+  // pra deixar claro onde ela vai entrar; na exportação some se estiver vazio.
+  const showImageBox = layout !== 'text-only' && (!!contentImgUrl || !forExport);
   const imageStyle = (height: number): React.CSSProperties => ({
     width: '100%',
     height,
     borderRadius: 20,
     overflow: 'hidden',
     flexShrink: 0,
-    backgroundImage: `url(${imgUrl})`,
-    backgroundSize: `${slide.imagePosition.zoom}%`,
-    backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
-    backgroundRepeat: 'no-repeat',
+    ...(contentImgUrl
+      ? {
+          backgroundImage: `url(${contentImgUrl})`,
+          backgroundSize: `${slide.contentImagePosition?.zoom ?? 100}%`,
+          backgroundPosition: `${slide.contentImagePosition?.x ?? 50}% ${slide.contentImagePosition?.y ?? 50}%`,
+          backgroundRepeat: 'no-repeat',
+        }
+      : {
+          background: bgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+          border: `1.5px dashed ${bgIsLight ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.20)'}`,
+          boxSizing: 'border-box',
+        }),
   });
+
+  // "Fundo do Slide" — cor sólida OU imagem full-bleed atrás de tudo (texto,
+  // shape de imagem, etc). Usa os mesmos campos que o layout "cover" já usava.
+  const bgImageUrl = slide.backgroundImageUrl || slide.gridImageUrl || '';
+  const backgroundImageLayer = bgImageUrl ? (
+    <div style={{
+      position: 'absolute', inset: 0,
+      backgroundImage: `url(${bgImageUrl})`,
+      backgroundSize: `${slide.imagePosition.zoom}%`,
+      backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
+      backgroundRepeat: 'no-repeat',
+    }} />
+  ) : null;
 
   // ── COVER LAYOUT ───────────────────────────────────────────────────────────
   if (layout === 'cover') {
@@ -335,40 +358,6 @@ export default function EditorialSlide({
             <span>{metaBar.left}</span>
             <span>{metaBar.center}</span>
             <span>{metaBar.right}</span>
-          </div>
-        )}
-
-        {/* Profile badge near bottom */}
-        {profileBadge.show && (
-          <div style={{
-            position: 'absolute',
-            bottom: COVER_BADGE_BOTTOM,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex', alignItems: 'center', gap: 14,
-            padding: '8px 20px', borderRadius: 60, zIndex: 10,
-            background: 'rgba(0,0,0,0.50)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          }}>
-            {profileBadge.photo && (
-              <div style={{
-                width: 48, height: 48, borderRadius: '50%', overflow: 'hidden',
-                backgroundImage: `url(${profileBadge.photo})`,
-                backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0,
-              }} />
-            )}
-            <div>
-              {profileBadge.name && (
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF', fontFamily: fonts.title }}>{profileBadge.name}</div>
-              )}
-              {profileBadge.handle && (
-                <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.70)', fontFamily: fonts.body }}>{profileBadge.handle}</div>
-              )}
-            </div>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill={accentColor}>
-              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke={accentColor} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
           </div>
         )}
 
@@ -446,6 +435,7 @@ export default function EditorialSlide({
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
+        {backgroundImageLayer}
         <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
         <div style={{
@@ -464,7 +454,7 @@ export default function EditorialSlide({
             {titleBlock}
           </div>
 
-          {hasImage && (
+          {showImageBox && (
             <div style={{
               height: imgH,
               width: '100%',
@@ -502,6 +492,7 @@ export default function EditorialSlide({
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
+        {backgroundImageLayer}
         <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
         {/* Top title */}
@@ -523,7 +514,7 @@ export default function EditorialSlide({
         )}
 
         {/* Image at bottom */}
-        {hasImage && imgH > 0 && (
+        {showImageBox && imgH > 0 && (
           <div style={{
             position: 'absolute', top: imgTopTTI, left: PAD_X, right: PAD_X, height: imgH,
             ...imageStyle(imgH),
@@ -551,10 +542,11 @@ export default function EditorialSlide({
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
+        {backgroundImageLayer}
         <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
         {/* Image at top */}
-        {hasImage && (
+        {showImageBox && (
           <div style={{
             position: 'absolute', top: imgTop, left: PAD_X, right: PAD_X, height: imgH,
             ...imageStyle(imgH),
@@ -594,6 +586,7 @@ export default function EditorialSlide({
 
   return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
+      {backgroundImageLayer}
       <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
       {/* Title — large */}

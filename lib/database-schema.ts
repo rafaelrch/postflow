@@ -161,11 +161,14 @@ create table if not exists public.slides (
   grid_image_url text not null default '',
   image_type text not null default 'grid',
   image_position jsonb not null default '{"x":50,"y":50,"zoom":175}'::jsonb,
+  content_image_url text not null default '',
+  content_image_position jsonb,
   background_color text not null default '#111111',
   shadow_style text not null default 'base',
   shadow_opacity smallint not null default 88,
   shadow_color text,
   shadow_size smallint,
+  shadow_distance smallint,
   text_position text not null default 'bottom-left',
   text_offset jsonb,
   text_alignment text not null default 'left',
@@ -199,6 +202,9 @@ create table if not exists public.slides (
 alter table public.slides add column if not exists highlights jsonb not null default '[]'::jsonb;
 alter table public.slides add column if not exists shadow_color text;
 alter table public.slides add column if not exists shadow_size smallint;
+alter table public.slides add column if not exists shadow_distance smallint;
+alter table public.slides add column if not exists content_image_url text not null default '';
+alter table public.slides add column if not exists content_image_position jsonb;
 alter table public.slides add column if not exists title_color text;
 alter table public.slides add column if not exists description_color text;
 alter table public.slides add column if not exists subtitle_color text;

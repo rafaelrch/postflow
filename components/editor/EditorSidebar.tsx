@@ -7,7 +7,7 @@ import { useGenerateCarouselImages } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Section from './Section';
 import { cn } from '@/lib/utils';
-import { TextPosition, ShadowStyle, BadgeStyle, TextHighlight, ElementFont } from '@/types';
+import { TextPosition, TextHighlight, ElementFont } from '@/types';
 import toast from 'react-hot-toast';
 
 // ── ColorPicker: swatch + hex input ─────────────────────────────────────────
@@ -385,14 +385,6 @@ const TEXT_POSITIONS: TextPosition[] = [
   'bottom-left', 'bottom-center', 'bottom-right',
 ];
 
-const SHADOW_STYLES: { value: ShadowStyle; label: string }[] = [
-  { value: 'base', label: 'Base' },
-  { value: 'top-strong', label: 'Topo Forte' },
-  { value: 'base-strong', label: 'Base Forte' },
-  { value: 'gradient-full', label: 'Gradiente Total' },
-  { value: 'none', label: 'Sem Sombra' },
-];
-
 export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: EditorSidebarProps) {
   const {
     slides, activeSlideIndex, style, globalSettings,
@@ -404,6 +396,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
   const bgImageRef = useRef<HTMLInputElement>(null);
   const gridImageRef = useRef<HTMLInputElement>(null);
+  const contentImageRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
 
   const { generateAll, generateOne, generating, progress } = useGenerateCarouselImages();
@@ -436,6 +429,31 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     } catch { toast.error('Clipboard indisponível'); }
   };
 
+  // Imagem de conteúdo (entre os textos) — distinta do fundo do slide, usada
+  // apenas no estilo minimalista.
+  const handleContentImageFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      updateActiveSlide({ contentImageUrl: e.target?.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePasteContentImage = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imgType = item.types.find((t) => t.startsWith('image/'));
+        if (imgType) {
+          const blob = await item.getType(imgType);
+          handleContentImageFile(new File([blob], 'paste.png', { type: imgType }));
+          return;
+        }
+      }
+      toast.error('Nenhuma imagem no clipboard');
+    } catch { toast.error('Clipboard indisponível'); }
+  };
+
   const labelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
   const inputCls = 'w-full px-3 py-2 rounded-xl bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-black/[0.06] dark:focus:ring-white/[0.06] focus:border-black/20 dark:focus:border-white/20 transition-all';
 
@@ -448,6 +466,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
       <input ref={gridImageRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
+      <input ref={contentImageRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleContentImageFile(e.target.files[0])} />
       <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -662,25 +682,25 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               <Section title="Imagem" defaultOpen>
                 <div
                   className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
-                  onClick={() => bgImageRef.current?.click()}
+                  onClick={() => contentImageRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
                     const f = e.dataTransfer.files[0];
-                    if (f) handleImageFile(f);
+                    if (f) handleContentImageFile(f);
                   }}
                 >
                   <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
                   <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
                 </div>
-                <button onClick={() => handlePasteImage()} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
+                <button onClick={() => handlePasteContentImage()} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
                   <Clipboard className="w-3 h-3" /> Colar do clipboard
                 </button>
 
                 {/* AI image generation */}
                 <div className="flex flex-col gap-1.5">
                   <button
-                    onClick={() => generateOne(activeSlideIndex, 'openai')}
+                    onClick={() => generateOne(activeSlideIndex, 'openai', 'content')}
                     disabled={generating}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -690,7 +710,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                       : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
                   </button>
                   <button
-                    onClick={() => generateAll('openai')}
+                    onClick={() => generateAll('openai', 'content')}
                     disabled={generating}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -707,37 +727,28 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                     type="text"
                     className={inputCls}
                     placeholder="https://..."
-                    value={slide.backgroundImageUrl || slide.gridImageUrl || ''}
-                    onChange={(e) => updateActiveSlide({ backgroundImageUrl: e.target.value, gridImageUrl: e.target.value })}
+                    value={slide.contentImageUrl || ''}
+                    onChange={(e) => updateActiveSlide({ contentImageUrl: e.target.value })}
                     spellCheck={false}
                   />
                 </div>
-                {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+                {slide.contentImageUrl && (
                   <div className="flex items-center justify-between px-0.5">
                     <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
-                    <button onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1">
+                    <button onClick={() => updateActiveSlide({ contentImageUrl: '' })} className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1">
                       <X className="w-3 h-3" /> Limpar
                     </button>
                   </div>
                 )}
-                <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
-                <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
-                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
+                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
+                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
+                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } })} unit="%" />
               </Section>
 
               <Section title="Sombra / Overlay">
-                <div>
-                  <span className={labelCls}>Estilo</span>
-                  <select
-                    value={slide.shadow.style}
-                    onChange={(e) => updateActiveSlide({ shadow: { ...slide.shadow, style: e.target.value as ShadowStyle } })}
-                    className={cn(inputCls, 'mt-1')}
-                  >
-                    {SHADOW_STYLES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
                 <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
-                <Slider label="Tamanho" value={slide.shadow.size ?? 60} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
+                <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
+                <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} unit="%" />
                 <ColorPicker
                   label="Cor"
                   value={slide.shadow.color || '#000000'}
@@ -751,6 +762,46 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   value={slide.backgroundColor || '#111111'}
                   onChange={(v) => updateActiveSlide({ backgroundColor: v })}
                 />
+                <div
+                  className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
+                  onClick={() => bgImageRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files[0];
+                    if (f) handleImageFile(f);
+                  }}
+                >
+                  <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
+                  <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste uma imagem de fundo</span>
+                </div>
+                <button onClick={() => handlePasteImage()} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
+                  <Clipboard className="w-3 h-3" /> Colar do clipboard
+                </button>
+                <div>
+                  <span className={labelCls + ' block mb-1'}>URL da imagem</span>
+                  <input
+                    type="text"
+                    className={inputCls}
+                    placeholder="https://..."
+                    value={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+                    onChange={(e) => updateActiveSlide({ backgroundImageUrl: e.target.value, gridImageUrl: e.target.value })}
+                    spellCheck={false}
+                  />
+                </div>
+                {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+                  <>
+                    <div className="flex items-center justify-between px-0.5">
+                      <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
+                      <button onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1">
+                        <X className="w-3 h-3" /> Limpar
+                      </button>
+                    </div>
+                    <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
+                    <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
+                    <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
+                  </>
+                )}
               </Section>
             </Section>
 
@@ -953,7 +1004,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
                   <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} onChange={(v) => updateCornersConfig({ borderDistance: v })} unit="px" />
                   <Slider label="Opacidade" value={corners.opacity} min={0} max={100} onChange={(v) => updateCornersConfig({ opacity: v })} unit="%" />
-                  <Slider label="Arredondamento" value={corners.borderRadius} min={0} max={20} onChange={(v) => updateCornersConfig({ borderRadius: v })} unit="px" />
                   <ColorPicker
                     label="Cor"
                     value={corners.color || '#FFFFFF'}
@@ -965,38 +1015,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                       value={corners.elementFont}
                       onChange={(v) => updateCornersConfig({ elementFont: v })}
                     />
-                  </div>
-                </>
-              )}
-            </Section>
-
-            {/* BADGE DE PERFIL */}
-            <Section title="Badge de Perfil">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div onClick={() => updateGlobalSettings({ profileBadge: { ...profileBadge, show: !profileBadge.show } })} className={cn('w-8 h-4 rounded-full relative transition-colors', profileBadge.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-                  <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', profileBadge.show ? 'left-[18px]' : 'left-0.5')} />
-                </div>
-                <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir badge</span>
-              </label>
-              {profileBadge.show && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden cursor-pointer border border-black/10 dark:border-white/10 shrink-0" onClick={() => profilePhotoRef.current?.click()}>
-                      {profileBadge.photo ? <img src={profileBadge.photo} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-900/20 dark:text-white/20 text-[8px]">foto</div>}
-                    </div>
-                    <div className="flex-1 flex flex-col gap-1">
-                      <input className={inputCls} placeholder="Nome" value={profileBadge.name} onChange={(e) => updateGlobalSettings({ profileBadge: { ...profileBadge, name: e.target.value } })} />
-                      <input className={inputCls} placeholder="@handle" value={profileBadge.handle} onChange={(e) => updateGlobalSettings({ profileBadge: { ...profileBadge, handle: e.target.value } })} />
-                    </div>
-                  </div>
-                  <Slider label="Tamanho" value={profileBadge.size} min={30} max={80} onChange={(v) => updateGlobalSettings({ profileBadge: { ...profileBadge, size: v } })} unit="px" />
-                  <div className="flex gap-1">
-                    {(['solid', 'minimal', 'glass'] as BadgeStyle[]).map((s) => (
-                      <button key={s} onClick={() => updateGlobalSettings({ profileBadge: { ...profileBadge, style: s } })}
-                        className={cn('flex-1 py-1 rounded text-[9px] capitalize transition-colors', profileBadge.style === s ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white')}>
-                        {s}
-                      </button>
-                    ))}
                   </div>
                 </>
               )}
