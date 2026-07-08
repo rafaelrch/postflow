@@ -2,7 +2,17 @@
 
 import React from 'react';
 import { Slide, GlobalSettings, ContentLayout, TextHighlight, ElementFont } from '@/types';
-import { getFontFamilies, getElementFontCSS } from '@/lib/utils';
+import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient } from '@/lib/utils';
+
+// Sublinhado via border-bottom — text-decoration sai diferente no html2canvas
+// (export). O inline-block é essencial: em elemento inline o navegador pinta a
+// borda na caixa de conteúdo do texto, mas o html2canvas pinta no retângulo do
+// elemento (altura da linha). Com inline-block as caixas coincidem nos dois.
+const UNDERLINE_STYLE: React.CSSProperties = {
+  display: 'inline-block',
+  lineHeight: 1.1,
+  borderBottom: '0.05em solid currentColor',
+};
 
 export interface EditorialSlideProps {
   slide: Slide;
@@ -69,7 +79,10 @@ function renderTextWithHighlights(
     ? highlights
     : (fallbackWord ? [{ text: fallbackWord, color: fallbackColor }] : [])) as IndexedHighlight[];
 
-  if (effective.length === 0 || !text) return <span style={style}>{text}</span>;
+  const underlineAll = style.textDecoration === 'underline';
+  const { textDecoration: _td, ...outerStyle } = style;
+
+  if ((effective.length === 0 && !underlineAll) || !text) return <span style={outerStyle}>{text}</span>;
 
   interface Token { raw: string; isWord: boolean }
   const tokens: Token[] = [];
@@ -96,16 +109,17 @@ function renderTextWithHighlights(
     ?? effective.find((h) => h.text.toLowerCase() === word.toLowerCase() && h.wordIdx === undefined);
 
   return (
-    <span style={style}>
+    <span style={outerStyle}>
       {tokens.map((token, i) => {
         if (!token.isWord) return token.raw;
         const hl = getHl(token.raw, wordOccurrences[i]);
-        if (!hl) return token.raw;
-        const hlFontCSS = hl.font ? getElementFontCSS(hl.font as ElementFont) : null;
+        const underlined = hl?.underline || underlineAll;
+        if (!hl && !underlined) return token.raw;
+        const hlFontCSS = hl?.font ? getElementFontCSS(hl.font as ElementFont) : null;
         return (
           <span key={i} style={{
-            color: hl.color,
-            textDecoration: hl.underline ? 'underline' : undefined,
+            ...(hl ? { color: hl.color } : {}),
+            ...(underlined ? UNDERLINE_STYLE : {}),
             ...(hlFontCSS ? { fontFamily: hlFontCSS.fontFamily, fontWeight: hlFontCSS.fontWeight, fontStyle: hlFontCSS.fontStyle } : {}),
           }}>{token.raw}</span>
         );
@@ -310,14 +324,23 @@ export default function EditorialSlide({
       backgroundSize: `${slide.imagePosition.zoom}%`,
       backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
       backgroundRepeat: 'no-repeat',
+      opacity: (slide.backgroundImageOpacity ?? 100) / 100,
+    }} />
+  ) : null;
+
+  // Sombra/Overlay — mesmo degradê em todos os layouts (antes só a capa tinha).
+  // Vem logo após o fundo no DOM, então texto/imagem de conteúdo ficam por cima.
+  const shadowOverlayLayer = slide.shadow.style !== 'none' ? (
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: getShadowOverlayGradient(slide.shadow.opacity, slide.shadow.color, slide.shadow.size, slide.shadow.distance),
+      pointerEvents: 'none',
     }} />
   ) : null;
 
   // ── COVER LAYOUT ───────────────────────────────────────────────────────────
   if (layout === 'cover') {
-    const coverBgUrl = slide.backgroundImageUrl || slide.gridImageUrl || '';
     const panelBg = slide.backgroundColor || '#111111';
-    const gradientOpacity = (slide.shadow?.opacity ?? 88) / 100;
     const coverGap = slide.titleDescriptionGap ?? 36;
     // Bloco de texto (título + descrição) posicionado pela faixa vertical do
     // seletor "Posição do texto"; os sliders de offset seguem funcionando.
@@ -329,23 +352,8 @@ export default function EditorialSlide({
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: panelBg }}>
-        {/* Full-bleed background image */}
-        {coverBgUrl && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: `url(${coverBgUrl})`,
-            backgroundSize: `${slide.imagePosition.zoom}%`,
-            backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
-            backgroundRepeat: 'no-repeat',
-          }} />
-        )}
-
-        {/* Bottom-to-top gradient overlay */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `linear-gradient(to top, rgba(0,0,0,${gradientOpacity}) 0%, rgba(0,0,0,${(gradientOpacity * 0.6).toFixed(2)}) 45%, rgba(0,0,0,0.08) 75%, transparent 100%)`,
-          zIndex: 1,
-        }} />
+        {backgroundImageLayer}
+        {shadowOverlayLayer}
 
         {/* Metadata bar — white on cover, only when enabled */}
         {metaBar?.show && (
@@ -436,6 +444,7 @@ export default function EditorialSlide({
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
         {backgroundImageLayer}
+        {shadowOverlayLayer}
         <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
         <div style={{
@@ -493,6 +502,7 @@ export default function EditorialSlide({
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
         {backgroundImageLayer}
+        {shadowOverlayLayer}
         <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
         {/* Top title */}
@@ -543,6 +553,7 @@ export default function EditorialSlide({
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
         {backgroundImageLayer}
+        {shadowOverlayLayer}
         <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
         {/* Image at top */}
@@ -587,6 +598,7 @@ export default function EditorialSlide({
   return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
       {backgroundImageLayer}
+      {shadowOverlayLayer}
       <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
 
       {/* Title — large */}

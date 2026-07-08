@@ -41,6 +41,29 @@ export function debounce<T extends (...args: any[]) => void>(
   };
 }
 
+/**
+ * Degradê multi-stop do overlay de sombra (mesma fórmula dos cards de notícias).
+ * Compartilhado entre MinimalistSlide e EditorialSlide para o preview e o export
+ * renderizarem o mesmo resultado.
+ */
+export function getShadowOverlayGradient(opacity: number, color?: string, size?: number, distance?: number): string {
+  const h = (color || '#000000').replace('#', '');
+  const rgb = `${parseInt(h.substring(0, 2), 16)},${parseInt(h.substring(2, 4), 16)},${parseInt(h.substring(4, 6), 16)}`;
+  const op = opacity / 100;
+  const sz = size ?? 85;
+  const dist = distance ?? 55;
+  return `linear-gradient(
+    to top,
+    rgba(${rgb},${op}) 0%,
+    rgba(${rgb},${Math.min(op * 0.96, 1)}) ${Math.round(dist * 0.22)}%,
+    rgba(${rgb},${Math.min(op * 0.85, 1)}) ${Math.round(dist * 0.45)}%,
+    rgba(${rgb},${op * 0.57}) ${Math.round(dist * 0.73)}%,
+    rgba(${rgb},${op * 0.26}) ${dist}%,
+    rgba(${rgb},${op * 0.05}) ${Math.round((dist + sz) / 2)}%,
+    transparent ${sz}%
+  )`;
+}
+
 export function getFontFamilies(fontPair: string): { title: string; body: string } {
   const SF = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
   const IVY = "'IvyOra Text', 'Georgia', serif";

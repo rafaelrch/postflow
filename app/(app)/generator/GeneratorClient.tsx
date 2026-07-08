@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CalendarPlus, CloudCheck, CloudOff, Loader2, Save, Sparkles } from 'lucide-react';
+import { CalendarPlus, CloudCheck, CloudOff, Loader2, Save } from 'lucide-react';
 import EditorSidebar from '@/components/editor/EditorSidebar';
 import SlideCanvas from '@/components/editor/SlideCanvas';
 import HiddenSlides from '@/components/editor/HiddenSlides';
 import CreateWizard from '@/components/editor/CreateWizard';
-import CaptionModal from '@/components/editor/CaptionModal';
 import ScheduleModal from '@/components/editor/ScheduleModal';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
@@ -28,7 +27,6 @@ export default function GeneratorClient() {
   } = useEditorStore();
 
   const [showWizard, setShowWizard] = useState(false);
-  const [showCaptionModal, setShowCaptionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const { saveNow } = useAutoSave();
@@ -166,15 +164,7 @@ export default function GeneratorClient() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Editor top bar */}
-      <div className="h-10 shrink-0 border-b border-black/[0.06] dark:border-white/[0.06] bg-[var(--background)] flex items-center justify-between px-4 gap-4">
-        <button
-          onClick={() => setShowCaptionModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          Gerar Legenda
-        </button>
-        <div className="flex-1" />
+      <div className="h-10 shrink-0 border-b border-black/[0.06] dark:border-white/[0.06] bg-[var(--background)] flex items-center justify-end px-4 gap-4">
         <SaveIndicator />
       </div>
 
@@ -192,7 +182,6 @@ export default function GeneratorClient() {
       <HiddenSlides registerRef={registerSlideRef} />
 
       {showWizard && <CreateWizard onClose={() => setShowWizard(false)} />}
-      {showCaptionModal && <CaptionModal onClose={() => setShowCaptionModal(false)} />}
       {showScheduleModal && (
         <ScheduleModal
           onClose={() => setShowScheduleModal(false)}

@@ -1,14 +1,13 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Download, Archive, Upload, Clipboard, Image, X, Underline, Sparkles } from 'lucide-react';
+import { Download, Archive, Upload, Image, X, Underline, Sparkles } from 'lucide-react';
 import { useEditorStore } from '@/hooks/useEditorStore';
-import { useGenerateCarouselImages } from '@/hooks/useGenerateCarouselImages';
+import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Section from './Section';
 import { cn } from '@/lib/utils';
 import { TextPosition, TextHighlight, ElementFont } from '@/types';
-import toast from 'react-hot-toast';
 
 // ── ColorPicker: swatch + hex input ─────────────────────────────────────────
 
@@ -199,45 +198,67 @@ function WordHighlightPicker({ label, text, highlights, onChange, accentColor }:
 
   const selKey = (word: string, wordIdx: number) => `${word.toLowerCase()}::${wordIdx}`;
 
-  const toggleToken = (word: string, wordIdx: number) => {
-    const key = selKey(word, wordIdx);
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-        const existing = getHighlightForToken(highlights, word, wordIdx);
-        if (existing) {
-          setPendingColor(existing.color);
-          setPendingFont(existing.font);
-          setPendingUnderline(existing.underline ?? false);
-        }
-      }
-      return next;
-    });
-  };
-
-  const applyHighlight = () => {
-    if (selected.size === 0) return;
+  // Aplica o estilo às palavras do conjunto imediatamente — o preview do slide
+  // atualiza ao vivo conforme o usuário mexe em cor/fonte/sublinhado.
+  const applyLive = (sel: Set<string>, color: string, font: ElementFont | undefined, underline: boolean) => {
+    if (sel.size === 0) return;
     const next = highlights.filter((h) => {
-      // Remove entries that are being overwritten
       const ih = h as IndexedHighlight;
-      return !selected.has(selKey(h.text, ih.wordIdx ?? 0));
+      return !sel.has(selKey(h.text, ih.wordIdx ?? 0));
     });
-    selected.forEach((key) => {
+    sel.forEach((key) => {
       const [word, idxStr] = key.split('::');
-      const entry: IndexedHighlight = {
+      next.push({
         text: word,
-        color: pendingColor,
-        underline: pendingUnderline,
-        font: pendingFont,
+        color,
+        underline,
+        font,
         wordIdx: parseInt(idxStr, 10),
-      };
-      next.push(entry);
+      } as IndexedHighlight);
     });
     onChange(next);
-    setSelected(new Set());
+  };
+
+  const toggleToken = (word: string, wordIdx: number) => {
+    const key = selKey(word, wordIdx);
+    const next = new Set(selected);
+    if (next.has(key)) {
+      next.delete(key);
+      setSelected(next);
+      return;
+    }
+    next.add(key);
+    const existing = getHighlightForToken(highlights, word, wordIdx);
+    let color = pendingColor;
+    let font = pendingFont;
+    let underline = pendingUnderline;
+    if (existing) {
+      color = existing.color;
+      font = existing.font;
+      underline = existing.underline ?? false;
+      setPendingColor(color);
+      setPendingFont(font);
+      setPendingUnderline(underline);
+    }
+    setSelected(next);
+    // Palavra recém-selecionada já ganha o destaque na hora
+    applyLive(new Set([key]), color, font, underline);
+  };
+
+  const changeColor = (c: string) => {
+    setPendingColor(c);
+    applyLive(selected, c, pendingFont, pendingUnderline);
+  };
+
+  const changeFont = (f: ElementFont | undefined) => {
+    setPendingFont(f);
+    applyLive(selected, pendingColor, f, pendingUnderline);
+  };
+
+  const toggleUnderline = () => {
+    const v = !pendingUnderline;
+    setPendingUnderline(v);
+    applyLive(selected, pendingColor, pendingFont, v);
   };
 
   const removeSelected = () => {
@@ -287,22 +308,22 @@ function WordHighlightPicker({ label, text, highlights, onChange, accentColor }:
           <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35">
             {selected.size} palavra{selected.size > 1 ? 's' : ''} selecionada{selected.size > 1 ? 's' : ''}
           </span>
-          <ColorPicker label="Cor" value={pendingColor} onChange={setPendingColor} />
+          <ColorPicker label="Cor" value={pendingColor} onChange={changeColor} />
           <div>
             <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] block mb-1.5">Fonte</span>
-            <ElementFontPicker value={pendingFont} onChange={setPendingFont} />
+            <ElementFontPicker value={pendingFont} onChange={changeFont} />
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
-            <div onClick={() => setPendingUnderline((v) => !v)}
+            <div onClick={toggleUnderline}
               className={cn('w-8 h-4 rounded-full relative transition-colors shrink-0', pendingUnderline ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
               <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all', pendingUnderline ? 'left-[18px]' : 'left-0.5')} />
             </div>
             <span className="text-[10px] text-gray-900/50 dark:text-white/40">Sublinhado</span>
           </label>
           <div className="flex gap-2">
-            <button onClick={applyHighlight}
+            <button onClick={() => setSelected(new Set())}
               className="flex-1 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-bold transition-colors hover:bg-gray-700 dark:hover:bg-white/90">
-              Aplicar
+              Concluir
             </button>
             <button onClick={removeSelected}
               className="px-3 py-2 rounded-xl border border-red-400/30 text-red-400/60 hover:text-red-400 hover:border-red-400/60 text-[10px] font-medium transition-colors">
@@ -403,6 +424,12 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
   if (!slide) return null;
 
+  // Capa do Editorial (layout 'cover'): não tem shape de imagem de conteúdo —
+  // a imagem da capa vai no fundo do slide.
+  const isEditorialCover = isEditorialCoverSlide(style, slide, activeSlideIndex);
+  // Quantos slides recebem imagem de conteúdo no "gerar para todos" (capa fora)
+  const contentSlidesCount = slides.filter((s, i) => !isEditorialCoverSlide(style, s, i)).length;
+
   const handleImageFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -414,44 +441,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     reader.readAsDataURL(file);
   };
 
-  const handlePasteImage = async () => {
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imgType = item.types.find((t) => t.startsWith('image/'));
-        if (imgType) {
-          const blob = await item.getType(imgType);
-          handleImageFile(new File([blob], 'paste.png', { type: imgType }));
-          return;
-        }
-      }
-      toast.error('Nenhuma imagem no clipboard');
-    } catch { toast.error('Clipboard indisponível'); }
-  };
-
-  // Imagem de conteúdo (entre os textos) — distinta do fundo do slide, usada
-  // apenas no estilo minimalista.
+  // Imagem de conteúdo (entre os textos) — distinta do fundo do slide.
   const handleContentImageFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       updateActiveSlide({ contentImageUrl: e.target?.result as string });
     };
     reader.readAsDataURL(file);
-  };
-
-  const handlePasteContentImage = async () => {
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imgType = item.types.find((t) => t.startsWith('image/'));
-        if (imgType) {
-          const blob = await item.getType(imgType);
-          handleContentImageFile(new File([blob], 'paste.png', { type: imgType }));
-          return;
-        }
-      }
-      toast.error('Nenhuma imagem no clipboard');
-    } catch { toast.error('Clipboard indisponível'); }
   };
 
   const labelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
@@ -677,8 +673,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
              MINIMALIST SIDEBAR — full editor
              ════════════════════════════════ */
           <>
-            {/* IMAGEM */}
+            {/* IMAGEM — a capa do Editorial não tem shape de conteúdo */}
             <Section title={`Conteúdo — Slide ${activeSlideIndex + 1}`} defaultOpen>
+              {!isEditorialCover && (
               <Section title="Imagem" defaultOpen>
                 <div
                   className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
@@ -693,10 +690,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
                   <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
                 </div>
-                <button onClick={() => handlePasteContentImage()} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
-                  <Clipboard className="w-3 h-3" /> Colar do clipboard
-                </button>
-
                 {/* AI image generation */}
                 <div className="flex flex-col gap-1.5">
                   <button
@@ -717,7 +710,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                     <Sparkles className="w-3 h-3" />
                     {generating && progress.total > 1
                       ? `Gerando ${progress.done}/${progress.total}…`
-                      : `Gerar para todos os ${slides.length} slides`}
+                      : `Gerar para os ${contentSlidesCount} slides`}
                   </button>
                 </div>
 
@@ -744,19 +737,33 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
                 <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } })} unit="%" />
               </Section>
+              )}
 
               <Section title="Sombra / Overlay">
-                <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
-                <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
-                <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} unit="%" />
-                <ColorPicker
-                  label="Cor"
-                  value={slide.shadow.color || '#000000'}
-                  onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })}
-                />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <div
+                    onClick={() => updateActiveSlide({ shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } })}
+                    className={cn('w-8 h-4 rounded-full relative transition-colors', slide.shadow.style !== 'none' ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}
+                  >
+                    <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.shadow.style !== 'none' ? 'left-[18px]' : 'left-0.5')} />
+                  </div>
+                  <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir sombra</span>
+                </label>
+                {slide.shadow.style !== 'none' && (
+                  <>
+                    <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
+                    <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
+                    <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} unit="%" />
+                    <ColorPicker
+                      label="Cor"
+                      value={slide.shadow.color || '#000000'}
+                      onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })}
+                    />
+                  </>
+                )}
               </Section>
 
-              <Section title="Fundo do Slide">
+              <Section title="Fundo do Slide" defaultOpen={isEditorialCover}>
                 <ColorPicker
                   label="Cor"
                   value={slide.backgroundColor || '#111111'}
@@ -775,9 +782,16 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
                   <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste uma imagem de fundo</span>
                 </div>
-                <button onClick={() => handlePasteImage()} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all">
-                  <Clipboard className="w-3 h-3" /> Colar do clipboard
-                </button>
+                {isEditorialCover && (
+                  <button
+                    onClick={() => generateOne(activeSlideIndex, 'openai')}
+                    disabled={generating}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {generating ? 'Gerando…' : 'Gerar imagem com IA (capa)'}
+                  </button>
+                )}
                 <div>
                   <span className={labelCls + ' block mb-1'}>URL da imagem</span>
                   <input
@@ -797,6 +811,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                         <X className="w-3 h-3" /> Limpar
                       </button>
                     </div>
+                    <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} unit="%" />
                     <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
                     <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
                     <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />

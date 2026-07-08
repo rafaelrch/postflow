@@ -9,9 +9,10 @@ import {
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData } from '@/types';
+import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData, TextPosition } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
+import { useCreditsStore } from '@/hooks/useCreditsStore';
 import toast from 'react-hot-toast';
 
 interface CreateWizardProps {
@@ -328,6 +329,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
         const aiWantsLight = aiBg === '#FFFFFF';
         const slideBg = aiWantsLight ? brandLightBg : brandDarkBg;
+        // Editorial (fora da capa): texto+imagem centralizados à esquerda,
+        // sem degradê — o shape de imagem já cria contraste sozinho.
+        const isEditorialContent = style === 'editorial' && i > 0;
         return ({
         id: `tmp-${i}-${Date.now()}`,
         position: i,
@@ -339,9 +343,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         gridImageUrl: sl.imageUrl || '',
         imageType: 'background' as const,
         imagePosition: { x: 50, y: 50, zoom: 175 },
-        shadow: { style: 'base', opacity: 88 },
+        shadow: { style: isEditorialContent ? 'none' : 'base', opacity: 88 } as const,
         backgroundColor: slideBg,
-        textPosition: (i === 0 ? 'bottom-center' : 'bottom-left') as 'bottom-center' | 'bottom-left',
+        textPosition: (isEditorialContent ? 'middle-left' : i === 0 ? 'bottom-center' : 'bottom-left') as TextPosition,
         textAlignment: (i === 0 ? 'center' : 'left') as 'center' | 'left',
         fontSize: style === 'profile'
           ? { title: 47, description: 26 }
@@ -396,6 +400,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         const slidesPayload = slides.map((sl, i) => {
           const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
           const slideBg = aiBg === '#FFFFFF' ? brandLightBg : brandDarkBg;
+          const isEditorialContent = style === 'editorial' && i > 0;
           return ({
           carousel_id: carousel.id,
           position: i,
@@ -406,9 +411,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           grid_image_url: sl.imageUrl || '',
           image_type: 'background',
           image_position: { x: 50, y: 50, zoom: 175 },
-          shadow_style: 'base',
+          shadow_style: isEditorialContent ? 'none' : 'base',
           shadow_opacity: 88,
-          text_position: i === 0 ? 'bottom-center' : 'bottom-left',
+          text_position: isEditorialContent ? 'middle-left' : i === 0 ? 'bottom-center' : 'bottom-left',
           text_offset: null,
           text_alignment: i === 0 ? 'center' : 'left',
           subtitle: '',
@@ -444,6 +449,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
       }
     } finally {
       setLoading(false);
+      if (contentMode === 'ai') useCreditsStore.getState().refresh();
     }
   };
 

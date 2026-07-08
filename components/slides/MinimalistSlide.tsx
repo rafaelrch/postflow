@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Slide, GlobalSettings, TextPosition, TextHighlight, ElementFont } from '@/types';
-import { getFontFamilies, getElementFontCSS } from '@/lib/utils';
+import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient } from '@/lib/utils';
 
 export interface MinimalistSlideProps {
   slide: Slide;
@@ -12,33 +12,17 @@ export interface MinimalistSlideProps {
   forExport?: boolean;
 }
 
-function hexToRgb(hex: string): string {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  return `${r},${g},${b}`;
-}
-
-// Degradê multi-stop (mesma fórmula do overlay dos cards de notícias) —
-// substitui o antigo modelo de 2 stops por "estilo", que deixava o slider
-// "Tamanho" com efeito quase imperceptível em boa parte da faixa.
-function getShadowGradient(opacity: number, color?: string, size?: number, distance?: number): string {
-  const rgb = hexToRgb(color || '#000000');
-  const op = opacity / 100;
-  const sz = size ?? 85;
-  const dist = distance ?? 55;
-  return `linear-gradient(
-    to top,
-    rgba(${rgb},${op}) 0%,
-    rgba(${rgb},${Math.min(op * 0.96, 1)}) ${Math.round(dist * 0.22)}%,
-    rgba(${rgb},${Math.min(op * 0.85, 1)}) ${Math.round(dist * 0.45)}%,
-    rgba(${rgb},${op * 0.57}) ${Math.round(dist * 0.73)}%,
-    rgba(${rgb},${op * 0.26}) ${dist}%,
-    rgba(${rgb},${op * 0.05}) ${Math.round((dist + sz) / 2)}%,
-    transparent ${sz}%
-  )`;
-}
+// Sublinhado desenhado com border-bottom em vez de text-decoration: o
+// html2canvas desenha text-decoration com espessura/posição próprias, então o
+// export ficava diferente do preview. O inline-block é essencial — em elemento
+// inline o navegador pinta a borda na caixa de conteúdo do texto, mas o
+// html2canvas pinta no retângulo do elemento (altura da linha), deslocando a
+// linha. Com inline-block as duas caixas coincidem e o PNG sai igual ao preview.
+const UNDERLINE_STYLE: React.CSSProperties = {
+  display: 'inline-block',
+  lineHeight: 1.1,
+  borderBottom: '0.05em solid currentColor',
+};
 
 function getTextPositionStyle(pos: TextPosition): React.CSSProperties {
   const base: React.CSSProperties = { position: 'absolute', display: 'flex', flexDirection: 'column' };
@@ -104,7 +88,12 @@ function renderTextWithHighlights(
     ? highlights
     : (fallbackWord ? [{ text: fallbackWord, color: fallbackColor }] : [])) as IndexedHighlight[];
 
-  if (effective.length === 0 || !text) return <span style={style}>{text}</span>;
+  // Sublinhado do bloco inteiro (título/descrição) vira border por palavra —
+  // text-decoration renderiza diferente no html2canvas.
+  const underlineAll = style.textDecoration === 'underline';
+  const { textDecoration: _td, ...outerStyle } = style;
+
+  if ((effective.length === 0 && !underlineAll) || !text) return <span style={outerStyle}>{text}</span>;
 
   // Tokenise text into words+gaps preserving whitespace
   // Each token = { raw: string, isWord: boolean }
@@ -138,19 +127,20 @@ function renderTextWithHighlights(
   };
 
   return (
-    <span style={style}>
+    <span style={outerStyle}>
       {tokens.map((token, i) => {
         if (!token.isWord) return token.raw;
         const occ = wordOccurrences[i];
         const hl = getHl(token.raw, occ);
-        if (!hl) return token.raw;
-        const hlFontCSS = hl.font ? getElementFontCSS(hl.font as ElementFont) : null;
+        const underlined = hl?.underline || underlineAll;
+        if (!hl && !underlined) return token.raw;
+        const hlFontCSS = hl?.font ? getElementFontCSS(hl.font as ElementFont) : null;
         return (
           <span
             key={i}
             style={{
-              color: hl.color,
-              textDecoration: hl.underline ? 'underline' : undefined,
+              ...(hl ? { color: hl.color } : {}),
+              ...(underlined ? UNDERLINE_STYLE : {}),
               ...(hlFontCSS ? {
                 fontFamily: hlFontCSS.fontFamily,
                 fontWeight: hlFontCSS.fontWeight,
@@ -282,6 +272,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
             backgroundSize: `${slide.imagePosition.zoom}%`,
             backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
             backgroundRepeat: 'no-repeat',
+            opacity: (slide.backgroundImageOpacity ?? 100) / 100,
           }}
         />
       )}
@@ -292,7 +283,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
           style={{
             position: 'absolute',
             inset: 0,
-            background: getShadowGradient(slide.shadow.opacity, slide.shadow.color, slide.shadow.size, slide.shadow.distance),
+            background: getShadowOverlayGradient(slide.shadow.opacity, slide.shadow.color, slide.shadow.size, slide.shadow.distance),
             pointerEvents: 'none',
           }}
         />
@@ -337,7 +328,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
             }
 
             {slide.subtitle &&
-              <p style={{ ...subtitleStyle, whiteSpace: 'pre-wrap' }}>{slide.subtitle}</p>
+              renderTextWithHighlights(slide.subtitle, [], '', accentColor, { ...subtitleStyle, whiteSpace: 'pre-wrap', display: 'block' })
             }
           </div>
         );

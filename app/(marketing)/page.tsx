@@ -303,7 +303,7 @@ const STEPS = [
   },
   {
     title: 'Exporte e publique',
-    desc: 'Baixe em Full HD (PNG ou ZIP), agende no calendário e publique. Legenda com hashtags? A IA escreve junto.',
+    desc: 'Baixe em Full HD (PNG ou ZIP), agende no calendário e publique direto no seu perfil.',
   },
 ];
 
@@ -453,8 +453,8 @@ function MockAiImages() {
     <div className="w-full max-w-[240px] text-left">
       <div className="aspect-[4/5] rounded-2xl" style={{ background: 'conic-gradient(from 210deg at 50% 40%, #232323, #4a4a46, #17171a, #2e2e2a, #232323)' }} />
       <div className="flex items-center justify-between mt-3">
-        <span className="text-[10px] font-semibold tracking-[0.14em] uppercase" style={{ color: '#9A9A96' }}>OpenAI · Nano Banana</span>
-        <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: '#0A0A0A', color: '#fff' }}>0 créditos</span>
+        <span className="text-[10px] font-semibold tracking-[0.14em] uppercase" style={{ color: '#9A9A96' }}>OpenAI · gpt-image-2</span>
+        <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: '#0A0A0A', color: '#fff' }}>5 créditos</span>
       </div>
     </div>
   );
@@ -469,7 +469,7 @@ const FEATURES: Feature[] = [
     bullets: [
       '3 estilos prontos: Editorial, Minimalista e Thread do X',
       'Gancho, desenvolvimento e CTA escritos pela IA',
-      'Legenda com hashtags gerada junto, sem custo extra',
+      'Editor visual completo pra ajustar tudo antes de exportar',
     ],
     visual: <MockCarousel />,
   },
@@ -524,12 +524,12 @@ const FEATURES: Feature[] = [
   {
     tab: 'Imagens com IA',
     tag: 'Sem banco de imagem genérico',
-    title: (<>Imagens geradas por IA — <span style={{ color: '#8B8B87' }}>sem gastar seus créditos</span></>),
-    body: 'Gere imagens exclusivas pros seus slides com as melhores IAs de imagem do mercado. E aqui está o diferencial: imagens não consomem créditos do seu plano.',
+    title: (<>Imagens geradas por IA — <span style={{ color: '#8B8B87' }}>sob medida pro seu slide</span></>),
+    body: 'Gere imagens exclusivas pros seus slides com o gpt-image-2, o modelo de imagem mais recente da OpenAI. Cada imagem custa 5 créditos do seu plano.',
     bullets: [
-      'Duas engines de imagem (OpenAI + Nano Banana)',
+      'Motor de imagem OpenAI gpt-image-2',
       'Imagem sob medida pro contexto do slide',
-      'Uso incluso na assinatura, sem custo por imagem',
+      '5 créditos por imagem gerada',
     ],
     visual: <MockAiImages />,
   },
@@ -793,8 +793,7 @@ const PLAN_FEATURES = [
   'Carrosséis completos com IA (texto + layout + design)',
   '3 estilos: Editorial, Minimalista e Thread do X',
   'News cards: notícia vira post em segundos',
-  'Legendas com IA ilimitadas',
-  'Imagens com IA ilimitadas (não gastam créditos)',
+  'Imagens com IA (OpenAI gpt-image-2) — 5 créditos cada',
   'Editor visual slide a slide',
   'Agenda de conteúdo',
   'Export Full HD (PNG e ZIP)',
@@ -932,7 +931,7 @@ const FAQS = [
   },
   {
     q: 'Como funcionam os créditos?',
-    a: 'Cada plano vem com créditos mensais que renovam automaticamente (200 no mensal, 300 no anual). Um carrossel completo custa 5 créditos e um news card custa 3. Legendas e imagens com IA são ilimitadas — não consomem créditos.',
+    a: 'Cada plano vem com créditos mensais que renovam automaticamente (200 no mensal, 300 no anual). Um carrossel completo custa 5 créditos, um news card custa 3, e cada imagem gerada com IA custa 5.',
   },
   {
     q: 'Quantos posts posso criar por mês?',
@@ -948,7 +947,7 @@ const FAQS = [
   },
   {
     q: 'Como funciona a geração de imagens com IA?',
-    a: 'Diferente de outras ferramentas, no Creatools as imagens com IA estão incluídas na assinatura e não consomem créditos. Gere quantas precisar pros seus slides.',
+    a: 'Cada imagem é gerada sob medida pro seu slide com o gpt-image-2 da OpenAI e custa 5 créditos do seu plano — o mesmo saldo que carrossel e news card usam.',
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',

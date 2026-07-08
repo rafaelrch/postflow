@@ -14,7 +14,6 @@ interface NavbarProps {
   onNextSlide?: () => void;
   onAddSlide?: () => void;
   onDeleteSlide?: () => void;
-  onGenerateCaption?: () => void;
 }
 
 export default function Navbar({
@@ -25,7 +24,6 @@ export default function Navbar({
   onNextSlide,
   onAddSlide,
   onDeleteSlide,
-  onGenerateCaption,
 }: NavbarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
@@ -64,15 +62,6 @@ export default function Navbar({
           <Sparkles className="w-3.5 h-3.5" />
           Gerador
         </Link>
-        {isEditor && (
-          <button
-            onClick={onGenerateCaption}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Gerar Legenda
-          </button>
-        )}
       </nav>
 
       {/* Editor slide controls */}

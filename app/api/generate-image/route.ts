@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { openai, buildImagePrompt } from '@/lib/openai';
 import { generateGeminiImage } from '@/lib/nanobanana';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { requireActiveSubscription } from '@/lib/subscription';
+import { requireCredits, refundCredits } from '@/lib/subscription';
+import { CREDIT_COSTS } from '@/lib/credits';
 
 export const maxDuration = 120;
 
@@ -35,8 +36,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'slideId e title são obrigatórios' }, { status: 400 });
   }
 
-  const guard = await requireActiveSubscription();
+  const charged = CREDIT_COSTS.image;
+  const guard = await requireCredits(charged);
   if (!guard.ok) return guard.response;
+  const { userId } = guard;
 
   const supabase = await createServerSupabaseClient();
 
@@ -52,7 +55,7 @@ export async function POST(req: NextRequest) {
       mimeType = result.mimeType;
     } else {
       const response = await openai.images.generate({
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         prompt,
         size: '1024x1536',
         quality,
@@ -61,16 +64,26 @@ export async function POST(req: NextRequest) {
       b64 = response.data?.[0]?.b64_json;
     }
   } catch (err) {
+    await refundCredits(userId, charged);
     const message = err instanceof Error ? err.message : 'Falha desconhecida';
     const lower = message.toLowerCase();
 
     if (provider === 'openai') {
       if (lower.includes('verify') || lower.includes('verification') || lower.includes('must be verified')) {
         return NextResponse.json({
-          error: 'Sua organização OpenAI ainda não foi verificada para usar gpt-image-1. Verifique em platform.openai.com/settings/organization/general',
+          error: 'Sua organização OpenAI ainda não foi verificada para usar gpt-image-2. Verifique em platform.openai.com/settings/organization/general',
         }, { status: 403 });
       }
-      if (lower.includes('billing') || lower.includes('quota') || lower.includes('insufficient')) {
+      if (lower.includes('billing') || lower.includes('insufficient')) {
+        return NextResponse.json({ error: 'Sem créditos / billing na conta OpenAI' }, { status: 402 });
+      }
+      // Limite de imagens/min da OpenAI — a mensagem já vem como "429 Rate
+      // limit reached... Please try again in Ns.", propagamos o status 429
+      // pra o cliente poder re-tentar automaticamente após esse tempo.
+      if (lower.includes('rate limit') || lower.includes('429')) {
+        return NextResponse.json({ error: message }, { status: 429 });
+      }
+      if (lower.includes('quota')) {
         return NextResponse.json({ error: 'Sem créditos / billing na conta OpenAI' }, { status: 402 });
       }
     } else {
@@ -90,12 +103,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!b64) {
+    await refundCredits(userId, charged);
     return NextResponse.json({ error: `${provider} não retornou imagem` }, { status: 502 });
   }
 
   const buffer = Buffer.from(b64, 'base64');
   const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
-  const path = `${guard.userId}/carousel-images/${slideId}-${provider}-${Date.now()}.${ext}`;
+  const path = `${userId}/carousel-images/${slideId}-${provider}-${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('postflow-assets')
@@ -106,6 +120,7 @@ export async function POST(req: NextRequest) {
     });
 
   if (uploadError) {
+    await refundCredits(userId, charged);
     const raw = uploadError.message || '';
     if (/bucket.*not.*found/i.test(raw)) {
       return NextResponse.json({
@@ -119,6 +134,7 @@ export async function POST(req: NextRequest) {
   const { data: publicData } = supabase.storage.from('postflow-assets').getPublicUrl(path);
   const url = publicData?.publicUrl;
   if (!url) {
+    await refundCredits(userId, charged);
     return NextResponse.json({ error: 'Não foi possível obter URL pública' }, { status: 500 });
   }
 

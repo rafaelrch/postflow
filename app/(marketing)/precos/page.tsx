@@ -16,7 +16,7 @@ const FEATURES = [
   'Editor visual de carrosséis com export PNG/ZIP',
   'Cards de notícias e editorial',
   'Calendário de conteúdo',
-  'Imagens com IA (OpenAI e Nano Banana) sem custo de créditos',
+  'Imagens com IA (OpenAI gpt-image-2) — 5 créditos cada',
 ];
 
 export default function PrecosPage() {

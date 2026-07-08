@@ -83,7 +83,7 @@ export default async function ContaPage() {
               <span className="font-medium">{fmtDate(credits?.period_end ?? null)}</span>
             </div>
             <p className="text-xs text-[var(--ink-dim)]">
-              Carrossel custa 5 · Notícias e Threads custam 3. Legenda, imagem e refinar slide são grátis.
+              Carrossel custa 5 · Notícias e Threads custam 3 · Imagem com IA custa 5. Refinar slide é grátis.
               Os créditos recarregam todo mês; para mais, faça upgrade do plano.
             </p>
           </div>

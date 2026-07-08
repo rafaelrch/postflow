@@ -134,6 +134,7 @@ export interface Slide {
   highlights?: TextHighlight[];
   backgroundImageUrl?: string;
   gridImageUrl?: string;
+  backgroundImageOpacity?: number; // 0–100, default 100
   imageType: ImageType;
   imagePosition: ImagePosition;
   // Imagem de conteúdo — renderizada entre os textos (não é o fundo do slide)

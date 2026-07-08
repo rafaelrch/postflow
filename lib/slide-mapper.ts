@@ -30,6 +30,7 @@ export function mapDbSlideToSlide(sl: DbRow): Slide {
     imagePosition: (sl.image_position as Slide['imagePosition']) || { x: 50, y: 50, zoom: 175 },
     contentImageUrl: (sl.content_image_url as string) || '',
     contentImagePosition: (sl.content_image_position as Slide['contentImagePosition']) || undefined,
+    backgroundImageOpacity: (sl.background_image_opacity as number) ?? undefined,
     shadow: {
       style: ((sl.shadow_style as string) || 'base') as Slide['shadow']['style'],
       opacity: (sl.shadow_opacity as number) ?? 88,
@@ -78,6 +79,7 @@ export function mapSlideToDbRow(slide: Slide, carouselId: string, position: numb
     image_position: slide.imagePosition,
     content_image_url: slide.contentImageUrl ?? '',
     content_image_position: slide.contentImagePosition ?? null,
+    background_image_opacity: slide.backgroundImageOpacity ?? null,
     background_color: slide.backgroundColor,
     shadow_style: slide.shadow.style,
     shadow_opacity: slide.shadow.opacity,

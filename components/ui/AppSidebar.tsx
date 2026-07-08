@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
+import { useCreditsStore } from '@/hooks/useCreditsStore';
 
 type NavKind = 'primary' | 'new';
 
@@ -43,7 +44,8 @@ export default function AppSidebar() {
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [planLabel, setPlanLabel] = useState<string | null>(null);
-  const [credits, setCredits] = useState<number | null>(null);
+  const credits = useCreditsStore((s) => s.balance);
+  const fetchCredits = useCreditsStore((s) => s.fetch);
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -92,14 +94,7 @@ export default function AppSidebar() {
           if (active && data?.plan_interval) setPlanLabel(data.plan_interval === 'year' ? 'Anual' : 'Mensal');
         });
 
-      supabase
-        .from('user_credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .then(({ data }: { data: { balance: number | null } | null }) => {
-          if (active && typeof data?.balance === 'number') setCredits(data.balance);
-        });
+      fetchCredits();
     });
 
     return () => {
