@@ -15,6 +15,18 @@ const interTight = localFont({
   ],
 });
 
+const interDisplay = localFont({
+  variable: '--font-inter-display',
+  display: 'swap',
+  src: [
+    { path: './fonts/InterDisplay-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/InterDisplay-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/InterDisplay-600.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/InterDisplay-700.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/InterDisplay-800.woff2', weight: '800', style: 'normal' },
+  ],
+});
+
 const instrumentSerif = localFont({
   variable: '--font-instrument-serif',
   display: 'swap',
@@ -63,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body
-        className={`${interTight.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} antialiased`}
+        className={`${interTight.variable} ${interDisplay.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} antialiased`}
         style={{
           fontFamily:
             "var(--font-inter-tight), 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",

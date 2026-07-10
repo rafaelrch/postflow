@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion, useInView } from 'framer-motion';
+import { AnimatePresence, motion, useInView } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { startStripeCheckout } from '@/lib/start-checkout';
+import { ShootingStarsGrid } from '@/components/ui/shooting-stars-grid';
 import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2 } from 'lucide-react';
 
 /* ────────────────────────────────────────────────────────────────
@@ -23,13 +24,13 @@ const LP_CSS = `
     --lp-gray-2: #6E6E6A;
     --lp-band: #F6F6F5;
     --lp-line: #E8E8E6;
-    font-family: 'SF Pro Display', var(--font-inter-tight), 'Inter Tight', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--font-inter-display), 'Inter Display', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background: #fff;
     color: var(--lp-black);
     letter-spacing: -0.01em;
   }
   .lp ::selection { background: var(--lp-black); color: #fff; }
-  .lp-h { font-weight: 700; letter-spacing: -0.04em; line-height: 1.04; }
+  .lp-h { font-weight: 700; line-height: 1.04; }
   .lp-badge {
     display: inline-flex; align-items: center;
     font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
@@ -42,7 +43,7 @@ const LP_CSS = `
   .lp-btn {
     display: inline-flex; align-items: center; gap: 12px;
     font-size: 15px; font-weight: 600; line-height: 1;
-    border-radius: 999px; white-space: nowrap;
+    border-radius: 15px; white-space: nowrap;
     transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
   }
   .lp-btn.black {
@@ -52,6 +53,9 @@ const LP_CSS = `
   }
   .lp-btn.black:hover { transform: translate(2px, 2px); box-shadow: 0 0 0 2px #fff, 3px 3px 0 0 var(--lp-black); }
   .lp-btn.black:active { transform: translate(5px, 5px); box-shadow: 0 0 0 2px #fff, 0 0 0 0 var(--lp-black); }
+  .lp-btn.black.flat { border-radius: 999px; box-shadow: none; }
+  .lp-btn.black.flat:hover { transform: none; box-shadow: none; }
+  .lp-btn.black.flat:active { transform: none; box-shadow: none; }
   .lp-btn.light { background: #F2F2F0; color: var(--lp-black); padding: 17px 26px; }
   .lp-btn.light:hover { background: #EAEAE8; }
   .lp-btn.white {
@@ -65,6 +69,7 @@ const LP_CSS = `
   .lp-arrow { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; }
   .lp-arrow.on-black { background: rgba(255,255,255,0.16); color: #fff; }
   .lp-arrow.on-white { background: #EFEFED; color: var(--lp-black); }
+  .lp-arrow.solid { background: var(--lp-black); color: #fff; }
 
   @keyframes lp-marquee {
     from { transform: translateX(0); }
@@ -92,9 +97,10 @@ function FadeUp({ children, delay = 0, className = '' }: { children: React.React
   );
 }
 
-function ArrowChip({ dark = false }: { dark?: boolean }) {
+function ArrowChip({ dark = false, solid = false }: { dark?: boolean; solid?: boolean }) {
+  const variant = solid ? 'solid' : dark ? 'on-black' : 'on-white';
   return (
-    <span className={`lp-arrow ${dark ? 'on-black' : 'on-white'}`}>
+    <span className={`lp-arrow ${variant}`}>
       <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
     </span>
   );
@@ -141,23 +147,115 @@ function Nav() {
 
 /* ─── Hero ────────────────────────────────────────────────────── */
 
-const HERO_SLIDES = [
-  { label: 'NEWS CARD', title: 'IA muda o jogo do marketing em 2026' },
-  { label: 'CARROSSEL', title: '5 erros que travam seu crescimento no Instagram' },
-  { label: 'EDITORIAL', title: 'Rotina de conteúdo em 30 min por dia' },
-  { label: 'THREAD X', title: 'Ninguém te conta isso sobre consistência' },
-  { label: 'AGENDA', title: 'Seu mês inteiro planejado num calendário' },
-];
+const HERO_IMAGES = [1, 3].flatMap((c) =>
+  [1, 2, 3, 4, 5].map((s) => `/cards_para_hero/carrossel-${c}/carrossel-${c}---${s}.png`)
+);
+
+const HERO_ITEM_W = 230;
+const HERO_ITEM_H = 288;
+const HERO_GAP = 10;
+const HERO_MAIN_GAP = 3;
+const HERO_STEP = HERO_ITEM_W + HERO_GAP;
+const HERO_MAIN_SCALE = 1.34;
+const HERO_INTERVAL_MS = 3000;
+// Odd count, centered on the main card. Wide enough that cards mount/unmount
+// beyond the viewport edge — a freshly mounted card appears at its final slot
+// with no transition, so if that happened on-screen it would overlap the card
+// still sliding out of that slot (the "stacked cards" glitch).
+const HERO_WINDOW = 15;
+
+// Distance from center for a given slot: slot 0 is the main (scaled-up) card,
+// so its neighbors (±1) need extra room to keep a real gap instead of
+// overlapping into the bigger card; farther slots then space out normally.
+function heroSlotX(slot: number) {
+  if (slot === 0) return 0;
+  const mainHalf = (HERO_ITEM_W * HERO_MAIN_SCALE) / 2;
+  const baseHalf = HERO_ITEM_W / 2;
+  const firstNeighbor = mainHalf + HERO_MAIN_GAP + baseHalf;
+  const dist = firstNeighbor + (Math.abs(slot) - 1) * HERO_STEP;
+  return slot > 0 ? dist : -dist;
+}
+
+function HeroCarousel() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setStep((s) => s + 1), HERO_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const n = HERO_IMAGES.length;
+  const half = Math.floor(HERO_WINDOW / 2);
+
+  const renderedItems = Array.from({ length: HERO_WINDOW }, (_, idx) => {
+    const k = step - half + idx;
+    const imgIndex = ((k % n) + n) % n;
+    return { k, src: HERO_IMAGES[imgIndex] };
+  });
+
+  // Edge fade measured in px from the center, not % of the viewport: stays
+  // fully opaque through the two side cards (±1), then fades out across the
+  // first half of the ±2 cards — main + 2 whole cards + 2 half cards visible.
+  const maskSolid = heroSlotX(1) + HERO_ITEM_W / 2;
+  const maskEnd = heroSlotX(2) + HERO_ITEM_W * 0.34;
+  const heroMask = `linear-gradient(90deg, transparent calc(50% - ${maskEnd}px), #000 calc(50% - ${maskSolid}px), #000 calc(50% + ${maskSolid}px), transparent calc(50% + ${maskEnd}px))`;
+
+  return (
+    <div className="relative w-full overflow-x-hidden" style={{ height: HERO_ITEM_H * HERO_MAIN_SCALE + 256 }}>
+      <div
+        className="absolute inset-0"
+        style={{
+          maskImage: heroMask,
+          WebkitMaskImage: heroMask,
+        }}
+      >
+        {renderedItems.map((item) => {
+          // Content advances right → left: as `step` grows, each card's slot
+          // decreases, so the current main card (slot 0) drifts left and the
+          // next one (slot +1) slides in from the right to take its place.
+          const slot = item.k - step;
+          const isMain = slot === 0;
+          const scale = isMain ? HERO_MAIN_SCALE : 1;
+          return (
+            <div
+              key={item.k}
+              className="absolute top-1/2 left-1/2 rounded-[20px] overflow-hidden"
+              style={{
+                width: HERO_ITEM_W,
+                height: HERO_ITEM_H,
+                marginTop: -HERO_ITEM_H / 2,
+                marginLeft: -HERO_ITEM_W / 2,
+                transform: `translateX(${heroSlotX(slot)}px) scale(${scale})`,
+                transition: 'transform 900ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 900ms cubic-bezier(0.22, 1, 0.36, 1)',
+                zIndex: isMain ? 20 : 10,
+                background: '#0B0B0B',
+                border: '4px solid #161616',
+                boxShadow: isMain
+                  ? '0 32px 70px -20px rgba(0,0,0,0.55)'
+                  : '0 14px 28px -14px rgba(0,0,0,0.25)',
+              }}
+            >
+              <Image src={item.src} alt="" fill sizes="310px" className="object-cover" />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-white pt-40 pb-0">
+    <ShootingStarsGrid
+      className="min-h-0 rounded-none border-0 shadow-none"
+      contentClassName="block min-h-0 px-0 py-0 sm:px-0 pt-32 md:pt-36 pb-14"
+    >
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
         <motion.h1
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-          className="lp-h"
+          className="lp-h tracking-tighter"
           style={{ fontSize: 'clamp(38px, 5.4vw, 64px)' }}
         >
           <span style={{ color: 'var(--lp-gray)' }}>Seu conteúdo do Instagram</span>
@@ -204,39 +302,11 @@ function Hero() {
         initial={{ opacity: 0, y: 48 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.55 }}
-        className="relative mt-16 md:mt-20 flex items-start justify-center gap-5 md:gap-8 px-4"
+        className="relative mt-4 md:mt-6"
       >
-        {HERO_SLIDES.map((s, i) => {
-          const center = i === 2 || i === 1 || i === 3;
-          const isMain = i === 2;
-          return (
-            <div
-              key={i}
-              className={`relative shrink-0 rounded-[24px] md:rounded-[32px] overflow-hidden ${i === 0 || i === 4 ? 'hidden lg:block' : ''} ${i === 1 || i === 3 ? 'hidden sm:block' : ''}`}
-              style={{
-                width: isMain ? 340 : 280,
-                height: isMain ? 430 : 350,
-                marginTop: isMain ? 0 : 44,
-                background: '#0B0B0B',
-                border: '6px solid #161616',
-                boxShadow: '0 30px 60px -30px rgba(0,0,0,0.45)',
-                maskImage: i === 0 ? 'linear-gradient(90deg, transparent 0%, #000 55%)' : i === 4 ? 'linear-gradient(90deg, #000 45%, transparent 100%)' : undefined,
-                WebkitMaskImage: i === 0 ? 'linear-gradient(90deg, transparent 0%, #000 55%)' : i === 4 ? 'linear-gradient(90deg, #000 45%, transparent 100%)' : undefined,
-              }}
-            >
-              <div className="w-full h-full p-6 flex flex-col justify-between text-left">
-                <span className="text-[10px] font-semibold tracking-[0.22em] uppercase" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                  {s.label}
-                </span>
-                <p className="lp-h text-white" style={{ fontSize: isMain ? 26 : 20, lineHeight: 1.12 }}>{s.title}</p>
-                <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>@orafaelrocha_</span>
-              </div>
-              {center && !isMain && <div className="absolute inset-0" style={{ background: 'rgba(255,255,255,0.04)' }} />}
-            </div>
-          );
-        })}
+        <HeroCarousel />
       </motion.div>
-    </section>
+    </ShootingStarsGrid>
   );
 }
 
@@ -263,7 +333,7 @@ function Truth() {
 
         <FadeUp delay={0.12}>
           <span className="lp-badge" style={{ background: '#fff', color: 'var(--lp-black)' }}>A verdade que ninguém te conta</span>
-          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(32px, 4vw, 48px)' }}>
+          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(32px, 4vw, 48px)' }}>
             Aqui está a verdade <span style={{ color: 'var(--lp-gray)' }}>brutal</span>
             <br className="hidden md:block" /> sobre o Instagram em 2026
           </h2>
@@ -281,7 +351,7 @@ function Truth() {
               sua mão: <b style={{ color: 'var(--lp-black)' }}>velocidade + consistência</b>, sem depender de inspiração.
             </p>
           </div>
-          <a href="#planos" className="lp-btn black mt-8">
+          <a href="#planos" className="lp-btn black flat mt-8">
             Quero parar de perder tempo <ArrowChip dark />
           </a>
         </FadeUp>
@@ -309,11 +379,11 @@ const STEPS = [
 
 function HowItWorks() {
   return (
-    <section id="como-funciona" className="py-24 md:py-32 px-6 bg-white">
+    <section id="como-funciona" className="py-16 md:py-24 px-6 bg-white">
       <div className="max-w-5xl mx-auto text-center">
         <FadeUp>
           <span className="lp-badge outline">Em 3 passos</span>
-          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>Tão simples que parece mágica</h2>
+          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>Tão simples que parece mágica</h2>
           <p className="mt-4 text-[17px]" style={{ color: 'var(--lp-gray)' }}>3 passos. Poucos minutos. Post pronto pra publicar.</p>
         </FadeUp>
 
@@ -341,7 +411,7 @@ function HowItWorks() {
         </div>
 
         <FadeUp delay={0.2} className="mt-14">
-          <a href="#planos" className="lp-btn black">
+          <a href="#planos" className="lp-btn black flat">
             Quero criar meu carrossel <ArrowChip dark />
           </a>
         </FadeUp>
@@ -540,11 +610,11 @@ function Features() {
   const f = FEATURES[active];
 
   return (
-    <section id="recursos" className="py-24 md:py-32 px-6 bg-white">
+    <section id="recursos" className="py-16 md:py-24 px-6 bg-white">
       <div className="max-w-6xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge outline">Vários recursos exclusivos</span>
-          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
             Tudo que você precisa pra
             <br />
             <span style={{ color: 'var(--lp-gray)' }}>crescer no Instagram</span>
@@ -565,14 +635,18 @@ function Features() {
                 key={feat.tab}
                 type="button"
                 onClick={() => setActive(i)}
-                className="px-4 md:px-5 py-2.5 rounded-full text-[11.5px] md:text-[12.5px] font-semibold uppercase tracking-[0.04em] transition-colors"
-                style={
-                  i === active
-                    ? { background: 'var(--lp-black)', color: '#fff' }
-                    : { color: 'var(--lp-gray-2)' }
-                }
+                className="relative px-4 md:px-5 py-2.5 rounded-full text-[11.5px] md:text-[12.5px] font-semibold uppercase tracking-[0.04em]"
+                style={{ color: i === active ? '#fff' : 'var(--lp-gray-2)', transition: 'color 250ms ease' }}
               >
-                {feat.tab}
+                {i === active && (
+                  <motion.span
+                    layoutId="feature-tab-pill"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: 'var(--lp-black)' }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <span className="relative z-10">{feat.tab}</span>
               </button>
             ))}
           </div>
@@ -625,9 +699,12 @@ const MARQUEE_ITEMS = [
 ];
 
 function Marquee() {
-  const items = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+  // The keyframe slides the track by -50%, so the track must hold an even
+  // number of item sets AND its half-width must exceed the widest viewport —
+  // otherwise the strip runs out of content and the right side shows blank.
+  const items = Array.from({ length: 8 }, () => MARQUEE_ITEMS).flat();
   return (
-    <section className="lp-marquee py-16 overflow-hidden" style={{ background: 'var(--lp-band)' }}>
+    <section className="lp-marquee py-4 overflow-hidden bg-[#F7F7F7]">
       <div
         className="lp-marquee-track"
         style={{
@@ -636,9 +713,9 @@ function Marquee() {
         }}
       >
         {items.map((item, i) => (
-          <div key={i} className="flex flex-col items-center gap-3 mx-8 shrink-0">
+          <div key={i} className="flex flex-col items-center gap-2 mx-2 shrink-0">
             <div
-              className="w-28 h-28 rounded-full grid place-items-center text-[40px] bg-white"
+              className="w-20 h-20 rounded-full grid place-items-center text-[40px] bg-white"
               style={{ border: `3px solid ${item.ring}` }}
             >
               {item.emoji}
@@ -655,11 +732,11 @@ function Marquee() {
 
 function Results() {
   return (
-    <section className="py-24 md:py-32 px-6 bg-white">
+    <section className="py-16 md:py-24 px-6 bg-white">
       <div className="max-w-6xl mx-auto text-center">
         <FadeUp>
           <span className="lp-badge soft">Resultados reais</span>
-          <h2 className="lp-h mt-6 max-w-3xl mx-auto" style={{ fontSize: 'clamp(30px, 3.8vw, 48px)' }}>
+          <h2 className="lp-h tracking-tighter mt-6 max-w-3xl mx-auto" style={{ fontSize: 'clamp(30px, 3.8vw, 48px)' }}>
             Veja o tipo de post que você vai criar <span style={{ color: 'var(--lp-gray)' }}>com o Creatools</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
@@ -723,10 +800,10 @@ function Results() {
 /* ─── Faça as contas ──────────────────────────────────────────── */
 
 const COSTS = [
-  { icon: '🎨', name: 'Canva Pro (design)', price: 'R$ 49,90/mês' },
-  { icon: '🤖', name: 'ChatGPT Plus (textos e ideias)', price: 'R$ 99,00/mês' },
-  { icon: '✦', name: 'Google Gemini (IA de imagem)', price: 'R$ 79,00/mês' },
-  { icon: 'Ps', name: 'Photoshop (editor profissional)', price: 'R$ 89,00/mês' },
+  { logo: '/canva_logo.png', name: 'Canva Pro (design)', price: 'R$ 49,90/mês' },
+  { logo: '/openai_logo.png', name: 'ChatGPT Plus (textos e ideias)', price: 'R$ 99,00/mês' },
+  { logo: '/gemini_logo.png', name: 'Google Gemini (IA de imagem)', price: 'R$ 79,00/mês' },
+  { logo: '/ps_logo.png', name: 'Photoshop (editor profissional)', price: 'R$ 89,00/mês' },
   { icon: '🧑‍🎨', name: 'Designer Freelancer (layout)', price: 'R$ 250/mês' },
   { icon: '✍️', name: 'Copywriter Freelancer (roteiros)', price: 'R$ 85/mês' },
 ];
@@ -737,7 +814,7 @@ function DoTheMath() {
       <div className="max-w-3xl mx-auto text-center">
         <FadeUp>
           <span className="lp-badge on-dark">Faça as contas</span>
-          <h2 className="lp-h mt-6 text-white" style={{ fontSize: 'clamp(32px, 4.2vw, 52px)' }}>
+          <h2 className="lp-h tracking-tighter mt-6 text-white" style={{ fontSize: 'clamp(32px, 4.2vw, 52px)' }}>
             Quanto você pagaria <span style={{ color: '#6E6E6A' }}>separado</span>
             <br /> por tudo isso?
           </h2>
@@ -752,12 +829,18 @@ function DoTheMath() {
                 style={{ borderBottom: i < COSTS.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
               >
                 <div className="flex items-center gap-4 text-left">
-                  <span
-                    className="w-10 h-10 rounded-xl grid place-items-center text-[16px] font-bold shrink-0"
-                    style={{ background: '#1E1E1D', color: '#fff' }}
-                  >
-                    {c.icon}
-                  </span>
+                  {c.logo ? (
+                    <span className="w-10 h-10 rounded-xl grid place-items-center shrink-0 p-2" style={{ background: '#1E1E1D' }}>
+                      <Image src={c.logo} alt="" width={24} height={24} className="w-full h-full object-contain" />
+                    </span>
+                  ) : (
+                    <span
+                      className="w-10 h-10 rounded-xl grid place-items-center text-[16px] font-bold shrink-0"
+                      style={{ background: '#1E1E1D', color: '#fff' }}
+                    >
+                      {c.icon}
+                    </span>
+                  )}
                   <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.85)' }}>{c.name}</span>
                 </div>
                 <span className="text-[14px] line-through shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{c.price}</span>
@@ -777,7 +860,7 @@ function DoTheMath() {
                 No Creatools, tudo está reunido por menos de 10% desse valor.
               </p>
             </div>
-            <a href="#planos" className="lp-btn white shrink-0">
+            <a href="#planos" className="lp-btn white shrink-0 !rounded-full">
               Ver planos <ArrowChip />
             </a>
           </div>
@@ -813,11 +896,11 @@ function Pricing() {
   }
 
   return (
-    <section id="planos" className="py-24 md:py-32 px-6 bg-white">
+    <section id="planos" className="py-12 md:py-16 px-6 bg-white">
       <div className="max-w-5xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge soft">Comece agora</span>
-          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
             Escolha a melhor opção
             <br />
             <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
@@ -859,7 +942,7 @@ function Pricing() {
                 type="button"
                 onClick={() => handleSubscribe('month')}
                 disabled={loadingInterval !== null}
-                className="lp-btn white w-full justify-between mt-8 !bg-white"
+                className="lp-btn white w-full justify-between mt-8 !bg-white !rounded-full"
               >
                 {loadingInterval === 'month' ? 'Abrindo checkout…' : 'Assinar Plano Mensal'} <ArrowChip />
               </button>
@@ -904,9 +987,9 @@ function Pricing() {
                 type="button"
                 onClick={() => handleSubscribe('year')}
                 disabled={loadingInterval !== null}
-                className="lp-btn white w-full justify-between mt-8"
+                className="lp-btn white w-full justify-between mt-8 !rounded-full"
               >
-                {loadingInterval === 'year' ? 'Abrindo checkout…' : 'Assinar Plano Anual'} <ArrowChip />
+                {loadingInterval === 'year' ? 'Abrindo checkout…' : 'Assinar Plano Anual'} <ArrowChip solid />
               </button>
             </div>
           </FadeUp>
@@ -960,14 +1043,14 @@ const FAQS = [
 ];
 
 function Faq() {
-  const [open, setOpen] = useState<number | null>(1);
+  const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="py-24 md:py-32 px-6 bg-white">
+    <section id="faq" className="py-16 md:pb-24 px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge soft">FAQ</span>
-          <h2 className="lp-h mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
             Perguntas <span style={{ color: 'var(--lp-gray)' }}>frequentes</span>
           </h2>
         </FadeUp>
@@ -984,7 +1067,7 @@ function Faq() {
                   <button
                     type="button"
                     onClick={() => setOpen(isOpen ? null : i)}
-                    className="w-full flex items-center justify-between gap-4 px-7 py-5 text-left"
+                    className="w-full flex items-center justify-between gap-4 px-7 py-4 text-left"
                   >
                     <span className="text-[16px] font-semibold tracking-tight">{item.q}</span>
                     <span
@@ -994,11 +1077,22 @@ function Faq() {
                       {isOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                     </span>
                   </button>
-                  {isOpen && (
-                    <p className="px-7 pb-6 text-[14.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
-                      {item.a}
-                    </p>
-                  )}
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        key="content"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <p className="px-7 pb-5 text-[14.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
+                          {item.a}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </FadeUp>
             );
@@ -1013,10 +1107,10 @@ function Faq() {
 
 function FinalCTA() {
   return (
-    <section className="py-24 md:py-32 px-6 text-center" style={{ background: 'var(--lp-band)' }}>
+    <section className="pb-24 md:pb-32 px-6 text-center bg-white">
       <FadeUp>
-        <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={56} height={56} className="mx-auto object-contain" />
-        <h2 className="lp-h mt-8" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+        <Image src="/ICON_SEMFUNDO.png" alt="Creatools" width={129} height={129} className="mx-auto object-contain" />
+        <h2 className="lp-h tracking-tighter" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
           Comece a publicar com
           <br />
           <span style={{ color: 'var(--lp-gray)' }}>consistência de verdade</span>
@@ -1025,7 +1119,7 @@ function FinalCTA() {
           Escolha o plano, a IA já está ativa. Em minutos você tem o primeiro carrossel pronto.
         </p>
         <div className="mt-9">
-          <a href="#planos" className="lp-btn black">
+          <a href="#planos" className="lp-btn black flat">
             Ver planos e assinar <ArrowChip dark />
           </a>
         </div>
@@ -1059,23 +1153,24 @@ const FOOTER_COLS = [
 
 function Footer() {
   return (
-    <footer className="px-4 pb-4" style={{ background: 'var(--lp-band)' }}>
-      <div className="relative max-w-6xl mx-auto overflow-hidden rounded-[36px] pt-2 pb-16" style={{ background: '#EFEFED' }}>
+    <footer className="relative overflow-hidden p-16" style={{ background: 'var(--lp-band)' }}>
         {/* Watermark */}
         <span
           aria-hidden
-          className="absolute left-1/2 -translate-x-1/2 bottom-[-6vw] font-bold select-none pointer-events-none"
-          style={{ fontSize: '17vw', letterSpacing: '-0.05em', color: '#E3E3E0', lineHeight: 1 }}
+          className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/3 font-bold select-none pointer-events-none whitespace-nowrap"
+          style={{ fontSize: '27vw', letterSpacing: '-0.05em', color: '#DEDEDA', lineHeight: 1 }}
         >
           creatools
         </span>
 
-        <div className="relative z-10 mx-4 mt-4 rounded-[28px] bg-white p-8 md:p-12">
+        <div
+          className="relative z-10 max-w-5xl mx-auto rounded-[32px] bg-white p-8 md:p-12 border border-[#CCCCCC]"
+          style={{ boxShadow: '0 24px 80px -24px rgba(0,0,0,0.27)' }}
+        >
           <div className="grid md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-10">
             <div>
               <div className="flex items-center gap-2.5">
-                <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={28} height={28} className="object-contain" />
-                <span className="font-bold text-[17px] tracking-tight">creatools</span>
+                <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={134} height={134} className="object-contain" />
               </div>
               <p className="mt-3 text-[14px] leading-relaxed max-w-[220px]" style={{ color: 'var(--lp-gray)' }}>
                 IA para creators que levam conteúdo a sério.
@@ -1100,7 +1195,6 @@ function Footer() {
             <p className="text-[13px]" style={{ color: 'var(--lp-gray)' }}>© 2026 Creatools. Todos os direitos reservados.</p>
           </div>
         </div>
-      </div>
     </footer>
   );
 }
