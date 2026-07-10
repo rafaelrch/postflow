@@ -247,8 +247,9 @@ function HeroCarousel() {
 function Hero() {
   return (
     <ShootingStarsGrid
-      className="min-h-0 rounded-none border-0 shadow-none"
+      className="min-h-0 rounded-none border-0 shadow-none !bg-none !bg-white"
       contentClassName="block min-h-0 px-0 py-0 sm:px-0 pt-32 md:pt-36 pb-14"
+      glow={false}
     >
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
         <motion.h1
@@ -270,7 +271,7 @@ function Hero() {
           className="mt-6 text-[17px] md:text-[19px] leading-relaxed max-w-2xl mx-auto"
           style={{ color: 'var(--lp-gray)' }}
         >
-          Carrosséis, news cards e agenda num único estúdio de IA. Ela escreve, desenha e organiza — você só aprova.{' '}
+          Carrosséis, news cards e agenda num único estúdio de IA. Ela escreve, desenha e organiza. Você só aprova.{' '}
           <b style={{ color: 'var(--lp-black)' }}>Sem Canva. Sem designer. Sem bloqueio criativo.</b>
         </motion.p>
 
@@ -344,7 +345,7 @@ function Truth() {
             </p>
             <p>
               Mas tem uma segunda verdade que quase ninguém fala: <b style={{ color: 'var(--lp-black)' }}>frequência vence perfeição</b>. Enquanto você
-              passa 3 horas no Canva polindo um único post, seu concorrente publica o assunto do momento primeiro — e leva o alcance que era seu.
+              passa 3 horas no Canva polindo um único post, seu concorrente publica o assunto do momento primeiro e leva o alcance que era seu.
             </p>
             <p>
               Quem cresce não é quem posta mais bonito. É quem publica rápido, todo dia, com padrão visual. É exatamente isso que o Creatools coloca na
@@ -365,7 +366,7 @@ function Truth() {
 const STEPS = [
   {
     title: 'Diga o tema',
-    desc: 'Digite uma frase simples — “5 erros de quem começa a treinar” — e escolha o estilo: editorial, minimalista ou thread do X.',
+    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o estilo: editorial, minimalista ou thread do X.',
   },
   {
     title: 'A IA monta tudo',
@@ -535,7 +536,7 @@ const FEATURES: Feature[] = [
     tab: 'Carrossel',
     tag: 'O carro-chefe',
     title: (<>Carrosséis completos <span style={{ color: '#8B8B87' }}>a partir de uma frase</span></>),
-    body: 'Você digita o tema, a IA escreve título, subtítulo e o texto de cada slide — com gancho de abertura e CTA de fechamento. Tudo editável num editor visual, slide por slide.',
+    body: 'Você digita o tema, a IA escreve título, subtítulo e o texto de cada slide, com gancho de abertura e CTA de fechamento. Tudo editável num editor visual, slide por slide.',
     bullets: [
       '3 estilos prontos: Editorial, Minimalista e Thread do X',
       'Gancho, desenvolvimento e CTA escritos pela IA',
@@ -547,7 +548,7 @@ const FEATURES: Feature[] = [
     tab: 'Notícias',
     tag: 'Poste o assunto do momento',
     title: (<>Transforme notícias em posts <span style={{ color: '#8B8B87' }}>antes de todo mundo</span></>),
-    body: 'Notícia quente do seu nicho vira news card pronto pra publicar em segundos. Formato jornalístico que passa autoridade — e pega o alcance de quem publica primeiro.',
+    body: 'Notícia quente do seu nicho vira news card pronto pra publicar em segundos. Formato jornalístico que passa autoridade e pega o alcance de quem publica primeiro.',
     bullets: [
       'Card no formato ideal do feed (1080×1350)',
       'Manchete, resumo e imagem montados pela IA',
@@ -559,7 +560,7 @@ const FEATURES: Feature[] = [
     tab: 'Templates',
     tag: 'Escala com padrão',
     title: (<>Estilos prontos, <span style={{ color: '#8B8B87' }}>identidade sempre igual</span></>),
-    body: 'Escolha entre os estilos do Creatools e 7 combinações profissionais de tipografia. Todo post sai com a mesma cara — consistência visual de quem está crescendo de verdade.',
+    body: 'Escolha entre os estilos do Creatools e 7 combinações profissionais de tipografia. Todo post sai com a mesma cara: consistência visual de quem está crescendo de verdade.',
     bullets: [
       'Editorial, Minimalista e formato thread do X',
       '7 pares de fontes calibrados por designers',
@@ -583,7 +584,7 @@ const FEATURES: Feature[] = [
     tab: 'Paleta de cor',
     tag: 'Branding automático',
     title: (<>As cores da sua marca <span style={{ color: '#8B8B87' }}>em todos os posts</span></>),
-    body: 'Defina a paleta da sua marca uma única vez. Todos os carrosséis gerados já saem com as suas cores — sem retrabalho, sem post fora da identidade.',
+    body: 'Defina a paleta da sua marca uma única vez. Todos os carrosséis gerados já saem com as suas cores, sem retrabalho e sem post fora da identidade.',
     bullets: [
       'Paleta salva no seu perfil',
       'Aplicada automaticamente em cada geração',
@@ -594,7 +595,7 @@ const FEATURES: Feature[] = [
   {
     tab: 'Imagens com IA',
     tag: 'Sem banco de imagem genérico',
-    title: (<>Imagens geradas por IA — <span style={{ color: '#8B8B87' }}>sob medida pro seu slide</span></>),
+    title: (<>Imagens geradas por IA <span style={{ color: '#8B8B87' }}>sob medida pro seu slide</span></>),
     body: 'Gere imagens exclusivas pros seus slides com o gpt-image-2, o modelo de imagem mais recente da OpenAI. Cada imagem custa 5 créditos do seu plano.',
     bullets: [
       'Motor de imagem OpenAI gpt-image-2',
@@ -740,7 +741,7 @@ function Results() {
             Veja o tipo de post que você vai criar <span style={{ color: 'var(--lp-gray)' }}>com o Creatools</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
-            Carrosséis e news cards gerados dentro da plataforma — sem Canva, sem Photoshop, sem designer.
+            Carrosséis e news cards gerados dentro da plataforma. Sem Canva, sem Photoshop, sem designer.
           </p>
         </FadeUp>
 
@@ -876,7 +877,7 @@ const PLAN_FEATURES = [
   'Carrosséis completos com IA (texto + layout + design)',
   '3 estilos: Editorial, Minimalista e Thread do X',
   'News cards: notícia vira post em segundos',
-  'Imagens com IA (OpenAI gpt-image-2) — 5 créditos cada',
+  'Imagens com IA (OpenAI gpt-image-2): 5 créditos cada',
   'Editor visual slide a slide',
   'Agenda de conteúdo',
   'Export Full HD (PNG e ZIP)',
@@ -968,7 +969,7 @@ function Pricing() {
                 <span className="ml-2 text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>/ano</span>
               </div>
               <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                Equivale a ~R$41,58/mês — economize ~30%.
+                Equivale a ~R$41,58/mês. Economize ~30%.
                 <br />O plano mais escolhido.
               </p>
               <div className="mt-6 -mx-8 px-8 py-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
@@ -997,7 +998,7 @@ function Pricing() {
 
         <FadeUp delay={0.15}>
           <p className="mt-12 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
-            Precisa de ajuda? Fale com nosso suporte — respondemos rápido.
+            Precisa de ajuda? Fale com nosso suporte. Respondemos rápido.
           </p>
         </FadeUp>
       </div>
@@ -1010,7 +1011,7 @@ function Pricing() {
 const FAQS = [
   {
     q: 'Preciso saber design?',
-    a: 'Não. A IA escreve o texto, escolhe o layout e aplica as cores da sua marca. Você só digita o tema — e, se quiser, ajusta qualquer detalhe no editor visual antes de exportar.',
+    a: 'Não. A IA escreve o texto, escolhe o layout e aplica as cores da sua marca. Você só digita o tema e, se quiser, ajusta qualquer detalhe no editor visual antes de exportar.',
   },
   {
     q: 'Como funcionam os créditos?',
@@ -1022,19 +1023,19 @@ const FAQS = [
   },
   {
     q: 'Funciona para qualquer nicho?',
-    a: 'Sim. Marketing, fitness, nutrição, finanças, moda, educação, coaching — você define o tema e o tom, e a IA adapta o conteúdo ao seu nicho.',
+    a: 'Sim. Marketing, fitness, nutrição, finanças, moda, educação, coaching: você define o tema e o tom, e a IA adapta o conteúdo ao seu nicho.',
   },
   {
     q: 'O Creatools publica automaticamente no Instagram?',
-    a: 'O Creatools cria, organiza e agenda seus posts no calendário. A publicação você faz direto no Instagram com o arquivo exportado em Full HD — sem conectar sua conta a ferramentas de terceiros, sem risco pro seu perfil.',
+    a: 'O Creatools cria, organiza e agenda seus posts no calendário. A publicação você faz direto no Instagram com o arquivo exportado em Full HD, sem conectar sua conta a ferramentas de terceiros e sem risco pro seu perfil.',
   },
   {
     q: 'Como funciona a geração de imagens com IA?',
-    a: 'Cada imagem é gerada sob medida pro seu slide com o gpt-image-2 da OpenAI e custa 5 créditos do seu plano — o mesmo saldo que carrossel e news card usam.',
+    a: 'Cada imagem é gerada sob medida pro seu slide com o gpt-image-2 da OpenAI e custa 5 créditos do seu plano, o mesmo saldo que carrossel e news card usam.',
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',
-    a: 'Você gerencia tudo pelo portal de assinatura dentro da plataforma — trocar de plano, atualizar cartão ou cancelar. E nosso suporte responde rápido pra qualquer dúvida.',
+    a: 'Você gerencia tudo pelo portal de assinatura dentro da plataforma: trocar de plano, atualizar cartão ou cancelar. E nosso suporte responde rápido pra qualquer dúvida.',
   },
   {
     q: 'Posso cancelar quando quiser?',

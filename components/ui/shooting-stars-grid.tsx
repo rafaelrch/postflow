@@ -55,14 +55,22 @@ function seeded(index: number, salt: number) {
   return value - Math.floor(value);
 }
 
+// Values that land in the DOM (style attrs) must round-trip identically through
+// SSR and client render: the server serializes numbers at ~6 significant digits
+// while the client keeps full float precision, so raw seeded() output causes
+// hydration mismatches. Keeping ≤3 decimals makes both sides format the same.
+function round3(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
 function createStaticStars(count: number): StaticStar[] {
   return Array.from({ length: count }, (_, index) => ({
-    x: seeded(index, 1) * 100,
-    y: seeded(index, 2) * 100,
-    size: 1 + seeded(index, 3) * 2.4,
-    opacity: 0.16 + seeded(index, 4) * 0.44,
-    delay: seeded(index, 5) * 4,
-    duration: 2.4 + seeded(index, 6) * 3.2,
+    x: round3(seeded(index, 1) * 100),
+    y: round3(seeded(index, 2) * 100),
+    size: round3(1 + seeded(index, 3) * 2.4),
+    opacity: round3(0.16 + seeded(index, 4) * 0.44),
+    delay: round3(seeded(index, 5) * 4),
+    duration: round3(2.4 + seeded(index, 6) * 3.2),
   }));
 }
 
@@ -80,10 +88,10 @@ function createShootingStars(count: number): ShootingStar[] {
       line: lanes[index % lanes.length],
       start: direction === 1 ? "-18%" : "112%",
       end: direction === 1 ? "112%" : "-18%",
-      length: 86 + seeded(index, 15) * 132,
-      delay: seeded(index, 16) * 7 + index * 0.65,
-      duration: 1.65 + seeded(index, 17) * 1.6,
-      repeatDelay: 4.8 + seeded(index, 18) * 6.2,
+      length: round3(86 + seeded(index, 15) * 132),
+      delay: round3(seeded(index, 16) * 7 + index * 0.65),
+      duration: round3(1.65 + seeded(index, 17) * 1.6),
+      repeatDelay: round3(4.8 + seeded(index, 18) * 6.2),
       direction,
     };
   });
