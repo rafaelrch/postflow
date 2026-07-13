@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useEditorStore } from '@/hooks/useEditorStore';
+import { normalizeHandle } from '@/lib/utils';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
@@ -16,7 +17,7 @@ export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',
     name: globalSettings.profileBadge.name || 'Seu Nome',
-    handle: globalSettings.profileBadge.handle || '@handle',
+    handle: normalizeHandle(globalSettings.profileBadge.handle) || '@handle',
   };
 
   return (

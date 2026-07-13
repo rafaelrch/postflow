@@ -8,11 +8,11 @@ import {
   Upload, Plus, Trash2, FileJson,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import { cn, normalizeHandle } from '@/lib/utils';
 import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData, TextPosition } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
-import { useCreditsStore } from '@/hooks/useCreditsStore';
+import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import toast from 'react-hot-toast';
 
 interface CreateWizardProps {
@@ -193,7 +193,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     handle: '',
     name: '',
     photoUrl: '',
-    followers: '',
   });
   // Manual slides
   const [manualSlides, setManualSlides] = useState<ManualSlide[]>(makeDefaultManualSlides(6));
@@ -261,6 +260,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     // Twitter/X tem fonte única — ignora qualquer fontPair escolhido antes de
     // trocar o estilo para 'profile'.
     const effectiveFontPair: FontPair = style === 'profile' ? 'SF Pro Display + IvyOra Text' : fontPair;
+    const effectiveProfile: ProfileData = { ...profileData, handle: normalizeHandle(profileData.handle) };
     try {
       let slides: { title: string; description: string; highlightWord: string; backgroundColor: string; imageUrl?: string }[];
       let jsonCarouselTitle: string | undefined;
@@ -278,12 +278,13 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             generateImages: false,
             fontPair: effectiveFontPair,
             accentColor,
-            profileData: style === 'profile' ? profileData : undefined,
+            profileData: style === 'profile' ? effectiveProfile : undefined,
             twitterFormat: style === 'profile' ? twitterFormat : undefined,
           }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
+          if (handleInsufficientCredits(err)) return; // popup global avisa a recarga
           throw new Error(err.error || 'Falha na geração com IA');
         }
         const data = await res.json();
@@ -316,9 +317,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           profileBadge: {
             ...DEFAULT_GLOBAL_SETTINGS.profileBadge,
             show: true,
-            name: profileData.name,
-            handle: profileData.handle,
-            photo: profileData.photoUrl || '',
+            name: effectiveProfile.name,
+            handle: effectiveProfile.handle,
+            photo: effectiveProfile.photoUrl || '',
           },
         } : {}),
       };
@@ -848,7 +849,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
               </div>
               <input className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30" placeholder="Nome de exibição" value={profileData.name} onChange={(e) => setProfileData(p => ({ ...p, name: e.target.value }))} />
               <input className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30" placeholder="@handle" value={profileData.handle} onChange={(e) => setProfileData(p => ({ ...p, handle: e.target.value }))} />
-              <input className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30" placeholder="Seguidores — ex: 12,5 mil" value={profileData.followers || ''} onChange={(e) => setProfileData(p => ({ ...p, followers: e.target.value }))} />
             </div>
           )}
         </div>

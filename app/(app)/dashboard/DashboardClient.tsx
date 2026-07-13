@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { SlideStyle } from '@/types';
 import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
+import { normalizeHandle } from '@/lib/utils';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import type { DashboardCarousel } from './page';
@@ -48,7 +49,7 @@ function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
             <ProfileSlide
               slide={slide}
               globalSettings={globalSettings}
-              profileData={{ photo: globalSettings.profileBadge.photo || '', name: globalSettings.profileBadge.name || '', handle: globalSettings.profileBadge.handle || '' }}
+              profileData={{ photo: globalSettings.profileBadge.photo || '', name: globalSettings.profileBadge.name || '', handle: normalizeHandle(globalSettings.profileBadge.handle) }}
               slideIndex={0}
               totalSlides={carousel.slides?.[0]?.count ?? 1}
             />

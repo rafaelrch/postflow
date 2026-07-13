@@ -15,15 +15,39 @@ export function useExport() {
   }, []);
 
   const captureSlide = useCallback(async (el: HTMLDivElement): Promise<HTMLCanvasElement> => {
-    const { default: html2canvas } = await import('html2canvas');
-    return html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      width: 1080,
-      height: 1350,
-      backgroundColor: null,
-    });
+    // html-to-image rasteriza via SVG foreignObject — o próprio browser desenha,
+    // então o PNG sai idêntico ao preview (html2canvas desloca texto de fontes
+    // customizadas alguns px para baixo). html2canvas fica como fallback.
+    try {
+      const { toCanvas } = await import('html-to-image');
+      // fontEmbedCSS pré-computado: evita que a lib escaneie document.styleSheets
+      // (SecurityError em folhas cross-origin) e reusa as fontes entre slides.
+      let fontEmbedCSS: string | undefined;
+      try {
+        const { getFontEmbedCss } = await import('@/lib/fontEmbed');
+        fontEmbedCSS = await getFontEmbedCss();
+      } catch {
+        // deixa a própria lib embutir as fontes
+      }
+      return await toCanvas(el, {
+        pixelRatio: 2,
+        width: 1080,
+        height: 1350,
+        cacheBust: true,
+        fontEmbedCSS,
+      });
+    } catch (err) {
+      console.warn('html-to-image falhou, usando html2canvas', err);
+      const { default: html2canvas } = await import('html2canvas');
+      return html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        width: 1080,
+        height: 1350,
+        backgroundColor: null,
+      });
+    }
   }, []);
 
   const downloadSlide = useCallback(async (index?: number) => {

@@ -75,6 +75,15 @@ export default function ProfileSlide({
   const handleFontSize = Math.round(headerFontSize * 0.82);
   const isEditable = Boolean(onUpdateProfile || onUpdateText) && !forExport;
 
+  // Alturas do header em pixels fixos — html2canvas diverge do browser ao
+  // centralizar flex vertical, então a coluna de texto é posicionada por
+  // offset calculado em vez de alignItems/justifyContent.
+  const nameRowH = Math.round(headerFontSize * 1.1);
+  const handleGap = 6;
+  const handleRowH = Math.round(handleFontSize * 1.1);
+  const textBlockH = nameRowH + handleGap + handleRowH;
+  const textPadTop = Math.max(0, Math.round((AVATAR_SIZE - textBlockH) / 2));
+
   // Theme colours
   const C = globalSettings.theme === 'dark' ? DARK : LIGHT;
 
@@ -146,20 +155,20 @@ export default function ProfileSlide({
           width: CONTENT_WIDTH,
         }}
       >
-        {/* Profile header — flex with explicit sizes (no gap, no vertical-align)
-            so html2canvas renders it identically to the browser preview */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        {/* Profile header — posições absolutas em pixels (sem centralização
+            flex vertical) para o html2canvas renderizar igual ao preview */}
+        <div style={{ position: 'relative', height: AVATAR_SIZE }}>
           {/* Avatar */}
           <div
             style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
               width: AVATAR_SIZE,
               height: AVATAR_SIZE,
               borderRadius: '50%',
               overflow: 'hidden',
               backgroundColor: C.avatarBg,
-              flexShrink: 0,
-              position: 'relative',
-              marginRight: 22,
             }}
           >
             {profileData.photo ? (
@@ -184,14 +193,14 @@ export default function ProfileSlide({
             )}
           </div>
 
-          {/* Name + handle column */}
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {/* Name + handle column — top fixo calculado para centralizar no avatar */}
+          <div style={{ position: 'absolute', left: AVATAR_SIZE + 22, top: textPadTop }}>
             {/* Row 1: name + spacer + badge, explicit height so html2canvas centers cleanly */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                height: Math.round(headerFontSize * 1.1),
+                height: nameRowH,
               }}
             >
               <span
@@ -199,7 +208,7 @@ export default function ProfileSlide({
                 {...editableProps('name')}
                 style={{
                   fontSize: headerFontSize,
-                  lineHeight: 1,
+                  lineHeight: `${nameRowH}px`,
                   fontWeight: 700,
                   color: C.text,
                   letterSpacing: '-0.03em',
@@ -219,9 +228,10 @@ export default function ProfileSlide({
               {...editableProps('handle')}
               style={{
                 display: 'block',
-                marginTop: 6,
+                marginTop: handleGap,
+                height: handleRowH,
                 fontSize: handleFontSize,
-                lineHeight: 1.1,
+                lineHeight: `${handleRowH}px`,
                 fontWeight: 400,
                 color: C.handle,
                 letterSpacing: '-0.02em',

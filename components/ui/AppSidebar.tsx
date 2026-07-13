@@ -9,6 +9,7 @@ import {
   Newspaper,
   Calendar,
   Palette,
+  CreditCard,
   Sun,
   Moon,
   LogOut,
@@ -20,21 +21,20 @@ import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
 
-type NavKind = 'primary' | 'new';
-
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  kind?: NavKind;
-  hint?: string;
+  /** Rotas extras que mantêm o item ativo (além do próprio href). */
+  match?: string[];
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard',  label: 'Carrosséis',  icon: LayoutGrid, hint: 'Feed' },
-  { href: '/news',       label: 'Notícias',     icon: Newspaper, hint: 'Daily' },
-  { href: '/agenda',     label: 'Agenda',       icon: Calendar,  kind: 'new', hint: 'Beta' },
-  { href: '/onboarding', label: 'Onboarding',   icon: Palette,   hint: 'Marca' },
+  { href: '/dashboard',  label: 'Carrosséis',  icon: LayoutGrid, match: ['/generator'] },
+  { href: '/news',       label: 'Notícias',     icon: Newspaper },
+  { href: '/agenda',     label: 'Agenda',       icon: Calendar },
+  { href: '/onboarding', label: 'Onboarding',   icon: Palette },
+  { href: '/conta',      label: 'Assinatura',   icon: CreditCard },
 ];
 
 export default function AppSidebar() {
@@ -178,18 +178,9 @@ export default function AppSidebar() {
           collapsed ? 'px-2' : 'px-3'
         )}
       >
-        {!collapsed && (
-          <p
-            className="font-mono text-[10px] uppercase tracking-[0.14em] px-3 mb-2"
-            style={{ color: 'var(--ink-dim)' }}
-          >
-            Ferramentas
-          </p>
-        )}
-
-        {navItems.map(({ href, label, icon: Icon, kind, hint }) => {
-          const isActive =
-            pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
+        {navItems.map(({ href, label, icon: Icon, match }) => {
+          const routes = [href, ...(match ?? [])];
+          const isActive = routes.some((r) => pathname === r || pathname.startsWith(`${r}/`));
           return (
             <Link
               key={href}
@@ -209,21 +200,7 @@ export default function AppSidebar() {
               }}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              {!collapsed && (
-                <>
-                  <span className="flex-1">{label}</span>
-                  {kind === 'new' && (
-                    <span className="chip filled text-[9px] py-[1px] px-[5px]">novo</span>
-                  )}
-                  {hint && kind !== 'new' && (
-                    <span
-                      className="font-mono text-[9.5px] uppercase tracking-[0.12em] opacity-60 group-hover:opacity-100 transition-opacity"
-                    >
-                      {hint}
-                    </span>
-                  )}
-                </>
-              )}
+              {!collapsed && <span className="flex-1">{label}</span>}
             </Link>
           );
         })}

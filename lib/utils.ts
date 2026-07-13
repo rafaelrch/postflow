@@ -11,6 +11,13 @@ export function generateId(): string {
   return uuidv4();
 }
 
+// Twitter/X handle sempre exibido com "@", independente de como o usuário digitou.
+export function normalizeHandle(handle: string | undefined): string {
+  const h = (handle || '').trim();
+  if (!h) return '';
+  return h.startsWith('@') ? h : `@${h}`;
+}
+
 export function createEmptySlide(position: number): Slide {
   return {
     ...DEFAULT_SLIDE,

@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import ThemeProvider from '@/components/ThemeProvider';
 import AppSidebar from '@/components/ui/AppSidebar';
 import AuthProvider from '@/components/AuthProvider';
+import CreditsExhaustedModal from '@/components/ui/CreditsExhaustedModal';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </div>
+        <CreditsExhaustedModal />
         <Toaster
           position="bottom-right"
           toastOptions={{

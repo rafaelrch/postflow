@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useEditorStore } from './useEditorStore';
-import { useCreditsStore } from './useCreditsStore';
+import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
 import { Slide, SlideStyle } from '@/types';
 
 export type ImageProvider = 'openai' | 'gemini';
@@ -22,15 +22,22 @@ export function isEditorialCoverSlide(style: SlideStyle, slide: Slide, index: nu
 interface GenerateImageResponse {
   url?: string;
   error?: string;
+  code?: string;
 }
 
-/** Erro de geração de imagem que carrega o status HTTP, pra detectar 429 (rate limit). */
+/** Erro de geração de imagem que carrega o status HTTP, pra detectar 429 (rate limit) e 402 (créditos). */
 class GenerateImageError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
+}
+
+function isInsufficientCredits(err: unknown): boolean {
+  return err instanceof GenerateImageError && err.code === 'insufficient_credits';
 }
 
 function sleep(ms: number): Promise<void> {
@@ -68,7 +75,7 @@ async function generateForSlide(
 
   const json: GenerateImageResponse = await res.json().catch(() => ({}));
   if (!res.ok || !json.url) {
-    throw new GenerateImageError(json.error || `Falha (${res.status}) no slide ${slideIndex + 1}`, res.status);
+    throw new GenerateImageError(json.error || `Falha (${res.status}) no slide ${slideIndex + 1}`, res.status, json.code);
   }
   return json.url;
 }
@@ -123,6 +130,7 @@ export function useGenerateCarouselImages() {
 
     let done = 0;
     let firstError: string | null = null;
+    let creditsOut = false;
 
     // Concorrência limitada (2 por vez) + retry automático em 429 — a OpenAI
     // limita geração de imagem a poucas por minuto, e disparar tudo de uma vez
@@ -130,7 +138,7 @@ export function useGenerateCarouselImages() {
     const CONCURRENCY = 2;
     let cursor = 0;
     const worker = async () => {
-      while (cursor < targets.length) {
+      while (cursor < targets.length && !creditsOut) {
         const { slide, i } = targets[cursor++];
         try {
           const url = await generateForSlideWithRetry(slide, i, slides.length, provider, (waitSecs) => {
@@ -140,6 +148,11 @@ export function useGenerateCarouselImages() {
             ? { contentImageUrl: url }
             : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
         } catch (err) {
+          // Sem créditos: os próximos slides falhariam igual — para o lote.
+          if (isInsufficientCredits(err)) {
+            creditsOut = true;
+            return;
+          }
           const msg = err instanceof Error ? err.message : 'Erro desconhecido';
           if (!firstError) firstError = msg;
           console.error(`[gen-images] slide ${i + 1}:`, err);
@@ -156,7 +169,10 @@ export function useGenerateCarouselImages() {
     setGenerating(false);
     useCreditsStore.getState().refresh();
 
-    if (firstError && done === targets.length) {
+    if (creditsOut) {
+      toast.dismiss(toastId);
+      handleInsufficientCredits({ code: 'insufficient_credits' }); // abre o popup global
+    } else if (firstError && done === targets.length) {
       toast.error(firstError, { id: toastId, duration: 6000 });
     } else if (firstError) {
       toast.error(`Algumas imagens falharam: ${firstError}`, { id: toastId, duration: 6000 });
@@ -183,8 +199,13 @@ export function useGenerateCarouselImages() {
         : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
       toast.success(`Slide ${index + 1} pronto!`, { id: toastId });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
-      toast.error(msg, { id: toastId, duration: 6000 });
+      if (isInsufficientCredits(err)) {
+        toast.dismiss(toastId);
+        handleInsufficientCredits({ code: 'insufficient_credits' }); // abre o popup global
+      } else {
+        const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+        toast.error(msg, { id: toastId, duration: 6000 });
+      }
     } finally {
       setGenerating(false);
       useCreditsStore.getState().refresh();
