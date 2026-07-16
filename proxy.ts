@@ -26,10 +26,14 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Refresh session so it doesn't expire
+  // getSession lê o JWT do cookie sem round-trip ao Supabase (getUser fazia
+  // uma chamada de rede em TODA navegação) e só vai à rede para renovar o
+  // token quando ele expira. O redirect daqui é só UX — a segurança real dos
+  // dados é o RLS, que valida a assinatura do JWT no próprio Postgres.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const pathname = request.nextUrl.pathname;
   const isProtected = protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -53,7 +57,19 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // Só as rotas que precisam de auth/redirect — landing, preços e /api não
+  // pagam a latência do proxy (as rotas de API validam a sessão por conta
+  // própria via createServerSupabaseClient).
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/dashboard/:path*',
+    '/generator/:path*',
+    '/agenda/:path*',
+    '/news/:path*',
+    '/twitter/:path*',
+    '/setup/:path*',
+    '/onboarding/:path*',
+    '/conta/:path*',
+    '/login',
+    '/cadastro',
   ],
 };

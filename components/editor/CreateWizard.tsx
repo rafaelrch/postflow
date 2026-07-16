@@ -5,10 +5,11 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   X, ChevronRight, Sparkles, Image as ImageIcon,
-  Upload, Plus, Trash2, FileJson,
+  Upload, Plus, Trash2, FileJson, Globe,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { cn, normalizeHandle } from '@/lib/utils';
+import { uploadImageFile } from '@/lib/upload-image';
 import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData, TextPosition } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
@@ -158,9 +159,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   const { loadCarousel } = useEditorStore();
 
   const [step, setStep] = useState(1);
-  const [style, setStyle] = useState<SlideStyle>('minimalist');
+  const [style, setStyle] = useState<SlideStyle>('profile');
   const [contentMode, setContentMode] = useState<'ai' | 'manual' | 'json'>('ai');
   const [prompt, setPrompt] = useState('');
+  const [webSearch, setWebSearch] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [slideCount, setSlideCount] = useState(6);
@@ -276,6 +278,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             slideCount,
             imageType: 'background',
             generateImages: false,
+            webSearch,
             fontPair: effectiveFontPair,
             accentColor,
             profileData: style === 'profile' ? effectiveProfile : undefined,
@@ -491,19 +494,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             <div className="flex gap-4 mt-2">
               {[
                 {
-                  value: 'minimalist' as SlideStyle,
-                  label: 'Minimalista',
-                  desc: 'Texto em destaque, overlays cinematográficos, tipografia bold',
-                  icon: (
-                    <div className="w-full h-44 rounded-lg bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="w-16 h-2 bg-white rounded mb-3 mx-auto" />
-                        <div className="w-10 h-1.5 bg-white/30 rounded mx-auto" />
-                      </div>
-                    </div>
-                  ),
-                },
-                {
                   value: 'profile' as SlideStyle,
                   label: 'Twitter / X',
                   desc: 'Estética de post no Twitter/X. Limpo, focado em texto e engajamento',
@@ -652,6 +642,22 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                     onChange={(e) => setPrompt(e.target.value)}
                     autoFocus
                   />
+                  <button
+                    type="button"
+                    onClick={() => setWebSearch((v) => !v)}
+                    className={cn(
+                      'flex items-center gap-2 self-start px-3 py-2 rounded-lg border text-xs font-medium transition-colors',
+                      webSearch
+                        ? 'border-[#1DA1F2] bg-[#1DA1F2]/8 text-[#1DA1F2]'
+                        : 'border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:border-black/30 dark:hover:border-white/30',
+                    )}
+                  >
+                    <Globe className="w-3.5 h-3.5 shrink-0" />
+                    Web search
+                    <span className={cn('font-normal', webSearch ? 'text-[#1DA1F2]/70' : 'text-gray-900/30 dark:text-white/30')}>
+                      {webSearch ? 'a IA vai buscar fatos e notícias atuais' : 'ative para temas recentes'}
+                    </span>
+                  </button>
                   {/* Nº de slides — hidden for Twitter Format A */}
                   {!(style === 'profile' && twitterFormat === 'A') && (
                     <div className="flex items-center gap-3">
@@ -839,12 +845,17 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                 <button onClick={() => profilePhotoRef.current?.click()} className="px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white text-xs transition-colors">
                   Upload foto
                 </button>
-                <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
-                  const r = new FileReader();
-                  r.onload = (ev) => setProfileData(p => ({ ...p, photoUrl: ev.target?.result as string }));
-                  r.readAsDataURL(f);
+                  const toastId = toast.loading('Enviando foto…');
+                  try {
+                    const url = await uploadImageFile(f, 'profile-photos');
+                    setProfileData(p => ({ ...p, photoUrl: url }));
+                    toast.success('Foto adicionada', { id: toastId });
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
+                  }
                 }} />
               </div>
               <input className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30" placeholder="Nome de exibição" value={profileData.name} onChange={(e) => setProfileData(p => ({ ...p, name: e.target.value }))} />

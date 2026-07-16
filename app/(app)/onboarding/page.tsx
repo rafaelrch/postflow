@@ -30,7 +30,10 @@ export default function OnboardingPage() {
   useEffect(() => {
     const load = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      // getSession lê do storage local (instantâneo); getUser fazia uma
+      // round-trip ao Supabase antes de renderizar o formulário.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         router.replace('/login?next=/onboarding');
         return;

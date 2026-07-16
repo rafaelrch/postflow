@@ -66,8 +66,8 @@ export default function AppSidebar() {
     const supabase = createClient();
     let active = true;
 
-    supabase.auth.getUser().then(({ data }: { data: { user: { id: string; email?: string; user_metadata?: { name?: string } } | null } }) => {
-      const user = data.user;
+    supabase.auth.getSession().then(({ data }: { data: { session: { user: { id: string; email?: string; user_metadata?: { name?: string } } } | null } }) => {
+      const user = data.session?.user;
       if (!user || !active) return;
 
       setUserEmail(user.email || '');

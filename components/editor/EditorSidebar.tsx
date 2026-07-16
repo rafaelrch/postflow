@@ -7,6 +7,8 @@ import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGen
 import Slider from './Slider';
 import Section from './Section';
 import { cn } from '@/lib/utils';
+import { uploadImageFile } from '@/lib/upload-image';
+import toast from 'react-hot-toast';
 import { TextPosition, TextHighlight, ElementFont } from '@/types';
 
 // ── ColorPicker: swatch + hex input ─────────────────────────────────────────
@@ -430,24 +432,29 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   // Quantos slides recebem imagem de conteúdo no "gerar para todos" (capa fora)
   const contentSlidesCount = slides.filter((s, i) => !isEditorialCoverSlide(style, s, i)).length;
 
-  const handleImageFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const url = e.target?.result as string;
+  const handleImageFile = async (file: File) => {
+    const toastId = toast.loading('Enviando imagem…');
+    try {
+      const url = await uploadImageFile(file, 'slide-images');
       // Sync both fields so templates that read either one (editorial prefers
       // gridImageUrl, minimalist switches on imageType) stay consistent.
       updateActiveSlide({ backgroundImageUrl: url, gridImageUrl: url });
-    };
-    reader.readAsDataURL(file);
+      toast.success('Imagem adicionada', { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
+    }
   };
 
   // Imagem de conteúdo (entre os textos) — distinta do fundo do slide.
-  const handleContentImageFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      updateActiveSlide({ contentImageUrl: e.target?.result as string });
-    };
-    reader.readAsDataURL(file);
+  const handleContentImageFile = async (file: File) => {
+    const toastId = toast.loading('Enviando imagem…');
+    try {
+      const url = await uploadImageFile(file, 'slide-images');
+      updateActiveSlide({ contentImageUrl: url });
+      toast.success('Imagem adicionada', { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
+    }
   };
 
   const labelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
@@ -465,12 +472,17 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       <input ref={contentImageRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => e.target.files?.[0] && handleContentImageFile(e.target.files[0])} />
       <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
-          const r = new FileReader();
-          r.onload = (ev) => updateGlobalSettings({ profileBadge: { ...profileBadge, photo: ev.target?.result as string } });
-          r.readAsDataURL(f);
+          const toastId = toast.loading('Enviando foto…');
+          try {
+            const url = await uploadImageFile(f, 'profile-photos');
+            updateGlobalSettings({ profileBadge: { ...profileBadge, photo: url } });
+            toast.success('Foto atualizada', { id: toastId });
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
+          }
         }} />
     </>
   );
@@ -623,7 +635,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               {/* AI image generation */}
               <div className="flex flex-col gap-1.5 pt-1">
                 <button
-                  onClick={() => generateOne(activeSlideIndex, 'openai')}
+                  onClick={() => generateOne(activeSlideIndex)}
                   disabled={generating}
                   className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -633,7 +645,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                     : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
                 </button>
                 <button
-                  onClick={() => generateAll('openai')}
+                  onClick={() => generateAll()}
                   disabled={generating}
                   className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -693,7 +705,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 {/* AI image generation */}
                 <div className="flex flex-col gap-1.5">
                   <button
-                    onClick={() => generateOne(activeSlideIndex, 'openai', 'content')}
+                    onClick={() => generateOne(activeSlideIndex, 'content')}
                     disabled={generating}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -703,7 +715,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                       : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
                   </button>
                   <button
-                    onClick={() => generateAll('openai', 'content')}
+                    onClick={() => generateAll('content')}
                     disabled={generating}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -784,7 +796,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 </div>
                 {isEditorialCover && (
                   <button
-                    onClick={() => generateOne(activeSlideIndex, 'openai')}
+                    onClick={() => generateOne(activeSlideIndex)}
                     disabled={generating}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                   >

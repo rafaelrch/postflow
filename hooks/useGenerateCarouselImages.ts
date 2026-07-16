@@ -6,7 +6,6 @@ import { useEditorStore } from './useEditorStore';
 import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
 import { Slide, SlideStyle } from '@/types';
 
-export type ImageProvider = 'openai' | 'gemini';
 /** Onde a imagem gerada é aplicada: fundo full-bleed do slide, ou imagem de conteúdo entre os textos. */
 export type ImageTarget = 'background' | 'content';
 
@@ -55,7 +54,6 @@ async function generateForSlide(
   slide: Slide,
   slideIndex: number,
   totalSlides: number,
-  provider: ImageProvider,
 ): Promise<string> {
   const isCover = slideIndex === 0;
   const isFinal = slideIndex === totalSlides - 1;
@@ -69,7 +67,6 @@ async function generateForSlide(
       description: slide.description,
       isCover,
       isFinal,
-      provider,
     }),
   });
 
@@ -90,12 +87,11 @@ async function generateForSlideWithRetry(
   slide: Slide,
   slideIndex: number,
   totalSlides: number,
-  provider: ImageProvider,
   onRateLimit?: (waitSeconds: number) => void,
 ): Promise<string> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await generateForSlide(slide, slideIndex, totalSlides, provider);
+      return await generateForSlide(slide, slideIndex, totalSlides);
     } catch (err) {
       const isRateLimit = err instanceof GenerateImageError && err.status === 429;
       if (!isRateLimit || attempt >= MAX_RATE_LIMIT_RETRIES) throw err;
@@ -111,7 +107,7 @@ export function useGenerateCarouselImages() {
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
-  const generateAll = useCallback(async (provider: ImageProvider = 'openai', target: ImageTarget = 'background') => {
+  const generateAll = useCallback(async (target: ImageTarget = 'background') => {
     if (generating) return;
 
     // "Gerar para todos" com imagem de conteúdo pula a capa do Editorial —
@@ -125,8 +121,7 @@ export function useGenerateCarouselImages() {
     setProgress({ done: 0, total: targets.length });
 
     const toastId = 'gen-images';
-    const providerLabel = provider === 'gemini' ? 'Nano Banana 2' : 'OpenAI';
-    toast.loading(`Gerando 0/${targets.length} imagens (${providerLabel})…`, { id: toastId });
+    toast.loading(`Gerando 0/${targets.length} imagens…`, { id: toastId });
 
     let done = 0;
     let firstError: string | null = null;
@@ -141,7 +136,7 @@ export function useGenerateCarouselImages() {
       while (cursor < targets.length && !creditsOut) {
         const { slide, i } = targets[cursor++];
         try {
-          const url = await generateForSlideWithRetry(slide, i, slides.length, provider, (waitSecs) => {
+          const url = await generateForSlideWithRetry(slide, i, slides.length, (waitSecs) => {
             toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
           });
           updateSlide(i, target === 'content'
@@ -159,7 +154,7 @@ export function useGenerateCarouselImages() {
         } finally {
           done++;
           setProgress({ done, total: targets.length });
-          toast.loading(`Gerando ${done}/${targets.length} imagens (${providerLabel})…`, { id: toastId });
+          toast.loading(`Gerando ${done}/${targets.length} imagens…`, { id: toastId });
         }
       }
     };
@@ -181,17 +176,16 @@ export function useGenerateCarouselImages() {
     }
   }, [slides, style, generating, updateSlide]);
 
-  const generateOne = useCallback(async (index: number, provider: ImageProvider = 'openai', target: ImageTarget = 'background') => {
+  const generateOne = useCallback(async (index: number, target: ImageTarget = 'background') => {
     const slide = slides[index];
     if (!slide || generating) return;
 
     setGenerating(true);
     const toastId = `gen-image-${slide.id}`;
-    const providerLabel = provider === 'gemini' ? 'Nano Banana 2' : 'OpenAI';
-    toast.loading(`Gerando imagem do slide ${index + 1} (${providerLabel})…`, { id: toastId });
+    toast.loading(`Gerando imagem do slide ${index + 1}…`, { id: toastId });
 
     try {
-      const url = await generateForSlideWithRetry(slide, index, slides.length, provider, (waitSecs) => {
+      const url = await generateForSlideWithRetry(slide, index, slides.length, (waitSecs) => {
         toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
       });
       updateSlide(index, target === 'content'

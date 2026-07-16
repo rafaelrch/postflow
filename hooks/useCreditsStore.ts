@@ -21,7 +21,8 @@ interface CreditsState {
 
 async function loadBalance(set: (partial: Partial<CreditsState>) => void) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) {
     set({ balance: null, monthlyAllowance: null, periodEnd: null, loaded: true });
     return;

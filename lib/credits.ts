@@ -6,7 +6,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  */
 export const CREDIT_COSTS = {
   carousel: 5,
-  news: 3,
   image: 5,
 } as const;
 

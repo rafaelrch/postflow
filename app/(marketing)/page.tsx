@@ -148,7 +148,7 @@ function Nav() {
 /* ─── Hero ────────────────────────────────────────────────────── */
 
 const HERO_IMAGES = [1, 3].flatMap((c) =>
-  [1, 2, 3, 4, 5].map((s) => `/cards_para_hero/carrossel-${c}/carrossel-${c}---${s}.png`)
+  [1, 2, 3, 4, 5].map((s) => `/cards_para_hero/carrossel-${c}/carrossel-${c}---${s}.webp`)
 );
 
 const HERO_ITEM_W = 230;

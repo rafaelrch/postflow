@@ -205,6 +205,7 @@ export interface GenerateCarouselInput {
   slideCount: number;
   imageType: ImageType;
   generateImages: boolean;
+  webSearch?: boolean;
   imageDirection?: string;
   fontPair: FontPair;
   accentColor?: string;
@@ -218,7 +219,6 @@ export interface SlideAIData {
   title: string;
   description: string;
   highlightWord: string;
-  imagePrompt: string;
   backgroundColor?: string;
 }
 

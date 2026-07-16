@@ -353,6 +353,9 @@ export default function NewsPage() {
   // ── Template state ────────────────────────────────────────────────────────
   const [newsTemplate, setNewsTemplate] = useState<NewsTemplateStyle>({ ...DEFAULT_TEMPLATE });
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
+  // Evita o flash de "crie seu primeiro template" enquanto os templates
+  // salvos ainda estão sendo carregados do banco.
+  const [templatesLoading, setTemplatesLoading] = useState(true);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [modalTemplateId, setModalTemplateId] = useState<string | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -376,27 +379,33 @@ export default function NewsPage() {
     let active = true;
     const load = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !active) return;
+      // getSession lê do storage local (instantâneo); getUser fazia uma
+      // round-trip ao Supabase antes de qualquer outra coisa.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user || !active) {
+        if (active) setTemplatesLoading(false);
+        return;
+      }
       setUserId(user.id);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('brand_logo_url')
-        .eq('id', user.id)
-        .single();
+      // Perfil (logo) e templates em paralelo — eram 2 round-trips em série.
+      const [{ data: profile }, { data: tplRows }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('brand_logo_url')
+          .eq('id', user.id)
+          .single(),
+        supabase
+          .from('templates')
+          .select('id, name, content_schema, created_at')
+          .eq('kind', 'news')
+          .order('created_at', { ascending: true }),
+      ]);
 
       if (!active) return;
       const savedLogo = (profile?.brand_logo_url as string | undefined)?.trim();
       if (savedLogo) setBrandLogoUrl(savedLogo);
-
-      // Templates na tabela `templates` (RLS por usuário).
-      const { data: tplRows } = await supabase
-        .from('templates')
-        .select('id, name, content_schema, created_at')
-        .eq('kind', 'news')
-        .order('created_at', { ascending: true });
-      if (!active) return;
 
       let templates: SavedTemplate[] = (tplRows || []).map((row: { id: string; name: string; content_schema: NewsTemplateStyle; created_at: string }) => ({
         id: row.id,
@@ -433,7 +442,10 @@ export default function NewsPage() {
         } catch { /* localStorage indisponível — segue sem migrar */ }
       }
 
-      if (active) setSavedTemplates(templates);
+      if (active) {
+        setSavedTemplates(templates);
+        setTemplatesLoading(false);
+      }
     };
     load();
     return () => { active = false; };
@@ -961,6 +973,25 @@ export default function NewsPage() {
   // ── Render: Choose step ──────────────────────────────────────────────────
 
   if (step === 'choose') {
+    // Skeleton enquanto os templates carregam — sem isso, quem já tem
+    // templates via primeiro a tela de usuário novo e depois o conteúdo.
+    if (templatesLoading) {
+      return (
+        <div className="flex-1 overflow-y-auto" style={{ background: 'var(--paper)' }}>
+          <div className="max-w-3xl mx-auto px-8 py-14 animate-pulse">
+            <div className="h-3 w-32 rounded bg-black/10 dark:bg-white/10 mb-5" />
+            <div className="h-12 w-72 rounded bg-black/10 dark:bg-white/10 mb-4" />
+            <div className="h-4 w-96 max-w-full rounded bg-black/[0.06] dark:bg-white/[0.06] mb-10" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] rounded-xl bg-black/[0.05] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.06]" />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const hasTemplates = savedTemplates.length > 0;
     const modalTemplate = savedTemplates.find(t => t.id === modalTemplateId) ?? null;
 

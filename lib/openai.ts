@@ -44,7 +44,6 @@ SLIDE FINAL — CTA:
   title: frase de fechamento que sintetiza a transformação prometida
   description: 1-2 frases de CTA direto (salvar, seguir, comentar, enviar para alguém)
   backgroundColor: "#0A0A0A"
-  Sem imagePrompt.
 
 ---
 
@@ -70,7 +69,6 @@ REGRAS POR CAMPO JSON:
 - description: MÁXIMO 2 frases. Denso, direto. Proibido texto longo ou parágrafo.
 - highlightWord: palavra ou expressão mais forte do slide
 - backgroundColor: cor em hex
-- imagePrompt: só quando agrega contexto visual real; em inglês; omitir no slide final
 
 ---
 
@@ -82,8 +80,7 @@ Retorne APENAS JSON válido, sem markdown:
       "title": "Título do slide",
       "description": "Descrição curta e direta.",
       "highlightWord": "palavra de destaque",
-      "backgroundColor": "#0A0A0A",
-      "imagePrompt": "visual prompt in english"
+      "backgroundColor": "#0A0A0A"
     }
   ],
   "caption": "Legenda para Instagram — começa com o hook da capa, desenvolve em 3-4 blocos curtos, fecha com CTA",
@@ -126,7 +123,7 @@ Estrutura narrativa:
 Slide 1 — HOOK:
   - Dado ou contraste chocante com o resultado atual
   - Termine com frase que force a próxima leitura
-  - 2-3 frases max. Com imagePrompt.
+  - 2-3 frases max.
 
 Slides 2-3 — CONTEXTO:
   - Origem com detalhes específicos (ano, lugar, personagem)
@@ -147,7 +144,6 @@ Slide N-1 — SÍNTESE:
 
 Slide final — PUNCHLINE + CTA:
   - 1-2 frases. A filosofia destilada.
-  - Sem imagePrompt.
 
 Se o usuário pedir menos slides, comprima mantendo a lógica narrativa.
 
@@ -167,7 +163,6 @@ REGRAS POR CAMPO JSON:
 - description: MÁXIMO 2-3 frases. Direto. Sem parágrafo longo.
 - highlightWord: palavra ou expressão mais forte do slide
 - backgroundColor: sempre "#FFFFFF"
-- imagePrompt: em inglês; omitir no slide final
 
 ---
 
@@ -179,35 +174,32 @@ Retorne APENAS JSON válido, sem markdown:
       "title": "Título do tweet",
       "description": "Texto curto e direto.",
       "highlightWord": "palavra",
-      "backgroundColor": "#FFFFFF",
-      "imagePrompt": "editorial image prompt in english"
+      "backgroundColor": "#FFFFFF"
     }
   ],
   "caption": "Legenda curta em estilo thread",
   "hashtags": ["#startups", "#negocios"]
 }`;
 
-export const CAPTION_SYSTEM_PROMPT = `Você é um especialista em copy editorial estratégica para Instagram, com foco em branding, posicionamento, design, percepção e negócio.
-Crie legendas densas, claras e autorais. Evite clichês, tom coach e excesso promocional.
-Use um CTA elegante e hashtags relevantes, sem exagero.
-Retorne APENAS JSON válido sem markdown:
-{
-  "caption": "legenda completa com emojis",
-  "hashtags": ["#tag1", "#tag2"]
-}`;
+/** Adendo aos system prompts quando o usuário ativa o web search no wizard. */
+export const WEB_SEARCH_PROMPT_ADDENDUM = `
+
+---
+
+BUSCA NA WEB (ativada pelo usuário):
+Use a busca na web para basear o conteúdo em fatos, lançamentos e notícias atuais sobre o tema — com números e datas reais do que encontrar.
+Nunca inclua citações, URLs ou referências de fontes no JSON final.`;
 
 export const IMAGE_STYLE_SUFFIX = ', editorial cinematic photograph, dark atmosphere, vertical composition, professional photography, shallow depth of field, no text, no logos, no captions, no watermarks';
 
 export function buildImagePrompt(input: {
-  imagePrompt?: string;
   title: string;
   description?: string;
   isCover?: boolean;
   isFinal?: boolean;
 }): string {
-  const { imagePrompt, title, description, isCover, isFinal } = input;
-  const base = (imagePrompt && imagePrompt.trim())
-    || [title, description].filter(Boolean).join(' — ');
+  const { title, description, isCover, isFinal } = input;
+  const base = [title, description].filter(Boolean).join(' — ');
   const intent = isCover
     ? 'Cover slide cinematic establishing shot for: '
     : isFinal

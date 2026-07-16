@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT } from '@/lib/openai';
+import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT, WEB_SEARCH_PROMPT_ADDENDUM } from '@/lib/openai';
 import { requireCredits, refundCredits } from '@/lib/subscription';
 import { CREDIT_COSTS } from '@/lib/credits';
 import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
@@ -44,47 +44,46 @@ export async function POST(req: NextRequest) {
         title: i === 0 ? 'Título da Capa' : i === body.slideCount - 1 ? 'Me segue pra mais!' : `Slide ${i + 1}`,
         description: i === 0 ? 'Subtítulo aqui' : '',
         highlightWord: '',
-        imagePrompt: '',
         backgroundColor: i === 0 || i === body.slideCount - 1 ? '#0A0A0A' : '#111111',
       }));
       return NextResponse.json({ slides, caption: '', hashtags: [] });
     }
 
-    // Build messages
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    // Build input
+    const input: OpenAI.Responses.ResponseInputItem[] = [];
 
     if (body.referenceImageBase64) {
-      messages.push({
+      input.push({
         role: 'user',
         content: [
           {
-            type: 'image_url',
-            image_url: {
-              url: body.referenceImageBase64.startsWith('data:')
-                ? body.referenceImageBase64
-                : `data:image/jpeg;base64,${body.referenceImageBase64}`,
-            },
+            type: 'input_image',
+            detail: 'auto',
+            image_url: body.referenceImageBase64.startsWith('data:')
+              ? body.referenceImageBase64
+              : `data:image/jpeg;base64,${body.referenceImageBase64}`,
           },
           {
-            type: 'text',
+            type: 'input_text',
             text: buildUserPrompt(body),
           },
         ],
       });
     } else {
-      messages.push({ role: 'user', content: buildUserPrompt(body) });
+      input.push({ role: 'user', content: buildUserPrompt(body) });
     }
 
-    const response = await openai.chat.completions.create({
+    const basePrompt = body.style === 'profile' ? TWITTER_CAROUSEL_SYSTEM_PROMPT : CAROUSEL_SYSTEM_PROMPT;
+
+    const response = await openai.responses.create({
       model: 'gpt-5.4-nano',
-      max_completion_tokens: 4096,
-      messages: [
-        { role: 'system', content: body.style === 'profile' ? TWITTER_CAROUSEL_SYSTEM_PROMPT : CAROUSEL_SYSTEM_PROMPT },
-        ...messages,
-      ],
+      max_output_tokens: 4096,
+      instructions: body.webSearch ? basePrompt + WEB_SEARCH_PROMPT_ADDENDUM : basePrompt,
+      tools: body.webSearch ? [{ type: 'web_search' }] : undefined,
+      input,
     });
 
-    const text = response.choices[0]?.message?.content ?? '';
+    const text = response.output_text;
     const aiData = parseAIJson(text);
 
     return NextResponse.json(aiData);

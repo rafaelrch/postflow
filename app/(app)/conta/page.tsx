@@ -20,8 +20,9 @@ export default async function ContaPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const sub = user ? await getActiveSubscription(supabase, user.id) : null;
-  const credits = user ? await getUserCredits(supabase, user.id) : null;
+  const [sub, credits] = user
+    ? await Promise.all([getActiveSubscription(supabase, user.id), getUserCredits(supabase, user.id)])
+    : [null, null];
 
   return (
     <div className="p-8 max-w-2xl mx-auto w-full overflow-y-auto">

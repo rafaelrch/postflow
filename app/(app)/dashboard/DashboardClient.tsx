@@ -138,8 +138,6 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
   };
 
   const total = carousels.length;
-  const published = carousels.filter((c) => c.status === 'published').length;
-  const drafts = total - published;
 
   return (
     <div
@@ -198,8 +196,6 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
           {/* Stats row */}
           <div className="flex items-center gap-8 mt-2">
             <Stat label="Total" value={total} />
-            <Stat label="Rascunho" value={drafts} />
-            <Stat label="Publicados" value={published} accent />
             <span className="hairline soft flex-1" />
           </div>
         </header>
@@ -208,15 +204,6 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
           <EmptyState onCreate={() => setShowWizard(true)} />
         ) : (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <p className="section-kicker">
-                {filtered.length} {filtered.length === 1 ? 'item' : 'itens'}
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="chip soft">grid</span>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {/* Create card — dashed brutalist */}
               <button
