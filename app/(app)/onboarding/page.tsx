@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, AtSign, Briefcase, CheckCircle2, Loader2, Palette } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
+import { uploadImageFile } from '@/lib/upload-image';
 
 const DEFAULT_COLORS = ['#0A0A0A', '#FAFAF7', '#E4572E'];
 
@@ -17,6 +18,9 @@ export default function OnboardingPage() {
   const [alreadyOnboarded, setAlreadyOnboarded] = useState(false);
 
   const [brandName, setBrandName] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [instagramHandle, setInstagramHandle] = useState('');
   const [newsInstagramHandle, setNewsInstagramHandle] = useState('');
   const [twitterHandle, setTwitterHandle] = useState('');
@@ -43,12 +47,13 @@ export default function OnboardingPage() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('brand_name, workspace_name, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, onboarding_completed')
+        .select('brand_name, workspace_name, photo_url, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, onboarding_completed')
         .eq('id', user.id)
         .single();
 
       if (data) {
         setBrandName(data.brand_name || data.workspace_name || '');
+        setPhotoUrl(data.photo_url || '');
         setInstagramHandle(data.instagram_handle || '');
         setNewsInstagramHandle(data.news_instagram_handle || '');
         setTwitterHandle(data.twitter_handle || '');
@@ -106,6 +111,7 @@ export default function OnboardingPage() {
         id: userId,
         workspace_name: brandName.trim(),
         brand_name: brandName.trim(),
+        photo_url: photoUrl,
         handle: cleanInstagram,
         instagram_handle: cleanInstagram,
         news_instagram_handle: cleanNewsInstagram,
@@ -200,6 +206,49 @@ export default function OnboardingPage() {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
           <section className="brand-card flex flex-col gap-6" style={{ padding: 22 }}>
             <Block icon={Briefcase} title="Identidade">
+              <div className="flex items-center gap-4 mb-4">
+                <div
+                  className="w-16 h-16 rounded-full overflow-hidden shrink-0 grid place-items-center"
+                  style={{ border: '1.5px solid var(--ink)', background: 'var(--paper-2)' }}
+                >
+                  {photoUrl
+                    ? <img src={photoUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
+                    : <span className="text-[10px]" style={{ color: 'var(--ink-muted)' }}>sem foto</span>}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    className="brand-btn outline sm self-start"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photoUploading}
+                  >
+                    {photoUploading ? 'Enviando…' : photoUrl ? 'Trocar foto' : 'Adicionar foto de perfil'}
+                  </button>
+                  <p className="text-[11.5px]" style={{ color: 'var(--ink-dim)' }}>
+                    Usada nos cards estilo Twitter/X e nos badges de perfil dos carrosséis.
+                  </p>
+                </div>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setPhotoUploading(true);
+                    try {
+                      const url = await uploadImageFile(f, 'profile-photos');
+                      setPhotoUrl(url);
+                      toast.success('Foto enviada');
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Falha no upload da foto');
+                    } finally {
+                      setPhotoUploading(false);
+                    }
+                  }}
+                />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Nome da marca" value={brandName} onChange={setBrandName} placeholder="Creatools" required />
                 <Field label="Nicho" value={niche} onChange={setNiche} placeholder="branding, educação, SaaS..." />

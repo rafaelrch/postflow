@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Backup dos PNGs originais do hero (nao versionar)
 /public/cards_para_hero_backup_png/
+.maestri/
+.next_root_owned_backup/

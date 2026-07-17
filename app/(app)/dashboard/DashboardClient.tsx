@@ -83,9 +83,14 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
   const handleDelete = async (id: string) => {
     if (!confirm('Deletar este carrossel? Esta ação não pode ser desfeita.')) return;
     setDeleting(id);
-    const supabase = createClient();
-    const { error } = await supabase.from('carousels').delete().eq('id', id);
-    if (error) {
+    // Rota dedicada: deleta o carrossel e limpa do Storage as imagens que
+    // nenhum outro carrossel/slide/perfil referencia.
+    const res = await fetch('/api/delete-carousel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
       toast.error('Erro ao deletar');
     } else {
       setCarousels((prev) => prev.filter((c) => c.id !== id));

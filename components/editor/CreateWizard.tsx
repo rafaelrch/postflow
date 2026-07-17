@@ -182,11 +182,19 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
       if (!user) return;
       const { data } = await supabase
         .from('profiles')
-        .select('brand_palette')
+        .select('brand_palette, photo_url, brand_name, name, twitter_handle')
         .eq('id', user.id)
         .single();
       if (data?.brand_palette && Array.isArray(data.brand_palette) && data.brand_palette.length >= 3) {
         setBrandPalette(data.brand_palette);
+      }
+      // Pré-preenche o perfil do card Twitter/X com os dados do onboarding.
+      if (data) {
+        setProfileData((p) => ({
+          handle: p.handle || data.twitter_handle || '',
+          name: p.name || data.brand_name || data.name || '',
+          photoUrl: p.photoUrl || data.photo_url || '',
+        }));
       }
     };
     load();
