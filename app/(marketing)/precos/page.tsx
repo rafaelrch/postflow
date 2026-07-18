@@ -89,7 +89,19 @@ export default function PrecosPage() {
 
         <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
           Pagamento via cartão de crédito processado com segurança pela Stripe. Você pode cancelar ou
-          trocar de plano a qualquer momento no portal de assinatura.
+          trocar de plano a qualquer momento no portal de assinatura. Ao assinar, você concorda com os{' '}
+          <Link href="/termos" className="underline underline-offset-4">
+            Termos de Uso
+          </Link>
+          , a{' '}
+          <Link href="/privacidade" className="underline underline-offset-4">
+            Política de Privacidade
+          </Link>{' '}
+          e a{' '}
+          <Link href="/reembolso" className="underline underline-offset-4">
+            Política de Reembolso
+          </Link>
+          .
         </p>
       </div>
     </main>

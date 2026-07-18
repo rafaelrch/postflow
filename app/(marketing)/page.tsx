@@ -1146,9 +1146,9 @@ const FOOTER_COLS = [
     { label: 'Ativar acesso', href: '/login' },
   ]},
   { title: 'Legal', links: [
-    { label: 'Termos de uso', href: '#' },
-    { label: 'Privacidade', href: '#' },
-    { label: 'Reembolso', href: '#' },
+    { label: 'Termos de uso', href: '/termos' },
+    { label: 'Privacidade', href: '/privacidade' },
+    { label: 'Reembolso', href: '/reembolso' },
   ]},
 ];
 

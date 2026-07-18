@@ -6,6 +6,10 @@ import {
   STRIPE_TRIAL_DAYS_YEARLY,
   type PlanInterval,
 } from '@/lib/stripe';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
+// Import relativo (não alias): vitest não resolve `@/*` para módulos não
+// mockados no teste (ver tests/stripe-checkout.test.ts).
+import { hasBillableSubscription } from '../../../../lib/subscription';
 
 export const runtime = 'nodejs';
 
@@ -13,9 +17,22 @@ export const runtime = 'nodejs';
  * Checkout "pagamento primeiro": NÃO exige login. O lead paga antes de ter
  * conta; a Stripe coleta o e-mail e cria o customer. A assinatura é vinculada
  * ao usuário depois, no cadastro (trigger handle_new_user casa por e-mail).
+ *
+ * Se o request vier de um usuário JÁ logado e com assinatura ativa (ex.: já
+ * assinou antes e volta pra página de preços), bloqueia antes de criar
+ * qualquer sessão Stripe para evitar cobrança duplicada.
  */
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user && (await hasBillableSubscription(supabase, user.id))) {
+      return NextResponse.json({ alreadySubscribed: true }, { status: 409 });
+    }
+
     const body = (await req.json().catch(() => ({}))) as { interval?: PlanInterval };
     const interval: PlanInterval = body.interval === 'year' ? 'year' : 'month';
     const priceId = priceIdForInterval(interval);

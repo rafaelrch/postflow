@@ -47,7 +47,22 @@ export function priceIdForInterval(interval: PlanInterval): string {
   return interval === 'year' ? STRIPE_PRICE_YEARLY : STRIPE_PRICE_MONTHLY;
 }
 
+/**
+ * URL base pública do app (usada em success_url/cancel_url do checkout e
+ * redirects de auth). Em produção, NEXT_PUBLIC_APP_URL é obrigatória e não
+ * pode apontar para localhost — falha ruidosamente em vez de gerar redirects
+ * quebrados. Em dev, cai em http://localhost:3000.
+ */
 export function appUrl(path = ''): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.NODE_ENV === 'production') {
+    if (!envUrl || /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(envUrl)) {
+      throw new Error(
+        'NEXT_PUBLIC_APP_URL deve estar definida com a URL pública de produção ' +
+          `(ex.: https://seu-dominio.com). Valor atual: ${envUrl ?? '(ausente)'}.`
+      );
+    }
+  }
+  const base = envUrl ?? 'http://localhost:3000';
   return `${base.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
 }
