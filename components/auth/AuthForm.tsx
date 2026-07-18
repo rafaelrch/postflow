@@ -38,8 +38,16 @@ export default function AuthForm({
   const title = isSignup ? 'Criar conta' : 'Entrar';
 
   const redirectTo = useMemo(() => {
-    if (typeof window === 'undefined') return undefined;
-    return `${window.location.origin}/auth/callback?next=${encodeURIComponent('/onboarding')}`;
+    // Mesma fonte de verdade de lib/stripe.ts#appUrl: NEXT_PUBLIC_APP_URL
+    // (inlinada no build). window.location.origin fica só como fallback de dev.
+    const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const base = envUrl
+      ? envUrl.replace(/\/$/, '')
+      : typeof window !== 'undefined'
+        ? window.location.origin
+        : undefined;
+    if (!base) return undefined;
+    return `${base}/auth/callback?next=${encodeURIComponent('/onboarding')}`;
   }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -50,6 +58,26 @@ export default function AuthForm({
       const supabase = createClient();
 
       if (isSignup) {
+        // B2: sem prova de pagamento (session_id da Stripe, só existe na URL
+        // de quem completou o checkout) não deixa cadastrar — não confia só
+        // no e-mail travado no form, que é puramente client-side.
+        const sessionId = searchParams.get('session_id');
+        if (!sessionId) {
+          toast.error('Não encontramos o pagamento desta assinatura. Assine um plano antes de criar a conta.');
+          return;
+        }
+
+        const verifyRes = await fetch('/api/auth/verify-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), session_id: sessionId }),
+        });
+        if (!verifyRes.ok) {
+          const verifyData = await verifyRes.json().catch(() => ({}));
+          toast.error(verifyData.error || 'Não foi possível confirmar o pagamento para este e-mail.');
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -182,6 +210,20 @@ export default function AuthForm({
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 {isSignup ? 'Criar conta' : 'Entrar'}
               </Button>
+
+              {isSignup && (
+                <p className="text-center text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                  Ao criar sua conta, você concorda com os{' '}
+                  <Link href="/termos" className="underline underline-offset-4">
+                    Termos de Uso
+                  </Link>{' '}
+                  e a{' '}
+                  <Link href="/privacidade" className="underline underline-offset-4">
+                    Política de Privacidade
+                  </Link>
+                  .
+                </p>
+              )}
             </form>
           )}
 

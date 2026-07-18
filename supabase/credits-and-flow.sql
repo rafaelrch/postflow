@@ -97,6 +97,13 @@ end;
 $$;
 
 -- 6) GATE DURO: ninguém cria conta sem assinatura ativa para o mesmo e-mail.
+-- B2 (defesa em profundidade): exige também user_id is null, ou seja, uma
+-- assinatura ainda NÃO reivindicada por nenhuma conta — evita reusar uma
+-- linha de subscriptions já vinculada a outra conta (ex.: e-mail trocado no
+-- customer da Stripe, linha antiga órfã) para autorizar um cadastro novo.
+-- A prova forte de pagamento (session_id da Stripe) é validada em código, na
+-- rota app/api/auth/verify-signup — este trigger é a última linha de defesa
+-- no banco, não o mecanismo primário.
 create or replace function public.enforce_paid_signup()
 returns trigger
 language plpgsql
@@ -108,6 +115,7 @@ begin
     select 1 from public.subscriptions
     where lower(email) = lower(new.email)
       and status in ('active', 'trialing')
+      and user_id is null
   ) then
     raise exception 'subscription_required'
       using errcode = 'P0001',
