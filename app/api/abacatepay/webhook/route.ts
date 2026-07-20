@@ -42,19 +42,19 @@ export async function POST(req: NextRequest) {
   }
 
   const event = payload.event ?? 'unknown';
+  const eventId = eventIdFor(rawBody);
   const admin = createAdminSupabaseClient();
 
-  // Idempotência: PK é o hash do corpo. Reentrega colide e sai sem reprocessar.
-  const { error: insertErr } = await admin
+  // Idempotência: PK é o hash do corpo bruto. Só CONSULTA aqui — o registro é
+  // gravado no fim, depois do sucesso.
+  const { data: jaProcessado } = await admin
     .from('abacatepay_webhook_events')
-    .insert({ id: eventIdFor(rawBody), event, payload: payload as unknown as Record<string, unknown> });
+    .select('id')
+    .eq('id', eventId)
+    .maybeSingle();
 
-  if (insertErr) {
-    if (insertErr.code === '23505') {
-      return NextResponse.json({ received: true, duplicate: true });
-    }
-    console.error('[abacatepay/webhook] erro ao registrar evento:', insertErr);
-    return NextResponse.json({ error: 'Erro ao registrar evento' }, { status: 500 });
+  if (jaProcessado) {
+    return NextResponse.json({ received: true, duplicate: true });
   }
 
   try {
@@ -88,7 +88,24 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.error(`[abacatepay/webhook] erro ao processar ${event}:`, err);
+    // 500 ⇒ a AbacatePay re-tenta. Como o evento AINDA NÃO foi registrado, o
+    // retry passa pela checagem de idempotência e reprocessa; o upsert (por
+    // id do checkout) é idempotente. Registrar antes de processar deixaria uma
+    // falha transitória de banco marcar o evento como concluído para sempre.
     return NextResponse.json({ error: 'Erro ao processar evento' }, { status: 500 });
+  }
+
+  // Só registra como processado depois do sucesso.
+  const { error: insertErr } = await admin
+    .from('abacatepay_webhook_events')
+    .insert({ id: eventId, event, payload: payload as unknown as Record<string, unknown> });
+
+  // 23505 = entrega concorrente registrou primeiro. O processamento é
+  // idempotente, então não há o que corrigir. Qualquer outro erro é só logado:
+  // o trabalho já foi feito, e falhar aqui provocaria um retry que apenas
+  // repetiria um upsert idempotente.
+  if (insertErr && insertErr.code !== '23505') {
+    console.error('[abacatepay/webhook] evento processado mas não registrado:', insertErr);
   }
 
   return NextResponse.json({ received: true });

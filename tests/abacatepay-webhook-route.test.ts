@@ -4,12 +4,14 @@ const {
   mockGetCheckout,
   mockUpsert,
   mockInsert,
+  mockMaybeSingle,
   mockVerifySignature,
   mockVerifySecret,
 } = vi.hoisted(() => ({
   mockGetCheckout: vi.fn(),
   mockUpsert: vi.fn(),
   mockInsert: vi.fn(),
+  mockMaybeSingle: vi.fn(),
   mockVerifySignature: vi.fn(),
   mockVerifySecret: vi.fn(),
 }));
@@ -19,7 +21,12 @@ vi.mock('@/lib/abacatepay', () => ({
 }));
 
 vi.mock('@/lib/supabase-admin', () => ({
-  createAdminSupabaseClient: () => ({ from: () => ({ insert: mockInsert }) }),
+  createAdminSupabaseClient: () => ({
+    from: () => ({
+      select: () => ({ eq: () => ({ maybeSingle: mockMaybeSingle }) }),
+      insert: mockInsert,
+    }),
+  }),
 }));
 
 // Relativos ao arquivo de teste — mesmos módulos que a rota importa.
@@ -57,6 +64,7 @@ const CHECKOUT_RELIDO = {
 beforeEach(() => {
   mockVerifySignature.mockReturnValue(true);
   mockVerifySecret.mockReturnValue(true);
+  mockMaybeSingle.mockResolvedValue({ data: null });
   mockInsert.mockResolvedValue({ error: null });
   mockGetCheckout.mockResolvedValue(CHECKOUT_RELIDO);
   mockUpsert.mockResolvedValue({ userId: null, interval: 'month', status: 'active' });
@@ -115,10 +123,12 @@ describe('POST /api/abacatepay/webhook — verificação', () => {
 });
 
 describe('POST /api/abacatepay/webhook — idempotência', () => {
-  it('reentrega do mesmo corpo não reprocessa', async () => {
-    mockInsert.mockResolvedValue({ error: { code: '23505' } });
+  const evento = { event: 'checkout.completed', data: { id: 'bill_1' } };
 
-    const res = await POST(webhookRequest({ event: 'checkout.completed', data: { id: 'bill_1' } }));
+  it('evento já registrado não reprocessa', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { id: 'hash-existente' } });
+
+    const res = await POST(webhookRequest(evento));
 
     expect(res.status).toBe(200);
     expect((await res.json()).duplicate).toBe(true);
@@ -126,13 +136,72 @@ describe('POST /api/abacatepay/webhook — idempotência', () => {
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 
-  it('erro inesperado ao registrar o evento vira 500 e não processa', async () => {
-    mockInsert.mockResolvedValue({ error: { code: '42P01', message: 'tabela sumiu' } });
+  it('só registra o evento DEPOIS de processar com sucesso', async () => {
+    const ordem: string[] = [];
+    mockUpsert.mockImplementation(async () => {
+      ordem.push('upsert');
+      return { userId: null, interval: 'month', status: 'active' };
+    });
+    mockInsert.mockImplementation(async () => {
+      ordem.push('registra');
+      return { error: null };
+    });
 
-    const res = await POST(webhookRequest({ event: 'checkout.completed', data: { id: 'bill_1' } }));
+    await POST(webhookRequest(evento));
+
+    expect(ordem).toEqual(['upsert', 'registra']);
+  });
+
+  it('falha transitória NÃO marca o evento como processado (senão o retry nunca roda)', async () => {
+    mockUpsert.mockRejectedValue(new Error('erro momentâneo de banco'));
+
+    const res = await POST(webhookRequest(evento));
 
     expect(res.status).toBe(500);
-    expect(mockUpsert).not.toHaveBeenCalled();
+    // o ponto do fix: nada foi gravado, então o evento segue elegível
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('o retry seguinte com o MESMO payload reprocessa e conclui', async () => {
+    // 1ª entrega: processamento falha de forma transitória.
+    mockUpsert.mockRejectedValueOnce(new Error('erro momentâneo de banco'));
+    const primeira = await POST(webhookRequest(evento));
+
+    expect(primeira.status).toBe(500);
+    expect(mockInsert).not.toHaveBeenCalled();
+
+    // 2ª entrega (retry da AbacatePay, corpo idêntico): como nada foi
+    // registrado, a checagem de idempotência não barra e o evento roda de novo.
+    mockUpsert.mockResolvedValue({ userId: 'user-1', interval: 'month', status: 'active' });
+    const retry = await POST(webhookRequest(evento));
+
+    expect(retry.status).toBe(200);
+    expect((await retry.json()).duplicate).toBeUndefined();
+    expect(mockUpsert).toHaveBeenCalledTimes(2);
+    // agora sim fica registrado, travando reentregas futuras
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('entrega concorrente que perde a corrida (23505) não vira erro', async () => {
+    mockInsert.mockResolvedValue({ error: { code: '23505' } });
+
+    const res = await POST(webhookRequest(evento));
+
+    // o processamento aconteceu e é idempotente — nada a corrigir
+    expect(res.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('falha ao registrar depois do sucesso não desfaz o processamento', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockInsert.mockResolvedValue({ error: { code: '42P01', message: 'tabela sumiu' } });
+
+    const res = await POST(webhookRequest(evento));
+
+    expect(res.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    expect(erro).toHaveBeenCalled();
+    erro.mockRestore();
   });
 });
 
