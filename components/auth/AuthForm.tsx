@@ -8,6 +8,7 @@ import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
+import { safeNextPath } from '@/lib/safe-next-path';
 
 type AuthMode = 'login' | 'signup';
 
@@ -24,7 +25,10 @@ export default function AuthForm({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/dashboard';
+  // Normalizado na origem: além do router.replace(next) pós-login, o valor é
+  // reinjetado nos links de login/cadastro abaixo. Sem isso,
+  // ?next=https://evil.com levaria o usuário para fora do domínio.
+  const next = safeNextPath(searchParams.get('next'));
   const isSignup = mode === 'signup';
 
   const [name, setName] = useState('');

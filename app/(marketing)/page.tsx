@@ -703,7 +703,14 @@ function Marquee() {
   // The keyframe slides the track by -50%, so the track must hold an even
   // number of item sets AND its half-width must exceed the widest viewport —
   // otherwise the strip runs out of content and the right side shows blank.
-  const items = Array.from({ length: 20 }, (_, i) => MARQUEE_ITEMS[i % MARQUEE_ITEMS.length]);
+  // 48 = 6 conjuntos de 8. Duas restrições, ambas satisfeitas:
+  // 1. A metade (24 itens) é múltiplo de MARQUEE_ITEMS.length, então os dois
+  //    trechos que a animação alterna são idênticos e o loop não tem costura.
+  //    20 falhava aqui: a metade (10) não fecha sobre um array de 8.
+  // 2. Cada item mede entre ~96px (círculo w-20 + mx-2) e ~115px (o texto
+  //    "@orafaelrocha_" é mais largo que o círculo), logo a metade cobre
+  //    2304–2760px — acima de 1920px mesmo no piso, sem faixa vazia à direita.
+  const items = Array.from({ length: 48 }, (_, i) => MARQUEE_ITEMS[i % MARQUEE_ITEMS.length]);
   return (
     <section className="lp-marquee py-4 overflow-hidden bg-[#F7F7F7]">
       <div

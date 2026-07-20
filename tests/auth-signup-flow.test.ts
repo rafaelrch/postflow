@@ -94,6 +94,23 @@ describe('GET /auth/callback — confirmação de e-mail vira sessão', () => {
     expect(location).not.toContain('/onboarding');
   });
 
+  it.each([
+    'https://evil.com',
+    '//evil.com',
+    '/\\evil.com',
+  ])('não redireciona para fora do domínio via ?next=%s (open redirect)', async (vetor) => {
+    const res = await GET(
+      callbackRequest(
+        `https://app.creatools.com.br/auth/callback?code=ok&next=${encodeURIComponent(vetor)}`,
+      ),
+    );
+
+    const location = res.headers.get('location') ?? '';
+    expect(location).not.toContain('evil.com');
+    expect(new URL(location).host).toBe('app.creatools.com.br');
+    expect(location).toBe('https://app.creatools.com.br/dashboard');
+  });
+
   it('não tenta trocar sessão quando o link vem sem code', async () => {
     const res = await GET(callbackRequest('https://app.creatools.com.br/auth/callback'));
 
