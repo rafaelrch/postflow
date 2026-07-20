@@ -8,7 +8,16 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createServerSupabaseClient();
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    // Sem essa checagem, um code expirado/já usado/adulterado seguia para o
+    // destino como se a confirmação tivesse dado certo — o usuário só
+    // descobria ao ser jogado de volta pro /login pelo proxy, sem explicação.
+    if (error) {
+      const loginUrl = new URL('/login', requestUrl.origin);
+      loginUrl.searchParams.set('authError', 'invalid_code');
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   return NextResponse.redirect(new URL(next, requestUrl.origin));

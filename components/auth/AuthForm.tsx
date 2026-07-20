@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
@@ -36,6 +36,19 @@ export default function AuthForm({
   const [confirmationSent, setConfirmationSent] = useState(false);
 
   const title = isSignup ? 'Criar conta' : 'Entrar';
+
+  // Mensagem vinda do /auth/callback quando a troca do code falha. Sem isso o
+  // usuário voltaria pro login sem saber por quê. O ref evita o toast duplicado
+  // que o StrictMode causaria em dev.
+  const authErrorShown = useRef(false);
+  const authError = searchParams.get('authError');
+  useEffect(() => {
+    if (!authError || authErrorShown.current) return;
+    authErrorShown.current = true;
+    if (authError === 'invalid_code') {
+      toast.error('Link de confirmação inválido ou expirado. Faça login ou cadastre-se novamente.');
+    }
+  }, [authError]);
 
   const redirectTo = useMemo(() => {
     // Mesma fonte de verdade de lib/stripe.ts#appUrl: NEXT_PUBLIC_APP_URL

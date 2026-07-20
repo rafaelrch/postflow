@@ -64,6 +64,36 @@ describe('GET /auth/callback — confirmação de e-mail vira sessão', () => {
     expect(res.headers.get('location')).toBe('https://app.creatools.com.br/onboarding');
   });
 
+  it('manda pro /login com aviso quando o code é inválido/expirado, em vez de fingir sucesso', async () => {
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: 'invalid request: both auth code and code verifier should be non-empty' },
+    });
+
+    const res = await GET(callbackRequest('https://app.creatools.com.br/auth/callback?code=pkce_expirado'));
+
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+    expect(location).toContain('authError=invalid_code');
+    // o ponto do fix: NÃO segue pro destino como se tivesse dado certo
+    expect(location).not.toContain('/dashboard');
+  });
+
+  it('não leva o erro pro next: code ruim vai pro login, não pra rota protegida', async () => {
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: 'code expired' },
+    });
+
+    const res = await GET(
+      callbackRequest('https://app.creatools.com.br/auth/callback?code=ruim&next=/onboarding')
+    );
+
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+    expect(location).not.toContain('/onboarding');
+  });
+
   it('não tenta trocar sessão quando o link vem sem code', async () => {
     const res = await GET(callbackRequest('https://app.creatools.com.br/auth/callback'));
 

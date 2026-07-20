@@ -89,6 +89,76 @@ describe('AuthProvider — gate de onboarding_completed', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it('checa de novo quando OUTRO usuário loga na mesma aba (flag é por usuário, não por aba)', async () => {
+    // Sem vi.resetModules() entre as duas renderizações: é justamente o estado
+    // de módulo sobrevivente que reproduz a aba real. Com a flag booleana
+    // antiga, a segunda checagem nunca rodava e o usuário B entrava direto.
+    vi.resetModules();
+    const { default: AuthProvider } = await import('../components/AuthProvider');
+
+    // Usuário A — já completou o onboarding.
+    mockGetSession.mockResolvedValue({ data: { session: SESSION } });
+    mockSingle.mockResolvedValue({ data: { onboarding_completed: true } });
+
+    const primeira = render(<AuthProvider>conteúdo protegido</AuthProvider>);
+    await waitFor(() => expect(mockSingle).toHaveBeenCalledTimes(1));
+    expect(mockReplace).not.toHaveBeenCalled();
+    primeira.unmount();
+
+    // Usuário B, mesma aba — ainda NÃO completou.
+    const OUTRO_USUARIO = { user: { id: 'user-outro-999', email: 'outro@example.com' } };
+    mockGetSession.mockResolvedValue({ data: { session: OUTRO_USUARIO } });
+    mockSingle.mockResolvedValue({ data: { onboarding_completed: false } });
+
+    render(<AuthProvider>conteúdo protegido</AuthProvider>);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/onboarding'));
+    expect(mockSingle).toHaveBeenCalledTimes(2);
+  });
+
+  it('não repete a checagem do MESMO usuário em remontagens (evita round-trip por clique)', async () => {
+    vi.resetModules();
+    const { default: AuthProvider } = await import('../components/AuthProvider');
+
+    mockGetSession.mockResolvedValue({ data: { session: SESSION } });
+    mockSingle.mockResolvedValue({ data: { onboarding_completed: true } });
+
+    const primeira = render(<AuthProvider>conteúdo protegido</AuthProvider>);
+    await waitFor(() => expect(mockSingle).toHaveBeenCalledTimes(1));
+    primeira.unmount();
+
+    render(<AuthProvider>conteúdo protegido</AuthProvider>);
+    await waitFor(() => expect(mockGetSession).toHaveBeenCalledTimes(2));
+
+    // mesma conta ⇒ segue consultando profiles uma vez só
+    expect(mockSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it('logout limpa o usuário checado para a próxima conta da mesma aba', async () => {
+    vi.resetModules();
+    let onAuthChange: ((event: string, session: unknown) => void) | undefined;
+    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
+      onAuthChange = cb;
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
+
+    const { default: AuthProvider } = await import('../components/AuthProvider');
+
+    mockGetSession.mockResolvedValue({ data: { session: SESSION } });
+    mockSingle.mockResolvedValue({ data: { onboarding_completed: true } });
+
+    const primeira = render(<AuthProvider>conteúdo protegido</AuthProvider>);
+    await waitFor(() => expect(mockSingle).toHaveBeenCalledTimes(1));
+
+    // logout
+    onAuthChange?.('SIGNED_OUT', null);
+    primeira.unmount();
+
+    // mesma conta volta a logar: como houve logout, a checagem roda de novo
+    render(<AuthProvider>conteúdo protegido</AuthProvider>);
+    await waitFor(() => expect(mockSingle).toHaveBeenCalledTimes(2));
+  });
+
   it('manda pro /login preservando o destino quando não há sessão', async () => {
     mockGetSession.mockResolvedValue({ data: { session: null } });
 

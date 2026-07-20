@@ -5,11 +5,16 @@ import type { Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 
-// A checagem de onboarding roda uma vez por carregamento do app — o proxy
-// (middleware) já protege as rotas a cada navegação, então repetir
-// getSession + select em profiles a cada troca de pathname só somava
-// round-trips ao Supabase em todo clique do sidebar.
-let onboardingChecked = false;
+// A checagem de onboarding roda uma vez por usuário — o proxy (middleware) já
+// protege as rotas a cada navegação, então repetir getSession + select em
+// profiles a cada troca de pathname só somava round-trips ao Supabase em todo
+// clique do sidebar.
+//
+// Guarda QUAL usuário já foi checado, não apenas "se já checou". Como flag
+// booleana, o estado sobrevivia à troca de conta na mesma aba: depois de
+// logout + login com outro usuário, a checagem não rodava de novo e quem
+// ainda não tinha completado o onboarding entrava direto no dashboard.
+let onboardingCheckedFor: string | null = null;
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -26,8 +31,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         return;
       }
 
-      if (!onboardingChecked && pathname !== '/onboarding' && pathname !== '/setup') {
-        onboardingChecked = true;
+      if (onboardingCheckedFor !== session.user.id && pathname !== '/onboarding' && pathname !== '/setup') {
+        onboardingCheckedFor = session.user.id;
         supabase
           .from('profiles')
           .select('onboarding_completed')
@@ -43,6 +48,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
       if (!session) {
+        // Logout limpa o usuário checado: a próxima conta a logar nesta aba
+        // precisa passar pela checagem de onboarding por conta própria.
+        onboardingCheckedFor = null;
         const next = encodeURIComponent(window.location.pathname || '/dashboard');
         router.replace(`/login?next=${next}`);
       }
