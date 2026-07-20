@@ -703,7 +703,7 @@ function Marquee() {
   // The keyframe slides the track by -50%, so the track must hold an even
   // number of item sets AND its half-width must exceed the widest viewport —
   // otherwise the strip runs out of content and the right side shows blank.
-  const items = Array.from({ length: 8 }, () => MARQUEE_ITEMS).flat();
+  const items = Array.from({ length: 20 }, (_, i) => MARQUEE_ITEMS[i % MARQUEE_ITEMS.length]);
   return (
     <section className="lp-marquee py-4 overflow-hidden bg-[#F7F7F7]">
       <div
