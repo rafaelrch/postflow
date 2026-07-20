@@ -455,7 +455,7 @@ function MockNews() {
       <div className="p-4 bg-white">
         <span className="inline-block text-[9px] font-bold tracking-[0.16em] uppercase px-2 py-1 rounded bg-red-600 text-white">Notícia</span>
         <p className="text-[14px] font-bold tracking-tight mt-2 leading-snug">IA generativa muda o jogo do marketing em 2026</p>
-        <p className="text-[10px] mt-2" style={{ color: '#9A9A96' }}>Gerado em segundos · 1080×1350</p>
+        <p className="text-[10px] mt-2" style={{ color: '#9A9A96' }}>Formato do feed · 1080×1350</p>
       </div>
     </div>
   );
@@ -547,10 +547,10 @@ const FEATURES: Feature[] = [
     tab: 'Notícias',
     tag: 'Poste o assunto do momento',
     title: (<>Transforme notícias em posts <span style={{ color: '#8B8B87' }}>antes de todo mundo</span></>),
-    body: 'Notícia quente do seu nicho vira news card pronto pra publicar em segundos. Formato jornalístico que passa autoridade e pega o alcance de quem publica primeiro.',
+    body: 'Monte o news card da notícia do seu nicho e publique enquanto o assunto ainda está em alta. Formato jornalístico que passa autoridade e pega o alcance de quem publica primeiro.',
     bullets: [
       'Card no formato ideal do feed (1080×1350)',
-      'Manchete, resumo e imagem montados pela IA',
+      'Manchete, resumo e imagem no layout jornalístico',
       'Edite qualquer texto antes de exportar',
     ],
     visual: <MockNews />,
@@ -875,7 +875,7 @@ function DoTheMath() {
 const PLAN_FEATURES = [
   'Carrosséis completos com IA (texto + layout + design)',
   '3 estilos: Editorial, Minimalista e Thread do X',
-  'News cards: notícia vira post em segundos',
+  'News cards no formato do feed (1080×1350)',
   'Imagens com IA (OpenAI gpt-image-2): 5 créditos cada',
   'Editor visual slide a slide',
   'Agenda de conteúdo',
@@ -922,7 +922,7 @@ function Pricing() {
               </p>
               <div className="mt-6 -mx-8 px-8 py-3" style={{ background: '#EBEBE9' }}>
                 <p className="text-[13px] font-bold tracking-tight">200 CRÉDITOS TODO MÊS</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 carrosséis ou 66 news cards</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 carrosséis por mês</p>
               </div>
               <ul className="mt-6 space-y-2.5">
                 {PLAN_FEATURES.map((perk) => (
@@ -966,7 +966,7 @@ function Pricing() {
               </p>
               <div className="mt-6 -mx-8 px-8 py-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <p className="text-[13px] font-bold tracking-tight">300 CRÉDITOS TODO MÊS</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 carrosséis ou 100 news cards</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 carrosséis por mês</p>
               </div>
               <ul className="mt-6 space-y-2.5">
                 {PLAN_FEATURES.map((perk) => (
@@ -1014,11 +1014,11 @@ const FAQS = [
   },
   {
     q: 'Como funcionam os créditos?',
-    a: 'Cada plano vem com créditos mensais que renovam automaticamente (200 no mensal, 300 no anual). Um carrossel completo custa 5 créditos, um news card custa 3, e cada imagem gerada com IA custa 5.',
+    a: 'Cada plano vem com créditos mensais que renovam automaticamente (200 no mensal, 300 no anual). Um carrossel completo custa 5 créditos e cada imagem gerada com IA custa 5. O editor de news cards não consome créditos.',
   },
   {
     q: 'Quantos posts posso criar por mês?',
-    a: 'Com o plano mensal, até 40 carrosséis ou 66 news cards por mês (ou uma combinação dos dois). No anual, até 60 carrosséis ou 100 news cards. Pra quem posta todo dia, sobra crédito.',
+    a: 'Com o plano mensal, até 40 carrosséis por mês; no anual, até 60. Como o editor de news cards não consome créditos, eles não entram nessa conta. Pra quem posta todo dia, sobra crédito.',
   },
   {
     q: 'Funciona para qualquer nicho?',
@@ -1030,7 +1030,7 @@ const FAQS = [
   },
   {
     q: 'Como funciona a geração de imagens com IA?',
-    a: 'Cada imagem é gerada sob medida pro seu slide com o gpt-image-2 da OpenAI e custa 5 créditos do seu plano, o mesmo saldo que carrossel e news card usam.',
+    a: 'Cada imagem é gerada sob medida pro seu slide com o gpt-image-2 da OpenAI e custa 5 créditos do seu plano, o mesmo saldo que os carrosséis usam.',
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',
