@@ -69,10 +69,16 @@ export async function POST(req: NextRequest) {
         // o checkout na API antes de gravar, para que um corpo forjado que
         // passasse pelas verificações ainda não conseguisse marcar assinatura
         // como paga.
+        //
+        // O re-read traz os dados acessórios (valor, produto, cliente), mas
+        // QUEM DECIDE o status é o tipo do evento: numa disputa ou
+        // cancelamento o checkout relido pode continuar PAID — o ciclo de
+        // vida vive no objeto `subs_...`, que este endpoint não lê. Ver
+        // REVOKING_EVENT_STATUS em lib/abacatepay-sync.ts.
         const id = extractCheckoutId(payload.data);
         if (id) {
           const checkout = await getCheckout(id);
-          await upsertSubscription(checkout);
+          await upsertSubscription(checkout, null, event);
         }
         break;
       }

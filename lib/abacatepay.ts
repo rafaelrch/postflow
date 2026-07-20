@@ -203,9 +203,25 @@ export function getCheckout(id: string): Promise<AbacateCheckout> {
   return abacateFetch<AbacateCheckout>(`/checkouts/get?id=${encodeURIComponent(id)}`);
 }
 
-export function cancelSubscription(id: string): Promise<AbacateCheckout> {
+/**
+ * Cancela uma assinatura.
+ *
+ * ATENÇÃO: `subscriptionId` é o id da ASSINATURA (`subs_...`), que NÃO é o id
+ * do checkout (`bill_...`). Verificado contra a API dev em 20/07/2026: chamar
+ * este endpoint com um `bill_...` responde 400 "Subscription not found".
+ *
+ * O id `subs_...` só passa a existir depois do primeiro pagamento e hoje NÃO é
+ * capturado em lugar nenhum — a tabela `subscriptions` guarda o id do
+ * checkout. Quem for construir a tela de gerenciamento (D2b/D2c) precisa
+ * persistir esse id a partir do webhook de `subscription.completed` antes de
+ * conseguir cancelar pela API.
+ *
+ * Cancelamento é imediato (`cancelPolicy: NOW`, sem carência) — não existe
+ * "cancelar ao fim do período" nesta API.
+ */
+export function cancelSubscription(subscriptionId: string): Promise<AbacateCheckout> {
   return abacateFetch<AbacateCheckout>('/subscriptions/cancel', {
     method: 'POST',
-    body: { id },
+    body: { id: subscriptionId },
   });
 }
