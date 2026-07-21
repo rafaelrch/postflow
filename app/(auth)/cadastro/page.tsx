@@ -3,9 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '@/components/auth/AuthForm';
 import PendingPayment from '@/components/auth/PendingPayment';
-import type Stripe from 'stripe';
-import { stripe } from '@/lib/stripe';
-import { syncSubscriptionFromSession } from '@/lib/stripe-sync';
+import { getCheckout } from '@/lib/abacatepay';
+import { resolveEmail, upsertSubscription, intervalOf } from '@/lib/abacatepay-sync';
 import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
@@ -13,53 +12,56 @@ export const dynamic = 'force-dynamic';
 type PlanInterval = 'month' | 'year';
 
 /**
- * Cadastro "pagamento primeiro": só é possível criar conta com um checkout
- * pago. Lê o session_id do Stripe, recupera o e-mail pago e confirma que a
- * assinatura já foi gravada (webhook) antes de liberar o formulário.
+ * Cadastro "pagamento primeiro" (AbacatePay): só é possível criar conta com um
+ * checkout pago. O checkout devolve `?ref=<uuid>` — um id nosso, gerado na
+ * criação e presente só na URL de retorno de quem pagou. Resolvemos ref → linha
+ * em subscriptions → id do checkout, confirmamos PAID relendo a API (fonte de
+ * verdade, não o timing do webhook) e recuperamos o e-mail pago antes de
+ * liberar o formulário.
  */
 export default async function CadastroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ ref?: string }>;
 }) {
-  const { session_id: sessionId } = await searchParams;
+  const { ref } = await searchParams;
 
-  if (!sessionId) return <Shell><NoSubscription /></Shell>;
+  if (!ref) return <Shell><NoSubscription /></Shell>;
 
-  let session: Stripe.Checkout.Session;
-  let email: string | null = null;
-  try {
-    session = await stripe.checkout.sessions.retrieve(sessionId);
-    email = session.customer_details?.email ?? session.customer_email ?? null;
-  } catch {
-    return <Shell><NoSubscription /></Shell>;
-  }
-  if (!email) return <Shell><NoSubscription /></Shell>;
-
-  // A assinatura já chegou pelo webhook?
+  // ref → linha da assinatura (gravada como 'incomplete' na criação do checkout).
   const admin = createAdminSupabaseClient();
-  const { data: sub } = await admin
+  const { data: row } = await admin
     .from('subscriptions')
-    .select('plan_interval, status')
-    // Escapa curingas do ilike — e-mail vem da Stripe, mas % e _ são válidos em e-mails.
-    .ilike('email', email.replace(/([%_\\])/g, '\\$1'))
-    .in('status', ['active', 'trialing'])
-    .order('current_period_end', { ascending: false, nullsFirst: false })
-    .limit(1)
+    .select('id, email, plan_interval, status')
+    .eq('provider', 'abacatepay')
+    .eq('metadata->>ref', ref)
     .maybeSingle();
 
-  let planInterval = sub?.plan_interval as PlanInterval | undefined;
+  // ref sem linha correspondente = referência inválida/forjada.
+  if (!row?.id) return <Shell><NoSubscription /></Shell>;
 
-  if (!sub) {
-    // Webhook ainda não chegou (dev sem `stripe listen`, ou atraso de entrega):
-    // sincroniza a assinatura direto da Stripe em vez de esperar para sempre.
-    const synced = await syncSubscriptionFromSession(session);
-    if (synced && (synced.status === 'active' || synced.status === 'trialing')) {
-      planInterval = synced.interval as PlanInterval;
+  let email = (row.email as string | null) ?? null;
+  let planInterval = row.plan_interval as PlanInterval | undefined;
+
+  // Se o webhook já marcou ativo, confia no registro. Senão, relê o checkout na
+  // API: PAID é o único status que comprova pagamento. getCheckout é a verdade;
+  // não dependemos do timing de entrega do webhook.
+  if (row.status !== 'active') {
+    try {
+      const checkout = await getCheckout(row.id as string);
+      if (checkout.status !== 'PAID') return <Shell><PendingPayment /></Shell>;
+      email = (await resolveEmail(checkout)) ?? email;
+      planInterval = intervalOf(checkout);
+      // Defesa em profundidade: sincroniza agora pra que o trigger
+      // enforce_paid_signup encontre o registro certo no signUp em seguida.
+      await upsertSubscription(checkout, email);
+    } catch {
+      // API indisponível e registro ainda não ativo: não dá pra confirmar agora.
+      return <Shell><PendingPayment /></Shell>;
     }
   }
 
-  if (!planInterval) return <Shell><PendingPayment /></Shell>;
+  if (!email || !planInterval) return <Shell><PendingPayment /></Shell>;
 
   const planLabel = planInterval === 'year' ? 'Anual' : 'Mensal';
 
