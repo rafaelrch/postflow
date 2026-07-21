@@ -35,6 +35,7 @@ export default async function CadastroPage({
     .select('id, email, plan_interval, status')
     .eq('provider', 'abacatepay')
     .eq('metadata->>ref', ref)
+    .is('user_id', null)
     .maybeSingle();
 
   // ref sem linha correspondente = referência inválida/forjada.
@@ -67,7 +68,7 @@ export default async function CadastroPage({
 
   return (
     <Suspense fallback={null}>
-      <AuthForm mode="signup" lockedEmail={email} planLabel={planLabel} />
+      <AuthForm mode="signup" lockedEmail={email} planLabel={planLabel} checkoutRef={ref} />
     </Suspense>
   );
 }

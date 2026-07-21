@@ -58,11 +58,50 @@ create index if not exists idx_subscriptions_customer on public.subscriptions (s
 create index if not exists idx_subscriptions_abacate_customer on public.subscriptions (abacatepay_customer_id);
 create index if not exists idx_subscriptions_provider on public.subscriptions (provider, status);
 create index if not exists idx_subscriptions_email on public.subscriptions (lower(email));
+create unique index if not exists idx_subscriptions_abacate_ref
+  on public.subscriptions ((metadata->>'ref'))
+  where provider = 'abacatepay' and metadata ? 'ref';
 
 -- Trigger updated_at
 drop trigger if exists set_subscriptions_updated on public.subscriptions;
 create trigger set_subscriptions_updated before update on public.subscriptions
   for each row execute function public.set_updated_at();
+
+-- Claim de signup é one-shot: syncs/webhooks posteriores podem enviar
+-- user_id NULL, mas nunca podem reabrir ou transferir uma assinatura já
+-- reivindicada. O trigger preserva o dono atual ou aborta uma troca.
+create or replace function public.protect_subscription_claim()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if old.provider = 'abacatepay'
+     and old.user_id is not null
+     and new.user_id is distinct from old.user_id then
+    if new.user_id is null then
+      new.user_id := old.user_id;
+    else
+      raise exception 'subscription_claim_immutable' using errcode = 'P0001';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_subscription_claim_trg on public.subscriptions;
+create trigger protect_subscription_claim_trg
+  before update of user_id on public.subscriptions
+  for each row execute function public.protect_subscription_claim();
+
+revoke all on function public.protect_subscription_claim() from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant execute on function public.protect_subscription_claim() to service_role';
+  end if;
+end
+$$;
 
 -- RLS: usuário só lê a própria assinatura. Inserts/updates via service role.
 alter table public.subscriptions enable row level security;

@@ -131,8 +131,9 @@ export async function requireCredits(cost: number): Promise<SubscriptionGuardRes
     return { ok: true, userId: user.id, subscription };
   }
 
-  const admin = createAdminSupabaseClient();
-  const { data, error } = await admin.rpc('consume_credits', { p_user: user.id, p_cost: cost });
+  // O RPC roda com o JWT do usuário e confere auth.uid() = p_user no banco.
+  // Service role aqui eliminaria essa vinculação e ampliaria o blast radius.
+  const { data, error } = await supabase.rpc('consume_credits', { p_user: user.id, p_cost: cost });
   if (error) {
     if (error.code === 'P0001' || /insufficient_credits/.test(error.message ?? '')) {
       return {
@@ -158,11 +159,11 @@ export async function requireCredits(cost: number): Promise<SubscriptionGuardRes
 
 /**
  * Estorna créditos debitados quando a geração falha (best-effort).
- * Reusa consume_credits com custo negativo (soma de volta ao saldo).
+ * RPC separado, restrito a service_role, com valor positivo e teto no allowance.
  */
 export async function refundCredits(userId: string, amount: number): Promise<void> {
   if (amount <= 0) return;
   const admin = createAdminSupabaseClient();
-  const { error } = await admin.rpc('consume_credits', { p_user: userId, p_cost: -amount });
+  const { error } = await admin.rpc('refund_credits', { p_user: userId, p_amount: amount });
   if (error) console.error('[refundCredits]', error);
 }

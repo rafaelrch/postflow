@@ -15,12 +15,15 @@ export default function AuthForm({
   mode,
   lockedEmail,
   planLabel,
+  checkoutRef,
 }: {
   mode: AuthMode;
   /** E-mail pago no checkout — quando presente, fica travado no form. */
   lockedEmail?: string;
   /** Rótulo do plano assinado (Mensal/Anual) exibido acima do form. */
   planLabel?: string;
+  /** Prova one-shot validada no servidor e consumida atomicamente pelo trigger. */
+  checkoutRef?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,7 +64,7 @@ export default function AuthForm({
         // B2: sem prova de pagamento (ref da AbacatePay — UUID gerado por nós,
         // presente só na URL de retorno de quem completou o checkout) não deixa
         // cadastrar. Não confia no e-mail travado no form, que é client-side.
-        const ref = searchParams.get('ref');
+        const ref = checkoutRef;
         if (!ref) {
           toast.error('Não encontramos o pagamento desta assinatura. Assine um plano antes de criar a conta.');
           return;
@@ -86,6 +89,9 @@ export default function AuthForm({
             data: {
               name: name.trim(),
               phone: phone.trim(),
+              // O trigger BEFORE INSERT valida e remove este valor antes de
+              // persistir o usuário; conhecer só o e-mail não basta para signup.
+              checkout_ref: ref,
             },
           },
         });
@@ -123,7 +129,7 @@ export default function AuthForm({
       let message = err instanceof Error ? err.message : 'Não foi possível autenticar.';
       // O gate "pagamento primeiro" (trigger no banco) chega aqui como um
       // erro genérico do Supabase Auth — traduz para uma mensagem acionável.
-      if (isSignup && /database error|subscription_required/i.test(message)) {
+      if (isSignup && /database error|subscription_required|subscription_proof_(required|invalid_or_used)/i.test(message)) {
         message = 'Esse e-mail ainda não tem uma assinatura ativa. Assine um plano em /precos antes de criar a conta (use o mesmo e-mail do pagamento).';
       }
       toast.error(message);

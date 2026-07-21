@@ -6,8 +6,8 @@
 
 -- PRÉ-VOO — confira os números e a presença de provider antes de prosseguir.
 -- Estas consultas não alteram dados.
-select count(*) as stripe_customers_rows from public.stripe_customers;
-select count(*) as stripe_webhook_events_rows from public.stripe_webhook_events;
+select to_regclass('public.stripe_customers') as stripe_customers_table;
+select to_regclass('public.stripe_webhook_events') as stripe_webhook_events_table;
 select column_name from information_schema.columns
   where table_schema='public' and table_name='subscriptions'
   order by ordinal_position;
@@ -35,8 +35,14 @@ begin
       'ABORTADO: public.subscriptions.provider não existe; aplique o schema com provider antes da limpeza.';
   end if;
 
-  delete from public.stripe_webhook_events;
+  if to_regclass('public.stripe_webhook_events') is not null then
+    execute 'delete from public.stripe_webhook_events';
+  end if;
+
   delete from public.subscriptions where provider = 'stripe';
-  delete from public.stripe_customers;
+
+  if to_regclass('public.stripe_customers') is not null then
+    execute 'delete from public.stripe_customers';
+  end if;
 end
 $cleanup$;

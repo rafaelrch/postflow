@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetCheckout, mockMaybeSingle, mockResolveEmail, mockUpsert } = vi.hoisted(() => ({
+const { mockGetCheckout, mockMaybeSingle, mockResolveEmail, mockUpsert, mockEq, mockIs } = vi.hoisted(() => ({
   mockGetCheckout: vi.fn(),
   mockMaybeSingle: vi.fn(),
   mockResolveEmail: vi.fn(),
   mockUpsert: vi.fn(),
+  mockEq: vi.fn(),
+  mockIs: vi.fn(),
 }));
 
 vi.mock('@/lib/abacatepay', () => ({
@@ -12,13 +14,18 @@ vi.mock('@/lib/abacatepay', () => ({
 }));
 
 vi.mock('@/lib/supabase-admin', () => ({
-  createAdminSupabaseClient: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({ eq: () => ({ maybeSingle: mockMaybeSingle }) }),
-      }),
-    }),
-  }),
+  createAdminSupabaseClient: () => {
+    const query = {
+      select: vi.fn(),
+      eq: mockEq,
+      is: mockIs,
+      maybeSingle: mockMaybeSingle,
+    };
+    query.select.mockReturnValue(query);
+    mockEq.mockReturnValue(query);
+    mockIs.mockReturnValue(query);
+    return { from: () => query };
+  },
 }));
 
 // Relativo ao arquivo de teste — mesmo módulo que a rota importa.
@@ -131,6 +138,7 @@ describe('POST /api/abacatepay/verify-signup (B2 — sequestro de conta)', () =>
     expect((await res.json()).ok).toBe(true);
     expect(mockUpsert).toHaveBeenCalledTimes(1);
     expect(mockUpsert).toHaveBeenCalledWith(paidCheckout, 'vitima@example.com');
+    expect(mockIs).toHaveBeenCalledWith('user_id', null);
   });
 
   it('compara e-mail sem diferenciar maiúsculas (não barra cadastro legítimo)', async () => {

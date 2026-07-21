@@ -65,14 +65,12 @@ create trigger set_abacatepay_customers_updated before update on public.abacatep
 alter table public.abacatepay_customers enable row level security;
 alter table public.abacatepay_webhook_events enable row level security;
 
--- Usuário só lê/insere o próprio customer (service role bypassa).
+-- Usuário só lê o próprio customer. Escrita é exclusivamente service role.
 drop policy if exists abacatepay_customers_select_own on public.abacatepay_customers;
 create policy abacatepay_customers_select_own on public.abacatepay_customers
   for select using (auth.uid() = user_id);
 
 drop policy if exists abacatepay_customers_insert_own on public.abacatepay_customers;
-create policy abacatepay_customers_insert_own on public.abacatepay_customers
-  for insert with check (auth.uid() = user_id);
 
 -- webhook_events: RLS ligado e nenhuma policy ⇒ deny por padrão para usuário
 -- final. Só o service role lê/escreve. Mesmo padrão de stripe_webhook_events.

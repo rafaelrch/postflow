@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     .select('id')
     .eq('provider', 'abacatepay')
     .eq('metadata->>ref', ref)
+    .is('user_id', null)
     .maybeSingle();
 
   if (!row?.id) {
