@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { safeNextPath } from '../lib/safe-next-path';
 
 /**
- * Open redirect via ?next=. Os três vetores abaixo foram confirmados pelo
- * Reviewer e pelo Security contra o código anterior, que fazia
- * `new URL(next, origin)` — todos escapavam para o domínio externo.
+ * Open redirect via ?next=. Os vetores abaixo foram confirmados pelo Reviewer e
+ * pelo Security contra o código anterior — todos escapavam para o domínio
+ * externo. `/..//evil.com` é o mais sutil: passa na checagem de ORIGEM (o `..`
+ * consome o primeiro segmento, mantendo a origem interna) mas o pathname
+ * normalizado vira `//evil.com`, protocol-relative no ponto de uso. Só a
+ * revalidação da SAÍDA o pega.
  */
-const VETORES_CONFIRMADOS = ['https://evil.com', '//evil.com', '/\\evil.com'];
+const VETORES_CONFIRMADOS = ['https://evil.com', '//evil.com', '/\\evil.com', '/..//evil.com'];
 
 describe('safeNextPath — vetores de open redirect', () => {
   it.each(VETORES_CONFIRMADOS)('%s cai no destino seguro', (vetor) => {

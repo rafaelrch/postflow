@@ -9,6 +9,13 @@
  * base sintética e, se o resultado escapar dela, foi absoluto ou
  * protocol-relative e é descartado.
  *
+ * Não basta checar a ENTRADA: `?next=/..//evil.com` resolve com origem interna
+ * (o `..` consome o primeiro segmento), mas o pathname normalizado vira
+ * `//evil.com`. Reconstruído no ponto de uso (`new URL(path, origin)` ou
+ * `router.replace(path)`) isso é protocol-relative e sai do domínio. Por isso
+ * revalidamos a SAÍDA: o caminho final é resolvido de novo contra a base e a
+ * origem reconferida.
+ *
  * Por que não o padrão de proxy.ts:51 (atribuir a `url.pathname`): ele protege
  * o redirect do servidor, mas deixa `//evil.com` como pathname literal — e no
  * cliente `router.replace('//evil.com')` é protocol-relative, então ainda sai
@@ -36,5 +43,19 @@ export function safeNextPath(
   if (url.origin !== SYNTHETIC_BASE) return fallback;
 
   const path = `${url.pathname}${url.search}${url.hash}`;
-  return path.startsWith('/') ? path : fallback;
+  if (!path.startsWith('/')) return fallback;
+
+  // Revalida a saída: `//evil.com` ou `/\evil.com` (via barra invertida ou via
+  // `..` que comeu o primeiro segmento) mantêm a origem interna aqui, mas viram
+  // protocol-relative quando reconstruídos no ponto de uso. Resolver o caminho
+  // final de novo contra a base expõe o escape — a origem deixa de bater.
+  let resolved: URL;
+  try {
+    resolved = new URL(path, SYNTHETIC_BASE);
+  } catch {
+    return fallback;
+  }
+  if (resolved.origin !== SYNTHETIC_BASE) return fallback;
+
+  return path;
 }

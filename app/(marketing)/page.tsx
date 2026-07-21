@@ -699,18 +699,38 @@ const MARQUEE_ITEMS = [
   { ring: '#EF4444', emoji: '🍒' },
 ];
 
+// Cada item mede no MÍNIMO ~96px: círculo w-20 (80px) + mx-2 (2×8px). O texto
+// "@orafaelrocha_" pode ser mais largo, então 96 é um piso conservador — usá-lo
+// faz superdimensionar, nunca faltar.
+const MARQUEE_ITEM_MIN_PX = 96;
+
+// Quantos conjuntos de MARQUEE_ITEMS a METADE do track precisa para cobrir uma
+// largura `w`. A metade é múltiplo de MARQUEE_ITEMS.length de propósito: a
+// animação desliza -50%, alternando duas metades que precisam ser idênticas ou
+// aparece costura. +1 conjunto de folga; piso de 3 para telas estreitas.
+function marqueeSetsPerHalf(w: number): number {
+  const perSet = MARQUEE_ITEMS.length * MARQUEE_ITEM_MIN_PX;
+  return Math.max(3, Math.ceil(w / perSet) + 1);
+}
+
 function Marquee() {
-  // The keyframe slides the track by -50%, so the track must hold an even
-  // number of item sets AND its half-width must exceed the widest viewport —
-  // otherwise the strip runs out of content and the right side shows blank.
-  // 48 = 6 conjuntos de 8. Duas restrições, ambas satisfeitas:
-  // 1. A metade (24 itens) é múltiplo de MARQUEE_ITEMS.length, então os dois
-  //    trechos que a animação alterna são idênticos e o loop não tem costura.
-  //    20 falhava aqui: a metade (10) não fecha sobre um array de 8.
-  // 2. Cada item mede entre ~96px (círculo w-20 + mx-2) e ~115px (o texto
-  //    "@orafaelrocha_" é mais largo que o círculo), logo a metade cobre
-  //    2304–2760px — acima de 1920px mesmo no piso, sem faixa vazia à direita.
-  const items = Array.from({ length: 48 }, (_, i) => MARQUEE_ITEMS[i % MARQUEE_ITEMS.length]);
+  // Contagem fixa não cobre toda tela: 48 itens chegavam a ~2760px e deixavam
+  // 4K (3840px) com faixa branca à direita. Derivamos do viewport real.
+  // O default 6 (=48 itens/metade → cobre ~4608px) já cobre 4K no SSR e no
+  // primeiro paint, então nunca há flash de faixa vazia; o efeito depois ajusta
+  // para ultrawide reais sem quebrar a hidratação (render inicial idêntico nos
+  // dois lados). Encolher em telas menores só remove itens fora da tela — os
+  // visíveis não se movem, então não há salto perceptível.
+  const [setsPerHalf, setSetsPerHalf] = useState(6);
+  useEffect(() => {
+    const update = () => setSetsPerHalf(marqueeSetsPerHalf(window.innerWidth));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const total = setsPerHalf * MARQUEE_ITEMS.length * 2;
+  const items = Array.from({ length: total }, (_, i) => MARQUEE_ITEMS[i % MARQUEE_ITEMS.length]);
   return (
     <section className="lp-marquee py-4 overflow-hidden bg-[#F7F7F7]">
       <div
