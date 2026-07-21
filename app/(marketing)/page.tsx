@@ -886,7 +886,7 @@ function Pricing() {
   // Escolher um plano abre o popup de captura de lead (nome/e-mail/telefone) —
   // o MESMO fluxo do /precos (CheckoutButton → LeadCaptureModal). O e-mail
   // coletado segue para a AbacatePay; a landing não vai mais direto ao checkout
-  // Stripe nem pula a captura de lead.
+  // AbacatePay nem pula a captura de lead.
   const [modalInterval, setModalInterval] = useState<'month' | 'year' | null>(null);
 
   return (
@@ -900,7 +900,7 @@ function Pricing() {
             <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
-            Checkout seguro (Stripe). Sem fidelidade. Cancele quando quiser.
+            Checkout seguro (Pix ou cartão). Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 
@@ -1034,7 +1034,7 @@ const FAQS = [
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',
-    a: 'Você gerencia tudo pelo portal de assinatura dentro da plataforma: trocar de plano, atualizar cartão ou cancelar. E nosso suporte responde rápido pra qualquer dúvida.',
+    a: 'Você gerencia tudo com a ajuda do nosso suporte: trocar de plano, atualizar forma de pagamento ou cancelar. Respondemos rápido pra qualquer dúvida.',
   },
   {
     q: 'Posso cancelar quando quiser?',
