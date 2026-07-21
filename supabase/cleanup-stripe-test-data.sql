@@ -4,25 +4,39 @@
 -- Rodar manualmente no SQL editor do Supabase. Idempotente.
 -- ============================================================
 
--- PRÉ-VOO — rode isto primeiro e confira os números antes de prosseguir:
+-- PRÉ-VOO — confira os números e a presença de provider antes de prosseguir.
+-- Estas consultas não alteram dados.
 select count(*) as stripe_customers_rows from public.stripe_customers;
 select count(*) as stripe_webhook_events_rows from public.stripe_webhook_events;
 select column_name from information_schema.columns
   where table_schema='public' and table_name='subscriptions'
   order by ordinal_position;
--- Se a coluna "provider" aparecer na lista acima, use a Opção B abaixo.
--- Se NÃO aparecer, toda linha de subscriptions é Stripe por definição — use a Opção A.
+select exists (
+  select 1
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'subscriptions'
+    and column_name = 'provider'
+) as subscriptions_provider_column_present;
 
--- Opção A — banco AINDA NÃO tem a coluna provider (schema antigo):
-begin;
-delete from public.stripe_webhook_events;
-delete from public.subscriptions;      -- toda linha é Stripe neste cenário
-delete from public.stripe_customers;
-commit;
+-- FLUXO ÚNICO E ATÔMICO:
+-- Sem public.subscriptions.provider, aborta antes de qualquer DELETE.
+-- Se qualquer comando falhar, o bloco inteiro é revertido.
+do $cleanup$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'subscriptions'
+      and column_name = 'provider'
+  ) then
+    raise exception
+      'ABORTADO: public.subscriptions.provider não existe; aplique o schema com provider antes da limpeza.';
+  end if;
 
--- Opção B — banco JÁ tem a coluna provider (schema com AbacatePay aplicado):
-begin;
-delete from public.stripe_webhook_events;
-delete from public.subscriptions where provider = 'stripe' or provider is null;
-delete from public.stripe_customers;
-commit;
+  delete from public.stripe_webhook_events;
+  delete from public.subscriptions where provider = 'stripe';
+  delete from public.stripe_customers;
+end
+$cleanup$;

@@ -66,16 +66,19 @@ export async function POST(req: NextRequest) {
     );
 
     if (error) {
-      // Log SEM PII: só code/message do Postgres, nunca `details`/`hint` (que
-      // ecoam o valor da linha, ex.: "Key (email)=(...)"). Nem os campos do form.
-      console.error('[api/leads] falha ao gravar lead:', { code: error.code, message: error.message });
+      // Nunca registre message/details/hint: todos podem ecoar valores da linha.
+      // O code do Postgres é útil operacionalmente, mas só entra se tiver o
+      // formato estável documentado (alfanumérico/underscore, até 32 chars).
+      const code = /^[a-z0-9_]{1,32}$/i.test(error.code ?? '') ? error.code : 'unknown';
+      console.error('[api/leads] database_write_failed', { code });
       return NextResponse.json({ error: 'Não foi possível registrar seus dados.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    // Idem: só a mensagem da exceção, sem despejar objeto que possa conter o form.
-    console.error('[api/leads] erro inesperado:', err instanceof Error ? err.message : 'desconhecido');
+  } catch {
+    // Exceções podem incorporar payloads na própria mensagem; registre só o
+    // identificador estável do evento, sem o objeto ou texto arbitrário.
+    console.error('[api/leads] unexpected_error');
     return NextResponse.json({ error: 'Erro ao registrar lead.' }, { status: 500 });
   }
 }

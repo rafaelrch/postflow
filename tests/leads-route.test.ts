@@ -25,7 +25,10 @@ function jsonRequest(body: unknown, ip = '10.0.0.1') {
 }
 
 beforeEach(() => __resetRateLimit());
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+});
 
 describe('POST /api/leads', () => {
   it('grava o lead com os 3 campos + plano, e-mail normalizado (upsert por e-mail)', async () => {
@@ -98,6 +101,35 @@ describe('POST /api/leads', () => {
     const res = await POST(jsonRequest({ name: 'Rafael', email: 'r@test.com', phone: '11999999999' }));
 
     expect(res.status).toBe(500);
+  });
+
+  it('erro do banco não escreve mensagem com PII no console', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFrom.mockReturnValue({ upsert: mockUpsert });
+    mockUpsert.mockResolvedValue({
+      error: { code: '23505', message: 'duplicate key: email=segredo@example.com, phone=11999999999' },
+    });
+
+    const res = await POST(jsonRequest({ name: 'Rafael', email: 'segredo@example.com', phone: '11999999999' }));
+
+    expect(res.status).toBe(500);
+    expect(consoleError).toHaveBeenCalledWith('[api/leads] database_write_failed', { code: '23505' });
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('segredo@example.com');
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('11999999999');
+  });
+
+  it('exceção inesperada não escreve texto arbitrário com PII no console', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFrom.mockImplementation(() => {
+      throw new Error('payload de segredo@example.com / 11999999999');
+    });
+
+    const res = await POST(jsonRequest({ name: 'Rafael', email: 'segredo@example.com', phone: '11999999999' }));
+
+    expect(res.status).toBe(500);
+    expect(consoleError).toHaveBeenCalledWith('[api/leads] unexpected_error');
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('segredo@example.com');
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('11999999999');
   });
 
   it('rate limit: a 11ª requisição do mesmo IP em 1 min recebe 429', async () => {
