@@ -193,3 +193,26 @@ Checklist de 7 passos escrito em TAREFAS-RAFAEL para o Rafael executar:
 ---
 
 **Registrado no LOG:** 2026-07-17, DOCS, CHANGELOG-go-live.md criado (Fase 6).
+
+---
+
+## Revisão de Segurança — D2f (remoção total Stripe + consolidação schema)
+
+**Escopo auditado:** branch `chore/leads-hardening-stripe-removal` sobre `feature/abacatepay-migration`. Commits `1146648`, `7310f0e`, `688038b`. Autorização: Rafael (21/07/2026, nenhum assinante Stripe real).
+
+**Veredito: ✅ APROVADO (segurança).** Nenhum bloqueio. Verificado de forma independente, não pelo relato do Builder.
+
+**Confirmações:**
+1. **Segredos** — nenhum literal `sk_`/`whsec_`/`rk_`/`service_role`/JWT nem `price_/prod_` hardcoded no diff dos 3 commits nem no HEAD. `lib/stripe.ts` removido lia tudo de `process.env`. Sem logging de segredo no código AbacatePay. `.gitignore` cobre `.env*`; nenhum `.env` rastreado. `cleanup-stripe-test-data.sql` é só SELECT/DELETE idempotente em transação, sem credencial.
+2. **RLS** — `subscriptions` (schema canônico em `subscriptions-schema.sql`) mantém apenas `select_own` (SELECT por `auth.uid()=user_id`); sem policy de INSERT/UPDATE/DELETE ⇒ escrita deny-by-default, service role é o único caminho — igual a antes. `stripe-schema.sql` reduzido preserva `stripe_customers` (select/insert own legado, sem leitor no código) e `stripe_webhook_events` (RLS on, zero policy ⇒ deny). View `user_active_subscription` com `security_invoker=true`. Nenhuma policy nova permissiva.
+3. **`handle_new_user()`** — remoção do insert morto em `stripe_customers` (que gravava `stripe_customer_id NOT NULL` e quebrava cadastro AbacatePay) NÃO abre janela de fraude: o gate é o trigger separado `enforce_paid_signup_trg` (BEFORE INSERT em `auth.users`), intocado; `on_auth_user_created`/`handle_new_user` roda AFTER INSERT, depois do gate. Se o gate lança, a transação inteira aborta antes de qualquer provisionamento.
+4. **`/api/abacatepay/verify-signup`** — validação `ref`→linha→`getCheckout()` PAID→e-mail continua robusta. Estado lido da API, nunca do cliente. Bypass via anon key impossível: (a) escrita em `subscriptions` bloqueada por RLS; (b) linha nasce no checkout com status `incomplete` (PENDING), fora de `('active','trialing')`, logo não satisfaz o gate; (c) promover para `active` exige PAID real, só alcançável por verify-signup (checa PAID+e-mail) ou webhook (HMAC+secret, re-read na API). `signUp` direto sem assinatura paga e não reivindicada é barrado pelo trigger.
+5. **Superfície removida** — `app/api/stripe/{checkout,portal,webhook}` e `app/api/auth/verify-signup` deletados; `lib/stripe.ts`/`lib/stripe-sync.ts` removidos; `ManageSubscriptionButton` removido. Nenhum endpoint órfão acessível. Únicas referências textuais restantes são 2 comentários (`abacatepay/checkout/route.ts:12`, `abacatepay/verify-signup/route.ts:11`) — cosmético, sem efeito.
+
+**Observações não-bloqueantes:**
+- Comentário desatualizado em `credits-and-flow.sql` (função `enforce_paid_signup`) e em `verify-signup/route.ts` ainda cita a rota Stripe `app/api/auth/verify-signup` como validação primária; a validação agora vive na rota AbacatePay. Só doc.
+- Working tree do worktree tem 2 arquivos não commitados fora do escopo dos 3 commits: `app/(marketing)/page.tsx` e `app/(marketing)/precos/page.tsx` (troca de copy "Stripe"→"Pix/cartão", sem impacto de segurança). Commitar ou stashar antes do merge para o diff da PR ficar limpo.
+
+Merge fica a critério do Rafael, com este aceite de Segurança + o do Reviewer.
+
+**Registrado no LOG:** 2026-07-21, Security Reviewer, revisão D2f (remoção Stripe).

@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AnimatePresence, motion, useInView } from 'framer-motion';
-import toast from 'react-hot-toast';
-import { startStripeCheckout } from '@/lib/start-checkout';
 import { ShootingStarsGrid } from '@/components/ui/shooting-stars-grid';
+import LeadCaptureModal from '@/components/billing/LeadCaptureModal';
 import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2 } from 'lucide-react';
 
 /* ────────────────────────────────────────────────────────────────
@@ -884,17 +883,11 @@ const PLAN_FEATURES = [
 ];
 
 function Pricing() {
-  const [loadingInterval, setLoadingInterval] = useState<'month' | 'year' | null>(null);
-
-  async function handleSubscribe(interval: 'month' | 'year') {
-    setLoadingInterval(interval);
-    try {
-      await startStripeCheckout(interval, { nextPath: '/#planos' });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao iniciar checkout');
-      setLoadingInterval(null);
-    }
-  }
+  // Escolher um plano abre o popup de captura de lead (nome/e-mail/telefone) —
+  // o MESMO fluxo do /precos (CheckoutButton → LeadCaptureModal). O e-mail
+  // coletado segue para a AbacatePay; a landing não vai mais direto ao checkout
+  // AbacatePay nem pula a captura de lead.
+  const [modalInterval, setModalInterval] = useState<'month' | 'year' | null>(null);
 
   return (
     <section id="planos" className="py-12 md:py-16 px-6 bg-white">
@@ -907,7 +900,7 @@ function Pricing() {
             <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
-            Checkout seguro (Stripe). Sem fidelidade. Cancele quando quiser.
+            Checkout seguro (Pix ou cartão). Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 
@@ -941,11 +934,10 @@ function Pricing() {
               </ul>
               <button
                 type="button"
-                onClick={() => handleSubscribe('month')}
-                disabled={loadingInterval !== null}
+                onClick={() => setModalInterval('month')}
                 className="lp-btn white w-full justify-between mt-8 !bg-white !rounded-full"
               >
-                {loadingInterval === 'month' ? 'Abrindo checkout…' : 'Assinar Plano Mensal'} <ArrowChip />
+                Assinar Plano Mensal <ArrowChip />
               </button>
             </div>
           </FadeUp>
@@ -986,11 +978,10 @@ function Pricing() {
               </ul>
               <button
                 type="button"
-                onClick={() => handleSubscribe('year')}
-                disabled={loadingInterval !== null}
+                onClick={() => setModalInterval('year')}
                 className="lp-btn white w-full justify-between mt-8 !rounded-full"
               >
-                {loadingInterval === 'year' ? 'Abrindo checkout…' : 'Assinar Plano Anual'} <ArrowChip solid />
+                Assinar Plano Anual <ArrowChip solid />
               </button>
             </div>
           </FadeUp>
@@ -1001,6 +992,14 @@ function Pricing() {
             Precisa de ajuda? Fale com nosso suporte. Respondemos rápido.
           </p>
         </FadeUp>
+
+        {modalInterval && (
+          <LeadCaptureModal
+            interval={modalInterval}
+            planLabel={modalInterval === 'year' ? 'Anual' : 'Mensal'}
+            onClose={() => setModalInterval(null)}
+          />
+        )}
       </div>
     </section>
   );
@@ -1035,7 +1034,7 @@ const FAQS = [
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',
-    a: 'Você gerencia tudo pelo portal de assinatura dentro da plataforma: trocar de plano, atualizar cartão ou cancelar. E nosso suporte responde rápido pra qualquer dúvida.',
+    a: 'Você gerencia tudo com a ajuda do nosso suporte: trocar de plano, atualizar forma de pagamento ou cancelar. Respondemos rápido pra qualquer dúvida.',
   },
   {
     q: 'Posso cancelar quando quiser?',

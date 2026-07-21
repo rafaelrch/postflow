@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
 import { getUserCredits } from '@/lib/credits';
-import ManageSubscriptionButton from '@/components/billing/ManageSubscriptionButton';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -51,9 +50,6 @@ export default async function ContaPage() {
             {sub.cancel_at_period_end && (
               <p className="text-[var(--warn)]">Cancelamento agendado — não haverá nova cobrança.</p>
             )}
-            <div className="pt-4">
-              <ManageSubscriptionButton />
-            </div>
           </div>
         ) : (
           <div className="mt-4">
