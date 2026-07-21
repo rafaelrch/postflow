@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { appUrl } from '../lib/app-url';
 
 const route = (() => { try { return readFileSync(new URL('../app/api/abacatepay/passwordless/start/route.ts', import.meta.url), 'utf8'); } catch { return ''; } })();
 const sql = readFileSync(new URL('../supabase/credits-and-flow.sql', import.meta.url), 'utf8');
@@ -57,5 +58,42 @@ describe('passwordless B2 start (failure-first)', () => {
     expect(runbook).toMatch(/keep the\s+Supabase Email provider enabled/i);
     expect(runbook).toMatch(/enforce_paid_passwordless_marker_trg/);
     expect(runbook).not.toMatch(/disable public\s+email signup/i);
+  });
+});
+
+// Regressão do 403 determinístico: a rota rejeita quando `origin !== appUrl()`
+// (route.ts). Antes do fix, appUrl() sem path devolvia a base COM barra final,
+// então nunca casava com o header Origin do navegador (RFC 6454, sem barra) e
+// o OTP jamais saía. Exercita o appUrl() real, sem mockar Supabase/AbacatePay.
+describe('passwordless start — checagem de origin (regressão do 403)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // Réplica fiel do gate em route.ts:17.
+  const originRejeitado = (origin: string | null) => !origin || origin !== appUrl();
+
+  it('libera quando o Origin do navegador bate com appUrl() (sem barra final)', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://creatools.com.br');
+
+    // Origin real de navegador: nunca traz barra final.
+    expect(originRejeitado('https://creatools.com.br')).toBe(false);
+  });
+
+  it('libera mesmo se a env tiver barra final (normalizada por appUrl())', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://creatools.com.br/');
+
+    expect(originRejeitado('https://creatools.com.br')).toBe(false);
+  });
+
+  it('bloqueia (403) quando o Origin difere ou está ausente', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://creatools.com.br');
+
+    expect(originRejeitado('https://evil.example.com')).toBe(true);
+    expect(originRejeitado('https://creatools.com.br/')).toBe(true); // barra final ≠ Origin
+    expect(originRejeitado(null)).toBe(true);
   });
 });

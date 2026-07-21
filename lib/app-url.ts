@@ -17,6 +17,9 @@ export function appUrl(path = ''): string {
       );
     }
   }
-  const base = envUrl ?? 'http://localhost:3000';
-  return `${base.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+  const base = (envUrl ?? 'http://localhost:3000').replace(/\/$/, '');
+  // Sem path, retorna a base pura (sem barra final) — casa com o header Origin
+  // do navegador (RFC 6454 nunca traz barra final). Com path, garante uma única
+  // barra inicial.
+  return path ? `${base}${path.startsWith('/') ? path : `/${path}`}` : base;
 }
