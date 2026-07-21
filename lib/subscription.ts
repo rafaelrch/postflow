@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { stripe } from './stripe';
 import { createAdminSupabaseClient } from './supabase-admin';
 import { createServerSupabaseClient } from './supabase-server';
 
@@ -166,49 +165,4 @@ export async function refundCredits(userId: string, amount: number): Promise<voi
   const admin = createAdminSupabaseClient();
   const { error } = await admin.rpc('consume_credits', { p_user: userId, p_cost: -amount });
   if (error) console.error('[refundCredits]', error);
-}
-
-/**
- * Looks up (or creates) the Stripe customer for a Supabase user.
- * Idempotent: if the row already exists, returns the stored customer id.
- *
- * Uses the admin client because the customer row may not exist yet for a brand
- * new user, and we don't want a race between INSERT-policy and the lookup.
- */
-export async function getOrCreateStripeCustomer(opts: {
-  userId: string;
-  email: string;
-  name?: string;
-}): Promise<string> {
-  const admin = createAdminSupabaseClient();
-
-  const { data: existing, error: lookupErr } = await admin
-    .from('stripe_customers')
-    .select('stripe_customer_id')
-    .eq('user_id', opts.userId)
-    .maybeSingle();
-  if (lookupErr) throw lookupErr;
-  if (existing?.stripe_customer_id) return existing.stripe_customer_id;
-
-  const customer = await stripe.customers.create({
-    email: opts.email,
-    name: opts.name,
-    metadata: { supabase_user_id: opts.userId },
-  });
-
-  const { error: insertErr } = await admin
-    .from('stripe_customers')
-    .insert({ user_id: opts.userId, stripe_customer_id: customer.id });
-  if (insertErr) {
-    // If a parallel request already inserted, re-fetch instead of failing.
-    const { data: retry } = await admin
-      .from('stripe_customers')
-      .select('stripe_customer_id')
-      .eq('user_id', opts.userId)
-      .maybeSingle();
-    if (retry?.stripe_customer_id) return retry.stripe_customer_id;
-    throw insertErr;
-  }
-
-  return customer.id;
 }
