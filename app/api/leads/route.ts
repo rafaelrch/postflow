@@ -66,11 +66,9 @@ export async function POST(req: NextRequest) {
     );
 
     if (error) {
-      // Nunca registre message/details/hint: todos podem ecoar valores da linha.
-      // O code do Postgres é útil operacionalmente, mas só entra se tiver o
-      // formato estável documentado (alfanumérico/underscore, até 32 chars).
-      const code = /^[a-z0-9_]{1,32}$/i.test(error.code ?? '') ? error.code : 'unknown';
-      console.error('[api/leads] database_write_failed', { code });
+      // Nenhum campo do erro é confiável para log: até `code` pode conter PII
+      // se uma dependência ou mock devolver um objeto fora do contrato esperado.
+      console.error('[api/leads] database_write_failed');
       return NextResponse.json({ error: 'Não foi possível registrar seus dados.' }, { status: 500 });
     }
 

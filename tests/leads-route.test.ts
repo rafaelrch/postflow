@@ -107,13 +107,13 @@ describe('POST /api/leads', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFrom.mockReturnValue({ upsert: mockUpsert });
     mockUpsert.mockResolvedValue({
-      error: { code: '23505', message: 'duplicate key: email=segredo@example.com, phone=11999999999' },
+      error: { code: '11999999999', message: 'duplicate key: email=segredo@example.com, phone=11999999999' },
     });
 
     const res = await POST(jsonRequest({ name: 'Rafael', email: 'segredo@example.com', phone: '11999999999' }));
 
     expect(res.status).toBe(500);
-    expect(consoleError).toHaveBeenCalledWith('[api/leads] database_write_failed', { code: '23505' });
+    expect(consoleError).toHaveBeenCalledWith('[api/leads] database_write_failed');
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('segredo@example.com');
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('11999999999');
   });
