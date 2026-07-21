@@ -21,13 +21,38 @@ create table if not exists public.leads (
   -- Qual plano o lead escolheu ao demonstrar interesse. Mesmo vocabulário
   -- ('month'/'year') usado em subscriptions.plan_interval.
   plan_interval text not null check (plan_interval in ('month', 'year')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Última vez que o mesmo e-mail reenviou o formulário (ver upsert abaixo).
+  updated_at timestamptz not null default now()
 );
 
--- Consulta típica de remarketing: mais recentes primeiro, e busca por e-mail
--- para cruzar com quem depois virou assinante.
+-- Coluna nova para tabelas que já existiam antes deste bloco.
+alter table public.leads add column if not exists updated_at timestamptz not null default now();
+
+-- E-mail único: um lead por endereço. A rota faz upsert por e-mail (atualiza
+-- nome/telefone/plano + updated_at) em vez de acumular duplicata infinita do
+-- mesmo contato. created_at fica com o primeiro registro; updated_at marca o
+-- último interesse.
+-- Antes de criar o índice único, remove duplicatas pré-existentes mantendo a
+-- linha mais recente por e-mail (idempotente: sem duplicata, é no-op).
+delete from public.leads a
+  using public.leads b
+  where a.email = b.email
+    and (a.created_at, a.id) < (b.created_at, b.id);
+
+alter table public.leads drop constraint if exists leads_email_key;
+alter table public.leads add constraint leads_email_key unique (email);
+
+-- Consulta típica de remarketing: mais recentes primeiro. O índice único de
+-- e-mail (leads_email_key) já cobre a busca por endereço — o idx_leads_email
+-- antigo, não-único, vira redundante.
 create index if not exists idx_leads_created_at on public.leads (created_at desc);
-create index if not exists idx_leads_email on public.leads (email);
+drop index if exists idx_leads_email;
+
+-- updated_at automático no upsert.
+drop trigger if exists set_leads_updated on public.leads;
+create trigger set_leads_updated before update on public.leads
+  for each row execute function public.set_updated_at();
 
 -- RLS ligado e NENHUMA policy ⇒ deny por padrão para o usuário final. A
 -- inserção acontece só via service role na rota /api/leads (mesmo padrão de

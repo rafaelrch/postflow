@@ -12,8 +12,13 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 // mockados no teste (mesmo motivo documentado em stripe/checkout/route.ts).
 import { hasBillableSubscription } from '../../../../lib/subscription';
 import { upsertSubscription } from '../../../../lib/abacatepay-sync';
+import { rateLimit, clientIp } from '../../../../lib/rate-limit';
 
 export const runtime = 'nodejs';
+
+// Rota pública de escrita (checkout pré-login): teto por IP por minuto.
+const CHECKOUT_RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60_000;
 
 /**
  * Checkout "pagamento primeiro": NÃO exige login. Equivalente AbacatePay da
@@ -32,6 +37,15 @@ export const runtime = 'nodejs';
  */
 export async function POST(req: NextRequest) {
   try {
+    const ip = clientIp(req);
+    const rl = rateLimit(`abacate-checkout:${ip}`, { limit: CHECKOUT_RATE_LIMIT, windowMs: RATE_WINDOW_MS });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Muitas requisições. Tente novamente em instantes.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+      );
+    }
+
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },

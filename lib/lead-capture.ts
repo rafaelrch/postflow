@@ -23,12 +23,22 @@ export type LeadFormErrors = Partial<Record<keyof LeadForm, string>>;
 // espaços. Não tenta validar RFC completa — só barrar erro grosseiro no client.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/**
+ * Teto de tamanho por campo. Sem isso a rota pública aceita uma string de MB
+ * por campo (DoS de memória / lixo no banco). 200 cobre com folga qualquer
+ * nome/e-mail/telefone real. Barra ANTES do formato: um e-mail gigante casa o
+ * regex (o local part é "não-@"), então o comprimento é uma checagem própria.
+ */
+export const MAX_LEAD_FIELD_LEN = 200;
+
 export function isValidEmail(email: string): boolean {
-  return EMAIL_RE.test(email.trim());
+  const v = email.trim();
+  return v.length <= MAX_LEAD_FIELD_LEN && EMAIL_RE.test(v);
 }
 
 export function isValidName(name: string): boolean {
-  return name.trim().length >= 2;
+  const v = name.trim();
+  return v.length >= 2 && v.length <= MAX_LEAD_FIELD_LEN;
 }
 
 /**
@@ -37,6 +47,7 @@ export function isValidName(name: string): boolean {
  * parênteses e traços são ignorados — o usuário digita como quiser.
  */
 export function isValidBrPhone(phone: string): boolean {
+  if (phone.trim().length > MAX_LEAD_FIELD_LEN) return false;
   const digits = phone.replace(/\D/g, '');
   const national = digits.length > 11 && digits.startsWith('55') ? digits.slice(2) : digits;
   return national.length === 10 || national.length === 11;

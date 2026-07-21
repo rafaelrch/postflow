@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetRateLimit } from '../lib/rate-limit';
 
 const { mockCreateCustomer, mockCreateCheckout, mockGetUser, mockLimit, mockUpsertSubscription } =
   vi.hoisted(() => ({
@@ -37,13 +38,31 @@ vi.mock('@/lib/supabase-server', () => ({
 
 import { POST } from '../app/api/abacatepay/checkout/route';
 
-function jsonRequest(body: unknown) {
-  return { json: async () => body } as unknown as Parameters<typeof POST>[0];
+function jsonRequest(body: unknown, ip = '10.0.0.1') {
+  return {
+    json: async () => body,
+    headers: { get: (h: string) => (h === 'x-forwarded-for' ? ip : null) },
+  } as unknown as Parameters<typeof POST>[0];
 }
 
+beforeEach(() => __resetRateLimit());
 afterEach(() => vi.clearAllMocks());
 
 describe('POST /api/abacatepay/checkout', () => {
+  it('rate limit: 11ª requisição do mesmo IP em 1 min recebe 429 antes de qualquer chamada', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    mockCreateCustomer.mockResolvedValue({ id: 'cust_x', email: 'a@test.com' });
+    mockCreateCheckout.mockResolvedValue({ id: 'bill_x', url: 'https://x', status: 'PENDING', items: [] });
+
+    const ip = '203.0.113.9';
+    for (let i = 0; i < 10; i++) {
+      const res = await POST(jsonRequest({ interval: 'month', email: `a${i}@test.com` }, ip));
+      expect(res.status).toBe(200);
+    }
+    const blocked = await POST(jsonRequest({ interval: 'month', email: 'a10@test.com' }, ip));
+    expect(blocked.status).toBe(429);
+  });
+
   it('retorna 409 alreadySubscribed e NÃO chama a AbacatePay quando o logado já assina (B1)', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'assinante@test.com' } }, error: null });
     mockLimit.mockResolvedValue({ data: [{ id: 'bill_1' }], error: null });

@@ -3,8 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 // o mock a partir do caminho do arquivo de teste, não do alias '@/'.
 import { validateLeadForm, hasErrors, type LeadInterval } from '../../../lib/lead-capture';
 import { createAdminSupabaseClient } from '../../../lib/supabase-admin';
+import { rateLimit, clientIp } from '../../../lib/rate-limit';
 
 export const runtime = 'nodejs';
+
+// Rota pública de escrita: teto de requisições por IP por minuto.
+const LEADS_RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60_000;
 
 /**
  * Grava um lead (nome/e-mail/telefone + plano escolhido) no submit do popup de
@@ -17,6 +22,15 @@ export const runtime = 'nodejs';
  */
 export async function POST(req: NextRequest) {
   try {
+    const ip = clientIp(req);
+    const rl = rateLimit(`leads:${ip}`, { limit: LEADS_RATE_LIMIT, windowMs: RATE_WINDOW_MS });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Muitas requisições. Tente novamente em instantes.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+      );
+    }
+
     const body = (await req.json().catch(() => ({}))) as {
       name?: string;
       email?: string;
@@ -39,21 +53,29 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminSupabaseClient();
-    const { error } = await admin.from('leads').insert({
-      name: form.name,
-      email: form.email,
-      phone: form.phone,
-      plan_interval: interval,
-    });
+    // Upsert por e-mail: reenvio do mesmo endereço atualiza nome/telefone/plano
+    // (+ updated_at via trigger) em vez de acumular duplicata. Ver leads-schema.sql.
+    const { error } = await admin.from('leads').upsert(
+      {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        plan_interval: interval,
+      },
+      { onConflict: 'email' },
+    );
 
     if (error) {
-      console.error('[api/leads] erro ao inserir lead:', error);
+      // Log SEM PII: só code/message do Postgres, nunca `details`/`hint` (que
+      // ecoam o valor da linha, ex.: "Key (email)=(...)"). Nem os campos do form.
+      console.error('[api/leads] falha ao gravar lead:', { code: error.code, message: error.message });
       return NextResponse.json({ error: 'Não foi possível registrar seus dados.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('[api/leads]', err);
+    // Idem: só a mensagem da exceção, sem despejar objeto que possa conter o form.
+    console.error('[api/leads] erro inesperado:', err instanceof Error ? err.message : 'desconhecido');
     return NextResponse.json({ error: 'Erro ao registrar lead.' }, { status: 500 });
   }
 }

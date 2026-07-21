@@ -47,6 +47,18 @@ describe('validação de campos', () => {
     expect(errs.email).toBeTruthy();
     expect(errs.phone).toBeTruthy();
   });
+
+  it('cap de tamanho: campo acima de 200 chars é inválido', () => {
+    const huge = 'a'.repeat(201);
+    expect(isValidName(huge)).toBe(false);
+    // e-mail gigante casa o regex mas estoura o teto → inválido
+    expect(isValidEmail(`${'a'.repeat(200)}@test.com`)).toBe(false);
+    // telefone com 10-11 dígitos mas enterrado em 200+ chars de lixo → inválido
+    expect(isValidBrPhone(`${'x'.repeat(220)}11999999999`)).toBe(false);
+
+    const errs = validateLeadForm({ name: huge, email: VALIDO.email, phone: VALIDO.phone });
+    expect(errs.name).toBeTruthy();
+  });
 });
 
 describe('submitLeadThenCheckout — ordem e contrato', () => {
