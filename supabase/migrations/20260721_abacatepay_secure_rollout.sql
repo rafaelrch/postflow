@@ -187,15 +187,17 @@ grant execute on function public.refresh_credits(uuid, integer, boolean) to serv
 
 create or replace function public.enforce_paid_signup()
 returns trigger language plpgsql security definer set search_path = pg_catalog, public as $$
-declare v_ref text; v_claimed_id text;
+declare v_ref text;
 begin
   v_ref := nullif(btrim(new.raw_user_meta_data->>'checkout_ref'), '');
   if v_ref is null then raise exception 'subscription_proof_required' using errcode = 'P0001'; end if;
-  update public.subscriptions set user_id = new.id where provider = 'abacatepay'
-    and status = 'active' and user_id is null and lower(email) = lower(new.email)
-    and metadata->>'ref' = v_ref returning id into v_claimed_id;
-  if v_claimed_id is null then raise exception 'subscription_proof_invalid_or_used' using errcode = 'P0001'; end if;
-  new.raw_user_meta_data := coalesce(new.raw_user_meta_data, '{}'::jsonb) - 'checkout_ref';
+  if not exists (
+    select 1 from public.subscriptions where provider = 'abacatepay'
+      and status = 'active' and user_id is null and lower(email) = lower(new.email)
+      and metadata->>'ref' = v_ref
+  ) then
+    raise exception 'subscription_proof_invalid_or_used' using errcode = 'P0001';
+  end if;
   return new;
 end;
 $$;
@@ -208,6 +210,32 @@ end $$;
 drop trigger if exists enforce_paid_signup_trg on auth.users;
 create trigger enforce_paid_signup_trg before insert on auth.users
   for each row execute function public.enforce_paid_signup();
+
+create or replace function public.claim_paid_signup()
+returns trigger language plpgsql security definer set search_path = pg_catalog, public as $$
+declare v_ref text; v_claimed_id text;
+begin
+  v_ref := nullif(btrim(new.raw_user_meta_data->>'checkout_ref'), '');
+  update public.subscriptions set user_id = new.id where provider = 'abacatepay'
+    and status = 'active' and user_id is null and lower(email) = lower(new.email)
+    and metadata->>'ref' = v_ref returning id into v_claimed_id;
+  if v_claimed_id is null then
+    raise exception 'subscription_proof_invalid_or_used' using errcode = 'P0001';
+  end if;
+  update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'checkout_ref'
+    where id = new.id;
+  return new;
+end;
+$$;
+revoke all on function public.claim_paid_signup() from public, anon, authenticated;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
+    execute 'grant execute on function public.claim_paid_signup() to supabase_auth_admin';
+  end if;
+end $$;
+drop trigger if exists claim_paid_signup_trg on auth.users;
+create trigger claim_paid_signup_trg after insert on auth.users
+  for each row execute function public.claim_paid_signup();
 
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = pg_catalog, public as $$

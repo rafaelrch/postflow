@@ -28,6 +28,10 @@ function enforceFunction(sql: string): string {
   return sql.match(/create or replace function public\.enforce_paid_signup\(\)[\s\S]*?\$\$;/i)?.[0] ?? '';
 }
 
+function claimFunction(sql: string): string {
+  return sql.match(/create or replace function public\.claim_paid_signup\(\)[\s\S]*?\$\$;/i)?.[0] ?? '';
+}
+
 describe('rollout SQL seguro AbacatePay', () => {
   it('possui migration one-shot transacional específica do snapshot', () => {
     expect(existsSync(migrationPath)).toBe(true);
@@ -37,20 +41,38 @@ describe('rollout SQL seguro AbacatePay', () => {
     expect(migration).toMatch(/alter\s+column\s+stripe_customer_id\s+drop\s+not\s+null/i);
     expect(migration).toMatch(/add\s+column\s+if\s+not\s+exists\s+provider[^;]*default\s+'stripe'/i);
     expect(migration).not.toMatch(/delete\s+from\s+public\./i);
+    const migrationEnforce = enforceFunction(migration);
+    const migrationClaim = claimFunction(migration);
+    expect(migrationEnforce).not.toMatch(/update\s+public\.subscriptions/i);
+    expect(migrationClaim).toMatch(/update\s+public\.subscriptions[\s\S]*?user_id\s*=\s*new\.id/i);
+    expect(migration.indexOf('create trigger claim_paid_signup_trg')).toBeLessThan(
+      migration.indexOf('create trigger on_auth_user_created'),
+    );
   });
 
   it('fecha B2 no trigger com ref, provider e claim atômico one-shot', () => {
     const enforce = enforceFunction(credits);
+    const claim = claimFunction(credits);
     expect(enforce).not.toBe('');
-    expect(b2Violations(enforce)).toEqual([]);
-    expect(enforce).toMatch(/new\.raw_user_meta_data\s*:?=\s*coalesce[\s\S]*?-\s*'checkout_ref'/i);
+    expect(claim).not.toBe('');
+    expect(enforce).toMatch(/raw_user_meta_data\s*->>\s*'checkout_ref'/i);
+    expect(enforce).not.toMatch(/update\s+public\.subscriptions/i);
+    expect(b2Violations(claim)).toEqual([]);
+    expect(claim).toMatch(/update\s+auth\.users[\s\S]*?-\s*'checkout_ref'/i);
+    expect(claim).toMatch(/update\s+public\.subscriptions[\s\S]*?returning\s+id/i);
+    expect(credits.indexOf('create trigger enforce_paid_signup_trg')).toBeLessThan(
+      credits.indexOf('create trigger claim_paid_signup_trg'),
+    );
+    expect(credits.indexOf('create trigger claim_paid_signup_trg')).toBeLessThan(
+      credits.indexOf('create trigger on_auth_user_created'),
+    );
     expect(credits).toMatch(/create\s+trigger\s+on_auth_user_created/i);
   });
 
   it('mutation-check detecta remoção dos guards B2 críticos', () => {
-    const enforce = enforceFunction(credits);
-    const withoutProvider = enforce.replace(/provider\s*=\s*'abacatepay'/i, 'true');
-    const withoutClaim = enforce.replace(/user_id\s+is\s+null/i, 'true');
+    const claim = claimFunction(credits);
+    const withoutProvider = claim.replace(/provider\s*=\s*'abacatepay'/i, 'true');
+    const withoutClaim = claim.replace(/user_id\s+is\s+null/i, 'true');
 
     expect(b2Violations(withoutProvider)).toContain('missing_provider_filter');
     expect(b2Violations(withoutClaim)).toContain('missing_unclaimed_filter');

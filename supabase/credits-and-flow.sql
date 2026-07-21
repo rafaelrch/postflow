@@ -148,39 +148,31 @@ $$;
 revoke all on function public.refresh_credits(uuid, integer, boolean) from public, anon, authenticated;
 grant execute on function public.refresh_credits(uuid, integer, boolean) to service_role;
 
--- B2: o ref secreto precisa acompanhar o signUp. Um único UPDATE valida
--- provider/e-mail/status/ref, exige user_id NULL e reivindica a assinatura.
--- Sob corrida, apenas uma transação encontra a linha ainda não reivindicada.
+-- B2 BEFORE: valida a prova, mas não toca subscriptions. O auth.users row ainda
+-- não existe neste ponto, portanto qualquer FK claim precisa esperar o AFTER.
 create or replace function public.enforce_paid_signup()
 returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public
 as $$
-declare
-  v_ref text;
-  v_claimed_id text;
+declare v_ref text;
 begin
   v_ref := nullif(btrim(new.raw_user_meta_data->>'checkout_ref'), '');
   if v_ref is null then
     raise exception 'subscription_proof_required' using errcode = 'P0001';
   end if;
 
-  update public.subscriptions
-     set user_id = new.id
-   where provider = 'abacatepay'
-     and status = 'active'
-     and user_id is null
-     and lower(email) = lower(new.email)
-     and metadata->>'ref' = v_ref
-   returning id into v_claimed_id;
-
-  if v_claimed_id is null then
+  if not exists (
+    select 1 from public.subscriptions
+     where provider = 'abacatepay'
+       and status = 'active'
+       and user_id is null
+       and lower(email) = lower(new.email)
+       and metadata->>'ref' = v_ref
+  ) then
     raise exception 'subscription_proof_invalid_or_used' using errcode = 'P0001';
   end if;
-
-  -- A prova não fica persistida em auth.users.raw_user_meta_data.
-  new.raw_user_meta_data := coalesce(new.raw_user_meta_data, '{}'::jsonb) - 'checkout_ref';
   return new;
 end;
 $$;
@@ -199,8 +191,55 @@ create trigger enforce_paid_signup_trg
   before insert on auth.users
   for each row execute function public.enforce_paid_signup();
 
--- O BEFORE trigger acima já fez o único claim permitido. Este AFTER trigger
--- apenas cria profile, mapeia customer e provisiona créditos para essa linha.
+-- B2 AFTER: o auth.users row já existe, então o FK de subscriptions.user_id é
+-- válido. O UPDATE continua one-shot sob corrida (user_id IS NULL + RETURNING).
+create or replace function public.claim_paid_signup()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_ref text;
+  v_claimed_id text;
+begin
+  v_ref := nullif(btrim(new.raw_user_meta_data->>'checkout_ref'), '');
+  update public.subscriptions
+     set user_id = new.id
+   where provider = 'abacatepay'
+     and status = 'active'
+     and user_id is null
+     and lower(email) = lower(new.email)
+     and metadata->>'ref' = v_ref
+   returning id into v_claimed_id;
+
+  if v_claimed_id is null then
+    raise exception 'subscription_proof_invalid_or_used' using errcode = 'P0001';
+  end if;
+
+  update auth.users
+     set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'checkout_ref'
+   where id = new.id;
+  return new;
+end;
+$$;
+
+revoke all on function public.claim_paid_signup() from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
+    execute 'grant execute on function public.claim_paid_signup() to supabase_auth_admin';
+  end if;
+end
+$$;
+
+drop trigger if exists claim_paid_signup_trg on auth.users;
+create trigger claim_paid_signup_trg
+  after insert on auth.users
+  for each row execute function public.claim_paid_signup();
+
+-- This AFTER trigger name sorts after claim_paid_signup_trg in PostgreSQL, so it
+-- only provisions data after the atomic claim has succeeded.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
