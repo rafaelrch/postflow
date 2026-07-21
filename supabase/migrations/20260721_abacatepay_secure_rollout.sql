@@ -427,4 +427,17 @@ end; $$;
 revoke all on function public.claim_paid_signup_for_user(uuid) from public,anon,authenticated;
 do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_paid_signup_for_user(uuid) to supabase_auth_admin'; end if; end $$;
 
+create or replace function public.enforce_paid_passwordless_marker()
+returns trigger language plpgsql security definer set search_path=pg_catalog,public,auth as $$
+begin
+  if coalesce(new.raw_app_meta_data->>'origin','') <> 'paid_passwordless' then
+    raise exception 'paid_passwordless_marker_required' using errcode='P0001';
+  end if;
+  return new;
+end; $$;
+revoke all on function public.enforce_paid_passwordless_marker() from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.enforce_paid_passwordless_marker() to supabase_auth_admin'; end if; end $$;
+drop trigger if exists enforce_paid_passwordless_marker_trg on auth.users;
+create trigger enforce_paid_passwordless_marker_trg before insert on auth.users for each row execute function public.enforce_paid_passwordless_marker();
+
 commit;

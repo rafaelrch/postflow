@@ -7,6 +7,7 @@ const sync = readFileSync(new URL('../lib/abacatepay-sync.ts', import.meta.url),
 const page = readFileSync(new URL('../app/(auth)/cadastro/page.tsx', import.meta.url), 'utf8');
 const checkout = readFileSync(new URL('../app/api/abacatepay/checkout/route.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20260721_abacatepay_secure_rollout.sql', import.meta.url), 'utf8');
+const runbook = readFileSync(new URL('../docs/abacatepay-db-rollout.md', import.meta.url), 'utf8');
 
 describe('passwordless B2 start (failure-first)', () => {
   it('envia OTP e não faz upsert direto de intent', () => {
@@ -40,5 +41,21 @@ describe('passwordless B2 start (failure-first)', () => {
       expect(definition).toMatch(/on conflict\(user_id\) do update/);
     }
     expect(canonical.replace(/\s+/g,' ')).toBe(migrated.replace(/\s+/g,' '));
+  });
+  it('gate final bloqueia criação sem app_metadata marker e não é removido depois', () => {
+    for (const source of [sql, migration]) {
+      const defs = source.match(/create or replace function public\.enforce_paid_passwordless_marker\(\)[\s\S]*?create trigger enforce_paid_passwordless_marker_trg[\s\S]*?execute function public\.enforce_paid_passwordless_marker\(\)/gi) ?? [];
+      expect(defs.length).toBeGreaterThan(0);
+      const last = defs.at(-1)!;
+      expect(last).toMatch(/raw_app_meta_data->>'origin'.*paid_passwordless/);
+      expect(last).toMatch(/raise exception 'paid_passwordless_marker_required'/);
+    }
+    expect(migration.lastIndexOf('drop trigger if exists enforce_paid_passwordless_marker_trg')).toBeLessThan(migration.lastIndexOf('create trigger enforce_paid_passwordless_marker_trg'));
+    expect(migration).not.toMatch(/raw_user_meta_data.*origin.*paid_passwordless/);
+  });
+  it('runbook mantém Email provider ligado e documenta o gate', () => {
+    expect(runbook).toMatch(/keep the\s+Supabase Email provider enabled/i);
+    expect(runbook).toMatch(/enforce_paid_passwordless_marker_trg/);
+    expect(runbook).not.toMatch(/disable public\s+email signup/i);
   });
 });

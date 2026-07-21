@@ -94,6 +94,8 @@ Expected: the pre-migration subscription count is unchanged, all old rows are
 `claim_on_email_confirmation_trg` is present on `auth.users` with the
 `email_confirmed_at` transition guard. Confirmed existing
 users are claimed before OTP is sent, then still receive OTP to authenticate.
+`enforce_paid_passwordless_marker_trg` must also be present as a BEFORE INSERT
+gate; future Free flows require a separately authorized marker and trigger.
 The ACL query must show `consume_credits` only for `authenticated`;
 `refund_credits` and `refresh_credits` only for `service_role`; auth trigger
 functions only for the Supabase auth role.
@@ -109,8 +111,11 @@ SELECTs; do not combine it with the migration.
 ## Passwordless B2 configuration (manual)
 
 Configure Supabase Custom SMTP with Resend (`smtp.resend.com`, user `resend`,
-password entered only in the dashboard), use the OTP template, disable public
-email signup, allowlist only the fixed callback, verify the Resend domain,
+password entered only in the dashboard), use the OTP template, and keep the
+Supabase Email provider enabled (OTP depends on it). Verify
+`enforce_paid_passwordless_marker_trg` is installed; direct password signup
+without `raw_app_meta_data.origin = 'paid_passwordless'` fails in that trigger.
+Allowlist only the fixed callback, verify the Resend domain,
 configure rate limits/CAPTCHA, and revoke any previously exposed key. No
 Resend SDK or API key is stored in the app.
 
@@ -120,7 +125,7 @@ users fail closed), call only `prepare_paid_signup_intent`, then
 `signInWithOtp({ shouldCreateUser: false })`. OTP verification calls the
 authenticated atomic claim RPC; only after claim may password be set. A
 temporary hosted/staging Supabase test is mandatory—mocks do not prove GoTrue
-behavior with public signup disabled.
+behavior with the Email provider and trigger gate enabled.
 
 ## Manual recovery (Rafael only; never automatic)
 
