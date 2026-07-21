@@ -38,7 +38,7 @@ export default function AuthForm({
   const title = isSignup ? 'Criar conta' : 'Entrar';
 
   const redirectTo = useMemo(() => {
-    // Mesma fonte de verdade de lib/stripe.ts#appUrl: NEXT_PUBLIC_APP_URL
+    // Mesma fonte de verdade de lib/app-url.ts#appUrl: NEXT_PUBLIC_APP_URL
     // (inlinada no build). window.location.origin fica só como fallback de dev.
     const envUrl = process.env.NEXT_PUBLIC_APP_URL;
     const base = envUrl

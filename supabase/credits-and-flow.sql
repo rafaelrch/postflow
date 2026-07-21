@@ -1,6 +1,7 @@
 -- ============================================================
 -- PostFlow/Creatools — Fluxo "pagamento primeiro" + créditos
--- Idempotente. Rodar APÓS supabase/schema.sql e supabase/stripe-schema.sql.
+-- Idempotente. Rodar APÓS supabase/schema.sql, supabase/subscriptions-schema.sql
+-- e supabase/stripe-schema.sql.
 -- ============================================================
 
 -- 1) subscriptions: pode existir antes do usuário (criada no checkout sem auth)
@@ -166,10 +167,10 @@ begin
    limit 1;
 
   if found then
-    insert into public.stripe_customers (user_id, stripe_customer_id)
-    values (new.id, v_sub.stripe_customer_id)
-    on conflict (user_id) do nothing;
-
+    -- (Removido na migração AbacatePay) Não espelha mais em stripe_customers: a
+    -- coluna stripe_customer_id é NULL numa assinatura AbacatePay, e
+    -- stripe_customers.stripe_customer_id é NOT NULL — o insert antigo quebrava
+    -- o cadastro pago via AbacatePay. Nada mais lê stripe_customers.
     v_allowance := public.plan_allowance(v_sub.price_id, v_sub.plan_interval);
 
     insert into public.user_credits (user_id, balance, monthly_allowance, period_start, period_end)

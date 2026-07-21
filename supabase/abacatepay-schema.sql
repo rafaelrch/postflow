@@ -1,6 +1,7 @@
 -- ============================================================
 -- Creatools — AbacatePay (assinatura) schema
--- Idempotente. Rodar APÓS supabase/schema.sql e supabase/stripe-schema.sql.
+-- Idempotente. Rodar APÓS supabase/schema.sql e supabase/subscriptions-schema.sql
+-- (que já define provider/abacatepay_customer_id — os ALTERs abaixo viram no-op).
 --
 -- ESTRATÉGIA: aditivo, não substitutivo. Em vez de criar uma tabela
 -- `abacatepay_subscriptions` paralela, a tabela `subscriptions` existente

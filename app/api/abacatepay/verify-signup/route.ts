@@ -7,8 +7,8 @@ import { resolveEmail, upsertSubscription } from '../../../../lib/abacatepay-syn
 export const runtime = 'nodejs';
 
 /**
- * B2 — sequestro de conta, equivalente AbacatePay de
- * app/api/auth/verify-signup/route.ts.
+ * B2 — sequestro de conta. Verificação de pagamento no cadastro pré-login
+ * (a versão Stripe em app/api/auth/verify-signup foi removida na migração).
  *
  * A propriedade de segurança é a mesma: o cadastro é pagamento-primeiro e
  * pré-login, então quem preenche o formulário só prova ser quem pagou
