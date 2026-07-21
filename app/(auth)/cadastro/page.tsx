@@ -2,14 +2,9 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '@/components/auth/AuthForm';
-import PendingPayment from '@/components/auth/PendingPayment';
-import { getCheckout } from '@/lib/abacatepay';
-import { resolveEmail, upsertSubscription, intervalOf } from '@/lib/abacatepay-sync';
-import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
-
-type PlanInterval = 'month' | 'year';
+export const metadata = { referrer: 'no-referrer' as const };
 
 /**
  * Cadastro "pagamento primeiro" (AbacatePay): só é possível criar conta com um
@@ -26,49 +21,11 @@ export default async function CadastroPage({
 }) {
   const { ref } = await searchParams;
 
-  if (!ref) return <Shell><NoSubscription /></Shell>;
-
-  // ref → linha da assinatura (gravada como 'incomplete' na criação do checkout).
-  const admin = createAdminSupabaseClient();
-  const { data: row } = await admin
-    .from('subscriptions')
-    .select('id, email, plan_interval, status')
-    .eq('provider', 'abacatepay')
-    .eq('metadata->>ref', ref)
-    .is('user_id', null)
-    .maybeSingle();
-
-  // ref sem linha correspondente = referência inválida/forjada.
-  if (!row?.id) return <Shell><NoSubscription /></Shell>;
-
-  let email = (row.email as string | null) ?? null;
-  let planInterval = row.plan_interval as PlanInterval | undefined;
-
-  // Se o webhook já marcou ativo, confia no registro. Senão, relê o checkout na
-  // API: PAID é o único status que comprova pagamento. getCheckout é a verdade;
-  // não dependemos do timing de entrega do webhook.
-  if (row.status !== 'active') {
-    try {
-      const checkout = await getCheckout(row.id as string);
-      if (checkout.status !== 'PAID') return <Shell><PendingPayment /></Shell>;
-      email = (await resolveEmail(checkout)) ?? email;
-      planInterval = intervalOf(checkout);
-      // Defesa em profundidade: sincroniza agora pra que o trigger
-      // enforce_paid_signup encontre o registro certo no signUp em seguida.
-      await upsertSubscription(checkout, email);
-    } catch {
-      // API indisponível e registro ainda não ativo: não dá pra confirmar agora.
-      return <Shell><PendingPayment /></Shell>;
-    }
-  }
-
-  if (!email || !planInterval) return <Shell><PendingPayment /></Shell>;
-
-  const planLabel = planInterval === 'year' ? 'Anual' : 'Mensal';
+  if (!ref || !/^[A-Za-z0-9_-]{8,160}$/.test(ref)) return <Shell><NoSubscription /></Shell>;
 
   return (
     <Suspense fallback={null}>
-      <AuthForm mode="signup" lockedEmail={email} planLabel={planLabel} checkoutRef={ref} />
+      <AuthForm mode="signup" checkoutRef={ref} />
     </Suspense>
   );
 }

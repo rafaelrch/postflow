@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
@@ -30,13 +30,14 @@ export default function AuthForm({
   const next = searchParams.get('next') || '/dashboard';
   const isSignup = mode === 'signup';
 
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState(lockedEmail ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [claimed, setClaimed] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const title = isSignup ? 'Criar conta' : 'Entrar';
 
@@ -70,10 +71,25 @@ export default function AuthForm({
           return;
         }
 
-        const verifyRes = await fetch('/api/abacatepay/verify-signup', {
+        if (confirmationSent && !claimed) {
+          const verified = await supabase.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: 'email' });
+          if (verified.error) throw verified.error;
+          setClaimed(true);
+          toast.success('E-mail confirmado. Defina sua senha para continuar.');
+          return;
+        }
+        if (claimed) {
+          if (password.length < 6) throw new Error('password_required');
+          const updated = await supabase.auth.updateUser({ password });
+          if (updated.error) throw updated.error;
+          router.replace('/onboarding');
+          router.refresh();
+          return;
+        }
+        const verifyRes = await fetch('/api/abacatepay/passwordless/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), ref }),
+          body: JSON.stringify({ checkout_ref: ref }),
         });
         if (!verifyRes.ok) {
           const verifyData = await verifyRes.json().catch(() => ({}));
@@ -81,37 +97,9 @@ export default function AuthForm({
           return;
         }
 
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: redirectTo,
-            data: {
-              name: name.trim(),
-              phone: phone.trim(),
-              // O trigger BEFORE INSERT valida e remove este valor antes de
-              // persistir o usuário; conhecer só o e-mail não basta para signup.
-              checkout_ref: ref,
-            },
-          },
-        });
-
-        if (error) throw error;
-
-        if (data.session) {
-          await supabase.from('profiles').upsert({
-            id: data.user?.id,
-            name: name.trim(),
-            phone: phone.trim(),
-          });
-          toast.success('Conta criada. Vamos configurar sua marca.');
-          router.replace('/onboarding');
-          router.refresh();
-          return;
-        }
-
         setConfirmationSent(true);
-        toast.success('Se a confirmação por e-mail estiver ativa no Supabase, confira sua caixa de entrada.');
+        window.history.replaceState(null, '', '/cadastro');
+        toast.success('Código enviado. Confira sua caixa de entrada.');
         return;
       }
 
@@ -125,17 +113,20 @@ export default function AuthForm({
       toast.success('Login realizado.');
       router.replace(next);
       router.refresh();
-    } catch (err) {
-      let message = err instanceof Error ? err.message : 'Não foi possível autenticar.';
-      // O gate "pagamento primeiro" (trigger no banco) chega aqui como um
-      // erro genérico do Supabase Auth — traduz para uma mensagem acionável.
-      if (isSignup && /database error|subscription_required|subscription_proof_(required|invalid_or_used)/i.test(message)) {
-        message = 'Esse e-mail ainda não tem uma assinatura ativa. Assine um plano em /precos antes de criar a conta (use o mesmo e-mail do pagamento).';
-      }
-      toast.error(message);
+    } catch {
+      toast.error(isSignup ? 'Não foi possível concluir o cadastro.' : 'Não foi possível autenticar.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const resendOtp = async () => {
+    if (!checkoutRef || resendCooldown > 0) return;
+    setResendCooldown(30);
+    const res = await fetch('/api/abacatepay/passwordless/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checkout_ref: checkoutRef }) });
+    if (!res.ok) toast.error('Não foi possível reenviar o código.');
+    else toast.success('Se elegível, um novo código foi enviado.');
+    const timer = window.setInterval(() => setResendCooldown((v) => { if (v <= 1) { window.clearInterval(timer); return 0; } return v - 1; }), 1000);
   };
 
   return (
@@ -166,26 +157,22 @@ export default function AuthForm({
             <div className="brand-card" style={{ padding: 24 }}>
               <CheckCircle2 className="w-8 h-8 mb-4" style={{ color: 'var(--success)' }} />
               <h2 className="font-display text-[26px] leading-none mb-3">Confirme seu e-mail</h2>
-              <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
-                Se a confirmação por e-mail estiver ativa no Supabase, o link foi enviado para <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
-              </p>
-              <Button className="mt-6 w-full" onClick={() => router.push(`/login?next=${encodeURIComponent(next)}`)}>
-                Ir para login
+                <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
+                Digite o código enviado para confirmar a posse do e-mail.
+                </p>
+              {!claimed && <Field icon={Mail} label="Código OTP" value={otp} onChange={setOtp} inputMode="numeric" autoComplete="one-time-code" required />}
+              {!claimed && <Button type="button" onClick={() => { void resendOtp(); }} disabled={resendCooldown > 0}>{resendCooldown ? `Reenviar em ${resendCooldown}s` : 'Reenviar código'}</Button>}
+              {claimed && <Field icon={Lock} label="Nova senha" value={password} onChange={setPassword} type="password" minLength={6} required />}
+              <Button className="mt-6 w-full" onClick={() => { void handleSubmit({ preventDefault() {} } as React.FormEvent<HTMLFormElement>); }}>
+                {claimed ? 'Definir senha' : 'Confirmar código'}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="brand-card flex flex-col gap-4" style={{ padding: 20 }}>
-              {isSignup && (
-                <>
-                  <Field icon={User} label="Nome" value={name} onChange={setName} placeholder="Rafael Rocha" autoComplete="name" required />
-                  <Field icon={Phone} label="Telefone" value={phone} onChange={setPhone} placeholder="+55 71 99999-9999" autoComplete="tel" required />
-                </>
-              )}
-
               <Field icon={Mail} label="E-mail" value={email} onChange={setEmail} placeholder="voce@email.com" type="email" autoComplete="email" required readOnly={!!lockedEmail} />
 
-              <div>
+              {(!isSignup || claimed) && <div>
                 <label className="section-kicker block mb-2">Senha</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--ink-dim)' }} />
@@ -210,7 +197,7 @@ export default function AuthForm({
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
+              </div>}
 
               <Button type="submit" className="w-full mt-2" disabled={loading}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}

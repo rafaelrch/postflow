@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import {
   createCustomer,
   createSubscriptionCheckout,
@@ -8,6 +8,7 @@ import {
 } from '@/lib/abacatepay';
 import { appUrl } from '@/lib/app-url';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 // Import relativo (não alias): vitest não resolve `@/*` para módulos não
 // mockados no teste (mesmo motivo documentado em stripe/checkout/route.ts).
 import { hasBillableSubscription } from '../../../../lib/subscription';
@@ -107,6 +108,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const admin = createAdminSupabaseClient();
+    const { error: mappingError } = await admin.from('abacatepay_checkout_refs').upsert({
+      ref_hash: createHash('sha256').update(ref).digest('hex'),
+      checkout_id: checkout.id,
+      expires_at: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+    }, { onConflict: 'ref_hash' });
+    if (mappingError) throw new Error('checkout_mapping_failed');
+
     // Registra o checkout pendente já (status PENDING → 'incomplete', que NÃO
     // entra na view de assinatura ativa nem no guard B1). É esse registro que
     // deixa o verify-signup resolver `ref` → id do checkout sem depender de um
@@ -114,10 +123,10 @@ export async function POST(req: NextRequest) {
     await upsertSubscription(checkout, email);
 
     return NextResponse.json({ url: checkout.url });
-  } catch (err) {
-    console.error('[abacatepay/checkout]', err);
+  } catch {
+    console.error('[abacatepay/checkout] checkout_failed');
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Erro ao criar checkout' },
+      { error: 'Não foi possível criar o checkout.' },
       { status: 500 },
     );
   }

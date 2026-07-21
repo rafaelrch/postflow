@@ -56,6 +56,17 @@ create table if not exists public.abacatepay_webhook_events (
 create index if not exists idx_abacatepay_webhook_events_event
   on public.abacatepay_webhook_events (event, processed_at desc);
 
+create table if not exists public.abacatepay_checkout_refs (
+  ref_hash text primary key,
+  checkout_id text not null unique,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  consumed_at timestamptz
+);
+alter table public.abacatepay_checkout_refs enable row level security;
+revoke all on public.abacatepay_checkout_refs from public, anon, authenticated;
+grant select, insert, update on public.abacatepay_checkout_refs to service_role;
+
 -- Triggers
 drop trigger if exists set_abacatepay_customers_updated on public.abacatepay_customers;
 create trigger set_abacatepay_customers_updated before update on public.abacatepay_customers

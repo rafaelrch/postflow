@@ -90,8 +90,11 @@ where n.nspname = 'auth' and c.relname = 'users' and not t.tgisinternal;
 ```
 
 Expected: the pre-migration subscription count is unchanged, all old rows are
-`provider = 'stripe'`, the new tables exist, and both auth triggers are
-present. The ACL query must show `consume_credits` only for `authenticated`;
+`provider = 'stripe'`, the new tables and `paid_signup_intents` exist, and
+`claim_on_email_confirmation_trg` is present on `auth.users` with the
+`email_confirmed_at` transition guard. Confirmed existing
+users are claimed before OTP is sent, then still receive OTP to authenticate.
+The ACL query must show `consume_credits` only for `authenticated`;
 `refund_credits` and `refresh_credits` only for `service_role`; auth trigger
 functions only for the Supabase auth role.
 
@@ -102,3 +105,39 @@ discardable, run `supabase/cleanup-stripe-test-data.sql` separately. It never
 creates Stripe tables, tolerates missing `stripe_*` tables, and deletes only
 `subscriptions where provider = 'stripe'`. Run its preflight and postflight
 SELECTs; do not combine it with the migration.
+
+## Passwordless B2 configuration (manual)
+
+Configure Supabase Custom SMTP with Resend (`smtp.resend.com`, user `resend`,
+password entered only in the dashboard), use the OTP template, disable public
+email signup, allowlist only the fixed callback, verify the Resend domain,
+configure rate limits/CAPTCHA, and revoke any previously exposed key. No
+Resend SDK or API key is stored in the app.
+
+Runtime: validate ref/subscription, re-read checkout by the original ref,
+resolve server-side email, `admin.createUser` without password (unmarked legacy
+users fail closed), call only `prepare_paid_signup_intent`, then
+`signInWithOtp({ shouldCreateUser: false })`. OTP verification calls the
+authenticated atomic claim RPC; only after claim may password be set. A
+temporary hosted/staging Supabase test is mandatory—mocks do not prove GoTrue
+behavior with public signup disabled.
+
+## Manual recovery (Rafael only; never automatic)
+
+Run preflight first and stop unless exactly one target is identified:
+
+```sql
+begin;
+select id,email from auth.users
+where id = '<USER_UUID>' and email_confirmed_at is null;
+select 1 from public.profiles where id = '<USER_UUID>';
+select 1 from public.user_credits where user_id = '<USER_UUID>';
+select 1 from public.paid_signup_intents where user_id = '<USER_UUID>';
+select 1 from public.subscriptions where user_id = '<USER_UUID>';
+rollback;
+```
+
+Only after manual proof, and only when all resource queries return zero, an
+operator may delete that unconfirmed user through the Supabase Admin API in a
+separate controlled session. Do not mark arbitrary users automatically; legacy
+unmarked users remain fail-closed.

@@ -93,6 +93,14 @@ create table if not exists public.abacatepay_webhook_events (
 );
 create index if not exists idx_abacatepay_webhook_events_event
   on public.abacatepay_webhook_events (event, processed_at desc);
+create table if not exists public.abacatepay_checkout_refs (
+  ref_hash text primary key, checkout_id text not null unique,
+  created_at timestamptz not null default now(), expires_at timestamptz not null,
+  consumed_at timestamptz
+);
+alter table public.abacatepay_checkout_refs enable row level security;
+revoke all on public.abacatepay_checkout_refs from public, anon, authenticated;
+grant select, insert, update on public.abacatepay_checkout_refs to service_role;
 drop trigger if exists set_abacatepay_customers_updated on public.abacatepay_customers;
 create trigger set_abacatepay_customers_updated before update
   on public.abacatepay_customers for each row execute function public.set_updated_at();
@@ -280,5 +288,143 @@ from public.subscriptions s where s.user_id is not null
   and s.provider = 'abacatepay' and s.status = 'active'
 order by s.user_id, s.current_period_end desc nulls last
 on conflict (user_id) do nothing;
+
+drop trigger if exists enforce_paid_signup_trg on auth.users;
+drop trigger if exists claim_paid_signup_trg on auth.users;
+drop trigger if exists on_auth_user_created on auth.users;
+create table if not exists public.paid_signup_intents (
+  id uuid primary key default gen_random_uuid(), subscription_id text not null references public.subscriptions(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  expires_at timestamptz not null, consumed_at timestamptz, consumed_by uuid references auth.users(id), created_at timestamptz not null default now()
+);
+create unique index if not exists paid_signup_intents_open_subscription on public.paid_signup_intents(subscription_id) where consumed_at is null;
+create unique index if not exists paid_signup_intents_open_user on public.paid_signup_intents(user_id) where consumed_at is null;
+alter table public.paid_signup_intents enable row level security;
+revoke all on public.paid_signup_intents from public, anon, authenticated;
+drop function if exists public.prepare_paid_signup_intent(text,text);
+create or replace function public.prepare_paid_signup_intent(p_subscription_id text,p_email text) returns jsonb language plpgsql security definer set search_path=pg_catalog,public,auth as $$
+declare v_uid uuid; v_id uuid; begin
+ select id into v_uid from auth.users where lower(email)=lower(p_email) and (email_confirmed_at is not null or raw_app_meta_data->>'origin'='paid_passwordless') limit 1;
+ if v_uid is null then raise exception 'signup_user_not_eligible' using errcode='P0001'; end if;
+ select id into v_id from public.paid_signup_intents where subscription_id=p_subscription_id and consumed_at is null for update;
+ if v_id is not null then if not exists(select 1 from public.paid_signup_intents where id=v_id and user_id=v_uid) then raise exception 'signup_intent_conflict' using errcode='P0001'; end if; update public.paid_signup_intents set expires_at=now()+interval '15 minutes' where id=v_id; return jsonb_build_object('state','pending'); end if;
+ insert into public.paid_signup_intents(subscription_id,user_id,expires_at) values(p_subscription_id,v_uid,now()+interval '15 minutes') returning id into v_id;
+ return jsonb_build_object('state','pending'); end; $$;
+revoke all on function public.prepare_paid_signup_intent(text,text) from public,anon,authenticated;
+grant execute on function public.prepare_paid_signup_intent(text,text) to service_role;
+create or replace function public.claim_verified_paid_signup() returns jsonb language plpgsql security definer set search_path=pg_catalog,public,auth as $$
+declare v_uid uuid:=auth.uid(); v_email text; v_intent public.paid_signup_intents%rowtype; v_sub public.subscriptions%rowtype; v_allowance int;
+begin
+ if v_uid is null then raise exception 'signup_session_required' using errcode='P0001'; end if;
+ select email into v_email from auth.users where id=v_uid and email_confirmed_at is not null for update;
+ if v_email is null then raise exception 'email_confirmation_required' using errcode='P0001'; end if;
+ select * into v_intent from public.paid_signup_intents where user_id=v_uid and consumed_at is null and expires_at>now() for update;
+ if not found then if exists(select 1 from public.subscriptions where user_id=v_uid and provider='abacatepay') then return jsonb_build_object('ok',true); end if; raise exception 'signup_intent_invalid_or_expired' using errcode='P0001'; end if;
+ select * into v_sub from public.subscriptions where id=v_intent.subscription_id and provider='abacatepay' and status='active' and user_id is null and lower(email)=lower(v_email) for update;
+ if not found then raise exception 'subscription_claim_unavailable' using errcode='P0001'; end if;
+ update public.subscriptions set user_id=v_uid where id=v_sub.id and user_id is null;
+ update public.paid_signup_intents set consumed_at=now(),consumed_by=v_uid where id=v_intent.id and consumed_at is null;
+ insert into public.profiles(id,name,handle,phone) values(v_uid,'','','') on conflict(id) do nothing;
+ v_allowance:=public.plan_allowance(v_sub.price_id,v_sub.plan_interval);
+ insert into public.user_credits(user_id,balance,monthly_allowance,period_start,period_end) values(v_uid,v_allowance,v_allowance,now(),now()+interval '1 month') on conflict(user_id) do nothing;
+ if v_sub.abacatepay_customer_id is not null then insert into public.abacatepay_customers(user_id,abacatepay_customer_id) values(v_uid,v_sub.abacatepay_customer_id) on conflict(user_id) do update set abacatepay_customer_id=excluded.abacatepay_customer_id; end if;
+ return jsonb_build_object('ok',true);
+end; $$;
+revoke all on function public.claim_verified_paid_signup() from public,anon,authenticated;
+grant execute on function public.claim_verified_paid_signup() to authenticated;
+create table if not exists public.passwordless_rate_limits(ip_hash text not null,ref_hash text not null,window_start timestamptz not null,count int not null default 0,primary key(ip_hash,ref_hash,window_start));
+create table if not exists public.passwordless_ref_rate_limits(ref_hash text not null,window_start timestamptz not null,count int not null default 0,primary key(ref_hash,window_start));
+alter table public.passwordless_rate_limits enable row level security;
+alter table public.passwordless_ref_rate_limits enable row level security;
+revoke all on public.passwordless_rate_limits from public,anon,authenticated;
+revoke all on public.passwordless_ref_rate_limits from public,anon,authenticated;
+create or replace function public.consume_passwordless_rate(p_ip_hash text,p_ref_hash text) returns boolean language plpgsql security definer set search_path=pg_catalog,public as $$ declare v_start timestamptz:=date_trunc('minute',now()); v_count int; v_global int; begin insert into public.passwordless_rate_limits(ip_hash,ref_hash,window_start,count) values(p_ip_hash,p_ref_hash,v_start,1) on conflict(ip_hash,ref_hash,window_start) do update set count=passwordless_rate_limits.count+1 returning count into v_count; insert into public.passwordless_ref_rate_limits(ref_hash,window_start,count) values(p_ref_hash,v_start,1) on conflict(ref_hash,window_start) do update set count=passwordless_ref_rate_limits.count+1 returning count into v_global; return v_count<=5 and v_global<=10; end; $$;
+revoke all on function public.consume_passwordless_rate(text,text) from public,anon,authenticated;
+grant execute on function public.consume_passwordless_rate(text,text) to service_role;
+create or replace function public.claim_on_email_confirmation() returns trigger language plpgsql security definer set search_path=pg_catalog,public,auth as $$ declare v_intent public.paid_signup_intents%rowtype; v_sub public.subscriptions%rowtype; v_allowance int; begin select * into v_intent from public.paid_signup_intents where user_id=new.id and consumed_at is null and expires_at>now() order by created_at desc for update; if not found then raise exception 'signup_intent_required' using errcode='P0001'; end if; select * into v_sub from public.subscriptions where id=v_intent.subscription_id and provider='abacatepay' and status='active' and user_id is null and lower(email)=lower(new.email) for update; if not found then raise exception 'subscription_claim_unavailable' using errcode='P0001'; end if; update public.subscriptions set user_id=new.id where id=v_sub.id and user_id is null; update public.paid_signup_intents set consumed_at=now(),consumed_by=new.id where id=v_intent.id and consumed_at is null; insert into public.profiles(id,name,handle,phone) values(new.id,'','','') on conflict(id) do nothing; v_allowance:=public.plan_allowance(v_sub.price_id,v_sub.plan_interval); insert into public.user_credits(user_id,balance,monthly_allowance,period_start,period_end) values(new.id,v_allowance,v_allowance,now(),now()+interval '1 month') on conflict(user_id) do nothing; return new; end; $$;
+revoke all on function public.claim_on_email_confirmation() from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_on_email_confirmation() to supabase_auth_admin'; end if; end $$;
+drop trigger if exists claim_on_email_confirmation_trg on auth.users;
+create trigger claim_on_email_confirmation_trg after update of email_confirmed_at on auth.users for each row when(old.email_confirmed_at is null and new.email_confirmed_at is not null) execute function public.claim_on_email_confirmation();
+create or replace function public.claim_paid_signup_for_user(p_uid uuid) returns boolean language plpgsql security definer set search_path=pg_catalog,public,auth as $$ declare v_email text; v_intent public.paid_signup_intents%rowtype; v_sub public.subscriptions%rowtype; v_allowance int; begin select email into v_email from auth.users where id=p_uid and email_confirmed_at is not null for update; if v_email is null then raise exception 'email_confirmation_required' using errcode='P0001'; end if; select * into v_intent from public.paid_signup_intents where user_id=p_uid and consumed_at is null and expires_at>now() order by created_at asc,id asc limit 1 for update; if not found then if exists(select 1 from public.subscriptions where user_id=p_uid and provider='abacatepay') then return true; end if; raise exception 'signup_intent_required' using errcode='P0001'; end if; select * into v_sub from public.subscriptions where id=v_intent.subscription_id and provider='abacatepay' and status='active' and user_id is null and lower(email)=lower(v_email) for update; if not found then raise exception 'subscription_claim_unavailable' using errcode='P0001'; end if; update public.subscriptions set user_id=p_uid where id=v_sub.id and user_id is null; update public.paid_signup_intents set consumed_at=now(),consumed_by=p_uid where id=v_intent.id and consumed_at is null; update public.abacatepay_checkout_refs set consumed_at=now() where checkout_id=v_sub.id and consumed_at is null; insert into public.profiles(id,name,handle,phone) values(p_uid,'','','') on conflict(id) do nothing; v_allowance:=public.plan_allowance(v_sub.price_id,v_sub.plan_interval); insert into public.user_credits(user_id,balance,monthly_allowance,period_start,period_end) values(p_uid,v_allowance,v_allowance,now(),now()+interval '1 month') on conflict(user_id) do nothing; if v_sub.abacatepay_customer_id is not null then insert into public.abacatepay_customers(user_id,abacatepay_customer_id) values(p_uid,v_sub.abacatepay_customer_id) on conflict(user_id) do update set abacatepay_customer_id=excluded.abacatepay_customer_id; end if; return true; end; $$;
+revoke all on function public.claim_paid_signup_for_user(uuid) from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_paid_signup_for_user(uuid) to supabase_auth_admin'; end if; end $$;
+create or replace function public.prepare_paid_signup_intent(p_subscription_id text,p_email text) returns jsonb language plpgsql security definer set search_path=pg_catalog,public,auth as $$ declare v_uid uuid; v_id uuid; v_confirmed timestamptz; begin select id,email_confirmed_at into v_uid,v_confirmed from auth.users where lower(email)=lower(p_email) and (email_confirmed_at is not null or raw_app_meta_data->>'origin'='paid_passwordless') order by id limit 1; if v_uid is null then raise exception 'signup_user_not_eligible' using errcode='P0001'; end if; select id into v_id from public.paid_signup_intents where subscription_id=p_subscription_id and consumed_at is null for update; if v_id is not null and not exists(select 1 from public.paid_signup_intents where id=v_id and user_id=v_uid) then raise exception 'signup_intent_conflict' using errcode='P0001'; end if; if v_id is null then insert into public.paid_signup_intents(subscription_id,user_id,expires_at) values(p_subscription_id,v_uid,now()+interval '15 minutes') returning id into v_id; else update public.paid_signup_intents set expires_at=now()+interval '15 minutes' where id=v_id; end if; if v_confirmed is not null then perform public.claim_paid_signup_for_user(v_uid); return jsonb_build_object('state','claimed'); end if; return jsonb_build_object('state','pending'); end; $$;
+revoke all on function public.prepare_paid_signup_intent(text,text) from public,anon,authenticated;
+grant execute on function public.prepare_paid_signup_intent(text,text) to service_role;
+create or replace function public.claim_on_email_confirmation() returns trigger language plpgsql security definer set search_path=pg_catalog,public,auth as $$ begin if coalesce(new.raw_app_meta_data->>'origin','') <> 'paid_passwordless' then return new; end if; perform public.claim_paid_signup_for_user(new.id); return new; end; $$;
+revoke all on function public.claim_on_email_confirmation() from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_on_email_confirmation() to supabase_auth_admin'; end if; end $$;
+
+-- Final canonical definitions (kept multiline for review/parity with credits-and-flow.sql).
+create or replace function public.prepare_paid_signup_intent(p_subscription_id text, p_email text)
+returns jsonb language plpgsql security definer set search_path=pg_catalog,public,auth as $$
+declare v_uid uuid; v_id uuid; v_confirmed timestamptz;
+begin
+  select id,email_confirmed_at into v_uid,v_confirmed from auth.users
+   where lower(email)=lower(p_email)
+     and raw_app_meta_data->>'origin'='paid_passwordless'
+   order by id limit 1;
+  if v_uid is null then raise exception 'signup_user_not_eligible' using errcode='P0001'; end if;
+  update public.paid_signup_intents set consumed_at=now()
+   where consumed_at is null and (user_id=v_uid or subscription_id=p_subscription_id) and expires_at<=now();
+  select id into v_id from public.paid_signup_intents
+   where subscription_id=p_subscription_id and consumed_at is null and expires_at>now() for update;
+  if v_id is not null and not exists(select 1 from public.paid_signup_intents where id=v_id and user_id=v_uid) then raise exception 'signup_intent_conflict' using errcode='P0001'; end if;
+  if v_id is null then
+    insert into public.paid_signup_intents(subscription_id,user_id,expires_at) values(p_subscription_id,v_uid,now()+interval '15 minutes') returning id into v_id;
+  else
+    update public.paid_signup_intents set expires_at=now()+interval '15 minutes' where id=v_id;
+  end if;
+  if v_confirmed is not null then perform public.claim_paid_signup_for_user(v_uid); return jsonb_build_object('state','claimed'); end if;
+  return jsonb_build_object('state','pending');
+end; $$;
+revoke all on function public.prepare_paid_signup_intent(text,text) from public,anon,authenticated;
+grant execute on function public.prepare_paid_signup_intent(text,text) to service_role;
+
+create or replace function public.claim_paid_signup_for_user(p_uid uuid)
+returns boolean language plpgsql security definer set search_path=pg_catalog,public,auth as $$
+declare v_email text; v_name text; v_phone text; v_intent public.paid_signup_intents%rowtype; v_sub public.subscriptions%rowtype; v_allowance int;
+begin
+  select email into v_email from auth.users where id=p_uid and email_confirmed_at is not null for update;
+  if v_email is null then raise exception 'email_confirmation_required' using errcode='P0001'; end if;
+  select * into v_intent from public.paid_signup_intents where user_id=p_uid and consumed_at is null and expires_at>now() order by created_at asc,id asc limit 1 for update;
+  if not found then raise exception 'signup_intent_required' using errcode='P0001'; end if;
+  select * into v_sub from public.subscriptions where id=v_intent.subscription_id and provider='abacatepay' and status='active' and user_id is null and lower(email)=lower(v_email) for update;
+  if not found then raise exception 'subscription_claim_unavailable' using errcode='P0001'; end if;
+  update public.subscriptions set user_id=p_uid where id=v_sub.id and user_id is null;
+  update public.paid_signup_intents set consumed_at=now(),consumed_by=p_uid where id=v_intent.id and consumed_at is null;
+  begin select name,phone into v_name,v_phone from public.leads where lower(email)=lower(v_email) order by created_at desc limit 1; exception when undefined_table then v_name:=null; v_phone:=null; end;
+  insert into public.profiles(id,name,handle,phone) values(p_uid,coalesce(v_name,''),'',coalesce(v_phone,'')) on conflict(id) do nothing;
+  v_allowance:=public.plan_allowance(v_sub.price_id,v_sub.plan_interval);
+  insert into public.user_credits(user_id,balance,monthly_allowance,period_start,period_end) values(p_uid,v_allowance,v_allowance,now(),now()+interval '1 month') on conflict(user_id) do nothing;
+  return true;
+end; $$;
+revoke all on function public.claim_paid_signup_for_user(uuid) from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_paid_signup_for_user(uuid) to supabase_auth_admin'; end if; end $$;
+
+-- Keep the migration's final implementation identical to the canonical script.
+create or replace function public.claim_paid_signup_for_user(p_uid uuid)
+returns boolean language plpgsql security definer set search_path=pg_catalog,public,auth as $$
+declare v_email text; v_name text; v_phone text; v_intent public.paid_signup_intents%rowtype; v_sub public.subscriptions%rowtype; v_allowance int;
+begin
+  select email into v_email from auth.users where id=p_uid and email_confirmed_at is not null for update;
+  if v_email is null then raise exception 'email_confirmation_required' using errcode='P0001'; end if;
+  select * into v_intent from public.paid_signup_intents where user_id=p_uid and consumed_at is null and expires_at>now() order by created_at asc,id asc limit 1 for update;
+  if not found then if exists(select 1 from public.subscriptions where user_id=p_uid and provider='abacatepay') then return true; end if; raise exception 'signup_intent_required' using errcode='P0001'; end if;
+  select * into v_sub from public.subscriptions where id=v_intent.subscription_id and provider='abacatepay' and status='active' and user_id is null and lower(email)=lower(v_email) for update;
+  if not found then raise exception 'subscription_claim_unavailable' using errcode='P0001'; end if;
+  update public.subscriptions set user_id=p_uid where id=v_sub.id and user_id is null;
+  update public.paid_signup_intents set consumed_at=now(),consumed_by=p_uid where id=v_intent.id and consumed_at is null;
+  update public.abacatepay_checkout_refs set consumed_at=now() where checkout_id=v_sub.id and consumed_at is null;
+  begin select name,phone into v_name,v_phone from public.leads where lower(email)=lower(v_email) order by created_at desc limit 1; exception when undefined_table then v_name:=null; v_phone:=null; end;
+  insert into public.profiles(id,name,handle,phone) values(p_uid,coalesce(v_name,''),'',coalesce(v_phone,'')) on conflict(id) do nothing;
+  v_allowance:=public.plan_allowance(v_sub.price_id,v_sub.plan_interval);
+  insert into public.user_credits(user_id,balance,monthly_allowance,period_start,period_end) values(p_uid,v_allowance,v_allowance,now(),now()+interval '1 month') on conflict(user_id) do nothing;
+  if v_sub.abacatepay_customer_id is not null then insert into public.abacatepay_customers(user_id,abacatepay_customer_id) values(p_uid,v_sub.abacatepay_customer_id) on conflict(user_id) do update set abacatepay_customer_id=excluded.abacatepay_customer_id; end if;
+  return true;
+end; $$;
+revoke all on function public.claim_paid_signup_for_user(uuid) from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_paid_signup_for_user(uuid) to supabase_auth_admin'; end if; end $$;
 
 commit;
