@@ -11,11 +11,12 @@ describe('link-to-create-password signup flow', () => {
     expect(authForm).toMatch(/Enviamos um e-mail de confirmação/);
   });
 
-  it('creates a password only for the confirmed Supabase session', () => {
-    expect(page).toMatch(/getUser/);
-    expect(page).toMatch(/isPaidPasswordlessSession/);
-    expect(page).toMatch(/email_confirmed_at/);
-    expect(page).toMatch(/updateUser\(\{ password \}\)/);
+  it('updates the password only through the SSR client returned by the paid callback bridge', () => {
+    expect(page).toMatch(/establishPaidSignupSession/);
+    expect(page).toMatch(/passwordClientRef/);
+    expect(page).toMatch(/const client = passwordClientRef\.current/);
+    expect(page).toMatch(/client\.auth\.updateUser\(\{ password \}\)/);
+    expect(page).not.toMatch(/createClient/);
     expect(page).toMatch(/router\.replace\(['"]\/onboarding['"]\)/);
   });
 });
