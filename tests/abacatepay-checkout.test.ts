@@ -35,6 +35,9 @@ vi.mock('@/lib/supabase-server', () => ({
     }),
   }),
 }));
+vi.mock('@/lib/supabase-admin', () => ({
+  createAdminSupabaseClient: () => ({ from: () => ({ upsert: vi.fn().mockResolvedValue({ error: null }) }) }),
+}));
 
 import { POST } from '../app/api/abacatepay/checkout/route';
 

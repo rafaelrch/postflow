@@ -26,4 +26,10 @@ describe('cleanup-stripe-test-data.sql', () => {
     expect(abort).toBeGreaterThan(guard);
     expect(deletion).toBeGreaterThan(abort);
   });
+
+  it('tolera tabelas Stripe legadas ausentes sem recriá-las', () => {
+    expect(executableSql).toMatch(/to_regclass\s*\(\s*'public\.stripe_customers'\s*\)/i);
+    expect(executableSql).toMatch(/to_regclass\s*\(\s*'public\.stripe_webhook_events'\s*\)/i);
+    expect(executableSql).not.toMatch(/create\s+table[^;]*stripe_/i);
+  });
 });

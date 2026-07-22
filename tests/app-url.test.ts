@@ -43,6 +43,30 @@ describe('appUrl', () => {
 
       expect(appUrl('dashboard')).toBe('https://creatools.com.br/dashboard');
     });
+
+    it('sem path, retorna a base pura sem barra final (casa com o header Origin)', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://creatools.com.br');
+
+      expect(appUrl()).toBe('https://creatools.com.br');
+    });
+
+    it('sem path, normaliza a barra final da env (nunca sobra barra)', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://creatools.com.br/');
+
+      expect(appUrl()).toBe('https://creatools.com.br');
+    });
+
+    it('appUrl() bate exatamente com um header Origin típico do navegador', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://creatools.com.br');
+
+      // Origin de navegador (RFC 6454) nunca traz barra final.
+      const origin = 'https://creatools.com.br';
+      expect(appUrl()).toBe(origin);
+      expect(origin === appUrl()).toBe(true);
+    });
   });
 
   describe('em desenvolvimento', () => {

@@ -86,8 +86,8 @@ export async function POST(req: NextRequest) {
         // Evento desconhecido fica registrado na tabela e não faz nada.
         break;
     }
-  } catch (err) {
-    console.error(`[abacatepay/webhook] erro ao processar ${event}:`, err);
+  } catch {
+    console.error('[abacatepay/webhook] processing_failed');
     // 500 ⇒ a AbacatePay re-tenta. Como o evento AINDA NÃO foi registrado, o
     // retry passa pela checagem de idempotência e reprocessa; o upsert (por
     // id do checkout) é idempotente. Registrar antes de processar deixaria uma
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   // o trabalho já foi feito, e falhar aqui provocaria um retry que apenas
   // repetiria um upsert idempotente.
   if (insertErr && insertErr.code !== '23505') {
-    console.error('[abacatepay/webhook] evento processado mas não registrado:', insertErr);
+    console.error('[abacatepay/webhook] event_record_failed');
   }
 
   return NextResponse.json({ received: true });

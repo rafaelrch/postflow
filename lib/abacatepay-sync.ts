@@ -146,18 +146,22 @@ export async function upsertSubscription(
   checkout: AbacateCheckout,
   emailOverride?: string | null,
   event?: string | null,
+  options: { linkUser?: boolean } = {},
 ): Promise<UpsertResult> {
   const admin = createAdminSupabaseClient();
-  const userId = await resolveUserId(admin, checkout);
+  const userId = options.linkUser === false ? null : await resolveUserId(admin, checkout);
   const email = emailOverride ?? (await resolveEmail(checkout));
   const status = statusForEvent(event, checkout.status);
   const interval = intervalOf(checkout);
   const revoking = isRevokingEvent(event);
 
+  const metadata = { ...(checkout.metadata ?? {}) };
+  delete metadata.ref;
+  delete metadata.checkout_ref;
   const row = {
     id: checkout.id,
     provider: 'abacatepay',
-    user_id: userId,
+    ...(options.linkUser === false ? {} : { user_id: userId }),
     email,
     abacatepay_customer_id: checkout.customerId,
     status,
@@ -174,12 +178,12 @@ export async function upsertSubscription(
     current_period_end: revoking ? null : (checkout.nextChargeAt ?? null),
     canceled_at: revoking ? (checkout.updatedAt ?? new Date().toISOString()) : null,
     trial_end: checkout.trialEndsAt ?? null,
-    metadata: checkout.metadata ?? {},
+    metadata,
   };
 
   const { error } = await admin.from('subscriptions').upsert(row, { onConflict: 'id' });
   if (error) {
-    console.error('[abacatepay-sync] erro ao upsert subscription:', error);
+    console.error('[abacatepay-sync] subscription_upsert_failed');
     throw error;
   }
 
@@ -199,7 +203,7 @@ export async function syncSubscriptionFromCheckout(
     if (checkout.frequency !== 'SUBSCRIPTION') return null;
     return await upsertSubscription(checkout);
   } catch (err) {
-    console.error('[abacatepay-sync] erro ao sincronizar checkout:', err);
+    console.error('[abacatepay-sync] checkout_sync_failed');
     return null;
   }
 }
