@@ -11,9 +11,13 @@ const migration = readFileSync(new URL('../supabase/migrations/20260721_abacatep
 const runbook = readFileSync(new URL('../docs/abacatepay-db-rollout.md', import.meta.url), 'utf8');
 
 describe('passwordless B2 start (failure-first)', () => {
-  it('envia link de confirmação para definir senha e não faz upsert direto de intent', () => {
-    expect(route).toMatch(/signInWithOtp/);
-    expect(route).toMatch(/shouldCreateUser\s*:\s*false/);
+  it('cria usuário marcado, prepara intent e reenvia confirmação sem invite/OTP público', () => {
+    expect(route).toMatch(/\.createUser\(/);
+    expect(route).toMatch(/app_metadata:\s*\{\s*origin:\s*['"]paid_passwordless['"]\s*\}/);
+    expect(route).toMatch(/\.auth\.resend\(/);
+    expect(route).toMatch(/type:\s*['"]signup['"]/);
+    expect(route).not.toMatch(/inviteUserByEmail/);
+    expect(route).not.toMatch(/signInWithOtp/);
     expect(route).toMatch(/emailRedirectTo\s*:\s*appUrl\(['"]\/definir-senha['"]\)/);
     expect(route).not.toMatch(/from\(['"]paid_signup_intents['"]\)[\s\S]*\.upsert/);
   });
@@ -24,7 +28,7 @@ describe('passwordless B2 start (failure-first)', () => {
   it('sincronização remove ref de metadata e permite linkUser false', () => { expect(sync).toMatch(/delete metadata\.ref/); expect(sync).toMatch(/linkUser\?\s*:\s*boolean/); expect(route).toMatch(/linkUser:\s*false/); });
   it('cadastro não consulta metadata.ref e checkout usa ref_hash', () => { expect(page).not.toMatch(/metadata->>ref/); expect(checkout).toMatch(/onConflict:\s*['"]ref_hash['"]/); });
   it('não expõe erros arbitrários', () => { expect(checkout).not.toMatch(/err\.message|error\.message/); expect(route).not.toMatch(/err\.message|error\.message/); });
-  it('confirmed user must be claimed before OTP and new user only via confirmation trigger', () => { expect(sql).toMatch(/v_confirmed[\s\S]*claim_paid_signup_for_user\(v_uid\)/); expect(sql).toMatch(/after update of email_confirmed_at/); expect(route).toMatch(/state\?[^\n]*pending.*claimed|\['pending',\s*'claimed'\]/); });
+  it('confirmed marked user is claimed during prepare before confirmation resend', () => { expect(sql).toMatch(/v_confirmed[\s\S]*claim_paid_signup_for_user\(v_uid\)/); expect(sql).toMatch(/after update of email_confirmed_at/); expect(route).toMatch(/state\?[^\n]*pending.*claimed|\['pending',\s*'claimed'\]/); });
   it('canonical e migration mantêm invariantes de expiração, lead e marcador', () => {
     for (const source of [sql, migration]) {
       expect(source).toMatch(/expires_at<=now\(\)/); expect(source).toMatch(/expires_at>now\(\)/);
@@ -71,16 +75,35 @@ describe('passwordless B2 start (failure-first)', () => {
     expect(sql).toMatch(/raw_app_meta_data->>'origin'='paid_passwordless'/);
   });
   it('runbook mantém Email provider ligado e documenta o novo gate', () => {
-    expect(runbook).toMatch(/keep the\s+Supabase Email provider enabled/i);
+    expect(runbook).toMatch(/keep the\s+Supabase Email provider\s+enabled/i);
     expect(runbook).toMatch(/enforce_paid_signup_precondition_trg/);
     expect(runbook).not.toMatch(/disable public\s+email signup/i);
+    expect(runbook).toMatch(/Allow new users to sign up[^\n]*disabled/i);
+    expect(runbook).toMatch(/auth\.resend/);
+    expect(runbook).toMatch(/Mandatory hosted smoke/i);
+    expect(runbook).not.toMatch(/signInWithOtp\(\{ shouldCreateUser/);
+  });
+  it('definição FINAL do prepare é marker-only e equivalente no canônico/migration', () => {
+    const finalPrepare = (source: string) => source.match(/create or replace function public\.prepare_paid_signup_intent\(p_subscription_id text\s*,\s*p_email text\)[\s\S]*?grant execute on function public\.prepare_paid_signup_intent\(text\s*,\s*text\) to service_role;/gi)?.at(-1) ?? '';
+    const normalize = (definition: string) => definition
+      .replace(/\s+/g, ' ')
+      .replace(/\s*([(),=<>;+])\s*/g, '$1')
+      .trim();
+    const canonical = finalPrepare(sql);
+    const migrated = finalPrepare(migration);
+    for (const definition of [canonical, migrated]) {
+      expect(definition).not.toBe('');
+      expect(definition).toMatch(/raw_app_meta_data->>'origin'='paid_passwordless'/);
+      expect(definition).not.toMatch(/email_confirmed_at is not null\s+or/i);
+    }
+    expect(normalize(canonical)).toBe(normalize(migrated));
   });
 });
 
 // Regressão do 403 determinístico: a rota rejeita quando `origin !== appUrl()`
 // (route.ts). Antes do fix, appUrl() sem path devolvia a base COM barra final,
 // então nunca casava com o header Origin do navegador (RFC 6454, sem barra) e
-// o OTP jamais saía. Exercita o appUrl() real, sem mockar Supabase/AbacatePay.
+// a confirmação jamais saía. Exercita o appUrl() real, sem mockar Supabase/AbacatePay.
 describe('passwordless start — checagem de origin (regressão do 403)', () => {
   afterEach(() => {
     vi.unstubAllEnvs();

@@ -92,8 +92,9 @@ where n.nspname = 'auth' and c.relname = 'users' and not t.tgisinternal;
 Expected: the pre-migration subscription count is unchanged, all old rows are
 `provider = 'stripe'`, the new tables and `paid_signup_intents` exist, and
 `claim_on_email_confirmation_trg` is present on `auth.users` with the
-`email_confirmed_at` transition guard. Confirmed existing
-users are claimed before OTP is sent, then still receive OTP to authenticate.
+`email_confirmed_at` transition guard. A signup confirmation can only be
+resent after `prepare_paid_signup_intent` accepts a user whose final
+`raw_app_meta_data.origin` is `paid_passwordless`.
 `enforce_paid_signup_precondition_trg` must also be present as a BEFORE INSERT
 gate; it blocks user creation unless an active, unclaimed AbacatePay subscription
 already exists for that email. The obsolete `enforce_paid_passwordless_marker_trg`
@@ -114,8 +115,9 @@ SELECTs; do not combine it with the migration.
 ## Passwordless B2 configuration (manual)
 
 Configure Supabase Custom SMTP with Resend (`smtp.resend.com`, user `resend`,
-password entered only in the dashboard), use the OTP template, and keep the
-Supabase Email provider enabled (OTP depends on it). Verify
+password entered only in the dashboard), customize the **Confirm signup**
+template with its confirmation link, and keep the Supabase Email provider
+enabled. Keep **Allow new users to sign up** disabled. Verify
 `enforce_paid_signup_precondition_trg` is installed; any user creation without a
 matching active, unclaimed AbacatePay subscription fails in that trigger with
 `paid_subscription_required`.
@@ -124,12 +126,33 @@ configure rate limits/CAPTCHA, and revoke any previously exposed key. No
 Resend SDK or API key is stored in the app.
 
 Runtime: validate ref/subscription, re-read checkout by the original ref,
-resolve server-side email, `admin.createUser` without password (unmarked legacy
-users fail closed), call only `prepare_paid_signup_intent`, then
-`signInWithOtp({ shouldCreateUser: false })`. OTP verification calls the
-authenticated atomic claim RPC; only after claim may password be set. A
-temporary hosted/staging Supabase test is mandatory—mocks do not prove GoTrue
-behavior with the Email provider and trigger gate enabled.
+resolve the server-side email, then call
+`admin.createUser({ email, email_confirm: false, app_metadata: { origin:
+'paid_passwordless' } })`. Only a successful creation or the strict
+`email_exists`/`user_already_exists` retry cases may continue. Next call
+`prepare_paid_signup_intent`; its **final** definition is marker-only, so a
+legacy/attacker-created user without `raw_app_meta_data.origin =
+'paid_passwordless'` fails closed and no email is sent. Only after state
+`pending`/`claimed`, call `auth.resend({ type: 'signup', email, options: {
+emailRedirectTo: appUrl('/definir-senha') } })`. Do not use
+`inviteUserByEmail`, `signInWithOtp`, or mutate an existing user.
+
+## Mandatory hosted smoke — create → prepare → resend
+
+Mocks are not sufficient to prove the hosted GoTrue behavior. Before merge or
+production promotion, run one hosted smoke with public signup disabled and
+record evidence that:
+
+1. a PAID subscription passes the server-side checkout re-read;
+2. the trace order is `admin.createUser` → `prepare_paid_signup_intent` →
+   signup `resend`, with redirect exactly `/definir-senha`;
+3. Custom SMTP actually delivers the **Confirm signup** link, clicking it
+   creates a session, claims the subscription and credits exactly once, and the
+   password page accepts only `origin = 'paid_passwordless'`;
+4. retrying the marked, unconfirmed user left by an interrupted smoke resends
+   safely; and
+5. an existing confirmed or unconfirmed user without the marker is rejected by
+   `prepare_paid_signup_intent`, with zero resend calls.
 
 ## Manual recovery (Rafael only; never automatic)
 
