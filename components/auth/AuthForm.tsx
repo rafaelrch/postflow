@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
@@ -35,24 +35,8 @@ export default function AuthForm({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [claimed, setClaimed] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
 
   const title = isSignup ? 'Criar conta' : 'Entrar';
-
-  const redirectTo = useMemo(() => {
-    // Mesma fonte de verdade de lib/app-url.ts#appUrl: NEXT_PUBLIC_APP_URL
-    // (inlinada no build). window.location.origin fica só como fallback de dev.
-    const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-    const base = envUrl
-      ? envUrl.replace(/\/$/, '')
-      : typeof window !== 'undefined'
-        ? window.location.origin
-        : undefined;
-    if (!base) return undefined;
-    return `${base}/auth/callback?next=${encodeURIComponent('/onboarding')}`;
-  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -71,21 +55,7 @@ export default function AuthForm({
           return;
         }
 
-        if (confirmationSent && !claimed) {
-          const verified = await supabase.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: 'email' });
-          if (verified.error) throw verified.error;
-          setClaimed(true);
-          toast.success('E-mail confirmado. Defina sua senha para continuar.');
-          return;
-        }
-        if (claimed) {
-          if (password.length < 6) throw new Error('password_required');
-          const updated = await supabase.auth.updateUser({ password });
-          if (updated.error) throw updated.error;
-          router.replace('/onboarding');
-          router.refresh();
-          return;
-        }
+        if (confirmationSent) return;
         const verifyRes = await fetch('/api/abacatepay/passwordless/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -99,7 +69,7 @@ export default function AuthForm({
 
         setConfirmationSent(true);
         window.history.replaceState(null, '', '/cadastro');
-        toast.success('Código enviado. Confira sua caixa de entrada.');
+        toast.success('Link enviado. Confira sua caixa de entrada.');
         return;
       }
 
@@ -118,17 +88,6 @@ export default function AuthForm({
     } finally {
       setLoading(false);
     }
-  };
-
-  const resendOtp = async () => {
-    if (!checkoutRef || resendCooldown > 0) return;
-    // Casa com o "Minimum interval per user" (60s) do Custom SMTP do Supabase;
-    // reenviar antes disso devolve 403.
-    setResendCooldown(60);
-    const res = await fetch('/api/abacatepay/passwordless/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checkout_ref: checkoutRef }) });
-    if (!res.ok) toast.error('Não foi possível reenviar o código.');
-    else toast.success('Se elegível, um novo código foi enviado.');
-    const timer = window.setInterval(() => setResendCooldown((v) => { if (v <= 1) { window.clearInterval(timer); return 0; } return v - 1; }), 1000);
   };
 
   return (
@@ -161,63 +120,20 @@ export default function AuthForm({
                 <CheckCircle2 className="w-8 h-8 mb-3" style={{ color: 'var(--success)' }} />
                 <h2 className="font-display text-[26px] leading-none mb-2">Confirme seu e-mail</h2>
                 <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
-                  {claimed ? (
-                    'E-mail confirmado. Defina uma senha para concluir o acesso.'
-                  ) : (
-                    <>
-                      Enviamos um código
-                      {email ? (
-                        <> para <strong style={{ color: 'var(--ink)' }}>{email}</strong></>
-                      ) : null}
-                      . Digite-o abaixo para confirmar a posse do e-mail.
-                    </>
-                  )}
+                  Enviamos um e-mail de confirmação
+                  {email ? <> para <strong style={{ color: 'var(--ink)' }}>{email}</strong></> : null}.
+                  Clique no link para confirmar seu e-mail e criar sua senha.
                 </p>
               </div>
-
-              {!claimed ? (
-                <div className="flex flex-col gap-3">
-                  <Field
-                    icon={Mail}
-                    label="Código OTP"
-                    value={otp}
-                    onChange={setOtp}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={8}
-                    placeholder="00000000"
-                    required
-                  />
-                  <div className="flex items-center justify-between text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-                    <span>Não recebeu o código?</span>
-                    <button
-                      type="button"
-                      onClick={() => { void resendOtp(); }}
-                      disabled={resendCooldown > 0}
-                      className="font-semibold underline underline-offset-4 disabled:no-underline disabled:cursor-not-allowed"
-                      style={{ color: resendCooldown > 0 ? 'var(--ink-muted)' : 'var(--ink)' }}
-                    >
-                      {resendCooldown ? `Reenviar em ${resendCooldown}s` : 'Reenviar código'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <Field icon={Lock} label="Nova senha" value={password} onChange={setPassword} type="password" minLength={6} placeholder="mínimo 6 caracteres" required />
-              )}
-
-              <Button className="w-full" onClick={() => { void handleSubmit({ preventDefault() {} } as React.FormEvent<HTMLFormElement>); }}>
-                {claimed ? 'Definir senha' : 'Confirmar código'}
-                <ArrowRight className="w-4 h-4" />
-              </Button>
+              <p className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>Após a confirmação, você definirá a senha na próxima página.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="brand-card flex flex-col gap-4" style={{ padding: 20 }}>
               <Field icon={Mail} label="E-mail" value={email} onChange={setEmail} placeholder="voce@email.com" type="email" autoComplete="email" required readOnly={!!lockedEmail} />
 
-              {(!isSignup || claimed) && <div>
+              {!isSignup && <div>
                 <label className="section-kicker block mb-2">Senha</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--ink-dim)' }} />
                   <input
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

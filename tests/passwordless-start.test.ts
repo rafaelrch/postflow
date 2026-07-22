@@ -11,9 +11,10 @@ const migration = readFileSync(new URL('../supabase/migrations/20260721_abacatep
 const runbook = readFileSync(new URL('../docs/abacatepay-db-rollout.md', import.meta.url), 'utf8');
 
 describe('passwordless B2 start (failure-first)', () => {
-  it('envia OTP e não faz upsert direto de intent', () => {
+  it('envia link de confirmação para definir senha e não faz upsert direto de intent', () => {
     expect(route).toMatch(/signInWithOtp/);
     expect(route).toMatch(/shouldCreateUser\s*:\s*false/);
+    expect(route).toMatch(/emailRedirectTo\s*:\s*appUrl\(['"]\/definir-senha['"]\)/);
     expect(route).not.toMatch(/from\(['"]paid_signup_intents['"]\)[\s\S]*\.upsert/);
   });
   it('resolve ref por mapping e usa checkout_id', () => { expect(route).toMatch(/abacatepay_checkout_refs/); expect(route).toMatch(/getCheckout\(mapping\.checkout_id\)/); expect(route).not.toMatch(/getCheckout\(row\.id\)|\.eq\(['"]ref['"]/) });

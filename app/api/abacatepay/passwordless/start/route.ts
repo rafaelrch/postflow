@@ -39,8 +39,14 @@ export async function POST(req: NextRequest) {
     const prepared = await admin.rpc('prepare_paid_signup_intent', { p_subscription_id: row.id, p_email: email });
     if (prepared.error || !prepared.data || !['pending', 'claimed'].includes((prepared.data as { state?: string }).state ?? '')) return NextResponse.json(generic, { status: 403 });
     const otpClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { error: otpError } = await otpClient.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-    if (otpError) return NextResponse.json(generic, { status: 403 });
+    const { error: confirmationError } = await otpClient.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: appUrl('/definir-senha'),
+      },
+    });
+    if (confirmationError) return NextResponse.json(generic, { status: 403 });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(generic, { status: 403 });
