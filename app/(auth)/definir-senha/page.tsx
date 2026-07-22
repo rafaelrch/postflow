@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
-import { createClient } from '@/lib/supabase';
 import { isPaidPasswordlessSession } from '@/lib/paid-password-session';
+import {
+  establishPaidSignupSession,
+  type PaidSignupClient,
+  type PaidSignupSessionResult,
+} from '@/lib/paid-signup-callback';
 
 export default function DefinirSenhaPage() {
   const router = useRouter();
@@ -14,13 +18,28 @@ export default function DefinirSenhaPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
+  const passwordClientRef = useRef<PaidSignupClient | null>(null);
+  const verificationRef = useRef<Promise<PaidSignupSessionResult | null> | null>(null);
 
   useEffect(() => {
     let active = true;
-    const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }: { data: { user: { email_confirmed_at?: string | null; app_metadata?: { origin?: unknown } | null } | null } }) => {
+    if (!verificationRef.current) {
+      verificationRef.current = establishPaidSignupSession(window.location.hash, {
+        clearHash: () => {
+          window.history.replaceState(
+            window.history.state,
+            '',
+            `${window.location.pathname}${window.location.search}`,
+          );
+        },
+      });
+    }
+
+    void verificationRef.current.then((result) => {
       if (!active) return;
-      setConfirmed(isPaidPasswordlessSession({ user: data.user }));
+      const eligible = Boolean(result && isPaidPasswordlessSession({ user: result.user }));
+      passwordClientRef.current = eligible && result ? result.client : null;
+      setConfirmed(eligible);
       setChecking(false);
     });
     return () => { active = false; };
@@ -30,8 +49,9 @@ export default function DefinirSenhaPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      if (!confirmed || password.length < 6) throw new Error('password_required');
-      const { error } = await createClient().auth.updateUser({ password });
+      const client = passwordClientRef.current;
+      if (!confirmed || !client || password.length < 6) throw new Error('password_required');
+      const { error } = await client.auth.updateUser({ password });
       if (error) throw error;
       toast.success('Senha definida.');
       router.replace('/onboarding');
