@@ -122,7 +122,9 @@ export default function AuthForm({
 
   const resendOtp = async () => {
     if (!checkoutRef || resendCooldown > 0) return;
-    setResendCooldown(30);
+    // Casa com o "Minimum interval per user" (60s) do Custom SMTP do Supabase;
+    // reenviar antes disso devolve 403.
+    setResendCooldown(60);
     const res = await fetch('/api/abacatepay/passwordless/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checkout_ref: checkoutRef }) });
     if (!res.ok) toast.error('Não foi possível reenviar o código.');
     else toast.success('Se elegível, um novo código foi enviado.');
@@ -154,16 +156,56 @@ export default function AuthForm({
           </div>
 
           {confirmationSent ? (
-            <div className="brand-card" style={{ padding: 24 }}>
-              <CheckCircle2 className="w-8 h-8 mb-4" style={{ color: 'var(--success)' }} />
-              <h2 className="font-display text-[26px] leading-none mb-3">Confirme seu e-mail</h2>
+            <div className="brand-card flex flex-col gap-5" style={{ padding: 24 }}>
+              <div>
+                <CheckCircle2 className="w-8 h-8 mb-3" style={{ color: 'var(--success)' }} />
+                <h2 className="font-display text-[26px] leading-none mb-2">Confirme seu e-mail</h2>
                 <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
-                Digite o código enviado para confirmar a posse do e-mail.
+                  {claimed ? (
+                    'E-mail confirmado. Defina uma senha para concluir o acesso.'
+                  ) : (
+                    <>
+                      Enviamos um código
+                      {email ? (
+                        <> para <strong style={{ color: 'var(--ink)' }}>{email}</strong></>
+                      ) : null}
+                      . Digite-o abaixo para confirmar a posse do e-mail.
+                    </>
+                  )}
                 </p>
-              {!claimed && <Field icon={Mail} label="Código OTP" value={otp} onChange={setOtp} inputMode="numeric" autoComplete="one-time-code" required />}
-              {!claimed && <Button type="button" onClick={() => { void resendOtp(); }} disabled={resendCooldown > 0}>{resendCooldown ? `Reenviar em ${resendCooldown}s` : 'Reenviar código'}</Button>}
-              {claimed && <Field icon={Lock} label="Nova senha" value={password} onChange={setPassword} type="password" minLength={6} required />}
-              <Button className="mt-6 w-full" onClick={() => { void handleSubmit({ preventDefault() {} } as React.FormEvent<HTMLFormElement>); }}>
+              </div>
+
+              {!claimed ? (
+                <div className="flex flex-col gap-3">
+                  <Field
+                    icon={Mail}
+                    label="Código OTP"
+                    value={otp}
+                    onChange={setOtp}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={8}
+                    placeholder="00000000"
+                    required
+                  />
+                  <div className="flex items-center justify-between text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                    <span>Não recebeu o código?</span>
+                    <button
+                      type="button"
+                      onClick={() => { void resendOtp(); }}
+                      disabled={resendCooldown > 0}
+                      className="font-semibold underline underline-offset-4 disabled:no-underline disabled:cursor-not-allowed"
+                      style={{ color: resendCooldown > 0 ? 'var(--ink-muted)' : 'var(--ink)' }}
+                    >
+                      {resendCooldown ? `Reenviar em ${resendCooldown}s` : 'Reenviar código'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Field icon={Lock} label="Nova senha" value={password} onChange={setPassword} type="password" minLength={6} placeholder="mínimo 6 caracteres" required />
+              )}
+
+              <Button className="w-full" onClick={() => { void handleSubmit({ preventDefault() {} } as React.FormEvent<HTMLFormElement>); }}>
                 {claimed ? 'Definir senha' : 'Confirmar código'}
                 <ArrowRight className="w-4 h-4" />
               </Button>
