@@ -427,17 +427,31 @@ end; $$;
 revoke all on function public.claim_paid_signup_for_user(uuid) from public,anon,authenticated;
 do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.claim_paid_signup_for_user(uuid) to supabase_auth_admin'; end if; end $$;
 
-create or replace function public.enforce_paid_passwordless_marker()
+-- Gate BEFORE INSERT em auth.users. O marcador antigo (raw_app_meta_data->>'origin'
+-- ='paid_passwordless') era inaplicável: o GoTrue só materializa app_metadata custom
+-- num UPDATE PÓS-insert, então no BEFORE INSERT o marcador nunca está presente e
+-- 100% das criações falhavam (paid_passwordless_marker_required). A precondição
+-- correta é já existir uma assinatura abacatepay ativa e ainda não reivindicada
+-- para o e-mail — a rota passwordless/start cria essa linha antes de chamar
+-- createUser. O marcador de origin segue sendo gravado e continua sendo usado
+-- PÓS-insert por claim_on_email_confirmation e prepare_paid_signup_intent.
+create or replace function public.enforce_paid_signup_precondition()
 returns trigger language plpgsql security definer set search_path=pg_catalog,public,auth as $$
 begin
-  if coalesce(new.raw_app_meta_data->>'origin','') <> 'paid_passwordless' then
-    raise exception 'paid_passwordless_marker_required' using errcode='P0001';
+  if not exists (
+    select 1 from public.subscriptions
+    where provider='abacatepay' and status='active' and user_id is null
+      and lower(email)=lower(new.email)
+  ) then
+    raise exception 'paid_subscription_required' using errcode='P0001';
   end if;
   return new;
 end; $$;
-revoke all on function public.enforce_paid_passwordless_marker() from public,anon,authenticated;
-do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.enforce_paid_passwordless_marker() to supabase_auth_admin'; end if; end $$;
+revoke all on function public.enforce_paid_signup_precondition() from public,anon,authenticated;
+do $$ begin if exists(select 1 from pg_roles where rolname='supabase_auth_admin') then execute 'grant execute on function public.enforce_paid_signup_precondition() to supabase_auth_admin'; end if; end $$;
 drop trigger if exists enforce_paid_passwordless_marker_trg on auth.users;
-create trigger enforce_paid_passwordless_marker_trg before insert on auth.users for each row execute function public.enforce_paid_passwordless_marker();
+drop function if exists public.enforce_paid_passwordless_marker();
+drop trigger if exists enforce_paid_signup_precondition_trg on auth.users;
+create trigger enforce_paid_signup_precondition_trg before insert on auth.users for each row execute function public.enforce_paid_signup_precondition();
 
 commit;

@@ -94,8 +94,11 @@ Expected: the pre-migration subscription count is unchanged, all old rows are
 `claim_on_email_confirmation_trg` is present on `auth.users` with the
 `email_confirmed_at` transition guard. Confirmed existing
 users are claimed before OTP is sent, then still receive OTP to authenticate.
-`enforce_paid_passwordless_marker_trg` must also be present as a BEFORE INSERT
-gate; future Free flows require a separately authorized marker and trigger.
+`enforce_paid_signup_precondition_trg` must also be present as a BEFORE INSERT
+gate; it blocks user creation unless an active, unclaimed AbacatePay subscription
+already exists for that email. The obsolete `enforce_paid_passwordless_marker_trg`
+must be gone (run `20260722_replace_marker_with_paid_precondition.sql`); future
+Free flows require a separately authorized precondition and trigger.
 The ACL query must show `consume_credits` only for `authenticated`;
 `refund_credits` and `refresh_credits` only for `service_role`; auth trigger
 functions only for the Supabase auth role.
@@ -113,8 +116,9 @@ SELECTs; do not combine it with the migration.
 Configure Supabase Custom SMTP with Resend (`smtp.resend.com`, user `resend`,
 password entered only in the dashboard), use the OTP template, and keep the
 Supabase Email provider enabled (OTP depends on it). Verify
-`enforce_paid_passwordless_marker_trg` is installed; direct password signup
-without `raw_app_meta_data.origin = 'paid_passwordless'` fails in that trigger.
+`enforce_paid_signup_precondition_trg` is installed; any user creation without a
+matching active, unclaimed AbacatePay subscription fails in that trigger with
+`paid_subscription_required`.
 Allowlist only the fixed callback, verify the Resend domain,
 configure rate limits/CAPTCHA, and revoke any previously exposed key. No
 Resend SDK or API key is stored in the app.

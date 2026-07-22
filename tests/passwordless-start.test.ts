@@ -43,20 +43,35 @@ describe('passwordless B2 start (failure-first)', () => {
     }
     expect(canonical.replace(/\s+/g,' ')).toBe(migrated.replace(/\s+/g,' '));
   });
-  it('gate final bloqueia criação sem app_metadata marker e não é removido depois', () => {
-    for (const source of [sql, migration]) {
-      const defs = source.match(/create or replace function public\.enforce_paid_passwordless_marker\(\)[\s\S]*?create trigger enforce_paid_passwordless_marker_trg[\s\S]*?execute function public\.enforce_paid_passwordless_marker\(\)/gi) ?? [];
+  it('gate BEFORE INSERT exige assinatura paga (não o marcador materializável pós-insert)', () => {
+    const standalone = readFileSync(new URL('../supabase/migrations/20260722_replace_marker_with_paid_precondition.sql', import.meta.url), 'utf8');
+    for (const source of [sql, migration, standalone]) {
+      const defs = source.match(/create or replace function public\.enforce_paid_signup_precondition\(\)[\s\S]*?create trigger enforce_paid_signup_precondition_trg[\s\S]*?execute function public\.enforce_paid_signup_precondition\(\)/gi) ?? [];
       expect(defs.length).toBeGreaterThan(0);
       const last = defs.at(-1)!;
-      expect(last).toMatch(/raw_app_meta_data->>'origin'.*paid_passwordless/);
-      expect(last).toMatch(/raise exception 'paid_passwordless_marker_required'/);
+      // A precondição é assinatura abacatepay ativa/não-reivindicada pelo e-mail…
+      expect(last).toMatch(/from public\.subscriptions[\s\S]*provider='abacatepay'[\s\S]*status='active'[\s\S]*user_id is null[\s\S]*lower\(email\)=lower\(new\.email\)/i);
+      expect(last).toMatch(/raise exception 'paid_subscription_required'/);
+      // …e o gate NÃO depende mais do marcador de origin no BEFORE INSERT.
+      expect(last).not.toMatch(/raw_app_meta_data->>'origin'/);
+      expect(last).not.toMatch(/paid_passwordless_marker_required/);
     }
-    expect(migration.lastIndexOf('drop trigger if exists enforce_paid_passwordless_marker_trg')).toBeLessThan(migration.lastIndexOf('create trigger enforce_paid_passwordless_marker_trg'));
-    expect(migration).not.toMatch(/raw_user_meta_data.*origin.*paid_passwordless/);
+    // O marcador antigo foi removido de todo arquivo (função + trigger).
+    for (const source of [sql, migration, standalone]) {
+      expect(source).toMatch(/drop trigger if exists enforce_paid_passwordless_marker_trg/i);
+      expect(source).toMatch(/drop function if exists public\.enforce_paid_passwordless_marker\(\)/i);
+      expect(source).not.toMatch(/create trigger enforce_paid_passwordless_marker_trg/i);
+      expect(source).not.toMatch(/raise exception 'paid_passwordless_marker_required'/i);
+      // trigger novo é criado depois do drop do antigo (ordem idempotente).
+      expect(source.lastIndexOf('drop trigger if exists enforce_paid_signup_precondition_trg')).toBeLessThan(source.lastIndexOf('create trigger enforce_paid_signup_precondition_trg'));
+    }
+    // O marcador de origin continua sendo GRAVADO/lido PÓS-insert (claim + intent),
+    // só não é mais a condição do gate BEFORE INSERT.
+    expect(sql).toMatch(/raw_app_meta_data->>'origin'='paid_passwordless'/);
   });
-  it('runbook mantém Email provider ligado e documenta o gate', () => {
+  it('runbook mantém Email provider ligado e documenta o novo gate', () => {
     expect(runbook).toMatch(/keep the\s+Supabase Email provider enabled/i);
-    expect(runbook).toMatch(/enforce_paid_passwordless_marker_trg/);
+    expect(runbook).toMatch(/enforce_paid_signup_precondition_trg/);
     expect(runbook).not.toMatch(/disable public\s+email signup/i);
   });
 });
