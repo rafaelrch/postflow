@@ -104,6 +104,10 @@ export default function CarouselPreview({ carouselId }: CarouselPreviewProps) {
         profileBadge:
           (data.profile_badge as GlobalSettings['profileBadge']) ||
           DEFAULT_GLOBAL_SETTINGS.profileBadge,
+        // Formato salvo no jsonb; ausência => '4:5' (projetos antigos).
+        format:
+          ((data.global_settings as { format?: GlobalSettings['format'] } | null)?.format) ||
+          '4:5',
       };
 
       setCarousel({

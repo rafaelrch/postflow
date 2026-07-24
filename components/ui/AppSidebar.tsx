@@ -48,16 +48,29 @@ export default function AppSidebar() {
   const fetchCredits = useCreditsStore((s) => s.fetch);
   const [collapsed, setCollapsed] = useState(false);
 
+  // No editor (/generator) a sidebar entra colapsada por padrão pra dar espaço
+  // ao canvas. Isso NÃO grava no localStorage — a preferência das outras páginas
+  // fica intacta e o botão de expandir continua funcionando (colapso efêmero).
+  const isGenerator = pathname === '/generator' || pathname.startsWith('/generator/');
+
   useEffect(() => {
     try {
       if (localStorage.getItem('sidebar_collapsed') === '1') setCollapsed(true);
     } catch { /* localStorage unavailable */ }
   }, []);
 
+  // Ao entrar no editor, força o colapso (sem persistir).
+  useEffect(() => {
+    if (isGenerator) setCollapsed(true);
+  }, [isGenerator]);
+
   const toggleCollapsed = () => {
     setCollapsed(prev => {
       const next = !prev;
-      try { localStorage.setItem('sidebar_collapsed', next ? '1' : '0'); } catch {}
+      // Só persiste fora do editor, pra não sobrescrever a preferência global.
+      if (!isGenerator) {
+        try { localStorage.setItem('sidebar_collapsed', next ? '1' : '0'); } catch {}
+      }
       return next;
     });
   };

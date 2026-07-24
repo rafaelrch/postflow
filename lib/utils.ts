@@ -71,6 +71,30 @@ export function getShadowOverlayGradient(opacity: number, color?: string, size?:
   )`;
 }
 
+/**
+ * Estilo de background para as imagens do slide (fundo full-bleed e imagem de
+ * conteúdo). Centraliza o handling de object-fit + posição + zoom para preview e
+ * export renderizarem igual.
+ * - objectFit 'cover' ou ausente → preenche a moldura (pode cortar).
+ * - objectFit 'contain' → encaixa a imagem inteira (pode sobrar espaço).
+ * O zoom é uma escala relativa à base acima: 100 mantém o fit, 175 amplia 1,75x.
+ * A moldura consumidora deve recortar esta camada com overflow hidden.
+ */
+export function getImageLayerStyle(
+  pos?: { x?: number; y?: number; zoom?: number; objectFit?: 'cover' | 'contain' } | null
+): React.CSSProperties {
+  const x = pos?.x ?? 50;
+  const y = pos?.y ?? 50;
+  const zoom = pos?.zoom ?? 100;
+  const fit = pos?.objectFit;
+  return {
+    backgroundSize: fit === 'contain' ? 'contain' : 'cover',
+    backgroundPosition: `${x}% ${y}%`,
+    backgroundRepeat: 'no-repeat',
+    transform: `scale(${zoom / 100})`,
+  };
+}
+
 export function getFontFamilies(fontPair: string): { title: string; body: string } {
   const SF = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
   const IVY = "'IvyOra Text', 'Georgia', serif";

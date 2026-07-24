@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { normalizeHandle } from '@/lib/utils';
+import { getFormat } from '@/lib/formats';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
@@ -13,6 +13,10 @@ interface HiddenSlidesProps {
 
 export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
   const { slides, globalSettings, style } = useEditorStore();
+
+  // O elemento capturado no export precisa ter a altura do formato ativo,
+  // senão o PNG/ZIP sairia cortado no 1350 legado.
+  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
 
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',
@@ -35,7 +39,7 @@ export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
         <div
           key={slide.id}
           ref={(el) => registerRef(slide.id, el)}
-          style={{ width: 1080, height: 1350, overflow: 'hidden' }}
+          style={{ width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}
         >
           {style === 'profile' ? (
             <ProfileSlide

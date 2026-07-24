@@ -6,6 +6,7 @@ import {
   GlobalSettings,
   DEFAULT_GLOBAL_SETTINGS,
   SlideStyle,
+  SlideFormat,
 } from '@/types';
 import { createEmptySlide, createDeterministicSlide, generateId } from '@/lib/utils';
 
@@ -21,6 +22,8 @@ interface EditorState {
   activeSlideIndex: number;
   globalSettings: GlobalSettings;
   saveStatus: 'saved' | 'saving' | 'unsaved';
+  // Momento do último save concluído (epoch ms). null => nunca salvou nesta sessão.
+  lastSavedAt: number | null;
   history: HistoryEntry[];
   historyIndex: number;
   caption: string;
@@ -45,6 +48,7 @@ interface EditorState {
 
   updateGlobalSettings: (updates: Partial<GlobalSettings>) => void;
   updateCornersConfig: (updates: Partial<GlobalSettings['corners']>) => void;
+  setFormat: (format: SlideFormat) => void;
 
   pushHistory: () => void;
   undo: () => void;
@@ -71,6 +75,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeSlideIndex: 0,
   globalSettings: JSON.parse(JSON.stringify(DEFAULT_GLOBAL_SETTINGS)),
   saveStatus: 'saved',
+  lastSavedAt: null,
   history: [],
   historyIndex: -1,
   caption: '',
@@ -81,7 +86,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setStyle: (style) => set({ style }),
   setSlides: (slides) => set({ slides }),
   setActiveSlideIndex: (index) => set({ activeSlideIndex: index }),
-  setSaveStatus: (status) => set({ saveStatus: status }),
+  // Ao concluir um save, registra o horário; demais estados não mexem no relógio.
+  setSaveStatus: (status) =>
+    set(status === 'saved' ? { saveStatus: status, lastSavedAt: Date.now() } : { saveStatus: status }),
   setCaption: (caption) => set({ caption }),
   setHashtags: (hashtags) => set({ hashtags }),
 
@@ -159,6 +166,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       saveStatus: 'unsaved' as const,
     })),
 
+  // O formato ativo vive em globalSettings.format (serializa junto no jsonb).
+  setFormat: (format) =>
+    set((s) => ({
+      globalSettings: { ...s.globalSettings, format },
+      saveStatus: 'unsaved' as const,
+    })),
+
   pushHistory: () =>
     set((s) => {
       const entry: HistoryEntry = { slides: JSON.parse(JSON.stringify(s.slides)) };
@@ -201,6 +215,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeSlideIndex: 0,
       globalSettings: JSON.parse(JSON.stringify(DEFAULT_GLOBAL_SETTINGS)),
       saveStatus: 'saved',
+      lastSavedAt: null,
       history: [],
       historyIndex: -1,
       caption: '',
@@ -216,6 +231,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       globalSettings,
       activeSlideIndex: 0,
       saveStatus: 'saved',
+      lastSavedAt: null,
       history: [],
       historyIndex: -1,
       caption,

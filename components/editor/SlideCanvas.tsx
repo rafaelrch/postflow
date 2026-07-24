@@ -1,40 +1,71 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Trash2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, Plus, GripVertical, Save, CalendarPlus } from 'lucide-react';
 import { useEditorStore } from '@/hooks/useEditorStore';
+import { getFormat } from '@/lib/formats';
 import SlidePreview from './SlidePreview';
+import FormatDropdown from './FormatDropdown';
 
-// Thumbnail dimensions — fully visible, compact
-const THUMB_SCALE = 0.11;
-const THUMB_W = Math.round(1080 * THUMB_SCALE); // 119px
-const THUMB_H = Math.round(1350 * THUMB_SCALE); // 149px
-const CAROUSEL_H = THUMB_H + 48;               // room for number label + padding
+// Margem vertical total (topo + base) reservada em volta dos cards na faixa —
+// o card ocupa a altura da área menos isto, e o scale deriva daí (fit-to-height).
+const V_MARGIN = 56;
+
+const STYLE_LABEL: Record<string, string> = {
+  minimalist: 'Minimalista',
+  profile: 'Profile',
+  editorial: 'Editorial',
+};
 
 interface SlideCanvasProps {
   generatingProgress?: { current: number; total: number; label: string } | null;
+  onSave?: () => void;
+  onSchedule?: () => void;
+  saveStatus?: 'saved' | 'saving' | 'unsaved';
 }
 
-export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
+export default function SlideCanvas({ generatingProgress, onSave, onSchedule, saveStatus: saveStatusProp }: SlideCanvasProps) {
   const {
-    slides, activeSlideIndex, style, globalSettings,
-    setActiveSlideIndex, reorderSlides, removeSlide, addSlide,
+    slides, activeSlideIndex, style, globalSettings, saveStatus, lastSavedAt,
+    setActiveSlideIndex, reorderSlides, removeSlide, addSlide, setFormat,
     updateGlobalSettings, updateActiveSlide,
   } = useEditorStore();
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null); // área que mede a altura disponível
+  const scrollRef = useRef<HTMLDivElement>(null);  // faixa rolável horizontal
+  const [availH, setAvailH] = useState(0);
+
+  const format = getFormat(globalSettings.format);
+
+  // Mede a altura disponível e recalcula no resize. Ao trocar de formato, o
+  // scale abaixo recomputa sozinho (depende de availH + format.height).
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    setAvailH(el.clientHeight);
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setAvailH(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Fit-to-height: card preenche a altura da área; largura segue a proporção.
+  const cardH = Math.max(0, availH - V_MARGIN);
+  const scale = cardH > 0 ? cardH / format.height : 0.4;
+  const cardW = Math.round(format.width * scale);
+  const cardHpx = Math.round(cardH);
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     reorderSlides(result.source.index, result.destination.index);
   };
 
+  // Edição inline (estilo profile) fica ligada só ao card ATIVO.
   const handleUpdateProfile = style === 'profile'
     ? (updates: { name?: string; handle?: string }) => {
-        updateGlobalSettings({
-          profileBadge: { ...globalSettings.profileBadge, ...updates },
-        });
+        updateGlobalSettings({ profileBadge: { ...globalSettings.profileBadge, ...updates } });
       }
     : undefined;
 
@@ -42,25 +73,31 @@ export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
     updateActiveSlide(updates);
   };
 
-
   const goPrev = () => setActiveSlideIndex(Math.max(0, activeSlideIndex - 1));
   const goNext = () => setActiveSlideIndex(Math.min(slides.length - 1, activeSlideIndex + 1));
 
-  // Scroll active thumbnail into view when it changes
-  const scrollToThumb = (el: HTMLDivElement | null) => {
+  // Rola o card ativo para dentro da área visível quando muda.
+  const scrollActiveIntoView = (el: HTMLElement | null) => {
     if (!el || !scrollRef.current) return;
     const container = scrollRef.current;
-    const thumbLeft = el.offsetLeft;
-    const thumbRight = thumbLeft + el.offsetWidth;
+    const left = el.offsetLeft;
+    const right = left + el.offsetWidth;
     const visibleLeft = container.scrollLeft;
     const visibleRight = visibleLeft + container.clientWidth;
-    if (thumbLeft < visibleLeft) container.scrollLeft = thumbLeft - 16;
-    else if (thumbRight > visibleRight) container.scrollLeft = thumbRight - container.clientWidth + 16;
+    if (left < visibleLeft) container.scrollLeft = left - 24;
+    else if (right > visibleRight) container.scrollLeft = right - container.clientWidth + 24;
   };
+
+  const savedTime = lastSavedAt
+    ? new Date(lastSavedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const statusText = savedTime
+    ? `Salvo às ${savedTime}`
+    : saveStatus === 'saving' ? 'Salvando…' : saveStatus === 'unsaved' ? 'Não salvo' : 'Salvo';
 
   return (
     <div className="flex-1 bg-[var(--background)] flex flex-col overflow-hidden">
-      {/* Top bar */}
+      {/* ── Top bar ── */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-black/[0.06] dark:border-white/[0.06]">
         <div className="flex items-center gap-3">
           <button
@@ -80,7 +117,11 @@ export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
           >
             →
           </button>
+
+          {/* Dropdown de formato — aplica a todos os slides */}
+          <FormatDropdown value={globalSettings.format} onChange={setFormat} />
         </div>
+
         <div className="flex items-center gap-2">
           <button
             onClick={addSlide}
@@ -96,152 +137,148 @@ export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
             <Trash2 className="w-3.5 h-3.5" />
             Deletar
           </button>
+
+          {/* Separador */}
+          <div className="w-px h-5 bg-black/10 dark:bg-white/10 mx-0.5" />
+
+          {onSave && (
+            <button
+              onClick={onSave}
+              disabled={saveStatusProp === 'saving'}
+              title="Salvar agora (Ctrl+S)"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition-colors disabled:opacity-40"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Salvar
+            </button>
+          )}
+          {onSchedule && (
+            <button
+              onClick={onSchedule}
+              title="Agendar publicação na agenda"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-gray-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity ring-1 ring-black/10 dark:ring-white/10"
+            >
+              <CalendarPlus className="w-3.5 h-3.5" />
+              Agendar
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main slide view */}
-      <div className="flex-1 bg-[var(--background)] flex items-center justify-center overflow-hidden p-6">
-        {slides.length > 0 && (
-          <div className="relative">
-            <SlidePreview
-              slide={slides[activeSlideIndex]}
-              globalSettings={globalSettings}
-              style={style}
-              slideIndex={activeSlideIndex}
-              totalSlides={slides.length}
-              scale={0.45}
-              isActive={true}
-              onClick={() => {}}
-              onUpdateProfile={handleUpdateProfile}
-              onUpdateText={handleUpdateText}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Thumbnail carousel */}
-      <div
-        className="border-t border-black/[0.06] dark:border-white/[0.06] bg-[var(--surface)] flex flex-col"
-        style={{ height: CAROUSEL_H }}
-      >
-        {/* Prev / scroll / Next */}
-        <div className="flex items-center gap-2 px-2 flex-1 min-h-0">
-          {/* Prev arrow */}
-          <button
-            onClick={goPrev}
-            disabled={activeSlideIndex === 0}
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-900/30 dark:text-white/30 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-20"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          {/* Scrollable thumbnail strip */}
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-x-auto overflow-y-hidden"
-            style={{ scrollbarWidth: 'none' }}
-          >
+      {/* ── Faixa horizontal com TODOS os slides (fit-to-height) ── */}
+      <div ref={previewRef} className="flex-1 min-h-0 bg-[var(--background)] overflow-hidden">
+        <div
+          ref={scrollRef}
+          className="h-full overflow-x-auto overflow-y-hidden"
+          style={{ scrollbarWidth: 'thin' }}
+        >
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="slides" direction="horizontal">
               {(provided) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex gap-2 py-3 px-1"
+                  className="flex items-center h-full gap-6 px-8"
                   style={{ minWidth: 'min-content' }}
                 >
-                  {slides.map((slide, i) => (
-                    <Draggable key={slide.id} draggableId={slide.id} index={i}>
-                      {(drag, snapshot) => (
-                        <div
-                          ref={(el) => {
-                            drag.innerRef(el);
-                            if (i === activeSlideIndex && el) scrollToThumb(el);
-                          }}
-                          {...drag.draggableProps}
-                          {...drag.dragHandleProps}
-                          onClick={() => setActiveSlideIndex(i)}
-                          className="relative group shrink-0 cursor-pointer select-none"
-                          style={{
-                            ...drag.draggableProps.style,
-                            opacity: snapshot.isDragging ? 0.5 : 1,
-                          }}
-                        >
-                          {/* Slide number badge */}
+                  {slides.map((slide, i) => {
+                    const isActive = i === activeSlideIndex;
+                    return (
+                      <Draggable key={slide.id} draggableId={slide.id} index={i}>
+                        {(drag, snapshot) => (
                           <div
-                            className={`absolute -top-1 -left-1 z-10 w-4 h-4 rounded text-[7px] flex items-center justify-center font-bold ${
-                              i === activeSlideIndex ? 'bg-blue-500 text-white' : 'bg-black/70 text-white/60'
-                            }`}
-                          >
-                            {i + 1}
-                          </div>
-
-                          {/* Delete on hover */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (slides.length > 1) removeSlide(i);
+                            ref={(el) => {
+                              drag.innerRef(el);
+                              if (isActive) scrollActiveIntoView(el);
                             }}
-                            className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded bg-black/70 text-white/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            {...drag.draggableProps}
+                            onClick={() => setActiveSlideIndex(i)}
+                            className="relative group shrink-0 select-none"
+                            style={{
+                              ...drag.draggableProps.style,
+                              opacity: snapshot.isDragging ? 0.6 : 1,
+                            }}
                           >
-                            <Trash2 className="w-2.5 h-2.5" />
-                          </button>
+                            {/* Número do slide */}
+                            <div
+                              className={`absolute -top-2 -left-2 z-20 w-5 h-5 rounded text-[10px] flex items-center justify-center font-bold ${
+                                isActive ? 'bg-blue-500 text-white' : 'bg-black/70 text-white/70'
+                              }`}
+                            >
+                              {i + 1}
+                            </div>
 
-                          {/* Thumbnail */}
-                          <div
-                            className={`rounded-md overflow-hidden transition-all ${
-                              i === activeSlideIndex
-                                ? 'ring-2 ring-blue-500'
-                                : 'ring-1 ring-black/10 dark:ring-white/10 hover:ring-black/30 dark:hover:ring-white/30'
-                            }`}
-                            style={{ width: THUMB_W, height: THUMB_H }}
-                          >
-                            <SlidePreview
-                              slide={slide}
-                              globalSettings={globalSettings}
-                              style={style}
-                              slideIndex={i}
-                              totalSlides={slides.length}
-                              scale={THUMB_SCALE}
-                              isActive={i === activeSlideIndex}
-                              onClick={() => setActiveSlideIndex(i)}
-                            />
+                            {/* Alça de arrastar — só ela dispara o reorder, pra não
+                                conflitar com a edição inline do card ativo */}
+                            <div
+                              {...drag.dragHandleProps}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Arraste para reordenar"
+                              className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 w-6 h-5 rounded bg-black/70 text-white/60 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-grab active:cursor-grabbing"
+                            >
+                              <GripVertical className="w-3 h-3" />
+                            </div>
+
+                            {/* Deletar */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (slides.length > 1) removeSlide(i);
+                              }}
+                              className="absolute -top-2 -right-2 z-20 w-5 h-5 rounded bg-black/70 text-white/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+
+                            {/* Card do slide */}
+                            <div
+                              className={`rounded-lg overflow-hidden transition-all ${
+                                isActive
+                                  ? 'ring-2 ring-blue-500'
+                                  : 'ring-1 ring-black/10 dark:ring-white/10 hover:ring-black/30 dark:hover:ring-white/30 cursor-pointer'
+                              }`}
+                              style={{ width: cardW, height: cardHpx }}
+                            >
+                              <SlidePreview
+                                slide={slide}
+                                globalSettings={globalSettings}
+                                style={style}
+                                slideIndex={i}
+                                totalSlides={slides.length}
+                                scale={scale}
+                                isActive={isActive}
+                                onClick={() => setActiveSlideIndex(i)}
+                                onUpdateProfile={isActive ? handleUpdateProfile : undefined}
+                                onUpdateText={isActive ? handleUpdateText : undefined}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
+                        )}
+                      </Draggable>
+                    );
+                  })}
                   {provided.placeholder}
 
-                  {/* Add slide button */}
+                  {/* Botão adicionar ao fim da faixa */}
                   <button
                     onClick={addSlide}
-                    className="flex items-center justify-center border border-dashed border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 transition-colors rounded-md text-gray-900/20 dark:text-white/20 hover:text-gray-900/50 dark:hover:text-white/50 shrink-0 self-center"
-                    style={{ width: THUMB_W, height: THUMB_H }}
+                    className="flex flex-col items-center justify-center gap-1 border border-dashed border-black/15 dark:border-white/15 hover:border-black/30 dark:hover:border-white/30 transition-colors rounded-lg text-gray-900/25 dark:text-white/25 hover:text-gray-900/50 dark:hover:text-white/50 shrink-0"
+                    style={{ width: cardW, height: cardHpx }}
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-6 h-6" />
+                    <span className="text-[11px] font-medium">Adicionar</span>
                   </button>
                 </div>
               )}
             </Droppable>
           </DragDropContext>
-          </div>
-
-          {/* Next arrow */}
-          <button
-            onClick={goNext}
-            disabled={activeSlideIndex === slides.length - 1}
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-900/30 dark:text-white/30 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-20"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
-      {/* Status bar */}
+      {/* ── Status bar ── */}
       <div className="px-4 py-1.5 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
-        <span className="text-[10px] text-gray-900/30 dark:text-white/30 tabular-nums">
-          {activeSlideIndex + 1}/{slides.length} slides · 1080 × 1350 px · {style === 'minimalist' ? 'Minimalista' : 'Profile'}
+        <span className="text-[10px] text-gray-900/40 dark:text-white/40 tabular-nums">
+          {statusText} · Slide {activeSlideIndex + 1}/{slides.length} · {format.width} × {format.height} px · {STYLE_LABEL[style] ?? style}
         </span>
 
         {generatingProgress && (
@@ -259,7 +296,7 @@ export default function SlideCanvas({ generatingProgress }: SlideCanvasProps) {
           </div>
         )}
 
-        <span className="text-[10px] text-gray-900/20 dark:text-white/20">Arraste para reordenar</span>
+        <span className="text-[10px] text-gray-900/20 dark:text-white/20">Arraste a alça para reordenar</span>
       </div>
     </div>
   );

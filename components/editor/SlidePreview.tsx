@@ -3,6 +3,7 @@
 import { forwardRef } from 'react';
 import { Slide, GlobalSettings, SlideStyle } from '@/types';
 import { normalizeHandle } from '@/lib/utils';
+import { getFormat } from '@/lib/formats';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
@@ -21,13 +22,13 @@ interface SlidePreviewProps {
   onUpdateText?: (updates: { title?: string; description?: string; subtitle?: string }) => void;
 }
 
-const SLIDE_W = 1080;
-const SLIDE_H = 1350;
-
 const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function SlidePreview(
   { slide, globalSettings, style, slideIndex, totalSlides, scale = 0.22, isActive = false, forExport = false, onClick, onUpdateProfile, onUpdateText },
   ref
 ) {
+  // Dimensões do formato ativo — a moldura escalada acompanha a proporção real.
+  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',
     name: globalSettings.profileBadge.name || 'Seu Nome',

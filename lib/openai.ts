@@ -197,13 +197,16 @@ export function buildImagePrompt(input: {
   description?: string;
   isCover?: boolean;
   isFinal?: boolean;
+  /** Direção livre do usuário (textarea do painel de IA), tecida no prompt. */
+  userPrompt?: string;
 }): string {
-  const { title, description, isCover, isFinal } = input;
+  const { title, description, isCover, isFinal, userPrompt } = input;
   const base = [title, description].filter(Boolean).join(' — ');
   const intent = isCover
     ? 'Cover slide cinematic establishing shot for: '
     : isFinal
       ? 'Closing slide minimalist evocative shot for: '
       : 'Editorial illustrative shot for: ';
-  return `${intent}${base}${IMAGE_STYLE_SUFFIX}`;
+  const extra = userPrompt?.trim() ? ` Additional art direction: ${userPrompt.trim()}.` : '';
+  return `${intent}${base}${extra}${IMAGE_STYLE_SUFFIX}`;
 }

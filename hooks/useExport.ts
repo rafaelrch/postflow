@@ -2,10 +2,14 @@
 
 import { useRef, useCallback } from 'react';
 import { useEditorStore } from './useEditorStore';
+import { getFormat } from '@/lib/formats';
 import toast from 'react-hot-toast';
 
 export function useExport() {
-  const { slides, activeSlideIndex } = useEditorStore();
+  const { slides, activeSlideIndex, globalSettings } = useEditorStore();
+
+  // Exporta EXATAMENTE no formato selecionado (largura 1080 fixa; altura varia).
+  const { width: exportWidth, height: exportHeight } = getFormat(globalSettings.format);
 
   const exportRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -31,8 +35,8 @@ export function useExport() {
       }
       return await toCanvas(el, {
         pixelRatio: 2,
-        width: 1080,
-        height: 1350,
+        width: exportWidth,
+        height: exportHeight,
         cacheBust: true,
         fontEmbedCSS,
       });
@@ -43,12 +47,12 @@ export function useExport() {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        width: 1080,
-        height: 1350,
+        width: exportWidth,
+        height: exportHeight,
         backgroundColor: null,
       });
     }
-  }, []);
+  }, [exportWidth, exportHeight]);
 
   const downloadSlide = useCallback(async (index?: number) => {
     const idx = index ?? activeSlideIndex;

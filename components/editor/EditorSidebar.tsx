@@ -11,6 +11,144 @@ import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
 import { TextPosition, TextHighlight, ElementFont } from '@/types';
 
+// ── ImageThumb: miniatura da imagem anexada com X para remover ───────────────
+function ImageThumb({ url, onRemove }: { url: string; onRemove: () => void }) {
+  return (
+    <div className="relative w-full h-24 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="Imagem anexada" className="w-full h-full object-cover" />
+      <button
+        onClick={onRemove}
+        title="Remover imagem"
+        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center transition-colors"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
+// ── AiGenPanel: painel expansível de geração de imagem por IA ─────────────────
+// Ao abrir: referência (upload + preview + X), prompt livre, conteúdo do slide
+// (somente leitura) e o botão Gerar. Estado local; reseta ao trocar de slide
+// via key={activeSlideIndex} no uso.
+function AiGenPanel({
+  buttonLabel,
+  generating,
+  slideTitle,
+  slideDescription,
+  onGenerate,
+}: {
+  buttonLabel: string;
+  generating: boolean;
+  slideTitle: string;
+  slideDescription: string;
+  onGenerate: (opts: { userPrompt?: string; referenceImageUrl?: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [refUrl, setRefUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    const toastId = toast.loading('Enviando referência…');
+    try {
+      const url = await uploadImageFile(file, 'reference-images');
+      setRefUrl(url);
+      toast.success('Referência adicionada', { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const slideContent = [slideTitle, slideDescription].filter(Boolean).join('\n\n');
+  const panelLabelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
+  const fieldCls = 'w-full px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:border-black/20 dark:focus:border-white/20 transition-all resize-none';
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          'w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-semibold transition-opacity',
+          open
+            ? 'border border-black/[0.1] dark:border-white/[0.1] text-gray-900/70 dark:text-white/70'
+            : 'bg-gray-900 dark:bg-white text-white dark:text-black hover:opacity-90'
+        )}
+      >
+        <Sparkles className="w-3 h-3" />
+        {buttonLabel}
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-2 p-2.5 rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+          />
+
+          {/* Imagem de referência */}
+          <span className={panelLabelCls}>Imagem de referência (opcional)</span>
+          {refUrl ? (
+            <ImageThumb url={refUrl} onRemove={() => setRefUrl('')} />
+          ) : (
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-lg p-3 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition-all"
+            >
+              <Upload className="w-3.5 h-3.5 mx-auto mb-1 text-gray-900/25 dark:text-white/25" />
+              <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">
+                {uploading ? 'Enviando…' : 'Clique para anexar referência'}
+              </span>
+            </div>
+          )}
+
+          {/* Prompt livre */}
+          <span className={panelLabelCls}>Prompt</span>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Descreva a imagem que você quer gerar…"
+            className={fieldCls}
+            style={{ minHeight: 64 }}
+          />
+
+          {/* Conteúdo do slide — somente leitura */}
+          <span className={panelLabelCls}>Conteúdo do slide</span>
+          <textarea
+            readOnly
+            value={slideContent}
+            className={cn(fieldCls, 'opacity-60 cursor-default')}
+            style={{ minHeight: 48 }}
+          />
+
+          {/* Gerar */}
+          <button
+            onClick={() =>
+              onGenerate({
+                userPrompt: prompt.trim() || undefined,
+                referenceImageUrl: refUrl || undefined,
+              })
+            }
+            disabled={generating || uploading}
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Sparkles className="w-3 h-3" />
+            {generating ? 'Gerando…' : 'Gerar'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── ColorPicker: swatch + hex input ─────────────────────────────────────────
 
 interface ColorPickerProps {
@@ -488,7 +626,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   );
 
   return (
-    <div className="w-[300px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
+    <div className="w-[272px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
       {fileInputs}
 
       {/* Theme toggle — only for profile (Twitter) style */}
@@ -632,18 +770,16 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 <span className="text-[10px] font-medium text-gray-900/35 dark:text-white/35">Arraste ou clique para adicionar</span>
               </div>
 
-              {/* AI image generation */}
+              {/* AI image generation — painel expansível */}
               <div className="flex flex-col gap-1.5 pt-1">
-                <button
-                  onClick={() => generateOne(activeSlideIndex)}
-                  disabled={generating}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  {generating
-                    ? (progress.total > 1 ? `Gerando ${progress.done}/${progress.total}…` : 'Gerando…')
-                    : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
-                </button>
+                <AiGenPanel
+                  key={`profile-bg-${activeSlideIndex}`}
+                  buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
+                  generating={generating}
+                  slideTitle={slide.title}
+                  slideDescription={slide.description || ''}
+                  onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+                />
                 <button
                   onClick={() => generateAll()}
                   disabled={generating}
@@ -656,17 +792,12 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 </button>
               </div>
 
-              {/* Current media status */}
+              {/* Miniatura da imagem anexada */}
               {(slide.backgroundImageUrl || slide.gridImageUrl) && (
-                <div className="flex items-center justify-between px-0.5">
-                  <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
-                  <button
-                    onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })}
-                    className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1"
-                  >
-                    <X className="w-3 h-3" /> Remover
-                  </button>
-                </div>
+                <ImageThumb
+                  url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+                  onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })}
+                />
               )}
               {/* Position controls — only when media exists */}
               {(slide.backgroundImageUrl || slide.gridImageUrl) && (
@@ -675,6 +806,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                     onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
                   <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100}
                     onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
+                  <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300}
+                    onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
                 </>
               )}
             </Section>
@@ -702,18 +835,16 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
                   <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
                 </div>
-                {/* AI image generation */}
+                {/* AI image generation — painel expansível */}
                 <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => generateOne(activeSlideIndex, 'content')}
-                    disabled={generating}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    {generating
-                      ? (progress.total > 1 ? `Gerando ${progress.done}/${progress.total}…` : 'Gerando…')
-                      : `Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
-                  </button>
+                  <AiGenPanel
+                    key={`content-${activeSlideIndex}`}
+                    buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
+                    generating={generating}
+                    slideTitle={slide.title}
+                    slideDescription={slide.description || ''}
+                    onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
+                  />
                   <button
                     onClick={() => generateAll('content')}
                     disabled={generating}
@@ -726,28 +857,12 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   </button>
                 </div>
 
-                <div>
-                  <span className={labelCls + ' block mb-1'}>URL da imagem</span>
-                  <input
-                    type="text"
-                    className={inputCls}
-                    placeholder="https://..."
-                    value={slide.contentImageUrl || ''}
-                    onChange={(e) => updateActiveSlide({ contentImageUrl: e.target.value })}
-                    spellCheck={false}
-                  />
-                </div>
                 {slide.contentImageUrl && (
-                  <div className="flex items-center justify-between px-0.5">
-                    <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
-                    <button onClick={() => updateActiveSlide({ contentImageUrl: '' })} className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1">
-                      <X className="w-3 h-3" /> Limpar
-                    </button>
-                  </div>
+                  <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
                 )}
                 <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
                 <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
-                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } })} unit="%" />
+                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v, objectFit: slide.contentImagePosition?.objectFit } })} unit="%" />
               </Section>
               )}
 
@@ -795,34 +910,18 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste uma imagem de fundo</span>
                 </div>
                 {isEditorialCover && (
-                  <button
-                    onClick={() => generateOne(activeSlideIndex)}
-                    disabled={generating}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    {generating ? 'Gerando…' : 'Gerar imagem com IA (capa)'}
-                  </button>
-                )}
-                <div>
-                  <span className={labelCls + ' block mb-1'}>URL da imagem</span>
-                  <input
-                    type="text"
-                    className={inputCls}
-                    placeholder="https://..."
-                    value={slide.backgroundImageUrl || slide.gridImageUrl || ''}
-                    onChange={(e) => updateActiveSlide({ backgroundImageUrl: e.target.value, gridImageUrl: e.target.value })}
-                    spellCheck={false}
+                  <AiGenPanel
+                    key={`cover-bg-${activeSlideIndex}`}
+                    buttonLabel="Gerar imagem com IA (capa)"
+                    generating={generating}
+                    slideTitle={slide.title}
+                    slideDescription={slide.description || ''}
+                    onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
                   />
-                </div>
+                )}
                 {(slide.backgroundImageUrl || slide.gridImageUrl) && (
                   <>
-                    <div className="flex items-center justify-between px-0.5">
-                      <span className="text-[10px] font-medium text-green-500/80">Imagem carregada</span>
-                      <button onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} className="text-[9px] font-medium text-red-400/50 hover:text-red-400 transition-colors flex items-center gap-1">
-                        <X className="w-3 h-3" /> Limpar
-                      </button>
-                    </div>
+                    <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''} onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
                     <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} unit="%" />
                     <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
                     <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />

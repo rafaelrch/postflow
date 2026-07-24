@@ -1,5 +1,8 @@
 export type SlideStyle = 'minimalist' | 'profile' | 'editorial';
 export type ContentLayout = 'cover' | 'text-image-text' | 'text-text-image' | 'image-text-text' | 'text-only';
+// Formato/proporção do slide. Todos compartilham largura 1080 (só a altura muda);
+// dimensões e labels vivem em lib/formats.ts. Ausência => '4:5' (legado).
+export type SlideFormat = '4:5' | '1:1' | '9:16';
 
 export interface TextHighlight {
   text: string;
@@ -66,6 +69,10 @@ export interface ImagePosition {
   x: number;
   y: number;
   zoom: number;
+  // Como a imagem preenche a moldura ao trocar de formato:
+  // 'cover' = preenche (pode cortar), 'contain' = contém (encaixa inteira).
+  // Ausência mantém o comportamento legado (backgroundSize = zoom%).
+  objectFit?: 'cover' | 'contain';
 }
 
 export interface FontSize {
@@ -182,6 +189,9 @@ export interface GlobalSettings {
   fontPair: FontPair;
   theme: SlideTheme;
   metaBar?: MetaBar;
+  // Formato/proporção do carrossel. Serializa em global_settings (jsonb).
+  // Ausência => '4:5' (projetos antigos).
+  format?: SlideFormat;
 }
 
 export interface Carousel {
@@ -266,6 +276,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   fontPair: 'SF Pro Display + IvyOra Text',
   theme: 'dark',
   metaBar: { show: false, left: '', center: '', right: '' },
+  format: '4:5',
 };
 
 export const DEFAULT_SLIDE: Omit<Slide, 'id' | 'position'> = {
