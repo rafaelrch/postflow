@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { Slide, GlobalSettings, ContentLayout, TextHighlight, ElementFont } from '@/types';
-import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient } from '@/lib/utils';
+import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient, getImageLayerStyle } from '@/lib/utils';
+import { getFormat } from '@/lib/formats';
 
 // Sublinhado via border-bottom — text-decoration sai diferente no html2canvas
 // (export). O inline-block é essencial: em elemento inline o navegador pinta a
@@ -25,15 +26,10 @@ export interface EditorialSlideProps {
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-const SLIDE_W = 1080;
-const SLIDE_H = 1350;
 const PAD_X = 56;           // horizontal padding for content
 const META_TOP = 36;        // top offset for metadata bar
 const META_FONTSIZE = 21;   // metadata bar font size
 const META_H = 60;          // total vertical footprint of meta bar area
-
-// Cover layout — text group default top (~58% down)
-const COVER_TEXT_DEFAULT_TOP = Math.round(SLIDE_H * 0.58); // ~783
 
 // Content layouts — zone boundaries (absolute pixels from slide top)
 const CONTENT_TOP = META_TOP + META_H; // ~96
@@ -224,6 +220,12 @@ export default function EditorialSlide({
   const { accentColor, fontPair, metaBar, corners } = globalSettings;
   const fonts = getFontFamilies(fontPair);
 
+  // Dimensões do formato ativo — largura sempre 1080; só a altura muda. As zonas
+  // verticais dos layouts são derivadas de SLIDE_H, então refluem sem esticar.
+  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+  // Cover layout — text group default top (~58% down)
+  const COVER_TEXT_DEFAULT_TOP = Math.round(SLIDE_H * 0.58);
+
   const layout: ContentLayout = slide.contentLayout ?? (slideIndex === 0 ? 'cover' : 'text-image-text');
 
   // Determine background and text colors
@@ -300,19 +302,23 @@ export default function EditorialSlide({
     borderRadius: 20,
     overflow: 'hidden',
     flexShrink: 0,
+    position: 'relative',
     ...(contentImgUrl
-      ? {
-          backgroundImage: `url(${contentImgUrl})`,
-          backgroundSize: `${slide.contentImagePosition?.zoom ?? 100}%`,
-          backgroundPosition: `${slide.contentImagePosition?.x ?? 50}% ${slide.contentImagePosition?.y ?? 50}%`,
-          backgroundRepeat: 'no-repeat',
-        }
+      ? {}
       : {
           background: bgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
           border: `1.5px dashed ${bgIsLight ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.20)'}`,
           boxSizing: 'border-box',
         }),
   });
+  const contentImageLayer = contentImgUrl ? (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      backgroundImage: `url(${contentImgUrl})`,
+      ...getImageLayerStyle(slide.contentImagePosition),
+    }} />
+  ) : null;
 
   // "Fundo do Slide" — cor sólida OU imagem full-bleed atrás de tudo (texto,
   // shape de imagem, etc). Usa os mesmos campos que o layout "cover" já usava.
@@ -321,9 +327,7 @@ export default function EditorialSlide({
     <div style={{
       position: 'absolute', inset: 0,
       backgroundImage: `url(${bgImageUrl})`,
-      backgroundSize: `${slide.imagePosition.zoom}%`,
-      backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
-      backgroundRepeat: 'no-repeat',
+      ...getImageLayerStyle(slide.imagePosition),
       opacity: (slide.backgroundImageOpacity ?? 100) / 100,
     }} />
   ) : null;
@@ -469,7 +473,9 @@ export default function EditorialSlide({
               width: '100%',
               transform: `translateY(${imageOffsetY}px)`,
               ...imageStyle(imgH),
-            }} />
+            }}>
+              {contentImageLayer}
+            </div>
           )}
 
           {descBlock && (
@@ -529,7 +535,9 @@ export default function EditorialSlide({
             position: 'absolute', top: imgTopTTI, left: PAD_X, right: PAD_X, height: imgH,
             ...imageStyle(imgH),
             width: SLIDE_W - PAD_X * 2,
-          }} />
+          }}>
+            {contentImageLayer}
+          </div>
         )}
 
         <Corners corners={corners} bgIsLight={bgIsLight} fontBody={fonts.body} />
@@ -562,7 +570,9 @@ export default function EditorialSlide({
             position: 'absolute', top: imgTop, left: PAD_X, right: PAD_X, height: imgH,
             ...imageStyle(imgH),
             width: SLIDE_W - PAD_X * 2,
-          }} />
+          }}>
+            {contentImageLayer}
+          </div>
         )}
 
         {/* Title */}

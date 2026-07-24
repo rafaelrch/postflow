@@ -32,7 +32,10 @@ export function useAutoSave() {
         accent_color:  store.globalSettings.accentColor,
         corners:       store.globalSettings.corners,
         profile_badge: store.globalSettings.profileBadge,
-        global_settings: { metaBar: store.globalSettings.metaBar ?? null },
+        global_settings: {
+          metaBar: store.globalSettings.metaBar ?? null,
+          format: store.globalSettings.format ?? '4:5',
+        },
         caption:       store.caption       ?? '',
         hashtags:      store.hashtags      ?? [],
       };

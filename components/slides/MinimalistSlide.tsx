@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { Slide, GlobalSettings, TextPosition, TextHighlight, ElementFont } from '@/types';
-import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient } from '@/lib/utils';
+import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient, getImageLayerStyle } from '@/lib/utils';
+import { getFormat } from '@/lib/formats';
 
 export interface MinimalistSlideProps {
   slide: Slide;
@@ -158,6 +159,9 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
   const { corners, accentColor, fontPair, theme } = globalSettings;
   const slideContainerRef = React.useRef<HTMLDivElement>(null);
 
+  // Dimensões do formato ativo — largura sempre 1080; só a altura muda.
+  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+
   const fonts = getFontFamilies(fontPair);
   const isDark = theme === 'dark';
 
@@ -254,8 +258,8 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
     <div
       ref={slideContainerRef}
       style={{
-        width: 1080,
-        height: 1350,
+        width: SLIDE_W,
+        height: SLIDE_H,
         position: 'relative',
         overflow: 'hidden',
         backgroundColor: bgColor,
@@ -269,9 +273,7 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
             position: 'absolute',
             inset: 0,
             backgroundImage: `url(${bgImageUrl})`,
-            backgroundSize: `${slide.imagePosition.zoom}%`,
-            backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
-            backgroundRepeat: 'no-repeat',
+            ...getImageLayerStyle(slide.imagePosition),
             opacity: (slide.backgroundImageOpacity ?? 100) / 100,
           }}
         />
@@ -315,12 +317,15 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
                   borderRadius: 16,
                   overflow: 'hidden',
                   flexShrink: 0,
-                  backgroundImage: `url(${slide.contentImageUrl})`,
-                  backgroundSize: `${slide.contentImagePosition?.zoom ?? 100}%`,
-                  backgroundPosition: `${slide.contentImagePosition?.x ?? 50}% ${slide.contentImagePosition?.y ?? 50}%`,
-                  backgroundRepeat: 'no-repeat',
                 }}
-              />
+              >
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundImage: `url(${slide.contentImageUrl})`,
+                  ...getImageLayerStyle(slide.contentImagePosition),
+                }} />
+              </div>
             )}
 
             {slide.description !== undefined && slide.description !== '' &&

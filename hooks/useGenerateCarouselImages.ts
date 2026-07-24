@@ -50,10 +50,17 @@ function parseRetryAfterMs(message: string): number {
   return Math.ceil(secs) * 1000 + 500; // pequena folga
 }
 
+/** Direção opcional do painel de IA: prompt livre + imagem de referência. */
+export interface GenerateOptions {
+  userPrompt?: string;
+  referenceImageUrl?: string;
+}
+
 async function generateForSlide(
   slide: Slide,
   slideIndex: number,
   totalSlides: number,
+  opts?: GenerateOptions,
 ): Promise<string> {
   const isCover = slideIndex === 0;
   const isFinal = slideIndex === totalSlides - 1;
@@ -67,6 +74,8 @@ async function generateForSlide(
       description: slide.description,
       isCover,
       isFinal,
+      userPrompt: opts?.userPrompt,
+      referenceImageUrl: opts?.referenceImageUrl,
     }),
   });
 
@@ -88,10 +97,11 @@ async function generateForSlideWithRetry(
   slideIndex: number,
   totalSlides: number,
   onRateLimit?: (waitSeconds: number) => void,
+  opts?: GenerateOptions,
 ): Promise<string> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await generateForSlide(slide, slideIndex, totalSlides);
+      return await generateForSlide(slide, slideIndex, totalSlides, opts);
     } catch (err) {
       const isRateLimit = err instanceof GenerateImageError && err.status === 429;
       if (!isRateLimit || attempt >= MAX_RATE_LIMIT_RETRIES) throw err;
@@ -176,7 +186,7 @@ export function useGenerateCarouselImages() {
     }
   }, [slides, style, generating, updateSlide]);
 
-  const generateOne = useCallback(async (index: number, target: ImageTarget = 'background') => {
+  const generateOne = useCallback(async (index: number, target: ImageTarget = 'background', opts?: GenerateOptions) => {
     const slide = slides[index];
     if (!slide || generating) return;
 
@@ -187,7 +197,7 @@ export function useGenerateCarouselImages() {
     try {
       const url = await generateForSlideWithRetry(slide, index, slides.length, (waitSecs) => {
         toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
-      });
+      }, opts);
       updateSlide(index, target === 'content'
         ? { contentImageUrl: url }
         : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });

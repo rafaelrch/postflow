@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CalendarPlus, CloudCheck, CloudOff, Loader2, Save } from 'lucide-react';
 import EditorSidebar from '@/components/editor/EditorSidebar';
 import SlideCanvas from '@/components/editor/SlideCanvas';
 import HiddenSlides from '@/components/editor/HiddenSlides';
@@ -116,58 +115,8 @@ export default function GeneratorClient() {
     toast.success('Carrossel salvo!');
   };
 
-  // ── Save indicator ────────────────────────────────────────────────────────
-  const SaveIndicator = () => (
-    <div className="flex items-center gap-2">
-      {saveStatus === 'saving' && (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md">
-          <Loader2 className="w-3 h-3 text-gray-900/30 dark:text-white/30 animate-spin" />
-          <span className="text-[10px] text-gray-900/30 dark:text-white/30">Salvando...</span>
-        </div>
-      )}
-      {saveStatus === 'saved' && (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md">
-          <CloudCheck className="w-3 h-3 text-green-500/70" />
-          <span className="text-[10px] text-gray-900/30 dark:text-white/30">Salvo</span>
-        </div>
-      )}
-      {saveStatus === 'unsaved' && (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md">
-          <CloudOff className="w-3 h-3 text-yellow-500/60" />
-          <span className="text-[10px] text-yellow-500/60">Não salvo</span>
-        </div>
-      )}
-
-      {/* Manual save button */}
-      <button
-        onClick={handleManualSave}
-        disabled={saveStatus === 'saving'}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 text-[10px] text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-40"
-        title="Salvar agora (Ctrl+S)"
-      >
-        <Save className="w-3 h-3" />
-        Salvar
-      </button>
-
-      {/* Schedule button */}
-      <button
-        onClick={() => setShowScheduleModal(true)}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-[13px] font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors shadow-sm ring-1 ring-black/10 dark:ring-white/10"
-        title="Agendar publicação na agenda"
-      >
-        <CalendarPlus className="w-4 h-4" />
-        Agendar
-      </button>
-    </div>
-  );
-
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Editor top bar */}
-      <div className="h-10 shrink-0 border-b border-black/[0.06] dark:border-white/[0.06] bg-[var(--background)] flex items-center justify-end px-4 gap-4">
-        <SaveIndicator />
-      </div>
-
       <div className="flex-1 flex overflow-hidden">
         <EditorSidebar
           onOpenWizard={() => setShowWizard(true)}
@@ -175,7 +124,11 @@ export default function GeneratorClient() {
           onDownloadAll={downloadAll}
         />
 
-        <SlideCanvas />
+        <SlideCanvas
+          onSave={handleManualSave}
+          onSchedule={() => setShowScheduleModal(true)}
+          saveStatus={saveStatus}
+        />
       </div>
 
       {/* Hidden slides for html2canvas export */}

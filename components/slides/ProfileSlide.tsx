@@ -2,6 +2,8 @@
 
 import React, { useRef } from 'react';
 import { Slide, GlobalSettings } from '@/types';
+import { getFormat } from '@/lib/formats';
+import { getImageLayerStyle } from '@/lib/utils';
 
 export interface ProfileSlideProps {
   slide: Slide;
@@ -64,6 +66,10 @@ export default function ProfileSlide({
   onUpdateProfile,
   onUpdateText,
 }: ProfileSlideProps) {
+  // Dimensões do formato ativo — o card é centralizado (top/left 50%), então
+  // encaixa em qualquer altura sem esticar.
+  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+
   const imageUrl = slide.gridImageUrl || slide.backgroundImageUrl;
   const hasMedia = Boolean(imageUrl);
   const descText = slide.description?.trim() || '';
@@ -138,8 +144,8 @@ export default function ProfileSlide({
   return (
     <div
       style={{
-        width: 1080,
-        height: 1350,
+        width: SLIDE_W,
+        height: SLIDE_H,
         overflow: 'hidden',
         backgroundColor: C.bg,
         fontFamily: TWITTER_FONT,
@@ -291,8 +297,7 @@ export default function ProfileSlide({
                   width: '100%',
                   height: '100%',
                   backgroundImage: `url(${imageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: `${slide.imagePosition.x}% ${slide.imagePosition.y}%`,
+                  ...getImageLayerStyle(slide.imagePosition),
                 }}
               />
             ) : null}

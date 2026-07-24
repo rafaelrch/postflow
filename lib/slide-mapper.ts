@@ -120,5 +120,7 @@ export function mapDbCarouselToGlobalSettings(carousel: DbRow): GlobalSettings {
     corners: (carousel.corners as GlobalSettings['corners']) || DEFAULT_GLOBAL_SETTINGS.corners,
     profileBadge: (carousel.profile_badge as GlobalSettings['profileBadge']) || DEFAULT_GLOBAL_SETTINGS.profileBadge,
     metaBar: stored.metaBar || DEFAULT_GLOBAL_SETTINGS.metaBar,
+    // Projetos antigos sem formato salvo assumem '4:5' (legado).
+    format: stored.format || '4:5',
   };
 }
