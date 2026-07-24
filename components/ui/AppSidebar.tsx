@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutGrid,
   Newspaper,
+  Clapperboard,
   Calendar,
   Palette,
   CreditCard,
@@ -32,6 +33,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard',  label: 'Carrosséis',  icon: LayoutGrid, match: ['/generator'] },
   { href: '/news',       label: 'Notícias',     icon: Newspaper },
+  { href: '/reels',      label: 'Reels',        icon: Clapperboard },
   { href: '/agenda',     label: 'Agenda',       icon: Calendar },
   { href: '/onboarding', label: 'Onboarding',   icon: Palette },
   { href: '/conta',      label: 'Assinatura',   icon: CreditCard },

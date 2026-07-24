@@ -9,6 +9,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@hello-pangea/dnd": "^18.0.1",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.100.1",
