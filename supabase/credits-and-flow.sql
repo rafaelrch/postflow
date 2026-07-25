@@ -3,6 +3,24 @@
 -- Idempotente. Rodar após schema.sql, subscriptions-schema.sql e
 -- abacatepay-schema.sql. Não depende de tabelas Stripe.
 -- ============================================================
+--
+-- ⚠️  ATENÇÃO — PARTE DESTE ARQUIVO ESTÁ OBSOLETA. NÃO RODE COMO ESTÁ.
+--
+-- As funções `consume_credits`, `refund_credits` e `refresh_credits` definidas
+-- aqui foram SUBSTITUÍDAS pela migration:
+--     supabase/migrations/20260721_abacatepay_secure_rollout.sql
+--
+-- A migration endureceu essas três RPCs (guarda `auth.uid() = p_user`, guardas
+-- de custo/valor, revoke de public/anon/authenticated e grants específicos por
+-- função). As definições contidas ABAIXO são as ANTIGAS e PERMISSIVAS, sem
+-- nada disso. Rodar este arquivo de novo faz `create or replace` por cima e
+-- DESFAZ o hardening de segurança — silenciosamente, sem erro nenhum.
+--
+-- A FONTE DA VERDADE dessas três funções é a migration 20260721, NÃO este
+-- arquivo. Se for realmente necessário rodar este arquivo (ex.: montando um
+-- banco novo), execute a migration 20260721 DEPOIS dele para restaurar o
+-- contrato correto.
+-- ============================================================
 
 alter table public.subscriptions alter column user_id drop not null;
 alter table public.subscriptions add column if not exists email text;
