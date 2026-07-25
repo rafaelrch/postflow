@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT, WEB_SEARCH_PROMPT_ADDENDUM } from '@/lib/openai';
 import { requireCredits, refundCredits } from '@/lib/subscription';
 import { CREDIT_COSTS } from '@/lib/credits';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { BrandContext, formatBrandContextAsPrompt, getBrandContext } from '@/lib/brand-context';
 import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
 
 export const maxDuration = 60;
@@ -49,8 +51,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ slides, caption: '', hashtags: [] });
     }
 
+    // Contexto de marca do onboarding entra como pano de fundo do prompt.
+    // Best-effort: qualquer falha aqui cai no prompt genérico de sempre.
+    let brandContext: BrandContext | undefined;
+    try {
+      const supabase = await createServerSupabaseClient();
+      brandContext = await getBrandContext(userId, supabase);
+    } catch (err) {
+      console.error('[generate-carousel] brand context', err);
+    }
+
     // Build input
     const input: OpenAI.Responses.ResponseInputItem[] = [];
+    const userPrompt = buildUserPrompt(body, brandContext);
 
     if (body.referenceImageBase64) {
       input.push({
@@ -65,12 +78,12 @@ export async function POST(req: NextRequest) {
           },
           {
             type: 'input_text',
-            text: buildUserPrompt(body),
+            text: userPrompt,
           },
         ],
       });
     } else {
-      input.push({ role: 'user', content: buildUserPrompt(body) });
+      input.push({ role: 'user', content: userPrompt });
     }
 
     const basePrompt = body.style === 'profile' ? TWITTER_CAROUSEL_SYSTEM_PROMPT : CAROUSEL_SYSTEM_PROMPT;
@@ -98,7 +111,17 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function buildUserPrompt(body: GenerateCarouselInput): string {
+/**
+ * Prefixa o contexto de marca ao prompt do usuário, sem alterá-lo.
+ * Sem contexto, a string devolvida é exatamente a de antes.
+ */
+function buildUserPrompt(body: GenerateCarouselInput, brandContext?: BrandContext): string {
+  const prompt = buildPromptBody(body);
+  const contexto = formatBrandContextAsPrompt(brandContext);
+  return contexto ? `${contexto}\n\n---\n\n${prompt}` : prompt;
+}
+
+function buildPromptBody(body: GenerateCarouselInput): string {
   if (body.style === 'profile') {
     const format = body.twitterFormat ?? 'B';
 
