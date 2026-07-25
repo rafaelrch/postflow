@@ -135,7 +135,12 @@ export async function requireCredits(cost: number): Promise<SubscriptionGuardRes
   // Service role aqui eliminaria essa vinculação e ampliaria o blast radius.
   const { data, error } = await supabase.rpc('consume_credits', { p_user: user.id, p_cost: cost });
   if (error) {
-    if (error.code === 'P0001' || /insufficient_credits/.test(error.message ?? '')) {
+    // Discrimina pela MENSAGEM, não pelo errcode: as RPCs endurecidas lançam
+    // vários erros distintos com o mesmo P0001 (insufficient_credits,
+    // credit_user_mismatch, invalid_credit_cost). Só falta de saldo é 402; o
+    // resto é bug interno de contrato/permissão e não pode virar "créditos
+    // acabaram" para o usuário. Falha fechada: desconhecido → 500.
+    if (/insufficient_credits/.test(error.message ?? '')) {
       return {
         ok: false,
         response: NextResponse.json(
@@ -150,7 +155,7 @@ export async function requireCredits(cost: number): Promise<SubscriptionGuardRes
     console.error('[requireCredits]', error);
     return {
       ok: false,
-      response: NextResponse.json({ error: 'Erro ao debitar créditos' }, { status: 500 }),
+      response: NextResponse.json({ error: 'Erro ao processar a geração' }, { status: 500 }),
     };
   }
 
