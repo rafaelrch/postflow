@@ -872,14 +872,25 @@ function DoTheMath() {
 
 /* ─── Planos ──────────────────────────────────────────────────── */
 
-const PLAN_FEATURES = [
-  'Carrosséis completos com IA (texto + layout + design)',
+// Plano gratuito: editor e templates manuais completos, sem nenhuma IA.
+const FREE_FEATURES = [
+  'Editor visual completo, slide a slide',
   '3 estilos: Editorial, Minimalista e Thread do X',
   'News cards no formato do feed (1080×1350)',
+  'Reels e Editorial manuais',
+  'Export Full HD (PNG, ZIP e MP4), sem marca d’água',
+  'Até 5 carrosséis salvos',
+  'Sem recursos de IA',
+];
+
+// Planos pagos: o que é EXCLUSIVO deles é a IA e a agenda — o resto o Free já dá.
+const PLAN_FEATURES = [
+  'Carrosséis completos gerados por IA (texto + layout + design)',
   'Imagens com IA (OpenAI gpt-image-2): 5 créditos cada',
-  'Editor visual slide a slide',
+  'Créditos de IA que renovam todo mês',
   'Agenda de conteúdo',
-  'Export Full HD (PNG e ZIP)',
+  'Projetos ilimitados',
+  'Tudo do plano Grátis incluído',
 ];
 
 function Pricing() {
@@ -904,9 +915,44 @@ function Pricing() {
           </p>
         </FadeUp>
 
-        <div className="mt-14 grid md:grid-cols-2 gap-6 max-w-3xl mx-auto items-start">
-          {/* Mensal */}
+        <div className="mt-14 grid md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
+          {/* Grátis */}
           <FadeUp>
+            <div className="rounded-[28px] p-8" style={{ background: 'var(--lp-band)' }}>
+              <span className="lp-badge" style={{ background: 'var(--lp-black)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
+                Grátis
+              </span>
+              <div className="mt-5 flex items-baseline">
+                <span className="lp-h" style={{ fontSize: 56 }}>R$0</span>
+                <span className="ml-2 text-[14px]" style={{ color: 'var(--lp-gray)' }}>/sempre</span>
+              </div>
+              <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
+                Editor e templates manuais completos.
+                <br />Sem cartão, sem prazo.
+              </p>
+              <div className="mt-6 -mx-8 px-8 py-3" style={{ background: '#EBEBE9' }}>
+                <p className="text-[13px] font-bold tracking-tight">100% MANUAL</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 5 carrosséis salvos</p>
+              </div>
+              <ul className="mt-6 space-y-2.5">
+                {FREE_FEATURES.map((perk) => (
+                  <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'var(--lp-gray-2)' }}>
+                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#C5C5C0' }} />
+                    {perk}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/cadastro?plan=free"
+                className="lp-btn white w-full justify-between mt-8 !bg-white !rounded-full"
+              >
+                Começar grátis <ArrowChip />
+              </Link>
+            </div>
+          </FadeUp>
+
+          {/* Mensal */}
+          <FadeUp delay={0.05}>
             <div className="rounded-[28px] p-8" style={{ background: 'var(--lp-band)' }}>
               <span className="lp-badge" style={{ background: 'var(--lp-black)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
                 Plano Mensal
@@ -953,7 +999,7 @@ function Pricing() {
                   Plano Anual
                 </span>
                 <span className="lp-badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
-                  3 meses grátis
+                  Economize ~30%
                 </span>
               </div>
               <div className="mt-5 flex items-baseline">

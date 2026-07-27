@@ -18,6 +18,8 @@ import {
 import toast from 'react-hot-toast';
 import NewsCard, { NewsCardItem, DEFAULT_STYLE, parseNewsJSON } from '@/components/news/NewsCard';
 import { createClient } from '@/lib/supabase';
+import { handleNewsDailyLimit } from '@/hooks/useUpgradeStore';
+import { fetchNewsUsage, newsCreateAllowance, FREE_NEWS_DAILY_LIMIT } from '@/lib/news-quota';
 
 // ── Canvas export helpers ─────────────────────────────────────────────────────
 
@@ -612,7 +614,22 @@ export default function NewsPage() {
   // ── Create cards from manual form ─────────────────────────────────────────
 
   const handleCreateManual = async () => {
-    const built: NewsCardItem[] = manualCards.slice(0, manualCount).map((c, i) => ({
+    const source = manualCards.slice(0, manualCount).filter((c) => c.titulo_card.trim() !== '');
+    const requested = source.length;
+    if (requested === 0) return;
+
+    // Trava de cota ANTES de gerar: news nascem no cliente, então recusar só no
+    // INSERT deixa cards utilizáveis na tela (bug). Cota esgotada = nada é
+    // gerado e o editor NÃO abre; cota parcial = gera só o que cabe.
+    const supabase = createClient();
+    const { plan, used24h } = await fetchNewsUsage(supabase);
+    const allowed = newsCreateAllowance({ plan, used24h, requested });
+    if (allowed <= 0) {
+      handleNewsDailyLimit({ message: 'free_news_daily_limit' });
+      return;
+    }
+
+    const built: NewsCardItem[] = source.slice(0, allowed).map((c, i) => ({
       numero: i + 1,
       tema: c.tema,
       titulo_card: c.titulo_card,
@@ -623,11 +640,19 @@ export default function NewsPage() {
       logo_url: brandLogoUrl,
     }));
     const saved = await persistNewBatch(built);
+    if (!saved) return; // limite pegou no INSERT (backstop): não abre o editor
     setItems(saved);
     setSelectedIdx(0);
     setLocalImages({});
     setStep('editor');
-    toast.success(`${saved.length} cards criados!`);
+    if (allowed < requested) {
+      toast.success(
+        `${saved.length} de ${requested} criados. Você atingiu o limite do plano Grátis (${FREE_NEWS_DAILY_LIMIT}/dia) — renova em 24h.`,
+        { duration: 6000 },
+      );
+    } else {
+      toast.success(`${saved.length} cards criados!`);
+    }
   };
 
   // ── Import ────────────────────────────────────────────────────────────────
@@ -636,13 +661,34 @@ export default function NewsPage() {
     try {
       const parsed = parseNewsJSON(jsonInput.trim());
       if (parsed.length === 0) throw new Error('Array vazio');
-      const withLogo = parsed.map(it => ({ ...DEFAULT_STYLE, ...it, ...newsTemplate, logo_url: brandLogoUrl }));
+
+      // Mesma trava de cota do fluxo manual, ANTES de gerar os cards.
+      const supabase = createClient();
+      const requested = parsed.length;
+      const { plan, used24h } = await fetchNewsUsage(supabase);
+      const allowed = newsCreateAllowance({ plan, used24h, requested });
+      if (allowed <= 0) {
+        handleNewsDailyLimit({ message: 'free_news_daily_limit' });
+        return;
+      }
+
+      const withLogo = parsed
+        .slice(0, allowed)
+        .map(it => ({ ...DEFAULT_STYLE, ...it, ...newsTemplate, logo_url: brandLogoUrl }));
       const saved = await persistNewBatch(withLogo);
+      if (!saved) return; // backstop do INSERT pegou: não abre o editor
       setItems(saved);
       setSelectedIdx(0);
       setLocalImages({});
       setStep('editor');
-      toast.success(`${parsed.length} cards carregados!`);
+      if (allowed < requested) {
+        toast.success(
+          `${saved.length} de ${requested} carregados. Você atingiu o limite do plano Grátis (${FREE_NEWS_DAILY_LIMIT}/dia) — renova em 24h.`,
+          { duration: 6000 },
+        );
+      } else {
+        toast.success(`${saved.length} cards carregados!`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'JSON inválido');
     }
@@ -677,8 +723,12 @@ export default function NewsPage() {
     return payload;
   };
 
-  /** Insere um lote novo de cards e devolve os itens com dbId preenchido. */
-  const persistNewBatch = useCallback(async (built: NewsCardItem[]): Promise<NewsCardItem[]> => {
+  /**
+   * Insere um lote novo de cards e devolve os itens com dbId preenchido.
+   * Retorna null quando o backstop de cota do banco recusa o INSERT — assim o
+   * chamador NÃO abre o editor com cards que nunca foram salvos.
+   */
+  const persistNewBatch = useCallback(async (built: NewsCardItem[]): Promise<NewsCardItem[] | null> => {
     try {
       const supabase = createClient();
       const batchId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
@@ -696,6 +746,9 @@ export default function NewsPage() {
         })))
         .select('id');
       if (error || !data) {
+        // Backstop de cota (trigger free_news_daily_limit): abre o modal e
+        // retorna null para o chamador NÃO abrir o editor com cards órfãos.
+        if (handleNewsDailyLimit(error)) return null;
         console.error('[news] erro ao salvar lote:', error);
         toast.error('Cards criados, mas não foi possível salvar no banco.');
         return built;
@@ -800,6 +853,12 @@ export default function NewsPage() {
       toast.success('Notícias salvas!', { id: 'save-news' });
       loadBatches();
     } catch (err) {
+      // Teto de 4 notícias/dia (janela 24h) do plano free: modal de upgrade com
+      // a mensagem de "renova em 24h". Nada foi apagado.
+      if (handleNewsDailyLimit(err)) {
+        toast.dismiss('save-news');
+        return;
+      }
       console.error('[news] erro ao salvar cards:', err);
       toast.error('Erro ao salvar notícias', { id: 'save-news' });
     }

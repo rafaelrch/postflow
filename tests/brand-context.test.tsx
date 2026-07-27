@@ -19,6 +19,12 @@ vi.mock('@/lib/subscription', () => ({
   refundCredits: mockRefundCredits,
 }));
 
+// Usuário autorizado (pro): o foco destes testes é a injeção do BrandContext,
+// não o split de plano (coberto em tests/generate-carousel-entitlement.test.ts).
+vi.mock('@/lib/entitlements', () => ({
+  requireEntitlement: async () => ({ ok: true, userId: 'user-brand', plan: 'pro' }),
+}));
+
 vi.mock('@/lib/supabase-server', () => ({
   createServerSupabaseClient: mockCreateServerSupabaseClient,
 }));

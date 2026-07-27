@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { SlideStyle } from '@/types';
 import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import { normalizeHandle } from '@/lib/utils';
+import { handleProjectLimit } from '@/hooks/useUpgradeStore';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import type { DashboardCarousel } from './page';
@@ -121,7 +122,12 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
       .select()
       .single();
 
-    if (error || !newCarousel) { toast.error('Erro ao duplicar'); return; }
+    if (error || !newCarousel) {
+      // Teto de 5 carrosséis do plano free: nada foi apagado, abre upgrade.
+      if (handleProjectLimit(error)) return;
+      toast.error('Erro ao duplicar');
+      return;
+    }
 
     if (carousel.slides?.length) {
       await supabase.from('slides').insert(

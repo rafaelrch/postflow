@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT, WEB_SEARCH_PROMPT_ADDENDUM } from '@/lib/openai';
 import { requireCredits, refundCredits } from '@/lib/subscription';
+import { requireEntitlement } from '@/lib/entitlements';
 import { CREDIT_COSTS } from '@/lib/credits';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { BrandContext, formatBrandContextAsPrompt, getBrandContext } from '@/lib/brand-context';
@@ -33,14 +34,12 @@ export async function POST(req: NextRequest) {
   try {
     const body: GenerateCarouselInput & { manual?: boolean } = await req.json();
 
-    // Geração manual (esqueleto vazio) não consome créditos; só exige assinatura.
-    const cost = body.manual ? 0 : CREDIT_COSTS.carousel;
-    const guard = await requireCredits(cost);
-    if (!guard.ok) return guard.response;
-    userId = guard.userId;
-    charged = cost;
-
+    // Superfície MANUAL (esqueleto vazio): sem IA e sem crédito. Aceita free e
+    // pro — só exige estar autenticado. NÃO passa por requireCredits.
     if (body.manual) {
+      const ent = await requireEntitlement();
+      if (!ent.ok) return ent.response;
+
       const slides = Array.from({ length: body.slideCount }, (_, i) => ({
         id: i + 1,
         title: i === 0 ? 'Título da Capa' : i === body.slideCount - 1 ? 'Me segue pra mais!' : `Slide ${i + 1}`,
@@ -50,6 +49,17 @@ export async function POST(req: NextRequest) {
       }));
       return NextResponse.json({ slides, caption: '', hashtags: [] });
     }
+
+    // Superfície de IA: exige plano PAGO e nega o free CEDO, com code
+    // 'plan_required', ANTES de qualquer débito ou chamada à OpenAI.
+    const ent = await requireEntitlement({ requirePlan: 'pro' });
+    if (!ent.ok) return ent.response;
+
+    const cost = CREDIT_COSTS.carousel;
+    const guard = await requireCredits(cost);
+    if (!guard.ok) return guard.response;
+    userId = guard.userId;
+    charged = cost;
 
     // Contexto de marca do onboarding entra como pano de fundo do prompt.
     // Best-effort: qualquer falha aqui cai no prompt genérico de sempre.

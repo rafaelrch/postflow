@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
+import { getEntitlement } from '@/lib/entitlements';
 import { getUserCredits } from '@/lib/credits';
 
 function fmtDate(iso: string | null): string {
@@ -19,14 +20,26 @@ export default async function ContaPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [sub, credits] = user
-    ? await Promise.all([getActiveSubscription(supabase, user.id), getUserCredits(supabase, user.id)])
-    : [null, null];
+  const [sub, credits, plan] = user
+    ? await Promise.all([
+        getActiveSubscription(supabase, user.id),
+        getUserCredits(supabase, user.id),
+        getEntitlement(supabase, user.id),
+      ])
+    : [null, null, 'free' as const];
+
+  const isPro = plan === 'pro';
 
   return (
     <div className="p-8 max-w-2xl mx-auto w-full overflow-y-auto">
       <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Conta</h1>
       <p className="mt-1 text-sm text-[var(--ink-dim)]">{user?.email}</p>
+      <span
+        className="chip filled mt-3 inline-flex text-[11px]"
+        data-testid="plan-badge"
+      >
+        {isPro ? 'Plano Pago' : 'Plano Grátis'}
+      </span>
 
       <section className="mt-8 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6">
         <h2 className="text-lg font-semibold text-[var(--foreground)]">Assinatura</h2>
@@ -53,12 +66,16 @@ export default async function ContaPage() {
           </div>
         ) : (
           <div className="mt-4">
-            <p className="text-sm text-[var(--ink-dim)]">Você ainda não tem uma assinatura ativa.</p>
+            <p className="text-sm text-[var(--ink-dim)]">
+              Você está no <strong className="text-[var(--foreground)]">plano Grátis</strong>: editor e
+              templates manuais completos, export sem marca d’água e até 5 carrosséis salvos. Os recursos
+              de IA (carrosséis e imagens geradas por IA) são exclusivos dos planos pagos.
+            </p>
             <Link
               href="/precos"
               className="brand-btn accent mt-4 inline-flex"
             >
-              Ver planos
+              Fazer upgrade
             </Link>
           </div>
         )}

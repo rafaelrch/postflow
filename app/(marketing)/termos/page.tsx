@@ -36,8 +36,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         O Creatools é vendido por assinatura recorrente, processada pela Stripe: plano mensal
-        (R$ 59,50/mês) ou plano anual (R$ 499,00/ano, com 3 meses de teste grátis para novos
-        assinantes). A assinatura renova automaticamente ao fim de cada ciclo até que seja
+        (R$ 59,50/mês) ou plano anual (R$ 499,00/ano). A assinatura renova automaticamente ao fim de cada ciclo até que seja
         cancelada. Você pode cancelar a renovação a qualquer momento pelo portal de assinatura,
         com efeito ao término do período já pago — sem cobranças futuras. Consulte também a nossa{' '}
         <Link href="/reembolso" className="underline underline-offset-4">
