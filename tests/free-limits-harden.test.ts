@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 // um INSERT concorrente de verdade (achado 2) nem um INSERT com created_at
 // forjado (achado 1) em unit test. Cobrimos os dois por presença/ordem no SQL
 // da migration — não fingimos cobertura de concorrência que não existe.
+// O mesmo vale para o trigger BEFORE UPDATE da fatia 7: asseguramos que ele
+// existe e que descarta o created_at do cliente, não que o Postgres o dispare.
 
 const sql = readFileSync(
   new URL('../supabase/migrations/20260728_harden_free_limits.sql', import.meta.url),
@@ -20,6 +22,7 @@ function fnBody(name: string): string {
 const carousel = fnBody('enforce_free_carousel_limit');
 const reel = fnBody('enforce_free_reel_limit');
 const news = fnBody('enforce_free_news_daily_limit');
+const freeze = fnBody('freeze_news_entries_created_at');
 
 describe('migration 20260728: hardening dos limites free', () => {
   it('é ARQUIVO NOVO, transacional', () => {
@@ -37,6 +40,27 @@ describe('migration 20260728: hardening dos limites free', () => {
       expect(iForce).toBeGreaterThan(-1);
       expect(iForce).toBeLessThan(iCount);
       expect(iForce).toBeLessThan(iWindow);
+    });
+
+    it('existe trigger BEFORE UPDATE em news_entries fechando o ramo UPDATE/upsert', () => {
+      expect(sql).toMatch(
+        /create trigger freeze_news_entries_created_at_trg\s*\n?\s*before update on public\.news_entries\s*\n?\s*for each row execute function public\.freeze_news_entries_created_at\(\)/i,
+      );
+      // drop antes do create, como os outros triggers do arquivo (idempotência).
+      const iDrop = sql.search(/drop trigger if exists freeze_news_entries_created_at_trg/i);
+      const iCreate = sql.search(/create trigger freeze_news_entries_created_at_trg/i);
+      expect(iDrop).toBeGreaterThan(-1);
+      expect(iDrop).toBeLessThan(iCreate);
+    });
+
+    it('o trigger de UPDATE DESCARTA o created_at do cliente (mantém old.created_at)', () => {
+      expect(freeze).toMatch(/new\.created_at\s*:=\s*old\.created_at\s*;/i);
+      // não pode "consertar" pra now(): isso reiniciaria a janela a cada edição.
+      expect(freeze).not.toMatch(/new\.created_at\s*:=\s*now\(\)/i);
+      expect(freeze).toMatch(/security definer/i);
+      expect(freeze).toMatch(/set search_path = pg_catalog, public/i);
+      // só toca created_at — não colide com set_news_entries_updated (updated_at).
+      expect(freeze).not.toMatch(/updated_at/i);
     });
 
     it('carrossel e reel NÃO precisam forçar created_at (contam acervo total, não janela)', () => {
@@ -81,6 +105,21 @@ describe('migration 20260728: hardening dos limites free', () => {
       for (const fn of [carousel, reel, news]) {
         expect(fn).toMatch(/security definer/i);
         expect(fn).toMatch(/set search_path = pg_catalog, public/i);
+      }
+    });
+  });
+
+  describe('EXECUTE revogado das roles de cliente', () => {
+    it('re-emite o revoke das 3 funções de limite e da função nova', () => {
+      for (const fn of [
+        'enforce_free_carousel_limit',
+        'enforce_free_reel_limit',
+        'enforce_free_news_daily_limit',
+        'freeze_news_entries_created_at',
+      ]) {
+        expect(sql).toMatch(
+          new RegExp(`revoke all on function public\\.${fn}\\(\\) from public, anon, authenticated;`, 'i'),
+        );
       }
     });
   });

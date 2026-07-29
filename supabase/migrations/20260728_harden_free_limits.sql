@@ -136,6 +136,38 @@ begin
 end;
 $$;
 
+-- ── NEWS: created_at imutável no UPDATE ──────────────────────────────────────
+-- O forçamento acima cobre só o INSERT. A policy news_entries_owner é `for all`
+-- sem restrição de coluna, então o usuário inseria 4 news (created_at = now())
+-- e depois dava UPDATE jogando created_at pro passado: a janela de 24h zerava e
+-- o limite voltava a ser decorativo. O ramo UPDATE do upsert cai no mesmo buraco.
+-- FIX: descarta qualquer alteração de created_at vinda do cliente.
+--
+-- DELETE + recriar continua possível e é ACEITÁVEL (decisão de produto): o
+-- usuário destrói o próprio conteúdo, o teto de acervo simultâneo continua
+-- valendo e news não consome IA nem crédito. Não há contador append-only.
+--
+-- Convive com set_news_entries_updated (schema.sql), que também é BEFORE UPDATE
+-- FOR EACH ROW na mesma tabela: aquele escreve updated_at, este escreve
+-- created_at. Colunas disjuntas e os BEFORE triggers encadeiam o NEW, então a
+-- ordem alfabética de disparo não muda o resultado — nenhum sobrescreve o outro.
+create or replace function public.freeze_news_entries_created_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  new.created_at := old.created_at;
+  return new;
+end;
+$$;
+
+drop trigger if exists freeze_news_entries_created_at_trg on public.news_entries;
+create trigger freeze_news_entries_created_at_trg
+  before update on public.news_entries
+  for each row execute function public.freeze_news_entries_created_at();
+
 -- Funções recriadas por create or replace; os triggers já apontam para elas
 -- (instalados em 20260724/20260727). Recria por idempotência/garantia.
 drop trigger if exists enforce_free_carousel_limit_trg on public.carousels;
@@ -152,5 +184,14 @@ drop trigger if exists enforce_free_news_daily_limit_trg on public.news_entries;
 create trigger enforce_free_news_daily_limit_trg
   before insert on public.news_entries
   for each row execute function public.enforce_free_news_daily_limit();
+
+-- Re-emite os revokes de 20260724/20260727. Idempotente: nenhuma dessas funções
+-- é chamável direto por cliente — só via trigger, que roda com os privilégios do
+-- dono. Reafirmado aqui para blindar contra um futuro drop+create que reponha os
+-- grants default de EXECUTE a public. Inclui a função nova deste arquivo.
+revoke all on function public.enforce_free_carousel_limit() from public, anon, authenticated;
+revoke all on function public.enforce_free_reel_limit() from public, anon, authenticated;
+revoke all on function public.enforce_free_news_daily_limit() from public, anon, authenticated;
+revoke all on function public.freeze_news_entries_created_at() from public, anon, authenticated;
 
 commit;
