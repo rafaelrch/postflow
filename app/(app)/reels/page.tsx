@@ -27,6 +27,7 @@ import {
 import { composeReelVideo, sanitizeReelFilename } from '@/lib/reels-export';
 import { getFormat } from '@/lib/formats';
 import { createClient } from '@/lib/supabase';
+import { handleReelLimit } from '@/hooks/useUpgradeStore';
 
 const REELS_BUCKET = 'postflow-reels';
 const PREVIEW_SCALE = 0.34;
@@ -262,10 +263,20 @@ export default function ReelsPage() {
       const res = await fetch('/api/reels/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mime, sizeBytes: file.size }),
+        // reelId presente = TROCA de vídeo do reel já salvo (liberada); ausente
+        // = reel novo (barrado para free que já tem 1). O servidor confere posse.
+        body: JSON.stringify({ mime, sizeBytes: file.size, reelId: reel.dbId }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        // Teto de 1 reel do free ao tentar CRIAR outro: modal de upgrade, sem
+        // erro genérico. Nada foi apagado.
+        if (body.code === 'free_reel_limit') {
+          handleReelLimit({ message: 'free_reel_limit' });
+          toast.dismiss(loadingId);
+          setUploading(false);
+          return;
+        }
         throw new Error(body.error || 'Não foi possível preparar o upload.');
       }
       const { path, token } = (await res.json()) as { path: string; token: string };
@@ -332,6 +343,9 @@ export default function ReelsPage() {
     }
     const { data, error } = await supabase.from('reels').insert(row).select('id').single();
     if (error || !data) {
+      // Teto de 1 reel do plano free (trigger no banco): modal de upgrade,
+      // nada foi apagado. Só depois cai no erro genérico.
+      if (handleReelLimit(error)) return null;
       console.error('[reels] insert', error);
       toast.error('Erro ao salvar o reel.');
       return null;

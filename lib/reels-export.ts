@@ -197,6 +197,29 @@ export function sanitizeReelFilename(name: string | undefined): string {
 /** Base do core do ffmpeg.wasm (single-thread). Sem segredo — CDN público. */
 const FFMPEG_CORE_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
 
+/**
+ * Teto para CARREGAR o core do ffmpeg (fetch do CDN + wasm compile). O core vem
+ * de um CDN externo (unpkg) via toBlobURL, que não tem timeout: se o CDN não
+ * responder, o export ficava preso em 0% PARA SEMPRE, sem erro. Com o teto, a
+ * carga falha rápido com mensagem clara e o modal libera o usuário.
+ */
+export const FFMPEG_LOAD_TIMEOUT_MS = 60_000;
+
+export const FFMPEG_LOAD_ERROR =
+  'Não foi possível carregar o motor de vídeo. Verifique sua conexão e tente novamente.';
+
+/** Rejeita `promise` se ela não resolver em `ms`. Não cancela o trabalho de
+ *  fundo (não dá pra abortar um fetch já em voo aqui) — só destrava a UI. */
+export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 // Import dinâmico: mantém os ~25MB do wasm fora do bundle inicial e só carrega
 // quando o usuário realmente exporta.
 type FFmpegInstance = import('@ffmpeg/ffmpeg').FFmpeg;
@@ -216,10 +239,17 @@ async function getFFmpeg(): Promise<FFmpegInstance> {
     ffmpeg.on('progress', ({ progress }: { progress: number }) => {
       progressCb?.(Math.min(Math.max(progress, 0), 1));
     });
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
+    // O fetch do core (toBlobURL) é a parte que pendurava em 0%. Todo o bloco
+    // fetch+load vai sob um timeout — se estourar, rejeita com mensagem clara.
+    await withTimeout(
+      (async () => {
+        const coreURL = await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.js`, 'text/javascript');
+        const wasmURL = await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm');
+        await ffmpeg.load({ coreURL, wasmURL });
+      })(),
+      FFMPEG_LOAD_TIMEOUT_MS,
+      FFMPEG_LOAD_ERROR,
+    );
     ffmpegSingleton = ffmpeg;
   }
   return ffmpegSingleton;

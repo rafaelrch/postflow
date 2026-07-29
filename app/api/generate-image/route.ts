@@ -3,6 +3,7 @@ import { toFile } from 'openai';
 import { openai, buildImagePrompt } from '@/lib/openai';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { requireCredits, refundCredits } from '@/lib/subscription';
+import { requireEntitlement } from '@/lib/entitlements';
 import { CREDIT_COSTS } from '@/lib/credits';
 import { downloadReferenceImage } from '@/lib/generate-image-reference';
 
@@ -33,6 +34,11 @@ export async function POST(req: NextRequest) {
   if (!slideId || !title) {
     return NextResponse.json({ error: 'slideId e title são obrigatórios' }, { status: 400 });
   }
+
+  // Geração de imagem é IA pura: exige plano PAGO e nega o free CEDO, com code
+  // 'plan_required', ANTES de qualquer débito ou chamada à OpenAI.
+  const ent = await requireEntitlement({ requirePlan: 'pro' });
+  if (!ent.ok) return ent.response;
 
   const charged = CREDIT_COSTS.image;
   const guard = await requireCredits(charged);

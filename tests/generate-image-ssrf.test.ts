@@ -38,6 +38,11 @@ vi.mock('@/lib/subscription', () => ({
   requireCredits: mockRequireCredits,
   refundCredits: mockRefundCredits,
 }));
+// Usuário autorizado (pro): o foco destes testes é a barreira anti-SSRF e o
+// estorno de créditos, não o split de plano (coberto nos testes de entitlement).
+vi.mock('@/lib/entitlements', () => ({
+  requireEntitlement: async () => ({ ok: true, userId: '11111111-1111-4111-8111-111111111111', plan: 'pro' }),
+}));
 vi.mock('@/lib/supabase-server', () => ({
   createServerSupabaseClient: async () => ({
     storage: {

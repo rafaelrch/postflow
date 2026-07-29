@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '@/components/auth/AuthForm';
+import FreeSignupForm from '@/components/auth/FreeSignupForm';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { referrer: 'no-referrer' as const };
@@ -17,10 +18,21 @@ export const metadata = { referrer: 'no-referrer' as const };
 export default async function CadastroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; plan?: string }>;
 }) {
-  const { ref } = await searchParams;
+  const { ref, plan } = await searchParams;
 
+  // Caminho FREE explícito: só quando ?plan=free e SEM ref pago. Não interfere
+  // no gating do caminho pago abaixo.
+  if (plan === 'free' && !ref) {
+    return (
+      <Suspense fallback={null}>
+        <FreeSignupForm />
+      </Suspense>
+    );
+  }
+
+  // Caminho PAGO (inalterado): exige ref válido do checkout.
   if (!ref || !/^[A-Za-z0-9_-]{8,160}$/.test(ref)) return <Shell><NoSubscription /></Shell>;
 
   return (
