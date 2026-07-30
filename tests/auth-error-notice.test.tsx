@@ -22,6 +22,12 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParams.current,
 }));
 
+// AuthForm é arquivo protegido pela SPEC e sai com diff vazio; aqui ele é só um
+// stub para a página de login poder ser renderizada sem arrastar o Supabase.
+vi.mock('@/components/auth/AuthForm', () => ({
+  default: () => <div data-testid="auth-form" />,
+}));
+
 async function renderNotice(query: string) {
   searchParams.current = new URLSearchParams(query);
   vi.resetModules();
@@ -57,5 +63,17 @@ describe('AuthErrorNotice', () => {
     await renderNotice('');
     await renderNotice('authError=coisa_que_nao_existe');
     expect(mockToastError).not.toHaveBeenCalled();
+  });
+});
+
+describe('/login monta o aviso', () => {
+  it('exibe o motivo ao chegar do callback — o redirect sozinho seria silencioso', async () => {
+    searchParams.current = new URLSearchParams('authError=invalid_code');
+    vi.resetModules();
+    const { default: LoginPage } = await import('../app/(auth)/login/page');
+    render(<LoginPage />);
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(
+      'Link de confirmação inválido ou expirado. Faça login ou cadastre-se novamente.',
+    ));
   });
 });
