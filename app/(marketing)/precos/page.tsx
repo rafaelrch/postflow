@@ -7,26 +7,81 @@ export const metadata = {
   description: 'Assine o Creatools: plano mensal ou anual.',
 };
 
+/**
+ * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
+ * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
+ * não existe portal de autoatendimento. Estes valores se repetem nas 5 páginas
+ * públicas: mudou aqui, muda nas cinco.
+ */
+const SUPORTE_URL = 'https://instagram.com/creatools';
+const SUPORTE_HANDLE = '@creatools';
+const SUPORTE_EMAIL = 'contato@creatools.com';
+
+/**
+ * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
+ * texto manda cancelar ou pedir reembolso, ele deixa registro escrito dos dois
+ * lados e não exige conta no Instagram. O DM continua oferecido — é mais
+ * rápido —, nunca como via única.
+ */
+function Canais() {
+  return (
+    <>
+      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
+        {SUPORTE_EMAIL}
+      </a>{' '}
+      ou no Instagram{' '}
+      <a
+        href={SUPORTE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_HANDLE}
+      </a>
+    </>
+  );
+}
+
 const MONTHLY_PRICE = 'R$ 59,50';
 const YEARLY_PRICE = 'R$ 499';
 const YEARLY_MONTHLY_EQUIV = 'R$ 41,58/mês';
 
-// Plano gratuito: editor e templates manuais completos, sem IA.
+// Plano gratuito: Studio manual completo, sem nenhuma IA.
+// Cada linha abaixo é verificável no código — não escreva nada aqui que você
+// não consiga apontar num arquivo:
+//   - formatos 4:5 / 1:1 / 9:16 .......... lib/formats.ts (FORMAT_LIST)
+//   - 3 estilos de carrossel ............. types/index.ts (SlideStyle)
+//   - teto de 5 projetos salvos .......... enforce_free_carousel_limit (>= 5)
+//   - teto de 4 notícias por dia ......... FREE_NEWS_DAILY_LIMIT / trigger 24h
+//   - sem IA ............................. as 2 rotas de IA exigem requirePlan 'pro'
+//   - calendário ......................... /agenda não tem gate de plano: o proxy só
+//     exige sessão, a policy scheduled_posts_owner só compara auth.uid() = user_id e
+//     o único trigger da tabela é set_updated_at. Por isso ele aparece nos DOIS cards
+//     — listar só no pago faria o free pagar por algo que já tem.
 const FREE_FEATURES = [
-  'Editor visual completo (4:5, 1:1, 9:16)',
-  'Todos os templates manuais: carrossel, News e Editorial',
-  'Export PNG, ZIP e MP4 — sem marca d’água',
+  'Studio de edição completo (4:5, 1:1, 9:16)',
+  'Carrosséis e notícias manuais, nos 3 estilos: Editorial, Minimalista e Thread do X',
+  'Calendário de postagem',
   'Até 5 carrosséis salvos',
+  'Até 4 notícias por dia',
   'Sem recursos de IA',
 ];
 
-// Planos pagos: o que é EXCLUSIVO deles é a IA e a agenda; o resto o Free já dá.
+// Planos pagos: a IA é exclusividade daqui, e os tetos do Grátis somem.
+// Referências: geração de carrossel e de imagem em app/api/generate-*/route.ts
+// (ambas com requireEntitlement({ requirePlan: 'pro' })); custo de 5 créditos
+// em lib/credits.ts (CREDIT_COSTS); mesada 200/300 em supabase/credits-and-flow.sql.
+// "Ilimitado" aqui vale para o ACERVO (os triggers de limite dão `return new`
+// quando o plano é 'pro'), NÃO para a geração por IA — essa é limitada pelos
+// créditos do mês. Não escreva "carrosséis ilimitados por IA": seria falso.
 const FEATURES = [
-  'Carrosséis completos gerados por IA (texto + layout)',
-  'Imagens com IA (OpenAI gpt-image-2) — 5 créditos cada',
-  'Créditos de IA todo mês (200 no mensal, 300 no anual)',
-  'Calendário de conteúdo',
-  'Projetos ilimitados',
+  'Carrosséis gerados por IA: texto dos slides, legenda e hashtags',
+  'Imagens com IA',
+  'Créditos de IA todo mês: 200 no mensal, 300 no anual (carrossel e imagem custam 5 cada)',
+  'Projetos salvos ilimitados',
+  'Notícias sem limite diário',
+  'Studio de edição completo',
+  'Calendário de postagem',
   'Tudo do plano Grátis incluído',
 ];
 
@@ -41,7 +96,7 @@ export default function PrecosPage() {
         <header className="text-center mb-14">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Escolha seu plano</h1>
           <p className="mt-4 text-[var(--ink-dim)] text-lg">
-            Tudo do PostFlow, sem limites. Cancele quando quiser.
+            O Grátis já tem o Studio completo. Os planos pagos somam IA e tiram os limites.
           </p>
         </header>
 
@@ -125,8 +180,8 @@ export default function PrecosPage() {
         </div>
 
         <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
-          Pagamento via Pix ou cartão, processado com segurança. Para cancelar ou trocar de plano,
-          entre em contato com nosso suporte. Ao assinar, você concorda com os{' '}
+          Pagamento em cartão de crédito, processado com segurança. Para cancelar ou trocar de plano,
+          fale com a gente pelo e-mail <Canais />. Ao assinar, você concorda com os{' '}
           <Link href="/termos" className="underline underline-offset-4">
             Termos de Uso
           </Link>

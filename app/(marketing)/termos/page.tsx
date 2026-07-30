@@ -6,6 +6,42 @@ export const metadata = {
   description: 'Termos de uso do Creatools: assinatura, pagamento, uso aceitável e responsabilidades.',
 };
 
+/**
+ * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
+ * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
+ * não existe portal de autoatendimento. Antes desta data as páginas mandavam
+ * "falar com o suporte" sem dizer onde, e o canal não existia.
+ * Estes valores se repetem nas 5 páginas públicas: mudou aqui, muda nas cinco.
+ */
+const SUPORTE_URL = 'https://instagram.com/creatools';
+const SUPORTE_HANDLE = '@creatools';
+const SUPORTE_EMAIL = 'contato@creatools.com';
+
+/**
+ * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
+ * texto manda cancelar, pedir reembolso ou exercer direitos de dados, o e-mail
+ * deixa registro escrito dos dois lados e não exige conta no Instagram. O DM
+ * continua oferecido — é mais rápido —, nunca como via única.
+ */
+function Canais() {
+  return (
+    <>
+      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
+        {SUPORTE_EMAIL}
+      </a>{' '}
+      ou no Instagram{' '}
+      <a
+        href={SUPORTE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_HANDLE}
+      </a>
+    </>
+  );
+}
+
 const SECTIONS: { title: string; body: React.ReactNode }[] = [
   {
     title: '1. Objeto do serviço',
@@ -13,7 +49,8 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
       <p>
         O Creatools é uma plataforma (SaaS) que auxilia criadores e empresas a produzir carrosséis,
         posts e imagens para redes sociais com apoio de inteligência artificial, incluindo a API da
-        OpenAI. O serviço é oferecido mediante assinatura paga, conforme os planos descritos em{' '}
+        OpenAI. O serviço é oferecido em um plano gratuito e em planos pagos por assinatura,
+        conforme descritos em{' '}
         <Link href="/precos" className="underline underline-offset-4">
           /precos
         </Link>
@@ -27,7 +64,8 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
       <p>
         Você é responsável por manter a veracidade dos dados cadastrados, pela guarda de suas
         credenciais de acesso e por toda atividade realizada em sua conta, inclusive por terceiros
-        autorizados por você. Avise imediatamente o suporte em caso de uso não autorizado.
+        autorizados por você. Em caso de uso não autorizado, avise imediatamente pelo e-mail{' '}
+        <Canais />.
       </p>
     ),
   },
@@ -35,10 +73,10 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '3. Planos, pagamento e renovação automática',
     body: (
       <p>
-        O Creatools é vendido por assinatura recorrente, processada pela Stripe: plano mensal
+        O Creatools é vendido por assinatura recorrente, processada pela AbacatePay: plano mensal
         (R$ 59,50/mês) ou plano anual (R$ 499,00/ano). A assinatura renova automaticamente ao fim de cada ciclo até que seja
-        cancelada. Você pode cancelar a renovação a qualquer momento pelo portal de assinatura,
-        com efeito ao término do período já pago — sem cobranças futuras. Consulte também a nossa{' '}
+        cancelada. Você pode cancelar a renovação a qualquer momento pelo e-mail{' '}
+        <Canais />, com efeito ao término do período já pago — sem cobranças futuras. Consulte também a nossa{' '}
         <Link href="/reembolso" className="underline underline-offset-4">
           Política de Reembolso
         </Link>
@@ -86,8 +124,8 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '7. Rescisão',
     body: (
       <p>
-        Você pode encerrar sua conta e cancelar a assinatura a qualquer momento pelo portal de
-        assinatura. O Creatools pode suspender ou encerrar contas que violem estes termos,
+        Você pode encerrar sua conta e cancelar a assinatura a qualquer momento pelo e-mail{' '}
+        <Canais />. O Creatools pode suspender ou encerrar contas que violem estes termos,
         mediante aviso quando possível, sem prejuízo dos valores já devidos até a data do
         encerramento.
       </p>
