@@ -877,7 +877,6 @@ const FREE_FEATURES = [
   'Editor visual completo, slide a slide',
   '3 estilos: Editorial, Minimalista e Thread do X',
   'News cards no formato do feed (1080×1350)',
-  'Reels e Editorial manuais',
   'Export Full HD (PNG, ZIP e MP4), sem marca d’água',
   'Até 5 carrosséis salvos',
   'Sem recursos de IA',

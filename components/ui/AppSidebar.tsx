@@ -18,6 +18,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { REELS_ENABLED } from '@/lib/feature-flags';
 import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
@@ -33,7 +34,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard',  label: 'Carrosséis',  icon: LayoutGrid, match: ['/generator'] },
   { href: '/news',       label: 'Notícias',     icon: Newspaper },
-  { href: '/reels',      label: 'Reels',        icon: Clapperboard },
+  // Reels fica fora da navegação enquanto a chave estiver desligada. O item
+  // continua declarado aqui — religar é só voltar REELS_ENABLED pra true.
+  ...(REELS_ENABLED
+    ? [{ href: '/reels', label: 'Reels', icon: Clapperboard } as NavItem]
+    : []),
   { href: '/agenda',     label: 'Agenda',       icon: Calendar },
   { href: '/onboarding', label: 'Onboarding',   icon: Palette },
   { href: '/conta',      label: 'Assinatura',   icon: CreditCard },
