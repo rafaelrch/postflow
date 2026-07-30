@@ -1,8 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Custo em créditos por tipo de geração. Ações não listadas são grátis
- * (ex.: refinar slide) — exigem apenas assinatura ativa.
+ * Custo em créditos por tipo de geração. Estas duas são as ÚNICAS ações que
+ * consomem crédito — só app/api/generate-carousel e app/api/generate-image
+ * chamam consumeCredits.
+ *
+ * Ações não listadas são grátis (ex.: criar e editar notícias, editor manual) —
+ * exigem apenas sessão, e no plano Grátis algumas têm TETO em vez de custo
+ * (FREE_NEWS_DAILY_LIMIT em lib/news-quota.ts). Limite não é custo.
+ *
+ * O exemplo anterior aqui era "refinar slide", funcionalidade que não existe no
+ * produto; a copy da /conta a anunciava por causa deste comentário.
  */
 export const CREDIT_COSTS = {
   carousel: 5,
