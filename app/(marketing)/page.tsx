@@ -15,6 +15,42 @@ import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2 } from 'lucide-rea
    Copy: COPY - CREATOOLS.md
    ──────────────────────────────────────────────────────────────── */
 
+/**
+ * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
+ * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
+ * não existe portal de autoatendimento. Estes valores se repetem nas 5 páginas
+ * públicas: mudou aqui, muda nas cinco.
+ */
+// Frase que manda a pessoa agir precisa dizer ONDE.
+const SUPORTE_URL = 'https://instagram.com/creatools';
+const SUPORTE_HANDLE = '@creatools';
+const SUPORTE_EMAIL = 'contato@creatools.com';
+
+/**
+ * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
+ * texto manda cancelar ou pedir reembolso, ele deixa registro escrito dos dois
+ * lados e não exige conta no Instagram. O DM continua oferecido — é mais
+ * rápido —, nunca como via única.
+ */
+function Canais() {
+  return (
+    <>
+      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
+        {SUPORTE_EMAIL}
+      </a>{' '}
+      ou no Instagram{' '}
+      <a
+        href={SUPORTE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_HANDLE}
+      </a>
+    </>
+  );
+}
+
 const LP_CSS = `
   html:has(.lp) { scroll-behavior: smooth; }
   .lp {
@@ -369,11 +405,11 @@ const STEPS = [
   },
   {
     title: 'A IA monta tudo',
-    desc: 'Texto persuasivo, layout, tipografia e as cores da sua marca. Em segundos o carrossel completo aparece no editor.',
+    desc: 'Texto dos slides, legenda e hashtags, no tom da sua marca. Em segundos o carrossel completo aparece no editor.',
   },
   {
     title: 'Exporte e publique',
-    desc: 'Baixe em Full HD (PNG ou ZIP), agende no calendário e publique direto no seu perfil.',
+    desc: 'Baixe em Full HD (PNG ou ZIP), agende no calendário e publique você mesmo no seu perfil.',
   },
 ];
 
@@ -873,18 +909,31 @@ function DoTheMath() {
 /* ─── Planos ──────────────────────────────────────────────────── */
 
 // Plano gratuito: editor e templates manuais completos, sem nenhuma IA.
+// O export é PNG por slide e ZIP do carrossel inteiro — é literalmente o que
+// hooks/useExport.ts faz (slide-N.png via canvas.toDataURL, e o zip montado com
+// JSZip). NÃO existe export em MP4 fora dos Reels, que estão desligados: prometer
+// MP4 aqui é prometer o que o produto não entrega.
 const FREE_FEATURES = [
   'Editor visual completo, slide a slide',
   '3 estilos: Editorial, Minimalista e Thread do X',
   'News cards no formato do feed (1080×1350)',
-  'Export Full HD (PNG, ZIP e MP4), sem marca d’água',
+  'Export em PNG por slide ou ZIP com o carrossel inteiro',
+  'Agenda de conteúdo',
   'Até 5 carrosséis salvos',
   'Sem recursos de IA',
 ];
 
-// Planos pagos: o que é EXCLUSIVO deles é a IA e a agenda — o resto o Free já dá.
+// Planos pagos: o EXCLUSIVO deles é a IA — e os tetos do Free somem.
+// A agenda NÃO é exclusiva: /agenda não tem trava de plano nenhuma (a policy
+// scheduled_posts_owner só compara auth.uid() = user_id, a tabela não tem
+// trigger de limite e o proxy só exige sessão). Por isso ela aparece nos DOIS
+// cards — não "restaure" isso para exclusividade do pago.
+// A IA devolve title/description/highlightWord/backgroundColor por slide, mais
+// caption e hashtags (types/index.ts: SlideAIData e CarouselAIResponse). Layout,
+// fontes e formato são escolha do usuário no wizard — não venha escrever que a
+// IA gera "layout" ou "design".
 const PLAN_FEATURES = [
-  'Carrosséis completos gerados por IA (texto + layout + design)',
+  'Carrosséis gerados por IA: texto dos slides, legenda e hashtags',
   'Imagens com IA (OpenAI gpt-image-2): 5 créditos cada',
   'Créditos de IA que renovam todo mês',
   'Agenda de conteúdo',
@@ -910,7 +959,7 @@ function Pricing() {
             <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
-            Checkout seguro (Pix ou cartão). Sem fidelidade. Cancele quando quiser.
+            Checkout seguro (cartão de crédito). Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 
@@ -1034,7 +1083,7 @@ function Pricing() {
 
         <FadeUp delay={0.15}>
           <p className="mt-12 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
-            Precisa de ajuda? Fale com nosso suporte. Respondemos rápido.
+            Precisa de ajuda? Fale com a gente pelo e-mail <Canais />. Respondemos rápido.
           </p>
         </FadeUp>
 
@@ -1052,10 +1101,10 @@ function Pricing() {
 
 /* ─── FAQ ─────────────────────────────────────────────────────── */
 
-const FAQS = [
+const FAQS: { q: string; a: React.ReactNode }[] = [
   {
     q: 'Preciso saber design?',
-    a: 'Não. A IA escreve o texto, escolhe o layout e aplica as cores da sua marca. Você só digita o tema e, se quiser, ajusta qualquer detalhe no editor visual antes de exportar.',
+    a: 'Não. A IA escreve o texto no tom e nas cores da sua marca. Você só digita o tema e, se quiser, ajusta qualquer detalhe no editor visual antes de exportar.',
   },
   {
     q: 'Como funcionam os créditos?',
@@ -1079,7 +1128,12 @@ const FAQS = [
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',
-    a: 'Você gerencia tudo com a ajuda do nosso suporte: trocar de plano, atualizar forma de pagamento ou cancelar. Respondemos rápido pra qualquer dúvida.',
+    a: (
+      <>
+        Você gerencia tudo com a gente pelo e-mail <Canais />: trocar de plano, atualizar forma
+        de pagamento ou cancelar. Respondemos rápido pra qualquer dúvida.
+      </>
+    ),
   },
   {
     q: 'Posso cancelar quando quiser?',

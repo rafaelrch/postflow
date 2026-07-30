@@ -6,16 +6,59 @@ export const metadata = {
   description: 'Como o Creatools coleta, usa e protege seus dados pessoais, em conformidade com a LGPD.',
 };
 
+/**
+ * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
+ * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp.
+ *
+ * ATENÇÃO, quem for mexer na seção 1: aqui o canal tem peso LEGAL (LGPD art. 41
+ * — contato do encarregado/DPO e via para o titular exercer direitos). O e-mail
+ * é o que sustenta esta seção: por Instagram, só exerce direitos quem TEM conta
+ * na plataforma, e o titular sem conta ficaria sem via. Por isso o e-mail vem
+ * primeiro e o DM fica como alternativa, nunca como caminho único.
+ *
+ * O texto abaixo publica os canais que existem e NÃO afirma que há encarregado
+ * nomeado, nem declara conformidade com o art. 41 — não temos nome de
+ * encarregado, e publicar contato não é o mesmo que nomear um. Não escreva isso
+ * sem o dado real.
+ */
+const SUPORTE_URL = 'https://instagram.com/creatools';
+const SUPORTE_HANDLE = '@creatools';
+const SUPORTE_EMAIL = 'contato@creatools.com';
+
+/**
+ * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
+ * texto manda cancelar, pedir reembolso ou exercer direitos de dados, o e-mail
+ * deixa registro escrito dos dois lados e não exige conta no Instagram. O DM
+ * continua oferecido — é mais rápido —, nunca como via única.
+ */
+function Canais() {
+  return (
+    <>
+      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
+        {SUPORTE_EMAIL}
+      </a>{' '}
+      ou no Instagram{' '}
+      <a
+        href={SUPORTE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_HANDLE}
+      </a>
+    </>
+  );
+}
+
 const SECTIONS: { title: string; body: React.ReactNode }[] = [
   {
     title: '1. Controlador dos dados',
     body: (
       <p>
         O Creatools é o controlador dos dados pessoais tratados nesta plataforma, nos termos da Lei
-        Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD). O Creatools ainda está em fase de
-        desenvolvimento e não possui, no momento, um e-mail oficial de contato — assim que o
-        serviço entrar em operação comercial, o canal oficial para dúvidas e solicitações sobre
-        dados pessoais (acesso, correção, exclusão etc.) será publicado nesta seção.
+        Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD). Para dúvidas e solicitações sobre
+        dados pessoais (acesso, correção, exclusão etc.), fale com a gente pelo e-mail{' '}
+        <Canais />.
       </p>
     ),
   },
@@ -24,7 +67,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         Coletamos: (a) dados de cadastro — nome, e-mail e telefone; (b) dados de pagamento —
-        processados diretamente pela Stripe, nossa processadora de pagamentos (o Creatools não
+        processados diretamente pela AbacatePay, nossa processadora de pagamentos (o Creatools não
         armazena números de cartão de crédito); (c) dados de uso da plataforma, incluindo prompts,
         conteúdos gerados e histórico de créditos; (d) dados técnicos, como endereço IP e
         identificadores de sessão, coletados via cookies.
@@ -57,7 +100,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '5. Compartilhamento com terceiros e transferência internacional',
     body: (
       <p>
-        Compartilhamos dados com prestadores essenciais ao funcionamento do serviço: Stripe
+        Compartilhamos dados com prestadores essenciais ao funcionamento do serviço: AbacatePay
         (processamento de pagamentos) e Supabase (banco de dados e autenticação).{' '}
         <strong className="text-[var(--ink)]">
           Os prompts e conteúdos que você envia para gerar carrosséis, textos e imagens são
@@ -99,8 +142,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
         eliminação de dados desnecessários ou excessivos; portabilidade a outro fornecedor;
         eliminação dos dados tratados com consentimento; informação sobre entidades públicas e
         privadas com as quais compartilhamos dados; e revogação do consentimento, quando aplicável.
-        Para exercer qualquer um desses direitos, entre em contato pelos canais de suporte da
-        plataforma ou pelo contato do controlador indicado na seção 1.
+        Para exercer qualquer um desses direitos, use o canal do controlador indicado na seção 1.
       </p>
     ),
   },
