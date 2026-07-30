@@ -20,6 +20,10 @@ vi.mock('@/lib/entitlements', () => ({
   getEntitlement: async () => 'pro',
 }));
 
+// Este arquivo descreve o comportamento da rota com Reels LIGADO. O gate da
+// chave desligada tem teste próprio em tests/reels-feature-flag.test.tsx.
+vi.mock('@/lib/feature-flags', () => ({ REELS_ENABLED: true }));
+
 let POST: typeof import('../app/api/reels/upload-url/route').POST;
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';

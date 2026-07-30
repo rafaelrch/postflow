@@ -36,6 +36,10 @@ vi.mock('@/lib/entitlements', () => ({
   getEntitlement: (...args: unknown[]) => mockGetEntitlement(...args),
 }));
 
+// A trava de custo só é exercitável com Reels LIGADO — com a chave desligada a
+// rota corta em 404 antes de tudo (coberto em tests/reels-feature-flag.test.tsx).
+vi.mock('@/lib/feature-flags', () => ({ REELS_ENABLED: true }));
+
 let POST: typeof import('../app/api/reels/upload-url/route').POST;
 
 const USER = '11111111-1111-4111-8111-111111111111';

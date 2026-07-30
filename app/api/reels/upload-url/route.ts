@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getEntitlement } from '@/lib/entitlements';
+import { REELS_ENABLED } from '@/lib/feature-flags';
 import {
   isAllowedVideoMime,
   validateVideoMeta,
@@ -38,6 +39,13 @@ interface UploadUrlBody {
 }
 
 export async function POST(request: Request) {
+  // Funcionalidade desligada: a rota some do ponto de vista de quem chama. Isso
+  // vem ANTES de qualquer coisa — nem sessão, nem banco, nem URL assinada. Não
+  // faz sentido deixar um endpoint de upload aberto pra algo que está fora do ar.
+  if (!REELS_ENABLED) {
+    return NextResponse.json({ error: 'Não encontrado.' }, { status: 404 });
+  }
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

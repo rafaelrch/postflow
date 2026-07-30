@@ -14,7 +14,7 @@ const YEARLY_MONTHLY_EQUIV = 'R$ 41,58/mês';
 // Plano gratuito: editor e templates manuais completos, sem IA.
 const FREE_FEATURES = [
   'Editor visual completo (4:5, 1:1, 9:16)',
-  'Todos os templates manuais: carrossel, News, Reels e Editorial',
+  'Todos os templates manuais: carrossel, News e Editorial',
   'Export PNG, ZIP e MP4 — sem marca d’água',
   'Até 5 carrosséis salvos',
   'Sem recursos de IA',
