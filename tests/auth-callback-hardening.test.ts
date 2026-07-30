@@ -89,6 +89,23 @@ describe('C2 — a rota /auth/callback aplica a sanitização', () => {
     const response = await callback(`?code=valido&next=${encodeURIComponent('/conta?tab=plano')}`);
     expect(location(response)).toBe(`${ORIGIN}/conta?tab=plano`);
   });
+
+  /**
+   * `next` repetido. Hoje o comportamento é seguro porque `searchParams.get()`
+   * devolve o PRIMEIRO valor — mas isso é detalhe da API, não intenção
+   * declarada. Trocar por `getAll()`, por um parser próprio, ou uma mudança de
+   * semântica do framework traria o open redirect de volta em silêncio.
+   */
+  it('com next repetido, ignora o valor externo que vem depois do interno', async () => {
+    const response = await callback('?code=valido&next=%2Fconta&next=https%3A%2F%2Fevil.com');
+    expect(location(response)).toBe(`${ORIGIN}/conta`);
+    expect(new URL(location(response)!).origin).toBe(ORIGIN);
+  });
+
+  it('com next repetido, sanitiza também o PRIMEIRO valor — ser o primeiro não o aprova', async () => {
+    const response = await callback('?code=valido&next=https%3A%2F%2Fevil.com&next=%2Fconta');
+    expect(location(response)).toBe(`${ORIGIN}/dashboard`);
+  });
 });
 
 describe('C2b — code inválido não finge sucesso', () => {
