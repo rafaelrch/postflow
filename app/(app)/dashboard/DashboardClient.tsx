@@ -12,6 +12,7 @@ import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-ma
 import { normalizeHandle } from '@/lib/utils';
 import { handleProjectLimit } from '@/hooks/useUpgradeStore';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
+import Template01Slide from '@/components/slides/Template01Slide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import type { DashboardCarousel } from './page';
 
@@ -51,6 +52,13 @@ function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
               slide={slide}
               globalSettings={globalSettings}
               profileData={{ photo: globalSettings.profileBadge.photo || '', name: globalSettings.profileBadge.name || '', handle: normalizeHandle(globalSettings.profileBadge.handle) }}
+              slideIndex={0}
+              totalSlides={carousel.slides?.[0]?.count ?? 1}
+            />
+          ) : (carousel.style as SlideStyle) === 'template01' ? (
+            <Template01Slide
+              slide={slide}
+              globalSettings={globalSettings}
               slideIndex={0}
               totalSlides={carousel.slides?.[0]?.count ?? 1}
             />

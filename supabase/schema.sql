@@ -124,7 +124,7 @@ create table if not exists public.carousels (
   published_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial')),
+  constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01')),
   constraint carousels_status_check check (status in ('draft', 'ready', 'published', 'archived')),
   constraint carousels_theme_check check (theme in ('dark', 'light'))
 );
@@ -141,7 +141,7 @@ alter table public.carousels add column if not exists archived_at timestamptz;
 alter table public.carousels add column if not exists published_at timestamptz;
 
 alter table public.carousels drop constraint if exists carousels_style_check;
-alter table public.carousels add constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial'));
+alter table public.carousels add constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01'));
 alter table public.carousels drop constraint if exists carousels_status_check;
 alter table public.carousels add constraint carousels_status_check check (status in ('draft', 'ready', 'published', 'archived'));
 alter table public.carousels drop constraint if exists carousels_theme_check;
@@ -185,6 +185,7 @@ create table if not exists public.slides (
   title_description_gap smallint,
   text_padding jsonb,
   content_layout text,
+  template_slots jsonb,
   editorial_title_offset_y smallint,
   editorial_desc_offset_y smallint,
   editorial_image_offset_y smallint,
@@ -212,6 +213,7 @@ alter table public.slides add column if not exists title_letter_spacing real;
 alter table public.slides add column if not exists title_description_gap smallint;
 alter table public.slides add column if not exists text_padding jsonb;
 alter table public.slides add column if not exists content_layout text;
+alter table public.slides add column if not exists template_slots jsonb;
 alter table public.slides add column if not exists editorial_title_offset_y smallint;
 alter table public.slides add column if not exists editorial_desc_offset_y smallint;
 alter table public.slides add column if not exists editorial_image_offset_y smallint;
@@ -262,7 +264,7 @@ create table if not exists public.templates (
   updated_at timestamptz not null default now(),
   constraint templates_kind_check check (kind in ('carousel', 'slide', 'news')),
   constraint templates_visibility_check check (visibility in ('private', 'system')),
-  constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial'))
+  constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01'))
 );
 
 -- Asset library

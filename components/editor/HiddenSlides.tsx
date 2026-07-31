@@ -6,6 +6,7 @@ import { getFormat } from '@/lib/formats';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
+import Template01Slide from '@/components/slides/Template01Slide';
 
 interface HiddenSlidesProps {
   registerRef: (id: string, el: HTMLDivElement | null) => void;
@@ -16,7 +17,10 @@ export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
 
   // O elemento capturado no export precisa ter a altura do formato ativo,
   // senão o PNG/ZIP sairia cortado no 1350 legado.
-  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+  // O TEMPLATE 1 tem forma travada em 1080x1350 pelo spec e não segue o seletor.
+  const fmt = getFormat(globalSettings.format);
+  const SLIDE_W = style === 'template01' ? 1080 : fmt.width;
+  const SLIDE_H = style === 'template01' ? 1350 : fmt.height;
 
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',
@@ -41,7 +45,15 @@ export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
           ref={(el) => registerRef(slide.id, el)}
           style={{ width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}
         >
-          {style === 'profile' ? (
+          {style === 'template01' ? (
+            <Template01Slide
+              slide={slide}
+              globalSettings={globalSettings}
+              slideIndex={i}
+              totalSlides={slides.length}
+              forExport
+            />
+          ) : style === 'profile' ? (
             <ProfileSlide
               slide={slide}
               globalSettings={globalSettings}

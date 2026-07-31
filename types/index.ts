@@ -1,4 +1,4 @@
-export type SlideStyle = 'minimalist' | 'profile' | 'editorial';
+export type SlideStyle = 'minimalist' | 'profile' | 'editorial' | 'template01';
 export type ContentLayout = 'cover' | 'text-image-text' | 'text-text-image' | 'image-text-text' | 'text-only';
 // Formato/proporção do slide. Todos compartilham largura 1080 (só a altura muda);
 // dimensões e labels vivem em lib/formats.ts. Ausência => '4:5' (legado).
@@ -170,6 +170,12 @@ export interface Slide {
   titleDescriptionGap?: number;
   textPadding?: { top: number; right: number; bottom: number; left: number };
   contentLayout?: ContentLayout;
+  /**
+   * Conteúdo por slot do TEMPLATE 1 (`s1.headline`, `s3.image`, `cantos.left`…).
+   * Só o estilo 'template01' usa: a forma é fixa no spec, então o slide não
+   * carrega tipografia/posição, apenas o texto e as URLs de imagem.
+   */
+  templateSlots?: Record<string, string>;
   editorialTitleOffsetY?: number;
   editorialDescOffsetY?: number;
   editorialImageOffsetY?: number;

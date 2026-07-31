@@ -187,6 +187,51 @@ body {
   font-weight: 800; font-style: normal; font-display: swap;
 }
 
+/* ─── TEMPLATE 1 (carrossel) ─────────────────────────────────
+
+   Faces próprias do template, prefixadas T01 para não colidirem com a
+   'IvyOra Text' do resto do app (aquela resolve via local(); aqui a serifada
+   é a substituta embutida, porque IvyOra é comercial). Os arquivos são os
+   mesmos que `render.py` embute — trocar aqui muda o deck inteiro.
+   font-display: block é intencional: com swap o texto mede na fonte fallback
+   e todo o line-wrapping do template muda antes da troca.                    */
+
+@font-face {
+  font-family: 'T01Inter';
+  src: url('/fonts/template-01/Inter-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'T01Inter';
+  src: url('/fonts/template-01/Inter-Light.woff2') format('woff2');
+  font-weight: 300; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'T01InterDisplay';
+  src: url('/fonts/template-01/InterDisplay-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'T01InterDisplay';
+  src: url('/fonts/template-01/InterDisplay-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: block;
+}
+/* Substituta de IvyOra Text — ver fontSubstitutions no spec. */
+@font-face {
+  font-family: 'T01Serif';
+  src: url('/fonts/template-01/cormorant-garamond-600.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'T01Serif';
+  src: url('/fonts/template-01/cormorant-garamond-ita.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: block;
+}
+
+/* O spec vem do Figma em caixa de conteúdo; o preflight do Tailwind põe
+   border-box em tudo. Os nós com stroke reativam border-box por conta. */
+.t01-slide, .t01-slide * { box-sizing: content-box; }
+
 /* ─── Utility classes ───────────────────────────────────────── */
 
 .font-display { font-family: var(--font-display); letter-spacing: -0.02em; font-weight: 400; }

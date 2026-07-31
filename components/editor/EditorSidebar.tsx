@@ -6,6 +6,7 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Section from './Section';
+import Template01Slots from './Template01Slots';
 import { cn } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
@@ -653,7 +654,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       {/* ── SCROLLABLE CONTENT ── */}
       <div className="flex-1 overflow-y-auto">
 
-        {style === 'profile' ? (
+        {style === 'template01' ? (
+          /* ══════════════════════════════════
+             TEMPLATE 1 — só texto e imagem: a
+             forma vem do spec e não é editável
+             ══════════════════════════════════ */
+          <Template01Slots />
+        ) : style === 'profile' ? (
           /* ══════════════════════════════════
              PROFILE SIDEBAR — focused & clean
              ══════════════════════════════════ */

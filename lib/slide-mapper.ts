@@ -58,6 +58,7 @@ export function mapDbSlideToSlide(sl: DbRow): Slide {
     titleDescriptionGap: (sl.title_description_gap as number) ?? undefined,
     textPadding: (sl.text_padding as Slide['textPadding']) || undefined,
     contentLayout: (sl.content_layout as Slide['contentLayout']) || undefined,
+    templateSlots: (sl.template_slots as Slide['templateSlots']) || undefined,
     editorialTitleOffsetY: (sl.editorial_title_offset_y as number) ?? undefined,
     editorialDescOffsetY: (sl.editorial_desc_offset_y as number) ?? undefined,
     editorialImageOffsetY: (sl.editorial_image_offset_y as number) ?? undefined,
@@ -105,6 +106,10 @@ export function mapSlideToDbRow(slide: Slide, carouselId: string, position: numb
     title_description_gap: slide.titleDescriptionGap ?? null,
     text_padding: slide.textPadding ?? null,
     content_layout: slide.contentLayout ?? null,
+    // Só o TEMPLATE 1 preenche isto. Escrever a chave apenas quando há conteúdo
+    // mantém o autosave dos outros estilos funcionando mesmo antes da migração
+    // do template rodar (a coluna não existe → o insert falharia).
+    ...(slide.templateSlots ? { template_slots: slide.templateSlots } : {}),
     editorial_title_offset_y: slide.editorialTitleOffsetY ?? null,
     editorial_desc_offset_y: slide.editorialDescOffsetY ?? null,
     editorial_image_offset_y: slide.editorialImageOffsetY ?? null,

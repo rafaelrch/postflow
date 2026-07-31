@@ -13,6 +13,7 @@ import { uploadImageFile } from '@/lib/upload-image';
 import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData, TextPosition } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
+import { template01SlotsFromContent, TEMPLATE_01_SLIDE_COUNT } from '@/lib/templates/template-01';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import { handlePlanRequired, handleProjectLimit } from '@/hooks/useUpgradeStore';
 import toast from 'react-hot-toast';
@@ -236,6 +237,12 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     setManualSlides((prev) => prev.filter((_, idx) => idx !== i));
   };
 
+  // O TEMPLATE 1 tem uma dramaturgia de 6 slides (capa → contexto → problema →
+  // virada → dois eixos → fechamento). Não é redimensionável: o slider some e a
+  // contagem é sempre a do spec.
+  const isFixedDeck = style === 'template01';
+  const effectiveSlideCount = isFixedDeck ? TEMPLATE_01_SLIDE_COUNT : slideCount;
+
   // Twitter/X (profile) pula a etapa Visual: a tipografia do template é fixa
   // e as cores vêm do tema claro/escuro do próprio Twitter.
   const totalSteps = 3;
@@ -284,7 +291,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           body: JSON.stringify({
             prompt,
             style,
-            slideCount,
+            slideCount: effectiveSlideCount,
             imageType: 'background',
             generateImages: false,
             webSearch,
@@ -321,6 +328,14 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         }));
       }
 
+      // O deck do TEMPLATE 1 é fechado em 6: conteúdo a mais é cortado, a menos
+      // é completado com slides vazios que caem no texto padrão do spec.
+      if (isFixedDeck) {
+        slides = Array.from({ length: TEMPLATE_01_SLIDE_COUNT }, (_, i) =>
+          slides[i] ?? { title: '', description: '', highlightWord: '', backgroundColor: '#111111' }
+        );
+      }
+
       const globalSettings = {
         ...DEFAULT_GLOBAL_SETTINGS,
         fontPair: effectiveFontPair,
@@ -348,6 +363,11 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         const isEditorialContent = style === 'editorial' && i > 0;
         return ({
         id: `tmp-${i}-${Date.now()}`,
+        // TEMPLATE 1: a forma vem do spec, então o conteúdo entra por slot.
+        // Os demais campos ficam preenchidos e simplesmente não são lidos.
+        ...(style === 'template01'
+          ? { templateSlots: template01SlotsFromContent(i, sl.title, sl.description, sl.imageUrl) }
+          : {}),
         position: i,
         title: sl.title,
         description: sl.description,
@@ -438,6 +458,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           title_description_gap: style === 'profile' ? 41 : null,
           cta_button: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
           background_color: slideBg,
+          ...(style === 'template01'
+            ? { template_slots: template01SlotsFromContent(i, sl.title, sl.description, sl.imageUrl) }
+            : {}),
           });
         });
 
@@ -547,6 +570,26 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                           <div className="w-full h-1.5 bg-[#1a1a1a]/30 rounded mt-1" />
                           <div className="w-5/6 h-1.5 bg-[#1a1a1a]/30 rounded" />
                         </div>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  value: 'template01' as SlideStyle,
+                  label: 'Template 1',
+                  desc: 'Deck fechado de 6 slides com forma fixa do Figma. Você troca texto e imagem',
+                  icon: (
+                    <div className="w-full h-44 rounded-lg border border-white/10 flex flex-col overflow-hidden bg-black">
+                      <div className="flex-1 relative bg-gradient-to-b from-[#3a3a3a] to-black">
+                        <div className="absolute inset-x-0 bottom-0 p-3">
+                          <div className="w-1/2 h-1.5 bg-white/40 rounded mx-auto mb-2" />
+                          <div className="w-full h-2.5 bg-white/85 rounded mb-1" />
+                          <div className="w-4/5 h-2.5 bg-white/85 rounded mb-1 mx-auto" />
+                          <div className="w-2/3 h-2.5 bg-white/85 rounded mx-auto" />
+                        </div>
+                      </div>
+                      <div className="h-9 bg-[#0D39E4] flex items-center justify-center gap-1">
+                        <div className="w-16 h-1.5 bg-white/70 rounded" />
                       </div>
                     </div>
                   ),
@@ -674,8 +717,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       {webSearch ? 'a IA vai buscar fatos e notícias atuais' : 'ative para temas recentes'}
                     </span>
                   </button>
-                  {/* Nº de slides — hidden for Twitter Format A */}
-                  {!(style === 'profile' && twitterFormat === 'A') && (
+                  {/* Nº de slides — oculto no Twitter Formato A e no TEMPLATE 1 (deck fixo) */}
+                  {!(style === 'profile' && twitterFormat === 'A') && !isFixedDeck && (
                     <div className="flex items-center gap-3">
                       <label className="text-xs text-gray-900/40 dark:text-white/40 shrink-0">Slides</label>
                       <input

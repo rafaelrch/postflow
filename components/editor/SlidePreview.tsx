@@ -7,6 +7,7 @@ import { getFormat } from '@/lib/formats';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
+import Template01Slide from '@/components/slides/Template01Slide';
 
 interface SlidePreviewProps {
   slide: Slide;
@@ -27,7 +28,11 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
   ref
 ) {
   // Dimensões do formato ativo — a moldura escalada acompanha a proporção real.
-  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+  // O TEMPLATE 1 é a exceção: a forma vem travada do spec em 1080x1350, então
+  // ele ignora o seletor de formato em vez de ser esticado para 1:1 ou 9:16.
+  const fmt = getFormat(globalSettings.format);
+  const SLIDE_W = style === 'template01' ? 1080 : fmt.width;
+  const SLIDE_H = style === 'template01' ? 1350 : fmt.height;
 
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',
@@ -65,7 +70,15 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
           pointerEvents: innerPointerEvents,
         }}
       >
-        {style === 'profile' ? (
+        {style === 'template01' ? (
+          <Template01Slide
+            slide={slide}
+            globalSettings={globalSettings}
+            slideIndex={slideIndex}
+            totalSlides={totalSlides}
+            forExport={forExport}
+          />
+        ) : style === 'profile' ? (
           <ProfileSlide
             slide={slide}
             globalSettings={globalSettings}
