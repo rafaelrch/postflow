@@ -626,6 +626,346 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     </>
   );
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     Controles padrão de edição — Conteúdo/Imagem, Sombra, Fundo, Texto, Cantos.
+     Ficam num fragmento porque são usados em DOIS lugares: o editor completo
+     (minimalist/editorial) e o TEMPLATE 1, onde entram ABAIXO dos slots. O
+     carrossel do template nasce seguindo o spec, mas depois disso o usuário tem
+     de volta tudo o que os outros estilos já ofereciam — por isso somamos os
+     dois painéis em vez de substituir um pelo outro.
+  ───────────────────────────────────────────────────────────────────────── */
+  const standardControls = (
+    <>
+      {/* IMAGEM — a capa do Editorial não tem shape de conteúdo */}
+      <Section title={`Conteúdo — Slide ${activeSlideIndex + 1}`} defaultOpen>
+        {!isEditorialCover && (
+        <Section title="Imagem" defaultOpen>
+          <div
+            className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
+            onClick={() => contentImageRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files[0];
+              if (f) handleContentImageFile(f);
+            }}
+          >
+            <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
+            <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
+          </div>
+          {/* AI image generation — painel expansível */}
+          <div className="flex flex-col gap-1.5">
+            <AiGenPanel
+              key={`content-${activeSlideIndex}`}
+              buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
+              generating={generating}
+              slideTitle={slide.title}
+              slideDescription={slide.description || ''}
+              onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
+            />
+            <button
+              onClick={() => generateAll('content')}
+              disabled={generating}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Sparkles className="w-3 h-3" />
+              {generating && progress.total > 1
+                ? `Gerando ${progress.done}/${progress.total}…`
+                : `Gerar para os ${contentSlidesCount} slides`}
+            </button>
+          </div>
+
+          {slide.contentImageUrl && (
+            <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
+          )}
+          <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
+          <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
+          <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v, objectFit: slide.contentImagePosition?.objectFit } })} unit="%" />
+        </Section>
+        )}
+
+        <Section title="Sombra / Overlay">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <div
+              onClick={() => updateActiveSlide({ shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } })}
+              className={cn('w-8 h-4 rounded-full relative transition-colors', slide.shadow.style !== 'none' ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}
+            >
+              <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.shadow.style !== 'none' ? 'left-[18px]' : 'left-0.5')} />
+            </div>
+            <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir sombra</span>
+          </label>
+          {slide.shadow.style !== 'none' && (
+            <>
+              <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
+              <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
+              <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} unit="%" />
+              <ColorPicker
+                label="Cor"
+                value={slide.shadow.color || '#000000'}
+                onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })}
+              />
+            </>
+          )}
+        </Section>
+
+        <Section title="Fundo do Slide" defaultOpen={isEditorialCover}>
+          <ColorPicker
+            label="Cor"
+            value={slide.backgroundColor || '#111111'}
+            onChange={(v) => updateActiveSlide({ backgroundColor: v })}
+          />
+          <div
+            className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
+            onClick={() => bgImageRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files[0];
+              if (f) handleImageFile(f);
+            }}
+          >
+            <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
+            <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste uma imagem de fundo</span>
+          </div>
+          {isEditorialCover && (
+            <AiGenPanel
+              key={`cover-bg-${activeSlideIndex}`}
+              buttonLabel="Gerar imagem com IA (capa)"
+              generating={generating}
+              slideTitle={slide.title}
+              slideDescription={slide.description || ''}
+              onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+            />
+          )}
+          {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+            <>
+              <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''} onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
+              <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} unit="%" />
+              <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
+              <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
+              <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
+            </>
+          )}
+        </Section>
+      </Section>
+
+      {/* TEXTO */}
+      <Section title="Texto do Slide" defaultOpen>
+
+        {/* ── Título ── */}
+        <div>
+          <span className={labelCls}>Título</span>
+          <textarea
+            className={cn(inputCls, 'mt-1 resize-none')}
+            rows={3}
+            value={slide.title}
+            onChange={(e) => updateActiveSlide({ title: e.target.value })}
+            placeholder="Título do slide"
+          />
+        </div>
+        <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160}
+          onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })} unit="px" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ColorPicker value={slide.titleColor || '#FFFFFF'} onChange={(v) => updateActiveSlide({ titleColor: v })} label="Cor" />
+          <button
+            onClick={() => updateActiveSlide({ titleUnderline: !slide.titleUnderline })}
+            title="Sublinhado"
+            className={cn(
+              'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+              slide.titleUnderline
+                ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+            )}
+          >
+            <Underline className="w-3 h-3" />
+          </button>
+        </div>
+        <div>
+          <span className={labelCls + ' block mb-1'}>Fonte título</span>
+          <ElementFontPicker
+            value={slide.titleFont}
+            onChange={(v) => updateActiveSlide({ titleFont: v })}
+          />
+        </div>
+
+        {/* ── Descrição ── */}
+        <div className="mt-2">
+          <span className={labelCls}>Descrição</span>
+          <textarea className={cn(inputCls, 'mt-1 resize-none h-16')} value={slide.description || ''}
+            onChange={(e) => updateActiveSlide({ description: e.target.value })} placeholder="Descrição do slide" />
+        </div>
+        <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80}
+          onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, description: v } })} unit="px" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ColorPicker value={slide.descriptionColor || 'rgba(255,255,255,0.7)'} onChange={(v) => updateActiveSlide({ descriptionColor: v })} label="Cor" />
+          <button
+            onClick={() => updateActiveSlide({ descriptionUnderline: !slide.descriptionUnderline })}
+            title="Sublinhado"
+            className={cn(
+              'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+              slide.descriptionUnderline
+                ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+            )}
+          >
+            <Underline className="w-3 h-3" />
+          </button>
+        </div>
+        <div>
+          <span className={labelCls + ' block mb-1'}>Fonte descrição</span>
+          <ElementFontPicker
+            value={slide.descriptionFont}
+            onChange={(v) => updateActiveSlide({ descriptionFont: v })}
+          />
+        </div>
+
+        {/* ── Espaçamento entre título e descrição ── */}
+        <Slider
+          label="Espaço título → descrição"
+          value={slide.titleDescriptionGap ?? 16}
+          min={0}
+          max={80}
+          step={1}
+          onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
+          unit="px"
+        />
+
+        {/* ── Espaçamento de letras (título) ── */}
+        <Slider
+          label="Espaçamento de letras (título)"
+          value={slide.titleLetterSpacing ?? -0.02}
+          min={-0.1}
+          max={0.3}
+          step={0.01}
+          onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
+          unit="em"
+        />
+
+        {/* ── Destaques título ── */}
+        <WordHighlightPicker
+          label="Destaques no título"
+          text={slide.title}
+          highlights={(slide.highlights || []).filter(h => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
+          onChange={(titleHls) => {
+            const otherHls = (slide.highlights || []).filter(h => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
+            updateActiveSlide({ highlights: [...otherHls, ...titleHls] });
+          }}
+          accentColor={accentColor}
+        />
+
+        {/* ── Destaques descrição ── */}
+        {slide.description && (
+          <WordHighlightPicker
+            label="Destaques na descrição"
+            text={slide.description}
+            highlights={(slide.highlights || []).filter(h => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
+            onChange={(descHls) => {
+              const otherHls = (slide.highlights || []).filter(h => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
+              updateActiveSlide({ highlights: [...otherHls, ...descHls] });
+            }}
+            accentColor={accentColor}
+          />
+        )}
+
+        <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
+          onChange={(v) => updateActiveSlide({ lineHeight: v })} />
+
+        {/* ── Posição do texto ── */}
+        <div>
+          <span className={labelCls + ' block mb-1.5'}>Posição do texto</span>
+          <div className="grid grid-cols-3 gap-1">
+            {TEXT_POSITIONS.map((pos) => (
+              <button key={pos} onClick={() => {
+                const autoAlign = (pos === 'top-center' || pos === 'center' || pos === 'bottom-center') ? 'center'
+                  : (pos === 'top-right' || pos === 'middle-right' || pos === 'bottom-right') ? 'right'
+                  : 'left';
+                updateActiveSlide({ textPosition: pos, textOffset: undefined, textAlignment: autoAlign });
+              }} title={pos}
+                className={cn('h-7 rounded text-[8px] transition-colors border',
+                  slide.textPosition === pos ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
+                )}
+              >
+                {pos === 'top-left' ? '↖' : pos === 'top-center' ? '↑' : pos === 'top-right' ? '↗'
+                  : pos === 'middle-left' ? '←' : pos === 'center' ? '·' : pos === 'middle-right' ? '→'
+                  : pos === 'bottom-left' ? '↙' : pos === 'bottom-center' ? '↓' : '↘'}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1.5 grid grid-cols-3 gap-1">
+            {(['left', 'center', 'right'] as const).map((align) => (
+              <button
+                key={align}
+                onClick={() => updateActiveSlide({ textAlignment: align })}
+                className={cn('h-7 rounded text-[8px] transition-colors border',
+                  slide.textAlignment === align ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
+                )}
+              >
+                {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
+              </button>
+            ))}
+          </div>
+          {style === 'editorial' && (
+            <div className="mt-3 space-y-2">
+              <Slider
+                label="Mover título ↕"
+                value={slide.editorialTitleOffsetY ?? 0}
+                min={-500} max={500} step={1}
+                onChange={(v) => updateActiveSlide({ editorialTitleOffsetY: v })}
+                unit="px"
+              />
+              <Slider
+                label="Mover descrição ↕"
+                value={slide.editorialDescOffsetY ?? 0}
+                min={-500} max={500} step={1}
+                onChange={(v) => updateActiveSlide({ editorialDescOffsetY: v })}
+                unit="px"
+              />
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* CANTOS */}
+      <Section title="Cantos">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <div onClick={() => updateCornersConfig({ show: !corners.show })} className={cn('w-8 h-4 rounded-full relative transition-colors', corners.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
+            <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.show ? 'left-[18px]' : 'left-0.5')} />
+          </div>
+          <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir cantos</span>
+        </label>
+        {corners.show && (
+          <>
+            {(['topLeft', 'topRight'] as const).map((key) => (
+              <div key={key} className="flex items-center gap-2">
+                <div onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
+                  className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0', corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
+                  {corners[key].visible && <span className="text-black text-[8px] font-bold">✓</span>}
+                </div>
+                <input className={cn(inputCls, 'flex-1 text-[10px]')} value={corners[key].text}
+                  onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} placeholder={key} />
+              </div>
+            ))}
+            <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
+            <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} onChange={(v) => updateCornersConfig({ borderDistance: v })} unit="px" />
+            <Slider label="Opacidade" value={corners.opacity} min={0} max={100} onChange={(v) => updateCornersConfig({ opacity: v })} unit="%" />
+            <ColorPicker
+              label="Cor"
+              value={corners.color || '#FFFFFF'}
+              onChange={(v) => updateCornersConfig({ color: v })}
+            />
+            <div>
+              <span className={labelCls + ' block mb-1'}>Fonte</span>
+              <ElementFontPicker
+                value={corners.elementFont}
+                onChange={(v) => updateCornersConfig({ elementFont: v })}
+              />
+            </div>
+          </>
+        )}
+      </Section>
+    </>
+  );
+
   return (
     <div className="w-[272px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
       {fileInputs}
@@ -656,10 +996,16 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
         {style === 'template01' ? (
           /* ══════════════════════════════════
-             TEMPLATE 1 — só texto e imagem: a
-             forma vem do spec e não é editável
+             TEMPLATE 1 — os slots do template
+             em cima (caminho principal) e os
+             controles padrão logo abaixo: o
+             carrossel nasce seguindo o spec e
+             segue editável como qualquer outro
              ══════════════════════════════════ */
-          <Template01Slots />
+          <>
+            <Template01Slots />
+            {standardControls}
+          </>
         ) : style === 'profile' ? (
           /* ══════════════════════════════════
              PROFILE SIDEBAR — focused & clean
@@ -824,336 +1170,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           /* ════════════════════════════════
              MINIMALIST SIDEBAR — full editor
              ════════════════════════════════ */
-          <>
-            {/* IMAGEM — a capa do Editorial não tem shape de conteúdo */}
-            <Section title={`Conteúdo — Slide ${activeSlideIndex + 1}`} defaultOpen>
-              {!isEditorialCover && (
-              <Section title="Imagem" defaultOpen>
-                <div
-                  className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
-                  onClick={() => contentImageRef.current?.click()}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const f = e.dataTransfer.files[0];
-                    if (f) handleContentImageFile(f);
-                  }}
-                >
-                  <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
-                  <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
-                </div>
-                {/* AI image generation — painel expansível */}
-                <div className="flex flex-col gap-1.5">
-                  <AiGenPanel
-                    key={`content-${activeSlideIndex}`}
-                    buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
-                    generating={generating}
-                    slideTitle={slide.title}
-                    slideDescription={slide.description || ''}
-                    onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
-                  />
-                  <button
-                    onClick={() => generateAll('content')}
-                    disabled={generating}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    {generating && progress.total > 1
-                      ? `Gerando ${progress.done}/${progress.total}…`
-                      : `Gerar para os ${contentSlidesCount} slides`}
-                  </button>
-                </div>
-
-                {slide.contentImageUrl && (
-                  <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
-                )}
-                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
-                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
-                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v, objectFit: slide.contentImagePosition?.objectFit } })} unit="%" />
-              </Section>
-              )}
-
-              <Section title="Sombra / Overlay">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <div
-                    onClick={() => updateActiveSlide({ shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } })}
-                    className={cn('w-8 h-4 rounded-full relative transition-colors', slide.shadow.style !== 'none' ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}
-                  >
-                    <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.shadow.style !== 'none' ? 'left-[18px]' : 'left-0.5')} />
-                  </div>
-                  <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir sombra</span>
-                </label>
-                {slide.shadow.style !== 'none' && (
-                  <>
-                    <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
-                    <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
-                    <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} unit="%" />
-                    <ColorPicker
-                      label="Cor"
-                      value={slide.shadow.color || '#000000'}
-                      onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })}
-                    />
-                  </>
-                )}
-              </Section>
-
-              <Section title="Fundo do Slide" defaultOpen={isEditorialCover}>
-                <ColorPicker
-                  label="Cor"
-                  value={slide.backgroundColor || '#111111'}
-                  onChange={(v) => updateActiveSlide({ backgroundColor: v })}
-                />
-                <div
-                  className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
-                  onClick={() => bgImageRef.current?.click()}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const f = e.dataTransfer.files[0];
-                    if (f) handleImageFile(f);
-                  }}
-                >
-                  <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
-                  <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste uma imagem de fundo</span>
-                </div>
-                {isEditorialCover && (
-                  <AiGenPanel
-                    key={`cover-bg-${activeSlideIndex}`}
-                    buttonLabel="Gerar imagem com IA (capa)"
-                    generating={generating}
-                    slideTitle={slide.title}
-                    slideDescription={slide.description || ''}
-                    onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
-                  />
-                )}
-                {(slide.backgroundImageUrl || slide.gridImageUrl) && (
-                  <>
-                    <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''} onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
-                    <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} unit="%" />
-                    <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
-                    <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
-                    <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
-                  </>
-                )}
-              </Section>
-            </Section>
-
-            {/* TEXTO */}
-            <Section title="Texto do Slide" defaultOpen>
-
-              {/* ── Título ── */}
-              <div>
-                <span className={labelCls}>Título</span>
-                <textarea
-                  className={cn(inputCls, 'mt-1 resize-none')}
-                  rows={3}
-                  value={slide.title}
-                  onChange={(e) => updateActiveSlide({ title: e.target.value })}
-                  placeholder="Título do slide"
-                />
-              </div>
-              <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160}
-                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })} unit="px" />
-              <div className="flex items-center gap-2 flex-wrap">
-                <ColorPicker value={slide.titleColor || '#FFFFFF'} onChange={(v) => updateActiveSlide({ titleColor: v })} label="Cor" />
-                <button
-                  onClick={() => updateActiveSlide({ titleUnderline: !slide.titleUnderline })}
-                  title="Sublinhado"
-                  className={cn(
-                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-                    slide.titleUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
-                  )}
-                >
-                  <Underline className="w-3 h-3" />
-                </button>
-              </div>
-              <div>
-                <span className={labelCls + ' block mb-1'}>Fonte título</span>
-                <ElementFontPicker
-                  value={slide.titleFont}
-                  onChange={(v) => updateActiveSlide({ titleFont: v })}
-                />
-              </div>
-
-              {/* ── Descrição ── */}
-              <div className="mt-2">
-                <span className={labelCls}>Descrição</span>
-                <textarea className={cn(inputCls, 'mt-1 resize-none h-16')} value={slide.description || ''}
-                  onChange={(e) => updateActiveSlide({ description: e.target.value })} placeholder="Descrição do slide" />
-              </div>
-              <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80}
-                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, description: v } })} unit="px" />
-              <div className="flex items-center gap-2 flex-wrap">
-                <ColorPicker value={slide.descriptionColor || 'rgba(255,255,255,0.7)'} onChange={(v) => updateActiveSlide({ descriptionColor: v })} label="Cor" />
-                <button
-                  onClick={() => updateActiveSlide({ descriptionUnderline: !slide.descriptionUnderline })}
-                  title="Sublinhado"
-                  className={cn(
-                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-                    slide.descriptionUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
-                  )}
-                >
-                  <Underline className="w-3 h-3" />
-                </button>
-              </div>
-              <div>
-                <span className={labelCls + ' block mb-1'}>Fonte descrição</span>
-                <ElementFontPicker
-                  value={slide.descriptionFont}
-                  onChange={(v) => updateActiveSlide({ descriptionFont: v })}
-                />
-              </div>
-
-              {/* ── Espaçamento entre título e descrição ── */}
-              <Slider
-                label="Espaço título → descrição"
-                value={slide.titleDescriptionGap ?? 16}
-                min={0}
-                max={80}
-                step={1}
-                onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
-                unit="px"
-              />
-
-              {/* ── Espaçamento de letras (título) ── */}
-              <Slider
-                label="Espaçamento de letras (título)"
-                value={slide.titleLetterSpacing ?? -0.02}
-                min={-0.1}
-                max={0.3}
-                step={0.01}
-                onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
-                unit="em"
-              />
-
-              {/* ── Destaques título ── */}
-              <WordHighlightPicker
-                label="Destaques no título"
-                text={slide.title}
-                highlights={(slide.highlights || []).filter(h => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
-                onChange={(titleHls) => {
-                  const otherHls = (slide.highlights || []).filter(h => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
-                  updateActiveSlide({ highlights: [...otherHls, ...titleHls] });
-                }}
-                accentColor={accentColor}
-              />
-
-              {/* ── Destaques descrição ── */}
-              {slide.description && (
-                <WordHighlightPicker
-                  label="Destaques na descrição"
-                  text={slide.description}
-                  highlights={(slide.highlights || []).filter(h => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
-                  onChange={(descHls) => {
-                    const otherHls = (slide.highlights || []).filter(h => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
-                    updateActiveSlide({ highlights: [...otherHls, ...descHls] });
-                  }}
-                  accentColor={accentColor}
-                />
-              )}
-
-              <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
-                onChange={(v) => updateActiveSlide({ lineHeight: v })} />
-
-              {/* ── Posição do texto ── */}
-              <div>
-                <span className={labelCls + ' block mb-1.5'}>Posição do texto</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {TEXT_POSITIONS.map((pos) => (
-                    <button key={pos} onClick={() => {
-                      const autoAlign = (pos === 'top-center' || pos === 'center' || pos === 'bottom-center') ? 'center'
-                        : (pos === 'top-right' || pos === 'middle-right' || pos === 'bottom-right') ? 'right'
-                        : 'left';
-                      updateActiveSlide({ textPosition: pos, textOffset: undefined, textAlignment: autoAlign });
-                    }} title={pos}
-                      className={cn('h-7 rounded text-[8px] transition-colors border',
-                        slide.textPosition === pos ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
-                      )}
-                    >
-                      {pos === 'top-left' ? '↖' : pos === 'top-center' ? '↑' : pos === 'top-right' ? '↗'
-                        : pos === 'middle-left' ? '←' : pos === 'center' ? '·' : pos === 'middle-right' ? '→'
-                        : pos === 'bottom-left' ? '↙' : pos === 'bottom-center' ? '↓' : '↘'}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-1.5 grid grid-cols-3 gap-1">
-                  {(['left', 'center', 'right'] as const).map((align) => (
-                    <button
-                      key={align}
-                      onClick={() => updateActiveSlide({ textAlignment: align })}
-                      className={cn('h-7 rounded text-[8px] transition-colors border',
-                        slide.textAlignment === align ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
-                      )}
-                    >
-                      {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
-                    </button>
-                  ))}
-                </div>
-                {style === 'editorial' && (
-                  <div className="mt-3 space-y-2">
-                    <Slider
-                      label="Mover título ↕"
-                      value={slide.editorialTitleOffsetY ?? 0}
-                      min={-500} max={500} step={1}
-                      onChange={(v) => updateActiveSlide({ editorialTitleOffsetY: v })}
-                      unit="px"
-                    />
-                    <Slider
-                      label="Mover descrição ↕"
-                      value={slide.editorialDescOffsetY ?? 0}
-                      min={-500} max={500} step={1}
-                      onChange={(v) => updateActiveSlide({ editorialDescOffsetY: v })}
-                      unit="px"
-                    />
-                  </div>
-                )}
-              </div>
-            </Section>
-
-            {/* CANTOS */}
-            <Section title="Cantos">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div onClick={() => updateCornersConfig({ show: !corners.show })} className={cn('w-8 h-4 rounded-full relative transition-colors', corners.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-                  <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.show ? 'left-[18px]' : 'left-0.5')} />
-                </div>
-                <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir cantos</span>
-              </label>
-              {corners.show && (
-                <>
-                  {(['topLeft', 'topRight'] as const).map((key) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <div onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
-                        className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0', corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
-                        {corners[key].visible && <span className="text-black text-[8px] font-bold">✓</span>}
-                      </div>
-                      <input className={cn(inputCls, 'flex-1 text-[10px]')} value={corners[key].text}
-                        onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} placeholder={key} />
-                    </div>
-                  ))}
-                  <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
-                  <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} onChange={(v) => updateCornersConfig({ borderDistance: v })} unit="px" />
-                  <Slider label="Opacidade" value={corners.opacity} min={0} max={100} onChange={(v) => updateCornersConfig({ opacity: v })} unit="%" />
-                  <ColorPicker
-                    label="Cor"
-                    value={corners.color || '#FFFFFF'}
-                    onChange={(v) => updateCornersConfig({ color: v })}
-                  />
-                  <div>
-                    <span className={labelCls + ' block mb-1'}>Fonte</span>
-                    <ElementFontPicker
-                      value={corners.elementFont}
-                      onChange={(v) => updateCornersConfig({ elementFont: v })}
-                    />
-                  </div>
-                </>
-              )}
-            </Section>
-
-          </>
+          standardControls
         )}
       </div>
 

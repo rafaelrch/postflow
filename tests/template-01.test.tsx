@@ -5,12 +5,17 @@ import {
   TEMPLATE_01_SPEC,
   TEMPLATE_01_SLIDE_COUNT,
   TEMPLATE_01_EDITABLE_SLOTS,
+  TEMPLATE_01_FLOW_GROUPS,
+  SpecNode,
   template01DefaultSlots,
   template01SlotsForSlide,
   template01SlotsFromContent,
   template01Overflows,
   template01Measure,
+  template01SpecLines,
+  template01Tops,
 } from '@/lib/templates/template-01';
+import { template01Overrides } from '@/lib/templates/template-01/overrides';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
 
 /**
@@ -20,7 +25,7 @@ import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
  * gabarito e ninguém percebe olhando o diff.
  */
 
-function renderSlide(index: number, slots?: Record<string, string>) {
+function renderSlide(index: number, slots?: Record<string, string>, extra?: Partial<Slide>) {
   const slide = {
     ...DEFAULT_SLIDE,
     id: 's',
@@ -30,6 +35,7 @@ function renderSlide(index: number, slots?: Record<string, string>) {
     gridImageUrl: '',
     contentImageUrl: '',
     ...(slots ? { templateSlots: slots } : {}),
+    ...extra,
   } as Slide;
   return renderToStaticMarkup(
     <Template01Slide
@@ -133,10 +139,14 @@ describe('TEMPLATE 1 — render', () => {
 
   it('põe a imagem atrás e o scrim por cima na capa', () => {
     const html = renderSlide(0, { 's1.image': 'https://exemplo/foto.jpg' });
-    const bg = html.match(/background:([^;"]+)/)![1];
-    expect(bg.indexOf('linear-gradient')).toBeLessThan(bg.indexOf('url('));
+    // Camadas separadas (a imagem ganhou posição/zoom/opacidade do editor): a
+    // ordem no DOM é que define quem pinta por cima.
+    const img = html.indexOf('exemplo/foto.jpg');
+    const scrim = html.indexOf('linear-gradient');
+    expect(img).toBeGreaterThan(-1);
+    expect(img).toBeLessThan(scrim);
     // Convertido para transparente→preto; branco→preto taparia a imagem.
-    expect(bg).toContain('rgba(0,0,0,0)');
+    expect(html.slice(scrim)).toContain('rgba(0,0,0,0)');
   });
 
   it('sem imagem, mostra o degradê original do Figma', () => {
@@ -166,5 +176,161 @@ describe('TEMPLATE 1 — render', () => {
     const rect = TEMPLATE_01_SPEC.slides[4].nodes.find((n) => n.slot === 's5.image')!;
     expect(rect.box.x).toBe(0);
     expect(rect.box.w).toBe(1080);
+  });
+});
+
+/**
+ * O `y` do spec pressupõe a contagem de linhas do texto do Figma. Com texto do
+ * usuário a caixa cresce ou encolhe, e `top` fixo abre buraco (slide 1) ou
+ * sobrepõe o bloco de baixo (slide 4) e a imagem (slide 5). O reflow ancora o
+ * grupo na borda que não pode se mexer e preserva o vão do desenho.
+ */
+describe('TEMPLATE 1 — reflow', () => {
+  const node = (slide: number, slot: string): SpecNode =>
+    TEMPLATE_01_SPEC.slides[slide - 1].nodes.find((n) => n.slot === slot)!;
+  const lh = (slide: number, slot: string) => node(slide, slot).typography!.lineHeightPx;
+  const specTop = (slide: number, slot: string) => node(slide, slot).box.y;
+
+  it('conta as linhas do spec pela altura da caixa, não pelas quebras escritas', () => {
+    // s6.body tem lineCount 1 no spec (nenhum \n), mas o Figma quebrou em 5.
+    expect(node(6, 's6.body').text!.lineCount).toBe(1);
+    expect(template01SpecLines(node(6, 's6.body'))).toBe(5);
+    expect(template01SpecLines(node(1, 's1.headline'))).toBe(3);
+  });
+
+  it('com a contagem de linhas do spec, não move NADA em nenhum slide', () => {
+    for (const slide of TEMPLATE_01_SPEC.slides) {
+      const tops = template01Tops(slide.index);
+      const slots = Object.keys(tops);
+      expect(slots.length).toBeGreaterThan(0);
+      for (const slot of slots) expect(tops[slot]).toBe(specTop(slide.index, slot));
+    }
+  });
+
+  it('todo slot de um grupo existe no slide correspondente', () => {
+    for (const [index, groups] of Object.entries(TEMPLATE_01_FLOW_GROUPS)) {
+      const slide = TEMPLATE_01_SPEC.slides[Number(index) - 1];
+      for (const g of groups)
+        for (const slot of g.slots)
+          expect(slide.nodes.some((n) => n.slot === slot && n.type === 'TEXT')).toBe(true);
+    }
+  });
+
+  it('slide 1: título mais curto não abre buraco — o vão até a síntese é o do spec', () => {
+    const specGap =
+      specTop(1, 's1.subline') - (specTop(1, 's1.headline') + 3 * lh(1, 's1.headline'));
+    const tops = template01Tops(1, {
+      's1.headline': { lines: 2, lineHeightPx: lh(1, 's1.headline') },
+    });
+    // A composição encosta no rodapé: a síntese não sai do lugar.
+    expect(tops['s1.subline']).toBeCloseTo(specTop(1, 's1.subline'), 6);
+    const gap = tops['s1.subline'] - (tops['s1.headline'] + 2 * lh(1, 's1.headline'));
+    expect(gap).toBeCloseTo(specGap, 6);
+    // Com uma linha a menos, o título DESCE (o grupo encolhe para o rodapé).
+    expect(tops['s1.headline']).toBeGreaterThan(specTop(1, 's1.headline'));
+  });
+
+  it('slide 4: título com 1 linha a mais não sobrepõe o corpo', () => {
+    const tops = template01Tops(4, { 's4.title': { lines: 2, lineHeightPx: lh(4, 's4.title') } });
+    const tituloBottom = tops['s4.title'] + 2 * lh(4, 's4.title');
+    expect(tops['s4.body']).toBeGreaterThan(tituloBottom);
+    // A imagem full-bleed termina em 850 e o título continua pendurado nela.
+    expect(tops['s4.title']).toBe(specTop(4, 's4.title'));
+    expect(tops['s4.title']).toBeGreaterThan(850);
+    const specGap = specTop(4, 's4.body') - (specTop(4, 's4.title') + lh(4, 's4.title'));
+    expect(tops['s4.body'] - tituloBottom).toBeCloseTo(specGap, 6);
+  });
+
+  it('slide 5: título de coluna com 4 linhas não cruza a borda da imagem (y=350)', () => {
+    const imagem = TEMPLATE_01_SPEC.slides[4].nodes.find((n) => n.slot === 's5.image')!;
+    expect(imagem.box.y).toBe(350);
+    const tops = template01Tops(5, {
+      's5.top.title': { lines: 4, lineHeightPx: lh(5, 's5.top.title') },
+    });
+    expect(tops['s5.top.title'] + 4 * lh(5, 's5.top.title')).toBeLessThanOrEqual(350);
+    // As duas colunas da faixa são independentes: a da direita não se mexe.
+    expect(tops['s5.top.body']).toBe(specTop(5, 's5.top.body'));
+  });
+
+  it('a entrelinha do override entra na conta do reflow', () => {
+    const dobro = lh(4, 's4.title') * 2;
+    const tops = template01Tops(4, { 's4.title': { lines: 1, lineHeightPx: dobro } });
+    expect(tops['s4.body']).toBeCloseTo(specTop(4, 's4.body') + lh(4, 's4.title'), 6);
+  });
+
+  it('o aviso de estouro acusa o texto que não cabe depois do reflow', () => {
+    // 4 linhas num slot de 2 é o caso do s5.top.title do teste acima.
+    const over = template01Overflows({ 's5.top.title': 'uma\nduas\ntres\nquatro' });
+    expect(over.map((o) => o.slot)).toEqual(['s5.top.title']);
+    expect(over[0].lines).toBe(4);
+    expect(over[0].maxLines).toBe(2);
+  });
+});
+
+/**
+ * Parte B: o spec é o VALOR PADRÃO. Sem override o render tem de sair idêntico —
+ * é isso que preserva a fidelidade de 0 px; com override, o usuário vence.
+ */
+describe('TEMPLATE 1 — overrides do editor', () => {
+  const slideBase = { ...DEFAULT_SLIDE, id: 's', position: 0 } as Slide;
+
+  it('um slide recém-criado não produz nenhum override', () => {
+    const ov = template01Overrides(slideBase, DEFAULT_GLOBAL_SETTINGS);
+    expect(ov.background).toBeUndefined();
+    expect(ov.shadow).toBeUndefined();
+    expect(ov.title).toMatchObject({ fontScale: 1, color: undefined, font: undefined });
+    expect(ov.body).toMatchObject({ fontScale: 1, color: undefined });
+    expect(ov.backgroundImage.position).toBeUndefined();
+    expect(ov.hideCorners).toBe(false);
+  });
+
+  it('sem override, o render é o do spec', () => {
+    const headline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!;
+    const html = renderSlide(0);
+    expect(html).toContain(`top:${headline.box.y}px`);
+    expect(html).toContain(`font-size:${headline.typography!.fontSizePx}px`);
+    expect(html).toContain(headline.fills![0].css!);
+  });
+
+  it('cor e fonte do título vencem o spec', () => {
+    const html = renderSlide(0, undefined, {
+      titleColor: '#FF0000',
+      titleFont: 'Bebas Neue',
+    } as Partial<Slide>);
+    expect(html).toContain('#FF0000');
+    expect(html).toContain('Bebas Neue');
+  });
+
+  it('o tamanho de fonte é proporcional — a razão entre os blocos é preservada', () => {
+    const headline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!;
+    const html = renderSlide(0, undefined, {
+      fontSize: { title: DEFAULT_SLIDE.fontSize.title * 2, description: DEFAULT_SLIDE.fontSize.description },
+    } as Partial<Slide>);
+    expect(html).toContain(`font-size:${headline.typography!.fontSizePx * 2}px`);
+    // A entrelinha acompanha, senão as linhas colariam.
+    expect(html).toContain(`line-height:${headline.typography!.lineHeightPx * 2}px`);
+  });
+
+  it('a cor de fundo do editor vence a do spec', () => {
+    expect(renderSlide(3)).toContain('#FFFFFF');
+    expect(renderSlide(3, undefined, { backgroundColor: '#0A0A0A' } as Partial<Slide>)).toContain(
+      '#0A0A0A'
+    );
+  });
+
+  it('desligar os cantos some com eles', () => {
+    expect(renderSlide(2)).toContain('data-slot="cantos.left"');
+    const html = renderToStaticMarkup(
+      <Template01Slide
+        slide={{ ...slideBase, position: 2 } as Slide}
+        globalSettings={{
+          ...DEFAULT_GLOBAL_SETTINGS,
+          corners: { ...DEFAULT_GLOBAL_SETTINGS.corners, show: false },
+        }}
+        slideIndex={2}
+        totalSlides={TEMPLATE_01_SLIDE_COUNT}
+      />
+    );
+    expect(html).not.toContain('data-slot="cantos.left"');
   });
 });

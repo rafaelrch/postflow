@@ -267,6 +267,162 @@ export function template01SlotsFromContent(
   return slots;
 }
 
+// ─── Reflow: âncora + vão preservado ────────────────────────────
+
+/**
+ * Grupo de blocos que fluem juntos, na ordem vertical do spec.
+ *
+ * O `y` de cada bloco no spec pressupõe a contagem de linhas do texto ORIGINAL
+ * do Figma. Com texto do usuário a caixa cresce (ou encolhe) e, com `top` fixo,
+ * abre buraco ou invade o bloco de baixo. O que é constante no desenho não é o
+ * `y`: é o VÃO entre os blocos e a BORDA em que o grupo encosta.
+ *
+ * - `anchor: 'top'`  — o grupo pendura no topo do primeiro bloco e cresce para
+ *   baixo. Usado quando o elemento fixo está ACIMA (imagem full-bleed no topo).
+ * - `anchor: 'bottom'` — o grupo pendura no rodapé do último bloco e cresce para
+ *   CIMA. Usado quando o elemento fixo está ABAIXO (borda da imagem, rodapé da
+ *   composição sobre o degradê).
+ */
+export interface Template01FlowGroup {
+  anchor: 'top' | 'bottom';
+  /** Slots na ordem vertical do spec. */
+  slots: string[];
+  note: string;
+}
+
+/** Grupos por slide (1-indexado, como o spec). */
+export const TEMPLATE_01_FLOW_GROUPS: Record<number, Template01FlowGroup[]> = {
+  1: [
+    {
+      anchor: 'bottom',
+      slots: ['s1.eyebrow', 's1.headline', 's1.subline'],
+      note: 'capa sobre o degradê: a composição encosta no rodapé (subline em 1243.2) e sobe',
+    },
+  ],
+  2: [
+    {
+      anchor: 'bottom',
+      slots: ['s2.title', 's2.body'],
+      note: 'mesma composição da capa: ancorada no rodapé do corpo',
+    },
+  ],
+  3: [
+    {
+      anchor: 'bottom',
+      slots: ['s3.title'],
+      note: 'título acima da imagem (y=300): cresce para cima para não invadi-la',
+    },
+    {
+      anchor: 'top',
+      slots: ['s3.body', 's3.kicker'],
+      note: 'corpo e remate penduram abaixo da imagem (termina em 830)',
+    },
+  ],
+  4: [
+    {
+      anchor: 'top',
+      slots: ['s4.title', 's4.body'],
+      note: 'imagem full-bleed fixa no topo (0→850): o texto pendura abaixo dela',
+    },
+  ],
+  5: [
+    {
+      anchor: 'bottom',
+      slots: ['s5.top.title'],
+      note: 'faixa de cima, coluna esquerda: encosta na borda superior da imagem (y=350)',
+    },
+    {
+      anchor: 'bottom',
+      slots: ['s5.top.body'],
+      note: 'faixa de cima, coluna direita: independente em altura da coluna esquerda',
+    },
+    { anchor: 'top', slots: ['s5.bot.title'], note: 'faixa de baixo: pendura sob a imagem (1000)' },
+    { anchor: 'top', slots: ['s5.bot.body'], note: 'faixa de baixo, coluna direita' },
+  ],
+  6: [
+    {
+      anchor: 'bottom',
+      slots: ['s6.title'],
+      note: 'título acima da seta (y=578): cresce para cima',
+    },
+    { anchor: 'top', slots: ['s6.body'], note: 'fecho abaixo da seta' },
+  ],
+};
+
+/**
+ * Quantas linhas o spec assume para o bloco.
+ *
+ * Não dá para usar `text.lineCount`: ele conta as quebras EXPLÍCITAS do
+ * conteúdo (s6.body tem 1, mas o Figma quebrou em 5). O que o `y` do bloco
+ * seguinte pressupõe é a altura da caixa — daí a contagem sair de `h / lh`.
+ */
+export function template01SpecLines(node: SpecNode): number {
+  const lh = node.typography?.lineHeightPx;
+  if (!lh) return 1;
+  return Math.max(1, Math.round(node.box.h / lh));
+}
+
+/** Medida real de um bloco: linhas que o navegador quebrou e a entrelinha em uso. */
+export interface Template01BlockMetrics {
+  lines: number;
+  /** Entrelinha efetiva (o spec, ou a do override do usuário). */
+  lineHeightPx: number;
+}
+
+/**
+ * `top` de cada bloco que participa do reflow, em px do canvas do spec.
+ *
+ * Cada bloco cresce (ou encolhe) `linhas × entrelinha − linhas_do_spec ×
+ * entrelinha_do_spec`; esse excedente é repassado aos vizinhos do grupo no
+ * sentido da âncora. Com a contagem de linhas do spec o excedente é ZERO em
+ * todos os blocos e o `top` devolvido é exatamente o `y` do spec — é isso que
+ * mantém a fidelidade de 0 px contra o gabarito do `render.py`.
+ *
+ * Slots fora de um grupo não aparecem no resultado: quem chama usa o `y` do spec.
+ */
+export function template01Tops(
+  slideIndex: number,
+  metrics: Record<string, Template01BlockMetrics> = {}
+): Record<string, number> {
+  const tops: Record<string, number> = {};
+  const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
+  if (!slide) return tops;
+
+  const bySlot = new Map<string, SpecNode>();
+  for (const n of slide.nodes) if (n.slot) bySlot.set(n.slot, n);
+
+  for (const group of TEMPLATE_01_FLOW_GROUPS[slideIndex] ?? []) {
+    const nodes = group.slots
+      .map((s) => bySlot.get(s))
+      .filter((n): n is SpecNode => !!n && n.type === 'TEXT');
+    if (!nodes.length) continue;
+
+    const extra = nodes.map((n) => {
+      const specLines = template01SpecLines(n);
+      const specLh = n.typography?.lineHeightPx ?? 0;
+      const m = metrics[n.slot!];
+      const lines = m?.lines ?? specLines;
+      const lh = m?.lineHeightPx ?? specLh;
+      return lines * lh - specLines * specLh;
+    });
+
+    if (group.anchor === 'top') {
+      let acc = 0;
+      nodes.forEach((n, i) => {
+        tops[n.slot!] = n.box.y + acc;
+        acc += extra[i];
+      });
+    } else {
+      let acc = 0;
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        acc += extra[i];
+        tops[nodes[i].slot!] = nodes[i].box.y - acc;
+      }
+    }
+  }
+  return tops;
+}
+
 export interface Template01SlotMeasure {
   lines: number;
   longestLine: number;
