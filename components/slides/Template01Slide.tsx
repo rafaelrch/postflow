@@ -11,6 +11,9 @@ import {
   Template01BlockMetrics,
   template01SpecLines,
   template01Tops,
+  template01AlignBoxes,
+  template01BaseType,
+  SpecBox,
   SpecNode,
   SpecSlide,
   SpecStyledRun,
@@ -21,6 +24,7 @@ import {
   Template01TextOverride,
   template01Kind,
   template01Overrides,
+  template01TextOverrideFor,
 } from '@/lib/templates/template-01/overrides';
 
 export interface Template01SlideProps {
@@ -65,13 +69,20 @@ function fontStack(family: string): string {
   return FONT_STACK[family] ?? `'${family}', sans-serif`;
 }
 
-/** Tipografia do bloco depois do override — o spec é só o ponto de partida. */
+/**
+ * Tipografia do bloco depois do override. O ponto de partida é o spec passado
+ * pela camada de ajuste (`template01BaseType`), não o `node.typography` cru:
+ * é ali que mora o tamanho novo dos títulos-coluna do slide 5.
+ */
 function effectiveType(node: SpecNode, o: Template01TextOverride) {
-  const t = node.typography!;
-  const fontSizePx = t.fontSizePx * o.fontScale;
+  const base = template01BaseType(node);
+  // Tamanho por SLOT vence a escala por papel: quem escolheu o tamanho daquele
+  // bloco pediu aquele número, não uma proporção.
+  const fontSizePx = o.fontSizePx ?? base.fontSizePx * o.fontScale;
+  const scale = base.fontSizePx ? fontSizePx / base.fontSizePx : 1;
   // A entrelinha acompanha o tamanho: escalar só a fonte colaria as linhas.
   const lineHeightPx =
-    o.lineHeightRatio != null ? fontSizePx * o.lineHeightRatio : t.lineHeightPx * o.fontScale;
+    o.lineHeightRatio != null ? fontSizePx * o.lineHeightRatio : base.lineHeightPx * scale;
   return { fontSizePx, lineHeightPx };
 }
 
@@ -88,14 +99,22 @@ function cornerShift(ov: Template01Overrides): number {
 }
 
 /** Espelha `node_css()` do render.py, com os overrides do usuário por cima. */
-function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React.CSSProperties {
-  const b = node.box;
+function nodeStyle(
+  node: SpecNode,
+  ov: Template01Overrides,
+  top?: number,
+  alignBox?: SpecBox
+): React.CSSProperties {
+  // Com override de alinhamento os blocos da mesma coluna passam a usar a caixa
+  // mais larga do grupo, senão as bordas divergem (ver TEMPLATE_01_ALIGN_GROUPS).
+  const b = alignBox ?? node.box;
   const css: React.CSSProperties = { position: 'absolute' };
 
   if (node.type === 'TEXT' && node.typography && node.anchor) {
+    const base = template01BaseType(node);
     const t = node.typography;
     const kind = template01Kind(node);
-    const o = ov[kind];
+    const o = template01TextOverrideFor(node, ov);
     const { fontSizePx, lineHeightPx } = effectiveType(node, o);
     // Os cantos têm controle próprio (distância às bordas); o resto do texto
     // anda junto no deslocamento do bloco.
@@ -124,8 +143,8 @@ function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React
     css.fontSize = `${fontSizePx}px`;
     css.lineHeight = `${lineHeightPx}px`;
     css.letterSpacing = `${o.letterSpacingEm ?? t.letterSpacingEm}em`;
-    css.textAlign = (o.align ??
-      t.textAlignHorizontal.toLowerCase()) as React.CSSProperties['textAlign'];
+    // `base.align` já traz o desvio pedido pelo Rafael (s3.title centralizado).
+    css.textAlign = (o.align ?? base.align) as React.CSSProperties['textAlign'];
     css.color = o.color ?? node.fills?.[0]?.css;
     if (o.underline) css.textDecoration = 'underline';
     css.margin = 0;
@@ -145,7 +164,7 @@ function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React
 
   if (node.opacity !== undefined && node.opacity !== 1) css.opacity = node.opacity;
   if (node.type === 'TEXT') {
-    const o = ov[template01Kind(node)];
+    const o = template01TextOverrideFor(node, ov);
     if (o.opacity !== undefined) css.opacity = o.opacity;
   }
   return css;
@@ -316,7 +335,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
     const out: Record<string, number> = {};
     for (const node of specSlide.nodes) {
       if (node.type !== 'TEXT' || !node.typography || !node.slot) continue;
-      out[node.slot] = effectiveType(node, ov[template01Kind(node)]).lineHeightPx;
+      out[node.slot] = effectiveType(node, template01TextOverrideFor(node, ov)).lineHeightPx;
     }
     return out;
   }, [specSlide, ov]);
@@ -371,6 +390,14 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
     [specSlide.index, metrics, ov.titleGapDelta, isTitleSlot]
   );
 
+  // Caixa compartilhada só existe quando o usuário troca o alinhamento: é a
+  // troca que revela o desencontro das bordas. Sem ela, o spec manda — e é isso
+  // que preserva o 0 px contra o gabarito.
+  const alignBoxes = React.useMemo(
+    () => (ov.title.align || ov.body.align ? template01AlignBoxes(specSlide.index) : {}),
+    [specSlide.index, ov.title.align, ov.body.align]
+  );
+
   const bgLayers = specSlide.backgroundLayers ?? [];
   const bgImageSlot = bgLayers.find((l) => l.type === 'IMAGE_SLOT')?.slot;
   const bgImageUrl = bgImageSlot ? slots[bgImageSlot] : undefined;
@@ -419,7 +446,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
                 if (el) textRefs.current.set(slot, el);
                 else textRefs.current.delete(slot);
               }}
-              style={nodeStyle(node, ov, tops[slot])}
+              style={nodeStyle(node, ov, tops[slot], alignBoxes[slot])}
             >
               {runs?.length ? renderRuns(value, runs, hasFontOverride) : value}
             </div>

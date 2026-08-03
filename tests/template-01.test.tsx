@@ -6,6 +6,11 @@ import {
   TEMPLATE_01_SLIDE_COUNT,
   TEMPLATE_01_EDITABLE_SLOTS,
   TEMPLATE_01_FLOW_GROUPS,
+  TEMPLATE_01_ALIGN_GROUPS,
+  TEMPLATE_01_DESIGN_TWEAKS,
+  template01AlignBoxes,
+  template01BaseType,
+  template01SlotLabel,
   SpecNode,
   template01DefaultSlots,
   template01SlotsForSlide,
@@ -640,5 +645,260 @@ describe('TEMPLATE 1 — cada controle da barra lateral tem efeito no render', (
     expect(afastado).toContain(`left:${cantoEsq.box.x + 20}px`);
     const cantoDir = TEMPLATE_01_SPEC.slides[2].nodes.find((n) => n.slot === 'cantos.right')!;
     expect(afastado).toContain(`right:${cantoDir.box.right + 20}px`);
+  });
+});
+
+/**
+ * DESVIOS DELIBERADOS DO FIGMA — pedidos pelo Rafael (dono do produto).
+ *
+ * O critério de fidelidade deixou de ser "0 px em tudo": passou a ser "0 px em
+ * tudo, EXCETO estes desvios". Sem os testes abaixo o critério vira folclore e
+ * qualquer refatoração desfaz o pedido sem ninguém perceber no diff.
+ */
+describe('TEMPLATE 1 — desvios deliberados do Figma', () => {
+  const nodeOf = (slot: string): SpecNode =>
+    TEMPLATE_01_SPEC.slides.flatMap((s) => s.nodes).find((n) => n.slot === slot)!;
+
+  it('slide 3: o título renderiza CENTER, e o spec continua dizendo LEFT', () => {
+    // A régua não pode ser editada junto com o desvio: o spec é o gabarito.
+    expect(nodeOf('s3.title').typography!.textAlignHorizontal).toBe('LEFT');
+    expect(TEMPLATE_01_DESIGN_TWEAKS.align['s3.title']).toBe('center');
+    expect(template01BaseType(nodeOf('s3.title')).align).toBe('center');
+
+    const html = renderSlide(2);
+    const bloco = html.slice(html.indexOf('data-slot="s3.title"'));
+    expect(bloco.slice(0, bloco.indexOf('>'))).toContain('text-align:center');
+  });
+
+  it('slide 3: só o título muda — corpo e remate seguem o spec', () => {
+    for (const slot of ['s3.body', 's3.kicker']) {
+      expect(TEMPLATE_01_DESIGN_TWEAKS.align[slot]).toBeUndefined();
+      expect(template01BaseType(nodeOf(slot)).align).toBe(
+        nodeOf(slot).typography!.textAlignHorizontal.toLowerCase()
+      );
+    }
+  });
+
+  it('nenhum outro slot do deck tem o alinhamento desviado', () => {
+    expect(Object.keys(TEMPLATE_01_DESIGN_TWEAKS.align)).toEqual(['s3.title']);
+  });
+
+  it('slide 5: os títulos-coluna usam o tamanho reduzido, não os 55.163 do Figma', () => {
+    for (const slot of ['s5.top.title', 's5.bot.title']) {
+      expect(nodeOf(slot).typography!.fontSizePx).toBeCloseTo(55.163, 3);
+      expect(TEMPLATE_01_DESIGN_TWEAKS.fontSizePx[slot]).toBe(44);
+      expect(template01BaseType(nodeOf(slot)).fontSizePx).toBe(44);
+    }
+    expect(renderSlide(4)).toContain('font-size:44px');
+  });
+
+  it('slide 5: a entrelinha acompanha o tamanho, preservando a razão do spec', () => {
+    const node = nodeOf('s5.top.title');
+    const t = node.typography!;
+    const razao = t.lineHeightPx / t.fontSizePx;
+    expect(template01BaseType(node).lineHeightPx).toBeCloseTo(44 * razao, 6);
+  });
+
+  it('slide 5: o limite de caracteres é o do tamanho novo, não o do slots.json', () => {
+    // slots.json (read-only): 10 no topo, 11 na base. A 44px cabem 12 nas duas.
+    expect(TEMPLATE_01_SPEC.slotIndex['s5.top.title'].maxCharsPerLine).toBe(10);
+    expect(TEMPLATE_01_SPEC.slotIndex['s5.bot.title'].maxCharsPerLine).toBe(11);
+    for (const slot of ['s5.top.title', 's5.bot.title']) {
+      expect(TEMPLATE_01_EDITABLE_SLOTS.find((s) => s.slot === slot)!.maxCharsPerLine).toBe(12);
+    }
+    // Uma palavra de 12 caracteres deixa de ser estouro.
+    expect(template01Overflows({ 's5.top.title': 'investimento' })).toEqual([]);
+  });
+
+  it('o tamanho novo e o limite novo são coerentes entre si', () => {
+    // Se alguém mexer num sem mexer no outro, o aviso da barra lateral passa a
+    // mentir. Os dois só fazem sentido juntos — ver TEMPLATE_01_DESIGN_TWEAKS.
+    expect(Object.keys(TEMPLATE_01_DESIGN_TWEAKS.fontSizePx).sort()).toEqual(
+      Object.keys(TEMPLATE_01_DESIGN_TWEAKS.maxCharsPerLine).sort()
+    );
+  });
+
+  it('os desvios NÃO vazam para os slides 1, 2, 4 e 6', () => {
+    const desviados = new Set([
+      ...Object.keys(TEMPLATE_01_DESIGN_TWEAKS.align),
+      ...Object.keys(TEMPLATE_01_DESIGN_TWEAKS.fontSizePx),
+    ]);
+    for (const slide of TEMPLATE_01_SPEC.slides) {
+      if (![1, 2, 4, 6].includes(slide.index)) continue;
+      for (const node of slide.nodes) {
+        if (node.type !== 'TEXT' || !node.typography) continue;
+        expect(desviados.has(node.slot!)).toBe(false);
+        const base = template01BaseType(node);
+        expect(base.fontSizePx).toBe(node.typography.fontSizePx);
+        expect(base.lineHeightPx).toBe(node.typography.lineHeightPx);
+        expect(base.align).toBe(node.typography.textAlignHorizontal.toLowerCase());
+      }
+    }
+  });
+});
+
+/**
+ * BUG REAL do slide 4: as caixas do Figma têm larguras diferentes por bloco.
+ * Com o CENTER do spec as duas são simétricas e parece certo; trocando o
+ * alinhamento as bordas divergem 51px. Não é desvio de design — é defeito.
+ */
+describe('TEMPLATE 1 — alinhamento: blocos da mesma coluna dividem a borda', () => {
+  const boxOf = (slideIndex: number, slot: string) =>
+    TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex)!.nodes.find((n) => n.slot === slot)!
+      .box;
+
+  const comAlinhamento = (index: number, align: 'left' | 'center' | 'right') =>
+    renderSlide(index, undefined, {
+      textAlignment: align,
+      templateOverrides: markTemplate01Override(undefined, 'textAlignment'),
+    } as Partial<Slide>);
+
+  it('o problema existe no spec: título e corpo do slide 4 têm caixas diferentes', () => {
+    expect(boxOf(4, 's4.title').x).toBeCloseTo(229.4, 1);
+    expect(boxOf(4, 's4.body').x).toBeCloseTo(178.0, 1);
+  });
+
+  it('com override, os dois blocos do slide 4 passam a usar a caixa mais larga', () => {
+    const boxes = template01AlignBoxes(4);
+    const largest = boxOf(4, 's4.body'); // 725px contra 622px do título
+    expect(boxes['s4.title']).toBe(largest);
+    expect(boxes['s4.body']).toBe(largest);
+
+    for (const align of ['left', 'right'] as const) {
+      const html = comAlinhamento(3, align);
+      // Uma largura só para os dois => bordas esquerda e direita coincidem.
+      const larguras = [...html.matchAll(/data-slot="s4\.(?:title|body)"[^>]*width:([\d.]+)px/g)].map(
+        (m) => m[1]
+      );
+      expect(larguras).toHaveLength(2);
+      expect(new Set(larguras).size).toBe(1);
+      expect(larguras[0]).toBe(String(largest.w));
+    }
+  });
+
+  it('SEM override nada muda — cada bloco fica na caixa do spec (é o 0 px)', () => {
+    const html = renderSlide(3);
+    expect(html).toContain(`width:${boxOf(4, 's4.title').w}px`);
+    expect(html).toContain(`width:${boxOf(4, 's4.body').w}px`);
+  });
+
+  it('a mesma regra vale nos outros slides com blocos de larguras diferentes', () => {
+    // s6: título (592) e fecho (756) são a mesma coluna, separados pela seta —
+    // grupos de FLUXO diferentes, mas uma coluna só para o alinhamento.
+    expect(template01AlignBoxes(6)['s6.title']).toBe(boxOf(6, 's6.body'));
+    // s1: o mais largo é o título (911).
+    expect(template01AlignBoxes(1)['s1.subline']).toBe(boxOf(1, 's1.headline'));
+    // s2: o mais largo é o corpo (813).
+    expect(template01AlignBoxes(2)['s2.title']).toBe(boxOf(2, 's2.body'));
+    // s5: as duas faixas são a mesma coluna; o título de baixo é o mais largo.
+    expect(template01AlignBoxes(5)['s5.top.title']).toBe(boxOf(5, 's5.bot.title'));
+  });
+
+  it('todo slot de um grupo de alinhamento existe no slide', () => {
+    for (const [index, grupos] of Object.entries(TEMPLATE_01_ALIGN_GROUPS)) {
+      const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === Number(index))!;
+      for (const slot of grupos.flat()) {
+        expect(slide.nodes.some((n) => n.slot === slot)).toBe(true);
+      }
+    }
+  });
+
+  it('os cantos ficam de fora: têm âncoras opostas e controle próprio', () => {
+    for (const index of [1, 2, 3, 4, 5, 6]) {
+      const slots = Object.keys(template01AlignBoxes(index));
+      expect(slots.some((s) => s.startsWith('cantos.'))).toBe(false);
+    }
+  });
+});
+
+describe('TEMPLATE 1 — estilo por slot', () => {
+  const headline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!;
+  const eyebrow = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.eyebrow')!;
+
+  it('a presença da chave do slot já é o gesto do usuário — sem marca à parte', () => {
+    const html = renderSlide(0, undefined, {
+      templateSlotStyles: { 's1.headline': { color: '#FF0000', fontSize: 30 } },
+    } as Partial<Slide>);
+    expect(html).toContain('#FF0000');
+    expect(html).toContain('font-size:30px');
+  });
+
+  it('mexer num bloco NÃO mexe nos outros do mesmo papel', () => {
+    const html = renderSlide(0, undefined, {
+      templateSlotStyles: { 's1.headline': { fontSize: 30 } },
+    } as Partial<Slide>);
+    // O chapéu é 'title' pelo papel antigo: antes ele teria andado junto.
+    expect(html).toContain(`font-size:${eyebrow.typography!.fontSizePx}px`);
+  });
+
+  it('tamanho, fonte, cor, espaçamento de letra e sublinhado valem por slot', () => {
+    const html = renderSlide(0, undefined, {
+      templateSlotStyles: {
+        's1.subline': { color: '#00FF00', fontSize: 20, letterSpacing: 0.2, underline: true },
+      },
+    } as Partial<Slide>);
+    expect(html).toContain('#00FF00');
+    expect(html).toContain('font-size:20px');
+    expect(html).toContain('letter-spacing:0.2em');
+    expect(html).toContain('text-decoration:underline');
+  });
+
+  it('a entrelinha continua sendo UM controle para o bloco inteiro', () => {
+    const html = renderSlide(0, undefined, {
+      lineHeight: 2,
+      templateOverrides: markTemplate01Override(undefined, 'lineHeight'),
+      templateSlotStyles: { 's1.headline': { fontSize: 40 } },
+    } as Partial<Slide>);
+    // Todos os três blocos da capa seguem a mesma razão.
+    expect(html).toContain('line-height:80px');
+    expect(html).toContain(`line-height:${eyebrow.typography!.fontSizePx * 2}px`);
+  });
+
+  it('sem estilo por slot, o render é o do spec', () => {
+    const html = renderSlide(0, undefined, { templateSlotStyles: {} } as Partial<Slide>);
+    expect(html).toContain(`font-size:${headline.typography!.fontSizePx}px`);
+  });
+
+  it('um deck gerado não escreve estilo por slot', () => {
+    const slots = template01SlotsFromContent(0, { title: 'A', description: 'B' });
+    expect(slots).not.toHaveProperty('templateSlotStyles');
+  });
+});
+
+describe('TEMPLATE 1 — rótulos da barra lateral', () => {
+  it('a capa usa os nomes que o Rafael pediu', () => {
+    expect(template01SlotLabel('s1.headline')).toBe('Título');
+    expect(template01SlotLabel('s1.eyebrow')).toBe('Subtítulo');
+    expect(template01SlotLabel('s1.subline')).toBe('Descrição');
+  });
+
+  it('renomear o rótulo NÃO renomeia a chave do slot', () => {
+    // A chave está gravada no templateSlots de todo carrossel já salvo.
+    const nomes = TEMPLATE_01_EDITABLE_SLOTS.map((s) => s.slot);
+    expect(nomes).toContain('s1.headline');
+    expect(nomes).toContain('s1.eyebrow');
+    expect(nomes).toContain('s1.subline');
+    expect(nomes).toContain('s2.title');
+    expect(nomes).toContain('s2.body');
+  });
+
+  it('todo slot editável tem rótulo em português, nunca a chave crua', () => {
+    for (const d of TEMPLATE_01_EDITABLE_SLOTS) {
+      expect(d.label).not.toBe(d.slot);
+      expect(d.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('a barra lateral lista os campos na ordem VISUAL do slide', () => {
+    // Na capa o spec traz o título antes do chapéu, que está acima dele.
+    const capa = template01SlotsForSlide(1).filter((d) => d.kind === 'text' && !d.slot.startsWith('cantos.'));
+    expect(capa.map((d) => d.slot)).toEqual(['s1.eyebrow', 's1.headline', 's1.subline']);
+  });
+
+  it('as duas faixas do slide 5 têm rótulos distintos', () => {
+    const labels = template01SlotsForSlide(5)
+      .filter((d) => d.kind === 'text' && !d.slot.startsWith('cantos.'))
+      .map((d) => d.label);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

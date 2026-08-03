@@ -23,6 +23,7 @@ import {
   Slide,
   Template01CornerControl,
   Template01SlideControl,
+  Template01SlotStyle,
 } from '@/types';
 import { getElementFontCSS, getShadowOverlayGradient, ElementFontCSS } from '@/lib/utils';
 import { SpecNode } from './index';
@@ -44,6 +45,12 @@ export interface Template01TextOverride {
   color?: string;
   /** Fator sobre o tamanho do spec — 1 = intocado. Preserva a proporção entre blocos. */
   fontScale: number;
+  /**
+   * Tamanho ABSOLUTO em px do canvas, vindo do controle por slot. Vence o
+   * `fontScale`: quem escolhe o tamanho de um bloco só não quer proporção, quer
+   * aquele tamanho.
+   */
+  fontSizePx?: number;
   font?: ElementFontCSS;
   underline: boolean;
   letterSpacingEm?: number;
@@ -64,6 +71,13 @@ export interface Template01Overrides {
   title: Template01TextOverride;
   body: Template01TextOverride;
   corner: Template01TextOverride;
+  /**
+   * Estilo POR SLOT — é este o controle que a barra lateral oferece hoje. Os
+   * três acima (`title`/`body`/`corner`) continuam existindo como CAMADA DE
+   * BAIXO: decks salvos antes desta rodada gravaram override por papel, e
+   * apagá-los mudaria retroativamente o carrossel de quem já editou.
+   */
+  slotStyles: Record<string, Template01SlotStyle>;
   /** Cor de fundo escolhida pelo usuário; ausente = o fundo do spec. */
   background?: string;
   /** Degradê de sombra/overlay; ausente = sem overlay extra. */
@@ -178,6 +192,8 @@ export function template01Overrides(
       underline: false,
       opacity: cornerTouched(globalSettings, 'cornerOpacity') ? corners.opacity / 100 : undefined,
     },
+    // Sem marca à parte: a chave existir JÁ é o gesto do usuário.
+    slotStyles: slide.templateSlotStyles ?? {},
     background: touched(slide, 'background') ? slide.backgroundColor : undefined,
     // O spec já traz o próprio degradê; o overlay do editor só entra quando o
     // usuário mexe no controle — senão a sombra de fábrica escureceria o
@@ -200,6 +216,32 @@ export function template01Overrides(
       position: touched(slide, 'contentImagePosition') ? slide.contentImagePosition : undefined,
       opacity: touched(slide, 'backgroundImageOpacity') ? bgOpacity / 100 : undefined,
     },
+  };
+}
+
+/**
+ * Override efetivo de UM bloco: o do papel (camada antiga) com o do slot por
+ * cima, campo a campo.
+ *
+ * Entrelinha e alinhamento não entram aqui de propósito: são controles do
+ * SLIDE, um só para o bloco inteiro — é o que o Rafael pediu ("é um controle
+ * só, que afeta o bloco inteiro"). O que é por slot é tamanho, fonte, cor,
+ * espaçamento de caractere e sublinhado.
+ */
+export function template01TextOverrideFor(
+  node: SpecNode,
+  ov: Template01Overrides
+): Template01TextOverride {
+  const base = ov[template01Kind(node)];
+  const st = node.slot ? ov.slotStyles[node.slot] : undefined;
+  if (!st) return base;
+  return {
+    ...base,
+    color: st.color ?? base.color,
+    fontSizePx: st.fontSize ?? base.fontSizePx,
+    font: st.font ? getElementFontCSS(st.font) : base.font,
+    letterSpacingEm: st.letterSpacing ?? base.letterSpacingEm,
+    underline: st.underline ?? base.underline,
   };
 }
 

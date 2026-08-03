@@ -169,6 +169,28 @@ export type Template01CornerControl =
 export type Template01SlideOverrideKeys = Partial<Record<Template01SlideControl, true>>;
 export type Template01CornerOverrideKeys = Partial<Record<Template01CornerControl, true>>;
 
+/**
+ * TEMPLATE 1 — estilo de UM slot de texto (`s1.headline`, `s2.body`…).
+ *
+ * Os controles acima (`titleSize`, `descriptionColor`…) regem o slide por PAPEL
+ * e por isso mexem em blocos diferentes de uma vez: no slide 5 o mesmo controle
+ * pegava as duas colunas, na capa o chapéu andava junto do título. O usuário
+ * pede tamanho/fonte/cor/letra por BLOCO — é o que mora aqui.
+ *
+ * Aqui não há marca separada: a PRESENÇA da chave do slot já é o gesto do
+ * usuário (só a barra lateral escreve). Um deck gerado não tem este campo, e é
+ * por isso que ele continua nascendo idêntico ao spec.
+ */
+export interface Template01SlotStyle {
+  color?: string;
+  /** Tamanho em px do canvas do spec (1080x1350), não em px de tela. */
+  fontSize?: number;
+  font?: ElementFont;
+  /** Espaçamento de caractere em `em`. */
+  letterSpacing?: number;
+  underline?: boolean;
+}
+
 export interface Slide {
   id: string;
   carouselId?: string;
@@ -227,6 +249,13 @@ export interface Slide {
    * Regra: GERAÇÃO NUNCA escreve aqui. Só os handlers da barra lateral.
    */
   templateOverrides?: Template01SlideOverrideKeys;
+  /**
+   * TEMPLATE 1: estilo POR SLOT de texto. Chave presente = o usuário mexeu
+   * naquele bloco. Serializa junto do slide (jsonb), sem coluna nova.
+   *
+   * Regra igual à de `templateOverrides`: GERAÇÃO NUNCA escreve aqui.
+   */
+  templateSlotStyles?: Record<string, Template01SlotStyle>;
   editorialTitleOffsetY?: number;
   editorialDescOffsetY?: number;
   editorialImageOffsetY?: number;

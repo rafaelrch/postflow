@@ -144,6 +144,164 @@ export interface TemplateSpec {
 
 export const TEMPLATE_01_SPEC = specJson as unknown as TemplateSpec;
 
+// ─── Desvios deliberados do Figma ───────────────────────────────
+
+/**
+ * AJUSTES DE DESIGN PEDIDOS PELO RAFAEL (dono do produto) — desvios conscientes
+ * do Figma, e o ÚNICO lugar onde eles existem.
+ *
+ * O `spec.json` e o `slots.json` da skill são read-only: são o gabarito contra o
+ * qual a fidelidade é medida, e editá-los apagaria a régua junto com o desvio.
+ * Por isso o ajuste vive aqui, como uma camada por cima do spec, com o valor
+ * ORIGINAL do Figma anotado ao lado de cada entrada.
+ *
+ * O critério de fidelidade passa a ser: 0 px contra o gabarito em tudo, EXCETO
+ * os slots listados abaixo. Acrescentar entrada aqui é decisão de produto, não
+ * de implementação — cada uma tem teste próprio em `tests/template-01.test.tsx`.
+ */
+export const TEMPLATE_01_DESIGN_TWEAKS = {
+  /**
+   * Alinhamento horizontal que substitui o do spec.
+   *
+   * `s3.title` — Figma: LEFT. A caixa dele é simétrica no frame (x=153, w=774),
+   * mas o corpo e o remate do mesmo slide são CENTER: com o título à esquerda o
+   * slide inteiro parecia desalinhado. Pedido: centralizar os textos do slide 3.
+   */
+  align: {
+    's3.title': 'center',
+  } as Record<string, 'left' | 'center' | 'right'>,
+
+  /**
+   * Tamanho de fonte que substitui o do spec, em px do canvas.
+   *
+   * `s5.top.title` / `s5.bot.title` — Figma: 55.163px. A coluna tem 211px
+   * (topo) e 217px (base): a 55.163px cabem 9 caracteres por linha, então quase
+   * qualquer palavra de pauta ("crescimento", "investimento") estourava.
+   *
+   * 44px é o MAIOR tamanho em que uma palavra real de 12 caracteres
+   * ("investimento" = 207px) cabe na coluna de 211px — a 45px ela já mede 213px
+   * e vaza. A 44px cabem 12 caracteres por linha nas duas colunas, contra 9 e 10
+   * do Figma; é daí que sai o `maxCharsPerLine` novo, logo abaixo.
+   *
+   * A entrelinha acompanha na mesma razão (58.512/55.163 = 1.0607), senão as
+   * linhas descolariam do desenho.
+   */
+  fontSizePx: {
+    's5.top.title': 44,
+    's5.bot.title': 44,
+  } as Record<string, number>,
+
+  /**
+   * Limite de caracteres por linha que substitui o do `slots.json`.
+   *
+   * `s5.top.title` — slots.json: 10. `s5.bot.title` — slots.json: 11.
+   * Os dois viram 12: é o que cabe medido a 44px nas colunas de 211px e 217px.
+   * Não é chute — o limite é consequência do tamanho novo acima.
+   */
+  maxCharsPerLine: {
+    's5.top.title': 12,
+    's5.bot.title': 12,
+  } as Record<string, number>,
+} as const;
+
+/** Razão entrelinha/tamanho do spec, preservada quando o tamanho é ajustado. */
+function specLineHeightRatio(t: SpecTypography): number {
+  return t.fontSizePx ? t.lineHeightPx / t.fontSizePx : 1;
+}
+
+/**
+ * Tipografia do slot depois da camada de ajuste — o que o render deve usar como
+ * PADRÃO, no lugar do `node.typography` cru. Sem entrada em
+ * `TEMPLATE_01_DESIGN_TWEAKS` devolve exatamente os números do spec.
+ */
+export function template01BaseType(node: SpecNode): {
+  fontSizePx: number;
+  lineHeightPx: number;
+  align: string;
+} {
+  const t = node.typography!;
+  const slot = node.slot ?? '';
+  const size = TEMPLATE_01_DESIGN_TWEAKS.fontSizePx[slot];
+  const align = TEMPLATE_01_DESIGN_TWEAKS.align[slot];
+  return {
+    fontSizePx: size ?? t.fontSizePx,
+    lineHeightPx: size != null ? size * specLineHeightRatio(t) : t.lineHeightPx,
+    align: align ?? t.textAlignHorizontal.toLowerCase(),
+  };
+}
+
+/**
+ * Valores de partida de um slot de texto para os controles da barra lateral —
+ * já com a camada de ajuste aplicada, para o slider nascer no que está na tela.
+ */
+export function template01SlotDefaults(
+  slot: string
+): { fontSizePx: number; letterSpacingEm: number } | undefined {
+  for (const slide of TEMPLATE_01_SPEC.slides) {
+    const node = slide.nodes.find((n) => n.slot === slot && n.type === 'TEXT' && n.typography);
+    if (!node) continue;
+    return {
+      fontSizePx: template01BaseType(node).fontSizePx,
+      letterSpacingEm: node.typography!.letterSpacingEm,
+    };
+  }
+  return undefined;
+}
+
+// ─── Grupos de alinhamento ──────────────────────────────────────
+
+/**
+ * Blocos que formam UMA coluna de texto e portanto têm que dividir a mesma
+ * borda quando o usuário troca o alinhamento.
+ *
+ * Não dá para reusar `TEMPLATE_01_FLOW_GROUPS`: ali o critério é o fluxo
+ * vertical (o que a imagem ou a seta separa vira grupo à parte), aqui é a
+ * coluna visual. No slide 6 o título e o fecho estão em grupos de fluxo
+ * diferentes — a seta os separa — mas são a mesma coluna e precisam alinhar.
+ *
+ * O PROBLEMA que isto resolve: as caixas do Figma têm larguras diferentes por
+ * bloco (slide 4: título x=229.4 w=622, corpo x=178 w=725). Ambas são simétricas
+ * no frame, então com o CENTER do spec parece certo; trocando para ESQUERDA o
+ * título encosta em 229.4 e o corpo em 178, e as bordas divergem 51px.
+ *
+ * A REGRA: com override de alinhamento, todos os blocos do grupo passam a usar a
+ * caixa MAIS LARGA do grupo. Sem override nada muda — é isso que preserva o 0 px.
+ */
+export const TEMPLATE_01_ALIGN_GROUPS: Record<number, string[][]> = {
+  1: [['s1.eyebrow', 's1.headline', 's1.subline']],
+  2: [['s2.title', 's2.body']],
+  3: [['s3.title', 's3.body', 's3.kicker']],
+  4: [['s4.title', 's4.body']],
+  // As duas faixas do slide 5 são a MESMA coluna, uma acima e outra abaixo da
+  // imagem: os títulos (211 e 217px) desalinhariam entre si à direita.
+  5: [
+    ['s5.top.title', 's5.bot.title'],
+    ['s5.top.body', 's5.bot.body'],
+  ],
+  6: [['s6.title', 's6.body']],
+};
+
+/**
+ * Caixa de referência compartilhada por slot, quando há override de alinhamento.
+ * Devolve `{}` para slides sem grupo. Os cantos ficam de fora: têm controle
+ * próprio e âncoras opostas.
+ */
+export function template01AlignBoxes(slideIndex: number): Record<string, SpecBox> {
+  const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
+  if (!slide) return {};
+  const bySlot = new Map<string, SpecNode>();
+  for (const n of slide.nodes) if (n.slot) bySlot.set(n.slot, n);
+
+  const out: Record<string, SpecBox> = {};
+  for (const group of TEMPLATE_01_ALIGN_GROUPS[slideIndex] ?? []) {
+    const nodes = group.map((s) => bySlot.get(s)).filter((n): n is SpecNode => !!n);
+    if (nodes.length < 2) continue;
+    const widest = nodes.reduce((a, b) => (b.box.w > a.box.w ? b : a));
+    for (const n of nodes) out[n.slot!] = widest.box;
+  }
+  return out;
+}
+
 // ─── Constantes de canvas ───────────────────────────────────────
 
 export const TEMPLATE_01_WIDTH = 1080;
@@ -160,12 +318,59 @@ export interface Template01SlotDescriptor {
   slot: string;
   slideIndex: number;
   role: string;
+  /** Rótulo da barra lateral. É só interface — a CHAVE do slot nunca muda. */
+  label: string;
   kind: 'text' | 'image';
   maxLines?: number;
   maxCharsPerLine?: number;
   /** Texto que vem do Figma; usado quando o slot não foi preenchido. */
   defaultValue: string;
   note?: string;
+  /** `y` do bloco no spec — a barra lateral ordena os campos por ele. */
+  y: number;
+}
+
+/**
+ * Rótulo de cada slot na barra lateral.
+ *
+ * O nome técnico (`s1.headline`, `chapeu`) não diz nada a quem está editando.
+ * Isto é APENAS o texto da interface: a chave do slot continua sendo a do spec,
+ * porque é ela que está gravada no `templateSlots` de todo carrossel já salvo.
+ *
+ * Nomes pedidos pelo Rafael para a capa: titulo-capa → "Título",
+ * chapeu → "Subtítulo", sintese → "Descrição". Os demais slides seguem o mesmo
+ * vocabulário para não haver dois nomes para a mesma coisa.
+ */
+const SLOT_LABELS: Record<string, string> = {
+  's1.headline': 'Título',
+  's1.eyebrow': 'Subtítulo',
+  's1.subline': 'Descrição',
+  's2.title': 'Título',
+  's2.body': 'Descrição',
+  's3.title': 'Título',
+  's3.body': 'Descrição',
+  's3.kicker': 'Remate',
+  's4.title': 'Título',
+  's4.body': 'Descrição',
+  // O slide 5 tem duas faixas com o mesmo par: sem a faixa no rótulo, o painel
+  // mostraria "Título" e "Descrição" duas vezes.
+  's5.top.title': 'Título (faixa de cima)',
+  's5.top.body': 'Descrição (faixa de cima)',
+  's5.bot.title': 'Título (faixa de baixo)',
+  's5.bot.body': 'Descrição (faixa de baixo)',
+  's6.title': 'Título',
+  's6.body': 'Descrição',
+  'cantos.left': 'Canto esquerdo',
+  'cantos.right': 'Canto direito',
+  's1.image': 'Imagem de fundo',
+  's2.image': 'Imagem de fundo',
+  's3.image': 'Imagem',
+  's4.image': 'Imagem',
+  's5.image': 'Imagem',
+};
+
+export function template01SlotLabel(slot: string, fallback = ''): string {
+  return SLOT_LABELS[slot] ?? fallback ?? slot;
 }
 
 /**
@@ -187,9 +392,14 @@ export const TEMPLATE_01_EDITABLE_SLOTS: Template01SlotDescriptor[] = (() => {
         slot,
         slideIndex: slide.index,
         role: node.role || info?.role || '',
+        label: template01SlotLabel(slot, node.role || info?.role || slot),
+        y: node.box.y,
         kind: node.type === 'TEXT' ? 'text' : 'image',
         maxLines: info?.maxLines,
-        maxCharsPerLine: info?.maxCharsPerLine,
+        // O limite do slots.json passa pela camada de ajuste: o do s5 foi
+        // recalculado para o tamanho de fonte novo. Ver TEMPLATE_01_DESIGN_TWEAKS.
+        maxCharsPerLine:
+          TEMPLATE_01_DESIGN_TWEAKS.maxCharsPerLine[slot] ?? info?.maxCharsPerLine,
         defaultValue: node.text?.characters ?? '',
         note: info?.note,
       });
@@ -204,6 +414,8 @@ export const TEMPLATE_01_EDITABLE_SLOTS: Template01SlotDescriptor[] = (() => {
         slot: layer.slot,
         slideIndex: slide.index,
         role: 'imagem-fundo',
+        label: template01SlotLabel(layer.slot, 'Imagem de fundo'),
+        y: 0,
         kind: 'image',
         defaultValue: '',
         note: layer.note,
@@ -239,11 +451,18 @@ export function template01DefaultSlots(): Template01Slots {
   return out;
 }
 
-/** Slots que pertencem a um slide (1-indexado), incluindo os cantos globais. */
+/**
+ * Slots que pertencem a um slide (1-indexado), incluindo os cantos globais, na
+ * ordem VISUAL do slide (de cima para baixo).
+ *
+ * A ordem dos nós no spec é a do Figma, não a da tela: na capa o título vem
+ * antes do chapéu, que está acima dele. Quem edita procura o campo pela posição
+ * no slide, então a barra lateral segue o `y`.
+ */
 export function template01SlotsForSlide(slideIndex: number): Template01SlotDescriptor[] {
   return TEMPLATE_01_EDITABLE_SLOTS.filter(
     (s) => s.slideIndex === slideIndex || s.slot.startsWith('cantos.')
-  );
+  ).sort((a, b) => a.y - b.y);
 }
 
 /**

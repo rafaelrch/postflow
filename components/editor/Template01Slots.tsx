@@ -24,8 +24,10 @@ const inputCls =
   'w-full px-3 py-2 rounded-xl bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-black/[0.06] dark:focus:ring-white/[0.06] focus:border-black/20 dark:focus:border-white/20 transition-all';
 
 export default function Template01Slots() {
-  const { slides, activeSlideIndex, updateActiveSlide, updateSlide } = useEditorStore();
+  const { slides, activeSlideIndex, updateActiveSlide, updateSlide, globalSettings, updateCornersConfig } =
+    useEditorStore();
   const slide = slides[activeSlideIndex];
+  const cornersShow = globalSettings.corners?.show !== false;
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingSlot = useRef<string | null>(null);
 
@@ -98,7 +100,7 @@ export default function Template01Slots() {
             return (
               <div key={d.slot} className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className={labelCls}>{d.slot}</span>
+                  <span className={labelCls}>{d.label}</span>
                   {url && (
                     <button
                       onClick={() => setSlot(d.slot, '')}
@@ -136,7 +138,7 @@ export default function Template01Slots() {
           return (
             <div key={d.slot} className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className={labelCls}>{d.role || d.slot}</span>
+                <span className={labelCls}>{d.label}</span>
                 <span
                   className={cn(
                     'text-[9px] tabular-nums',
@@ -153,11 +155,15 @@ export default function Template01Slots() {
                         .join(' · ')}
                 </span>
               </div>
+              {/* Campo folgado de propósito: editar aqui é apagar, trocar e
+                  acrescentar, e a caixa apertada de antes escondia o que já
+                  estava escrito. Nunca menos de 4 linhas, sempre 2 de sobra
+                  além do que o texto ocupa, e o usuário ainda pode arrastar. */}
               <textarea
                 value={value}
                 onChange={(e) => setSlot(d.slot, e.target.value)}
-                rows={Math.min(Math.max(o.lines, 1), 6)}
-                className={cn(inputCls, 'resize-none leading-relaxed', o.over && 'border-red-500/60')}
+                rows={Math.min(Math.max(o.lines + 2, 4), 12)}
+                className={cn(inputCls, 'resize-y leading-relaxed', o.over && 'border-red-500/60')}
               />
               {o.over && (
                 <p className="text-[9px] text-red-500">
@@ -174,16 +180,36 @@ export default function Template01Slots() {
           <p className="text-[9px] text-gray-900/30 dark:text-white/30 -mt-1">
             Valem para o deck inteiro.
           </p>
-          {cornerSlots.map((d) => (
-            <div key={d.slot} className="space-y-1">
-              <span className={labelCls}>{d.slot}</span>
-              <input
-                value={slots[d.slot] ?? d.defaultValue}
-                onChange={(e) => setSlot(d.slot, e.target.value)}
-                className={inputCls}
+          {/* UM liga/desliga para os DOIS cantos: eles são uma linha só do
+              desenho — exibir um sem o outro deixa a composição torta. */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <div
+              onClick={() => updateCornersConfig({ show: !cornersShow })}
+              className={cn(
+                'w-8 h-4 rounded-full relative transition-colors',
+                cornersShow ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10'
+              )}
+            >
+              <div
+                className={cn(
+                  'absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all',
+                  cornersShow ? 'left-[18px]' : 'left-0.5'
+                )}
               />
             </div>
-          ))}
+            <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir cantos</span>
+          </label>
+          {cornersShow &&
+            cornerSlots.map((d) => (
+              <div key={d.slot} className="space-y-1">
+                <span className={labelCls}>{d.label}</span>
+                <input
+                  value={slots[d.slot] ?? d.defaultValue}
+                  onChange={(e) => setSlot(d.slot, e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            ))}
         </Section>
       )}
     </>

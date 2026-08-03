@@ -16,11 +16,16 @@ import {
   Slide,
   Template01CornerControl,
   Template01SlideControl,
+  Template01SlotStyle,
   TextPosition,
   TextHighlight,
   ElementFont,
 } from '@/types';
-import { template01SlideMedia } from '@/lib/templates/template-01';
+import {
+  template01SlideMedia,
+  template01SlotDefaults,
+  template01SlotsForSlide,
+} from '@/lib/templates/template-01';
 import {
   markTemplate01CornerOverride,
   markTemplate01Override,
@@ -1009,9 +1014,28 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     });
   };
 
+  /**
+   * Estilo de UM slot. A chave existir já é o gesto do usuário, então aqui não
+   * há `markTemplate01Override` — ver `Slide.templateSlotStyles`.
+   */
+  const setT01Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
+    updateActiveSlide({
+      templateSlotStyles: {
+        ...(slide.templateSlotStyles ?? {}),
+        [slot]: { ...(slide.templateSlotStyles?.[slot] ?? {}), ...patch },
+      },
+    });
+
   const t01Media = template01SlideMedia(activeSlideIndex + 1);
-  const t01Offset = slide.textOffset ?? { x: 0, y: 0 };
-  const t01Touched = Object.keys(slide.templateOverrides ?? {}).length > 0;
+  const t01Touched =
+    Object.keys(slide.templateOverrides ?? {}).length > 0 ||
+    Object.keys(slide.templateSlotStyles ?? {}).length > 0;
+
+  // Os mesmos slots de texto que o painel de conteúdo mostra, na mesma ordem
+  // visual — o usuário acha o bloco pelo lugar dele no slide, não pelo papel.
+  const t01TextSlots = template01SlotsForSlide(activeSlideIndex + 1).filter(
+    (d) => d.kind === 'text' && !d.slot.startsWith('cantos.')
+  );
 
   const template01Controls = (
     <>
@@ -1063,138 +1087,103 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         )}
       </Section>
 
-      <Section title="Degradê / Sombra">
-        <p className="text-[9px] text-gray-900/30 dark:text-white/30 -mt-1">
-          Entra POR CIMA do degradê do template, sem apagá-lo.
-        </p>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <div
-            onClick={() =>
-              setT01(
-                { shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } },
-                'shadow'
-              )
-            }
-            className={cn('w-8 h-4 rounded-full relative transition-colors', slide.shadow.style !== 'none' ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}
-          >
-            <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.shadow.style !== 'none' ? 'left-[18px]' : 'left-0.5')} />
-          </div>
-          <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir degradê</span>
-        </label>
-        {slide.shadow.style !== 'none' && (
-          <>
-            <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} unit="%"
-              onChange={(v) => setT01({ shadow: { ...slide.shadow, opacity: v } }, 'shadow')} />
-            <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} unit="%"
-              onChange={(v) => setT01({ shadow: { ...slide.shadow, size: v } }, 'shadow')} />
-            <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} unit="%"
-              onChange={(v) => setT01({ shadow: { ...slide.shadow, distance: v } }, 'shadow')} />
-            <ColorPicker label="Cor" value={slide.shadow.color || '#000000'}
-              onChange={(v) => setT01({ shadow: { ...slide.shadow, color: v } }, 'shadow')} />
-          </>
-        )}
-      </Section>
-
-      <Section title="Fundo do Slide">
-        <ColorPicker
-          label="Cor"
-          value={slide.backgroundColor || DEFAULT_SLIDE.backgroundColor}
-          onChange={(v) => setT01({ backgroundColor: v }, 'background')}
-        />
-      </Section>
-
+      {/* Um controle de estilo por BLOCO de texto. Antes era por papel
+          (título/descrição) e uma mexida pegava blocos diferentes de uma vez —
+          no slide 5, as duas colunas juntas. Entrelinha e alinhamento ficam de
+          fora da repetição de propósito: são um controle só para o slide. */}
       <Section title="Estilo do texto" defaultOpen>
         <p className="text-[9px] text-gray-900/30 dark:text-white/30 -mt-1">
-          O texto em si é editado por slot, acima.
+          O texto em si é editado por slot, acima. Cada bloco tem tamanho, fonte, cor e
+          espaçamento próprios.
         </p>
 
-        <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160} unit="px"
-          onChange={(v) => setT01({ fontSize: { ...slide.fontSize, title: v } }, 'titleSize')} />
-        <div className="flex items-center gap-2 flex-wrap">
-          <ColorPicker label="Cor título" value={slide.titleColor || '#FFFFFF'}
-            onChange={(v) => setT01({ titleColor: v }, 'titleColor')} />
-          <button
-            onClick={() => setT01({ titleUnderline: !slide.titleUnderline }, 'titleUnderline')}
-            title="Sublinhado"
-            className={cn('w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-              slide.titleUnderline
-                ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20')}
-          >
-            <Underline className="w-3 h-3" />
-          </button>
-        </div>
-        <div>
-          <span className={labelCls + ' block mb-1'}>Fonte título</span>
-          <ElementFontPicker value={slide.titleFont} onChange={(v) => setT01({ titleFont: v }, 'titleFont')} />
-        </div>
+        {t01TextSlots.map((d) => {
+          const st = slide.templateSlotStyles?.[d.slot] ?? {};
+          const base = template01SlotDefaults(d.slot);
+          return (
+            <div
+              key={d.slot}
+              className="space-y-2 pt-2 border-t border-black/[0.05] dark:border-white/[0.05] first:border-t-0 first:pt-0"
+            >
+              <span className={labelCls}>{d.label}</span>
+              <Slider
+                label="Tamanho"
+                value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
+                min={10}
+                max={160}
+                unit="px"
+                onChange={(v) => setT01Slot(d.slot, { fontSize: v })}
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker
+                  label="Cor"
+                  value={st.color || '#FFFFFF'}
+                  onChange={(v) => setT01Slot(d.slot, { color: v })}
+                />
+                <button
+                  onClick={() => setT01Slot(d.slot, { underline: !st.underline })}
+                  title="Sublinhado"
+                  className={cn('w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+                    st.underline
+                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20')}
+                >
+                  <Underline className="w-3 h-3" />
+                </button>
+              </div>
+              <div>
+                <span className={labelCls + ' block mb-1'}>Fonte</span>
+                <ElementFontPicker value={st.font} onChange={(v) => setT01Slot(d.slot, { font: v })} />
+              </div>
+              <Slider
+                label="Espaçamento de letras"
+                value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
+                min={-0.1}
+                max={0.3}
+                step={0.01}
+                unit="em"
+                onChange={(v) => setT01Slot(d.slot, { letterSpacing: v })}
+              />
+            </div>
+          );
+        })}
 
-        <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80} unit="px"
-          onChange={(v) => setT01({ fontSize: { ...slide.fontSize, description: v } }, 'descriptionSize')} />
-        <div className="flex items-center gap-2 flex-wrap">
-          <ColorPicker label="Cor descrição" value={slide.descriptionColor || '#FFFFFF'}
-            onChange={(v) => setT01({ descriptionColor: v }, 'descriptionColor')} />
-          <button
-            onClick={() => setT01({ descriptionUnderline: !slide.descriptionUnderline }, 'descriptionUnderline')}
-            title="Sublinhado"
-            className={cn('w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-              slide.descriptionUnderline
-                ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20')}
-          >
-            <Underline className="w-3 h-3" />
-          </button>
-        </div>
-        <div>
-          <span className={labelCls + ' block mb-1'}>Fonte descrição</span>
-          <ElementFontPicker value={slide.descriptionFont} onChange={(v) => setT01({ descriptionFont: v }, 'descriptionFont')} />
-        </div>
-
-        <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
-          onChange={(v) => setT01({ lineHeight: v }, 'lineHeight')} />
-        <Slider label="Espaçamento de letras (título)" value={slide.titleLetterSpacing ?? 0}
-          min={-0.1} max={0.3} step={0.01} unit="em"
-          onChange={(v) => setT01({ titleLetterSpacing: v }, 'titleLetterSpacing')} />
-        <Slider label="Espaço título → descrição" value={slide.titleDescriptionGap ?? 0}
-          min={-80} max={200} step={1} unit="px"
-          onChange={(v) => setT01({ titleDescriptionGap: v }, 'titleDescriptionGap')} />
-
-        {/* Posição: no template os blocos são ancorados pelo spec (a capa
-            centraliza, o slide 5 tem duas colunas), então a grade de 9 posições
-            dos outros estilos destruiria a composição. O que faz sentido aqui é
-            DESLOCAR o conjunto e trocar o alinhamento. */}
-        <Slider label="Mover texto ↔" value={t01Offset.x} min={-300} max={300} step={1} unit="px"
-          onChange={(v) => setT01({ textOffset: { ...t01Offset, x: v } }, 'textOffset')} />
-        <Slider label="Mover texto ↕" value={t01Offset.y} min={-300} max={300} step={1} unit="px"
-          onChange={(v) => setT01({ textOffset: { ...t01Offset, y: v } }, 'textOffset')} />
-        <div>
-          <span className={labelCls + ' block mb-1.5'}>Alinhamento</span>
-          <div className="grid grid-cols-3 gap-1">
-            {(['left', 'center', 'right'] as const).map((align) => (
-              <button
-                key={align}
-                onClick={() => setT01({ textAlignment: align }, 'textAlignment')}
-                className={cn('h-7 rounded text-[8px] transition-colors border',
-                  slide.templateOverrides?.textAlignment && slide.textAlignment === align
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm'
-                    : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20')}
-              >
-                {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
-              </button>
-            ))}
+        {/* Estes dois valem para o bloco inteiro do slide — um controle só. */}
+        <div className="pt-2 border-t border-black/[0.05] dark:border-white/[0.05] space-y-2">
+          <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
+            onChange={(v) => setT01({ lineHeight: v }, 'lineHeight')} />
+          {/* Posição: no template os blocos são ancorados pelo spec (a capa
+              centraliza, o slide 5 tem duas colunas), então a grade de 9
+              posições dos outros estilos destruiria a composição. O que resta —
+              e é o que o Rafael quer — é trocar o alinhamento. */}
+          <div>
+            <span className={labelCls + ' block mb-1.5'}>Alinhamento</span>
+            <div className="grid grid-cols-3 gap-1">
+              {(['left', 'center', 'right'] as const).map((align) => (
+                <button
+                  key={align}
+                  onClick={() => setT01({ textAlignment: align }, 'textAlignment')}
+                  className={cn('h-7 rounded text-[8px] transition-colors border',
+                    slide.templateOverrides?.textAlignment && slide.textAlignment === align
+                      ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm'
+                      : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20')}
+                >
+                  {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </Section>
 
+      {/* O liga/desliga dos cantos é um só e mora no painel de conteúdo, junto
+          dos dois campos de texto que ele libera. Aqui fica só o estilo. */}
       <Section title="Cantos">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <div onClick={() => updateCornersConfig({ show: !corners.show })}
-            className={cn('w-8 h-4 rounded-full relative transition-colors', corners.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-            <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.show ? 'left-[18px]' : 'left-0.5')} />
-          </div>
-          <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir cantos</span>
-        </label>
-        {corners.show && (
+        {!corners.show ? (
+          <p className="text-[10px] text-gray-900/35 dark:text-white/35">
+            Cantos desligados. Ligue em “Cantos”, no painel de conteúdo acima.
+          </p>
+        ) : (
           <>
             <p className="text-[9px] text-gray-900/30 dark:text-white/30">
               O texto dos cantos é editado por slot, acima.
@@ -1220,7 +1209,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           cria override, e ele pode desfazer todos de uma vez. */}
       <div className="px-4 pb-4">
         <button
-          onClick={() => updateActiveSlide({ templateOverrides: undefined })}
+          onClick={() =>
+            updateActiveSlide({ templateOverrides: undefined, templateSlotStyles: undefined })
+          }
           disabled={!t01Touched}
           className="w-full py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
