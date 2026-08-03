@@ -202,6 +202,24 @@ export const TEMPLATE_01_DESIGN_TWEAKS = {
     's5.top.title': 12,
     's5.bot.title': 12,
   } as Record<string, number>,
+
+  /**
+   * `y` que o centro compartilhado do slide 5 substitui, com a contagem de
+   * linhas do spec (ver TEMPLATE_01_CENTER_PAIRS).
+   *
+   * Na faixa de CIMA o Figma já centra as duas colunas no mesmo eixo (206.0 nas
+   * duas), então a regra é no-op ali: centrar `s5.top.title` (h=118) no centro de
+   * `s5.top.body` (top=128, h=156) dá 206 − 59 = 147, que é o `y` do spec.
+   *
+   * `s5.bot.title` — Figma: y=1062, centro 1150.5, contra 1167.5 do
+   * `s5.bot.body`: 17px de diferença que o Figma NÃO resolve. Centrar move o
+   * título para 1079. É desvio deliberado, pedido do Rafael ("título e descrição
+   * de cada faixa centrados no mesmo eixo vertical"), e o único do slide 5 fora
+   * dos 44px acima.
+   */
+  verticalCenter: {
+    's5.bot.title': { specY: 1062, y: 1079 },
+  } as Record<string, { specY: number; y: number }>,
 } as const;
 
 /** Razão entrelinha/tamanho do spec, preservada quando o tamanho é ajustado. */
@@ -642,6 +660,31 @@ export const TEMPLATE_01_FLOW_GROUPS: Record<number, Template01FlowGroup[]> = {
 };
 
 /**
+ * Colunas LADO A LADO que dividem o mesmo centro vertical.
+ *
+ * O PROBLEMA que isto resolve: as duas colunas de uma faixa do slide 5 têm
+ * alturas diferentes (topo: 118 e 156; base: 177 e 195). Ancorar as duas na
+ * MESMA borda — a da imagem — só as mantém alinhadas enquanto a contagem de
+ * linhas for a do spec; com o texto do usuário uma cresce mais que a outra e o
+ * miolo desencontra. Na faixa de cima o Figma centra as duas no mesmo eixo
+ * (206.0 nas duas) e era isso que a âncora estava destruindo.
+ *
+ * A REGRA: a coluna MAIS ALTA da faixa mantém a âncora (é ela que garante que o
+ * texto não invada a imagem); a mais BAIXA é centrada no centro vertical dela.
+ * Como a menor fica CONTIDA no intervalo da maior, a garantia da âncora vale
+ * para as duas.
+ *
+ * Só o slide 5 tem colunas lado a lado — os demais empilham blocos de largura
+ * cheia, e os cantos (mesma altura, mesmo `y`) já nascem centrados entre si.
+ */
+export const TEMPLATE_01_CENTER_PAIRS: Record<number, [string, string][]> = {
+  5: [
+    ['s5.top.title', 's5.top.body'],
+    ['s5.bot.title', 's5.bot.body'],
+  ],
+};
+
+/**
  * Quantas linhas o spec assume para o bloco.
  *
  * Não dá para usar `text.lineCount`: ele conta as quebras EXPLÍCITAS do
@@ -671,6 +714,9 @@ export interface Template01BlockMetrics {
  * mantém a fidelidade de 0 px contra o gabarito do `render.py`.
  *
  * Slots fora de um grupo não aparecem no resultado: quem chama usa o `y` do spec.
+ *
+ * Depois do fluxo, as colunas lado a lado passam a dividir o centro vertical —
+ * ver TEMPLATE_01_CENTER_PAIRS.
  */
 export function template01Tops(
   slideIndex: number,
@@ -680,6 +726,16 @@ export function template01Tops(
   const tops: Record<string, number> = {};
   const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
   if (!slide) return tops;
+
+  /**
+   * Altura de cada bloco, para o centro compartilhado.
+   *
+   * Medido, é `linhas × entrelinha` — a altura que o bloco tem MESMO na tela, e
+   * é dela que sai o centro exato. Sem medida (o SSR, antes do layout effect) a
+   * caixa do spec é a medida de registro: é ela que põe o centro da faixa de
+   * cima em 206.0, como no Figma, e mantém o 0 px contra o gabarito.
+   */
+  const heights: Record<string, number> = {};
 
   const bySlot = new Map<string, SpecNode>();
   for (const n of slide.nodes) if (n.slot) bySlot.set(n.slot, n);
@@ -698,6 +754,7 @@ export function template01Tops(
       const m = metrics[n.slot!];
       const lines = m?.lines ?? specLines;
       const lh = m?.lineHeightPx ?? specLh;
+      heights[n.slot!] = m ? lines * lh : n.box.h;
       return lines * lh - specLines * specLh;
     });
 
@@ -726,6 +783,16 @@ export function template01Tops(
       }
     }
   }
+
+  // As colunas lado a lado da faixa: a mais alta manda, a mais baixa centra
+  // nela. Em caso de empate não há o que fazer — as duas já dividem o centro.
+  for (const pair of TEMPLATE_01_CENTER_PAIRS[slideIndex] ?? []) {
+    if (!pair.every((s) => heights[s] != null && tops[s] != null)) continue;
+    const [alta, baixa] = [...pair].sort((a, b) => heights[b] - heights[a]);
+    if (heights[alta] === heights[baixa]) continue;
+    tops[baixa] = tops[alta] + (heights[alta] - heights[baixa]) / 2;
+  }
+
   return tops;
 }
 

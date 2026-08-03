@@ -7,6 +7,7 @@ import {
   TEMPLATE_01_EDITABLE_SLOTS,
   TEMPLATE_01_FLOW_GROUPS,
   TEMPLATE_01_ALIGN_GROUPS,
+  TEMPLATE_01_CENTER_PAIRS,
   TEMPLATE_01_DESIGN_TWEAKS,
   template01AlignBoxes,
   template01BaseType,
@@ -294,11 +295,17 @@ describe('TEMPLATE 1 — reflow', () => {
   });
 
   it('com a contagem de linhas do spec, não move NADA em nenhum slide', () => {
+    // A única exceção é o desvio registrado em TEMPLATE_01_DESIGN_TWEAKS: o
+    // Figma não centra as duas colunas da faixa de baixo do slide 5 entre si.
+    const desviados = TEMPLATE_01_DESIGN_TWEAKS.verticalCenter;
     for (const slide of TEMPLATE_01_SPEC.slides) {
       const tops = template01Tops(slide.index);
       const slots = Object.keys(tops);
       expect(slots.length).toBeGreaterThan(0);
-      for (const slot of slots) expect(tops[slot]).toBe(specTop(slide.index, slot));
+      for (const slot of slots) {
+        if (desviados[slot]) continue;
+        expect(tops[slot]).toBe(specTop(slide.index, slot));
+      }
     }
   });
 
@@ -343,8 +350,10 @@ describe('TEMPLATE 1 — reflow', () => {
       's5.top.title': { lines: 4, lineHeightPx: lh(5, 's5.top.title') },
     });
     expect(tops['s5.top.title'] + 4 * lh(5, 's5.top.title')).toBeLessThanOrEqual(350);
-    // As duas colunas da faixa são independentes: a da direita não se mexe.
-    expect(tops['s5.top.body']).toBe(specTop(5, 's5.top.body'));
+    // A coluna da direita não fica onde o spec a pôs: ela é a mais BAIXA da
+    // faixa agora e passa a dividir o centro da esquerda (ver o describe
+    // "centro vertical" abaixo).
+    expect(tops['s5.top.body']).toBeLessThan(specTop(5, 's5.top.body'));
   });
 
   it('a entrelinha do override entra na conta do reflow', () => {
@@ -359,6 +368,156 @@ describe('TEMPLATE 1 — reflow', () => {
     expect(over.map((o) => o.slot)).toEqual(['s5.top.title']);
     expect(over[0].lines).toBe(4);
     expect(over[0].maxLines).toBe(2);
+  });
+});
+
+/**
+ * O QUE O RAFAEL VIU: no slide 5, título de 3 linhas e descrição de 3 linhas na
+ * mesma faixa saíam desencontrados — o título começava bem mais alto.
+ *
+ * Não era desvio do Figma: na faixa de cima ele centra as duas colunas no MESMO
+ * eixo (206.0 nas duas). Quem quebrava era a nossa ancoragem — as duas colunas
+ * presas à borda da imagem, com alturas diferentes, perdem o centro comum assim
+ * que a contagem de linhas foge da do spec.
+ */
+describe('TEMPLATE 1 — slide 5: as duas colunas da faixa dividem o centro', () => {
+  const node = (slide: number, slot: string): SpecNode =>
+    TEMPLATE_01_SPEC.slides[slide - 1].nodes.find((n) => n.slot === slot)!;
+  const lh = (slot: string) => node(5, slot).typography!.lineHeightPx;
+
+  /** Altura do bloco: a medida quando há medição, a caixa do spec quando não há. */
+  const alturaCom = (slot: string, lines?: number) =>
+    lines == null ? node(5, slot).box.h : lines * lh(slot);
+
+  const linhas = (n: Record<string, number>): Record<string, { lines: number; lineHeightPx: number }> =>
+    Object.fromEntries(
+      Object.entries(n).map(([slot, lines]) => [slot, { lines, lineHeightPx: lh(slot) }])
+    );
+
+  const centro = (tops: Record<string, number>, slot: string, lines?: number) =>
+    tops[slot] + alturaCom(slot, lines) / 2;
+
+  it('o Figma já centra as duas colunas da faixa de cima no mesmo eixo', () => {
+    const t = node(5, 's5.top.title').box;
+    const b = node(5, 's5.top.body').box;
+    expect(t.y + t.h / 2).toBe(206);
+    expect(b.y + b.h / 2).toBe(206);
+  });
+
+  it('o caso do Rafael: título de 3 linhas e descrição de 3 linhas ficam centrados', () => {
+    const m = linhas({
+      's5.top.title': 3,
+      's5.top.body': 3,
+      's5.bot.title': 2,
+      's5.bot.body': 3,
+    });
+    const tops = template01Tops(5, m);
+    expect(centro(tops, 's5.top.title', 3)).toBeCloseTo(centro(tops, 's5.top.body', 3), 6);
+    expect(centro(tops, 's5.bot.title', 2)).toBeCloseTo(centro(tops, 's5.bot.body', 3), 6);
+  });
+
+  it('vale para qualquer contagem de linhas, dos dois lados', () => {
+    for (const [titleLines, bodyLines] of [[1, 1], [1, 6], [4, 2], [2, 4], [5, 5]]) {
+      const tops = template01Tops(
+        5,
+        linhas({
+          's5.top.title': titleLines,
+          's5.top.body': bodyLines,
+          's5.bot.title': titleLines,
+          's5.bot.body': bodyLines,
+        })
+      );
+      expect(centro(tops, 's5.top.title', titleLines)).toBeCloseTo(
+        centro(tops, 's5.top.body', bodyLines),
+        6
+      );
+      expect(centro(tops, 's5.bot.title', titleLines)).toBeCloseTo(
+        centro(tops, 's5.bot.body', bodyLines),
+        6
+      );
+    }
+  });
+
+  it('a coluna mais alta mantém a âncora: o texto não invade a imagem', () => {
+    const imagem = node(5, 's5.image').box;
+    expect(imagem.y).toBe(350);
+    expect(imagem.bottom).toBe(350); // a faixa de baixo começa em 1000
+
+    for (const lines of [1, 2, 3, 4, 5, 6]) {
+      // Faixa de cima: a coluna que cresce é a mais alta e continua encostada
+      // na borda de cima da imagem.
+      const cima = template01Tops(5, linhas({ 's5.top.title': lines, 's5.top.body': 1 }));
+      expect(cima['s5.top.title'] + alturaCom('s5.top.title', lines)).toBeLessThanOrEqual(350);
+      // Faixa de baixo: cresce para baixo, sem subir por cima da imagem.
+      const baixo = template01Tops(5, linhas({ 's5.bot.title': lines, 's5.bot.body': 1 }));
+      expect(baixo['s5.bot.title']).toBeGreaterThanOrEqual(1000);
+    }
+  });
+
+  it('a coluna mais baixa fica CONTIDA na mais alta — a garantia da âncora vale para as duas', () => {
+    const m = linhas({ 's5.top.title': 5, 's5.top.body': 1, 's5.bot.title': 5, 's5.bot.body': 1 });
+    const tops = template01Tops(5, m);
+    for (const [alta, baixa, altaLines, baixaLines] of [
+      ['s5.top.title', 's5.top.body', 5, 1],
+      ['s5.bot.title', 's5.bot.body', 5, 1],
+    ] as const) {
+      expect(tops[baixa]).toBeGreaterThanOrEqual(tops[alta]);
+      expect(tops[baixa] + alturaCom(baixa, baixaLines)).toBeLessThanOrEqual(
+        tops[alta] + alturaCom(alta, altaLines)
+      );
+    }
+  });
+
+  it('faixa de CIMA: com a contagem de linhas do spec a regra é no-op (0 px)', () => {
+    const tops = template01Tops(5);
+    expect(tops['s5.top.body']).toBe(node(5, 's5.top.body').box.y);
+    expect(tops['s5.top.title']).toBe(node(5, 's5.top.title').box.y);
+    expect(tops['s5.top.title']).toBe(147);
+  });
+
+  it('faixa de BAIXO: o desvio é o registrado em TEMPLATE_01_DESIGN_TWEAKS', () => {
+    const desvio = TEMPLATE_01_DESIGN_TWEAKS.verticalCenter['s5.bot.title'];
+    expect(desvio.specY).toBe(node(5, 's5.bot.title').box.y);
+    const tops = template01Tops(5);
+    expect(tops['s5.bot.title']).toBe(desvio.y);
+    expect(desvio.y - desvio.specY).toBe(17);
+    // O deslocamento é exatamente o que faltava para os centros coincidirem.
+    expect(centro(tops, 's5.bot.title')).toBeCloseTo(centro(tops, 's5.bot.body'), 6);
+  });
+
+  it('o desvio NÃO vaza: nenhum outro slot muda com a contagem de linhas do spec', () => {
+    expect(Object.keys(TEMPLATE_01_DESIGN_TWEAKS.verticalCenter)).toEqual(['s5.bot.title']);
+  });
+
+  it('só o slide 5 tem colunas lado a lado — o resto empilha', () => {
+    const declarados = new Set(
+      Object.entries(TEMPLATE_01_CENTER_PAIRS).flatMap(([slide, pares]) =>
+        pares.map((p) => `${slide} ${[...p].sort().join('|')}`)
+      )
+    );
+    const achados: string[] = [];
+    for (const slide of TEMPLATE_01_SPEC.slides) {
+      const textos = slide.nodes.filter((n) => n.type === 'TEXT' && n.slot);
+      for (let i = 0; i < textos.length; i++) {
+        for (let j = i + 1; j < textos.length; j++) {
+          const a = textos[i].box;
+          const b = textos[j].box;
+          const ladoALado = a.x + a.w <= b.x || b.x + b.w <= a.x;
+          const mesmaAltura = a.y < b.y + b.h && b.y < a.y + a.h;
+          if (!ladoALado || !mesmaAltura) continue;
+          const slots = [textos[i].slot!, textos[j].slot!].sort();
+          // Os cantos são a exceção: mesma caixa em y, mesma altura, uma linha
+          // cada — já nascem com o mesmo centro e nunca refluem.
+          if (slots.every((s) => s.startsWith('cantos.'))) {
+            expect(a.y).toBe(b.y);
+            expect(a.h).toBe(b.h);
+            continue;
+          }
+          achados.push(`${slide.index} ${slots.join('|')}`);
+        }
+      }
+    }
+    expect(new Set(achados)).toEqual(declarados);
   });
 });
 
