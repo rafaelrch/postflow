@@ -36,6 +36,9 @@ export function useAutoSave() {
         global_settings: {
           metaBar: store.globalSettings.metaBar ?? null,
           format: store.globalSettings.format ?? '4:5',
+          // TEMPLATE 1: quais controles de canto o usuário mexeu. Sem isto o
+          // deck reabriria seguindo o spec e perderia a escolha dele.
+          templateOverrides: store.globalSettings.templateOverrides ?? null,
         },
         caption:       store.caption       ?? '',
         hashtags:      store.hashtags      ?? [],

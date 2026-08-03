@@ -10,7 +10,21 @@ import Template01Slots from './Template01Slots';
 import { cn } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
-import { TextPosition, TextHighlight, ElementFont } from '@/types';
+import {
+  DEFAULT_CORNERS,
+  DEFAULT_SLIDE,
+  Slide,
+  Template01CornerControl,
+  Template01SlideControl,
+  TextPosition,
+  TextHighlight,
+  ElementFont,
+} from '@/types';
+import { template01SlideMedia } from '@/lib/templates/template-01';
+import {
+  markTemplate01CornerOverride,
+  markTemplate01Override,
+} from '@/lib/templates/template-01/overrides';
 
 // ── ImageThumb: miniatura da imagem anexada com X para remover ───────────────
 function ImageThumb({ url, onRemove }: { url: string; onRemove: () => void }) {
@@ -966,6 +980,256 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     </>
   );
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     TEMPLATE 1 — painel próprio.
+
+     Não dá para reusar `standardControls` aqui: metade daqueles controles não
+     tem para onde ir no template (a grade de 9 posições, os destaques por
+     palavra, os textareas de título/descrição — no template o texto é editado
+     por SLOT, logo acima). Controle na tela que não muda o render é pior que
+     controle ausente, então aqui só entra o que tem efeito.
+
+     Cada handler MARCA o controle em `templateOverrides`. É a marca — nunca o
+     valor — que faz o override existir: o carrossel gerado não tem nenhuma, e
+     por isso nasce idêntico ao spec.
+  ───────────────────────────────────────────────────────────────────────── */
+  const setT01 = (patch: Partial<Slide>, ...keys: Template01SlideControl[]) =>
+    updateActiveSlide({
+      ...patch,
+      templateOverrides: markTemplate01Override(slide.templateOverrides, ...keys),
+    });
+
+  const setT01Corner = (
+    patch: Parameters<typeof updateCornersConfig>[0],
+    ...keys: Template01CornerControl[]
+  ) => {
+    updateCornersConfig(patch);
+    updateGlobalSettings({
+      templateOverrides: markTemplate01CornerOverride(globalSettings.templateOverrides, ...keys),
+    });
+  };
+
+  const t01Media = template01SlideMedia(activeSlideIndex + 1);
+  const t01Offset = slide.textOffset ?? { x: 0, y: 0 };
+  const t01Touched = Object.keys(slide.templateOverrides ?? {}).length > 0;
+
+  const template01Controls = (
+    <>
+      <Section title={`Imagem — Slide ${activeSlideIndex + 1}`}>
+        {!t01Media.background && !t01Media.content ? (
+          <p className="text-[10px] text-gray-900/35 dark:text-white/35">
+            Este slide não tem imagem no template.
+          </p>
+        ) : (
+          <>
+            <AiGenPanel
+              key={`t01-img-${activeSlideIndex}`}
+              buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
+              generating={generating}
+              slideTitle={slide.title}
+              slideDescription={slide.description || ''}
+              onGenerate={(opts) =>
+                generateOne(activeSlideIndex, t01Media.background ? 'background' : 'content', opts)
+              }
+            />
+            <Slider
+              label="Opacidade"
+              value={slide.backgroundImageOpacity ?? 100}
+              min={0}
+              max={100}
+              unit="%"
+              onChange={(v) => setT01({ backgroundImageOpacity: v }, 'backgroundImageOpacity')}
+            />
+            {t01Media.background ? (
+              <>
+                <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
+                <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
+                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
+              </>
+            ) : (
+              <>
+                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                  onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } }, 'contentImagePosition')} />
+              </>
+            )}
+          </>
+        )}
+      </Section>
+
+      <Section title="Degradê / Sombra">
+        <p className="text-[9px] text-gray-900/30 dark:text-white/30 -mt-1">
+          Entra POR CIMA do degradê do template, sem apagá-lo.
+        </p>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <div
+            onClick={() =>
+              setT01(
+                { shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } },
+                'shadow'
+              )
+            }
+            className={cn('w-8 h-4 rounded-full relative transition-colors', slide.shadow.style !== 'none' ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}
+          >
+            <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.shadow.style !== 'none' ? 'left-[18px]' : 'left-0.5')} />
+          </div>
+          <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir degradê</span>
+        </label>
+        {slide.shadow.style !== 'none' && (
+          <>
+            <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} unit="%"
+              onChange={(v) => setT01({ shadow: { ...slide.shadow, opacity: v } }, 'shadow')} />
+            <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} unit="%"
+              onChange={(v) => setT01({ shadow: { ...slide.shadow, size: v } }, 'shadow')} />
+            <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} unit="%"
+              onChange={(v) => setT01({ shadow: { ...slide.shadow, distance: v } }, 'shadow')} />
+            <ColorPicker label="Cor" value={slide.shadow.color || '#000000'}
+              onChange={(v) => setT01({ shadow: { ...slide.shadow, color: v } }, 'shadow')} />
+          </>
+        )}
+      </Section>
+
+      <Section title="Fundo do Slide">
+        <ColorPicker
+          label="Cor"
+          value={slide.backgroundColor || DEFAULT_SLIDE.backgroundColor}
+          onChange={(v) => setT01({ backgroundColor: v }, 'background')}
+        />
+      </Section>
+
+      <Section title="Estilo do texto" defaultOpen>
+        <p className="text-[9px] text-gray-900/30 dark:text-white/30 -mt-1">
+          O texto em si é editado por slot, acima.
+        </p>
+
+        <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160} unit="px"
+          onChange={(v) => setT01({ fontSize: { ...slide.fontSize, title: v } }, 'titleSize')} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ColorPicker label="Cor título" value={slide.titleColor || '#FFFFFF'}
+            onChange={(v) => setT01({ titleColor: v }, 'titleColor')} />
+          <button
+            onClick={() => setT01({ titleUnderline: !slide.titleUnderline }, 'titleUnderline')}
+            title="Sublinhado"
+            className={cn('w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+              slide.titleUnderline
+                ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20')}
+          >
+            <Underline className="w-3 h-3" />
+          </button>
+        </div>
+        <div>
+          <span className={labelCls + ' block mb-1'}>Fonte título</span>
+          <ElementFontPicker value={slide.titleFont} onChange={(v) => setT01({ titleFont: v }, 'titleFont')} />
+        </div>
+
+        <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80} unit="px"
+          onChange={(v) => setT01({ fontSize: { ...slide.fontSize, description: v } }, 'descriptionSize')} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ColorPicker label="Cor descrição" value={slide.descriptionColor || '#FFFFFF'}
+            onChange={(v) => setT01({ descriptionColor: v }, 'descriptionColor')} />
+          <button
+            onClick={() => setT01({ descriptionUnderline: !slide.descriptionUnderline }, 'descriptionUnderline')}
+            title="Sublinhado"
+            className={cn('w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+              slide.descriptionUnderline
+                ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20')}
+          >
+            <Underline className="w-3 h-3" />
+          </button>
+        </div>
+        <div>
+          <span className={labelCls + ' block mb-1'}>Fonte descrição</span>
+          <ElementFontPicker value={slide.descriptionFont} onChange={(v) => setT01({ descriptionFont: v }, 'descriptionFont')} />
+        </div>
+
+        <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
+          onChange={(v) => setT01({ lineHeight: v }, 'lineHeight')} />
+        <Slider label="Espaçamento de letras (título)" value={slide.titleLetterSpacing ?? 0}
+          min={-0.1} max={0.3} step={0.01} unit="em"
+          onChange={(v) => setT01({ titleLetterSpacing: v }, 'titleLetterSpacing')} />
+        <Slider label="Espaço título → descrição" value={slide.titleDescriptionGap ?? 0}
+          min={-80} max={200} step={1} unit="px"
+          onChange={(v) => setT01({ titleDescriptionGap: v }, 'titleDescriptionGap')} />
+
+        {/* Posição: no template os blocos são ancorados pelo spec (a capa
+            centraliza, o slide 5 tem duas colunas), então a grade de 9 posições
+            dos outros estilos destruiria a composição. O que faz sentido aqui é
+            DESLOCAR o conjunto e trocar o alinhamento. */}
+        <Slider label="Mover texto ↔" value={t01Offset.x} min={-300} max={300} step={1} unit="px"
+          onChange={(v) => setT01({ textOffset: { ...t01Offset, x: v } }, 'textOffset')} />
+        <Slider label="Mover texto ↕" value={t01Offset.y} min={-300} max={300} step={1} unit="px"
+          onChange={(v) => setT01({ textOffset: { ...t01Offset, y: v } }, 'textOffset')} />
+        <div>
+          <span className={labelCls + ' block mb-1.5'}>Alinhamento</span>
+          <div className="grid grid-cols-3 gap-1">
+            {(['left', 'center', 'right'] as const).map((align) => (
+              <button
+                key={align}
+                onClick={() => setT01({ textAlignment: align }, 'textAlignment')}
+                className={cn('h-7 rounded text-[8px] transition-colors border',
+                  slide.templateOverrides?.textAlignment && slide.textAlignment === align
+                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm'
+                    : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20')}
+              >
+                {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Cantos">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <div onClick={() => updateCornersConfig({ show: !corners.show })}
+            className={cn('w-8 h-4 rounded-full relative transition-colors', corners.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
+            <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.show ? 'left-[18px]' : 'left-0.5')} />
+          </div>
+          <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir cantos</span>
+        </label>
+        {corners.show && (
+          <>
+            <p className="text-[9px] text-gray-900/30 dark:text-white/30">
+              O texto dos cantos é editado por slot, acima.
+            </p>
+            <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} unit="px"
+              onChange={(v) => setT01Corner({ fontSize: v }, 'cornerSize')} />
+            <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} unit="px"
+              onChange={(v) => setT01Corner({ borderDistance: v }, 'cornerDistance')} />
+            <Slider label="Opacidade" value={corners.opacity} min={0} max={100} unit="%"
+              onChange={(v) => setT01Corner({ opacity: v }, 'cornerOpacity')} />
+            <ColorPicker label="Cor" value={corners.color || DEFAULT_CORNERS.color || '#FFFFFF'}
+              onChange={(v) => setT01Corner({ color: v }, 'cornerColor')} />
+            <div>
+              <span className={labelCls + ' block mb-1'}>Fonte</span>
+              <ElementFontPicker value={corners.elementFont}
+                onChange={(v) => setT01Corner({ elementFont: v }, 'cornerFont')} />
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* Volta o slide ao template. É o par do princípio: só o gesto do usuário
+          cria override, e ele pode desfazer todos de uma vez. */}
+      <div className="px-4 pb-4">
+        <button
+          onClick={() => updateActiveSlide({ templateOverrides: undefined })}
+          disabled={!t01Touched}
+          className="w-full py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          Restaurar o estilo do template neste slide
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="w-[272px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
       {fileInputs}
@@ -998,13 +1262,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           /* ══════════════════════════════════
              TEMPLATE 1 — os slots do template
              em cima (caminho principal) e os
-             controles padrão logo abaixo: o
-             carrossel nasce seguindo o spec e
+             controles do template logo abaixo:
+             o carrossel nasce seguindo o spec e
              segue editável como qualquer outro
              ══════════════════════════════════ */
           <>
             <Template01Slots />
-            {standardControls}
+            {template01Controls}
           </>
         ) : style === 'profile' ? (
           /* ══════════════════════════════════

@@ -13,7 +13,12 @@ import { uploadImageFile } from '@/lib/upload-image';
 import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData, TextPosition } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
-import { template01SlotsFromContent, TEMPLATE_01_SLIDE_COUNT } from '@/lib/templates/template-01';
+import {
+  template01CornerSlots,
+  template01SlotsFromContent,
+  TEMPLATE_01_SLIDE_COUNT,
+} from '@/lib/templates/template-01';
+import { DEFAULT_SLIDE } from '@/types';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import { handlePlanRequired, handleProjectLimit } from '@/hooks/useUpgradeStore';
 import toast from 'react-hot-toast';
@@ -280,7 +285,15 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     const effectiveFontPair: FontPair = style === 'profile' ? 'SF Pro Display + IvyOra Text' : fontPair;
     const effectiveProfile: ProfileData = { ...profileData, handle: normalizeHandle(profileData.handle) };
     try {
-      let slides: { title: string; description: string; highlightWord: string; backgroundColor: string; imageUrl?: string }[];
+      let slides: {
+        title: string;
+        description: string;
+        highlightWord: string;
+        backgroundColor: string;
+        imageUrl?: string;
+        /** TEMPLATE 1: slots secundários que a IA escreveu (chapéu, remate…). */
+        extras?: Record<string, string>;
+      }[];
       let jsonCarouselTitle: string | undefined;
       let jsonCaption: string | undefined;
 
@@ -313,6 +326,15 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           description: String(s.description || ''),
           highlightWord: String(s.highlightWord || ''),
           backgroundColor: String(s.backgroundColor || '#111111'),
+          extras:
+            s.extras && typeof s.extras === 'object'
+              ? Object.fromEntries(
+                  Object.entries(s.extras as Record<string, unknown>).map(([k, v]) => [
+                    k,
+                    String(v ?? ''),
+                  ])
+                )
+              : undefined,
         }));
       } else if (contentMode === 'json') {
         const parsed = parseCarouselJSON(jsonInput);
@@ -361,13 +383,45 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         // Editorial (fora da capa): texto+imagem centralizados à esquerda,
         // sem degradê — o shape de imagem já cria contraste sozinho.
         const isEditorialContent = style === 'editorial' && i > 0;
+
+        // TEMPLATE 1: a GERAÇÃO NÃO ESCREVE ESTILO. A forma inteira — fundo,
+        // degradê, tamanho de fonte, entrelinha — é do spec, e o carrossel
+        // recém-gerado tem de sair idêntico a ele qualquer que seja a paleta do
+        // onboarding. Os campos de estilo do `Slide` ficam nos valores padrão e
+        // `templateOverrides` nasce ausente: só a barra lateral cria override.
+        if (style === 'template01') {
+          return {
+            id: `tmp-${i}-${Date.now()}`,
+            templateSlots: {
+              ...template01SlotsFromContent(i, {
+                title: sl.title,
+                description: sl.description,
+                imageUrl: sl.imageUrl,
+                extras: sl.extras,
+              }),
+              ...template01CornerSlots(effectiveProfile.name, effectiveProfile.handle),
+            },
+            position: i,
+            title: sl.title,
+            description: sl.description,
+            highlightWord: sl.highlightWord,
+            highlights: [],
+            backgroundImageUrl: '',
+            gridImageUrl: '',
+            imageType: 'background' as const,
+            imagePosition: DEFAULT_SLIDE.imagePosition,
+            shadow: { ...DEFAULT_SLIDE.shadow },
+            backgroundColor: DEFAULT_SLIDE.backgroundColor,
+            textPosition: DEFAULT_SLIDE.textPosition,
+            textAlignment: DEFAULT_SLIDE.textAlignment,
+            fontSize: { ...DEFAULT_SLIDE.fontSize },
+            lineHeight: DEFAULT_SLIDE.lineHeight,
+            ctaButton: { ...DEFAULT_SLIDE.ctaButton },
+          };
+        }
+
         return ({
         id: `tmp-${i}-${Date.now()}`,
-        // TEMPLATE 1: a forma vem do spec, então o conteúdo entra por slot.
-        // Os demais campos ficam preenchidos e simplesmente não são lidos.
-        ...(style === 'template01'
-          ? { templateSlots: template01SlotsFromContent(i, sl.title, sl.description, sl.imageUrl) }
-          : {}),
         position: i,
         title: sl.title,
         description: sl.description,
@@ -435,6 +489,36 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
           const slideBg = aiBg === '#FFFFFF' ? brandLightBg : brandDarkBg;
           const isEditorialContent = style === 'editorial' && i > 0;
+
+          // Espelha o `editorSlides` acima: no TEMPLATE 1 o banco recebe os
+          // padrões, nunca a paleta da marca. Ver o comentário de lá.
+          if (style === 'template01') {
+            const editor = editorSlides[i] as Record<string, unknown>;
+            return {
+              carousel_id: carousel.id,
+              position: i,
+              title: sl.title,
+              description: sl.description,
+              highlight_word: sl.highlightWord,
+              background_image_url: '',
+              grid_image_url: '',
+              image_type: 'background',
+              image_position: DEFAULT_SLIDE.imagePosition,
+              shadow_style: DEFAULT_SLIDE.shadow.style,
+              shadow_opacity: DEFAULT_SLIDE.shadow.opacity,
+              text_position: DEFAULT_SLIDE.textPosition,
+              text_offset: null,
+              text_alignment: DEFAULT_SLIDE.textAlignment,
+              subtitle: '',
+              font_size: DEFAULT_SLIDE.fontSize,
+              line_height: DEFAULT_SLIDE.lineHeight,
+              title_description_gap: null,
+              cta_button: DEFAULT_SLIDE.ctaButton,
+              background_color: DEFAULT_SLIDE.backgroundColor,
+              template_slots: editor.templateSlots,
+            };
+          }
+
           return ({
           carousel_id: carousel.id,
           position: i,
@@ -458,9 +542,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           title_description_gap: style === 'profile' ? 41 : null,
           cta_button: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
           background_color: slideBg,
-          ...(style === 'template01'
-            ? { template_slots: template01SlotsFromContent(i, sl.title, sl.description, sl.imageUrl) }
-            : {}),
           });
         });
 

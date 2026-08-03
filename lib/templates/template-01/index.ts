@@ -213,6 +213,23 @@ export const TEMPLATE_01_EDITABLE_SLOTS: Template01SlotDescriptor[] = (() => {
   return out.sort((a, b) => a.slideIndex - b.slideIndex);
 })();
 
+/**
+ * Que tipo de imagem o slide tem (1-indexado). A capa e o slide 2 têm imagem de
+ * FUNDO full-bleed sob o scrim; os slides 3, 4 e 5 têm um shape de imagem
+ * dentro da composição; o 6 não tem nenhuma. A barra lateral usa isto para não
+ * mostrar controle de imagem em slide que não tem imagem.
+ */
+export function template01SlideMedia(slideIndex: number): {
+  background: boolean;
+  content: boolean;
+} {
+  const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
+  return {
+    background: !!slide?.backgroundLayers?.some((l) => l.type === 'IMAGE_SLOT'),
+    content: !!slide?.nodes.some((n) => n.type === 'RECTANGLE' && !!n.slot),
+  };
+}
+
 /** Conteúdo original do Figma — usado como estado inicial de um carrossel novo. */
 export function template01DefaultSlots(): Template01Slots {
   const out: Template01Slots = {};
@@ -232,8 +249,6 @@ export function template01SlotsForSlide(slideIndex: number): Template01SlotDescr
 /**
  * Slot de título e de corpo de cada slide, na ordem do deck. É por aqui que o
  * conteúdo genérico do wizard (título + descrição por slide) entra no template.
- * Os slots que não aparecem aqui — a coluna de baixo do slide 5, o kicker, o
- * eyebrow — ficam no texto padrão do Figma até serem editados na sidebar.
  */
 const PRIMARY_SLOTS: { title: string; body: string }[] = [
   { title: 's1.headline', body: 's1.subline' },
@@ -245,26 +260,84 @@ const PRIMARY_SLOTS: { title: string; body: string }[] = [
 ];
 
 /**
- * Monta os slots de um slide a partir de título/descrição soltos. Mantém o
- * padrão do Figma nos slots não mapeados para o slide nunca sair vazio.
+ * Slots de texto que NÃO são o par primário do slide — o chapéu da capa, o
+ * remate do slide 3, a coluna de baixo do slide 5.
+ *
+ * Eles existem no desenho e a IA precisa escrevê-los: o texto de fábrica do
+ * Figma ("*Barcelona FC cria fonte inspirada na arquiterua catalã") é
+ * ilustrativo e não pode sobrar num carrossel gerado. A chave é o nome curto
+ * que o contrato da IA usa; o valor, o slot do spec.
+ */
+export const TEMPLATE_01_EXTRA_SLOTS: Record<number, Record<string, string>> = {
+  0: { eyebrow: 's1.eyebrow' },
+  2: { kicker: 's3.kicker' },
+  4: { botTitle: 's5.bot.title', botBody: 's5.bot.body' },
+};
+
+/** Todos os slots de texto de um slide (1-indexado no spec), cantos fora. */
+function textSlotsOfSlide(slideIndex: number): string[] {
+  return TEMPLATE_01_EDITABLE_SLOTS.filter(
+    (s) => s.kind === 'text' && s.slideIndex === slideIndex && !s.slot.startsWith('cantos.')
+  ).map((s) => s.slot);
+}
+
+export interface Template01ContentInput {
+  title: string;
+  description: string;
+  imageUrl?: string;
+  /** Slots secundários, pelo nome curto do contrato da IA (`eyebrow`, `kicker`…). */
+  extras?: Record<string, string>;
+}
+
+/**
+ * Monta os slots de um slide gerado.
+ *
+ * REGRA DURA: um deck gerado não pode exibir NENHUM texto ilustrativo do Figma.
+ * Por isso todo slot de texto do slide sai preenchido — com o que a IA escreveu
+ * ou, na falta, com string VAZIA. Vazio é pior visualmente que o texto do
+ * Barcelona? Não: o texto do Barcelona é uma mentira sobre o conteúdo do
+ * usuário, e o vazio ele conserta em um campo da barra lateral.
+ *
+ * O caminho "sem slots" (`templateSlots` ausente) continua caindo no texto do
+ * spec — é dele que sai a fidelidade de 0 px, e nada aqui o toca.
  */
 export function template01SlotsFromContent(
   slideIndex: number,
-  title: string,
-  description: string,
-  imageUrl?: string
+  input: Template01ContentInput
 ): Template01Slots {
   const primary = PRIMARY_SLOTS[slideIndex];
   if (!primary) return {};
+
   const slots: Template01Slots = {};
-  if (title.trim()) slots[primary.title] = title;
-  if (description.trim()) slots[primary.body] = description;
-  if (imageUrl) {
+  for (const slot of textSlotsOfSlide(slideIndex + 1)) slots[slot] = '';
+
+  if (input.title.trim()) slots[primary.title] = input.title.trim();
+  if (input.description.trim()) slots[primary.body] = input.description.trim();
+
+  for (const [key, slot] of Object.entries(TEMPLATE_01_EXTRA_SLOTS[slideIndex] ?? {})) {
+    const value = input.extras?.[key];
+    if (typeof value === 'string' && value.trim()) slots[slot] = value.trim();
+  }
+
+  if (input.imageUrl) {
     for (const s of TEMPLATE_01_EDITABLE_SLOTS) {
-      if (s.kind === 'image' && s.slideIndex === slideIndex + 1) slots[s.slot] = imageUrl;
+      if (s.kind === 'image' && s.slideIndex === slideIndex + 1) slots[s.slot] = input.imageUrl;
     }
   }
   return slots;
+}
+
+/**
+ * Cantos de um deck gerado: assinatura e @ do usuário. São dados DELE (marca e
+ * handle do onboarding), não estilo — por isso a geração pode escrevê-los. Sem
+ * marca nem handle o slot sai vazio, nunca com o "@OANDRELONA" do Figma.
+ */
+export function template01CornerSlots(brandName?: string, handle?: string): Template01Slots {
+  const at = (handle ?? '').trim().replace(/^@+/, '');
+  return {
+    'cantos.left': (brandName ?? '').trim().toUpperCase(),
+    'cantos.right': at ? `@${at.toUpperCase()}` : '',
+  };
 }
 
 // ─── Reflow: âncora + vão preservado ────────────────────────────
@@ -382,7 +455,8 @@ export interface Template01BlockMetrics {
  */
 export function template01Tops(
   slideIndex: number,
-  metrics: Record<string, Template01BlockMetrics> = {}
+  metrics: Record<string, Template01BlockMetrics> = {},
+  options: { titleGapDelta?: number; isTitleSlot?: (slot: string) => boolean } = {}
 ): Record<string, number> {
   const tops: Record<string, number> = {};
   const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
@@ -390,6 +464,8 @@ export function template01Tops(
 
   const bySlot = new Map<string, SpecNode>();
   for (const n of slide.nodes) if (n.slot) bySlot.set(n.slot, n);
+
+  const { titleGapDelta = 0, isTitleSlot } = options;
 
   for (const group of TEMPLATE_01_FLOW_GROUPS[slideIndex] ?? []) {
     const nodes = group.slots
@@ -406,9 +482,19 @@ export function template01Tops(
       return lines * lh - specLines * specLh;
     });
 
+    // Vão extra pedido no controle "espaço título → descrição": só existe onde
+    // um título é seguido, DENTRO do mesmo grupo, pelo corpo dele. Nos slides
+    // em que a imagem ou a seta separa os dois blocos o vão é do desenho e não
+    // é parâmetro livre — ver as notas de TEMPLATE_01_FLOW_GROUPS.
+    const gapBefore = (i: number) =>
+      i > 0 && titleGapDelta && isTitleSlot?.(nodes[i - 1].slot!) && !isTitleSlot(nodes[i].slot!)
+        ? titleGapDelta
+        : 0;
+
     if (group.anchor === 'top') {
       let acc = 0;
       nodes.forEach((n, i) => {
+        acc += gapBefore(i);
         tops[n.slot!] = n.box.y + acc;
         acc += extra[i];
       });
@@ -417,6 +503,7 @@ export function template01Tops(
       for (let i = nodes.length - 1; i >= 0; i--) {
         acc += extra[i];
         tops[nodes[i].slot!] = nodes[i].box.y - acc;
+        acc += gapBefore(i);
       }
     }
   }

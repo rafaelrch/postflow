@@ -10,13 +10,24 @@ import {
   template01DefaultSlots,
   template01SlotsForSlide,
   template01SlotsFromContent,
+  template01CornerSlots,
   template01Overflows,
   template01Measure,
   template01SpecLines,
   template01Tops,
 } from '@/lib/templates/template-01';
-import { template01Overrides } from '@/lib/templates/template-01/overrides';
-import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
+import {
+  markTemplate01CornerOverride,
+  markTemplate01Override,
+  template01Overrides,
+} from '@/lib/templates/template-01/overrides';
+import {
+  DEFAULT_CORNERS,
+  DEFAULT_GLOBAL_SETTINGS,
+  DEFAULT_SLIDE,
+  Slide,
+  Template01CornerControl,
+} from '@/types';
 
 /**
  * O spec é a fonte da verdade da forma e foi validado pixel a pixel contra o
@@ -107,16 +118,88 @@ describe('TEMPLATE 1 — conteúdo', () => {
   });
 
   it('mapeia título e descrição para os slots principais de cada slide', () => {
-    expect(template01SlotsFromContent(0, 'Título', 'Corpo')).toEqual({
+    expect(template01SlotsFromContent(0, { title: 'Título', description: 'Corpo' })).toMatchObject({
       's1.headline': 'Título',
       's1.subline': 'Corpo',
     });
-    expect(template01SlotsFromContent(5, 'Fecho', 'Final')).toEqual({
+    expect(template01SlotsFromContent(5, { title: 'Fecho', description: 'Final' })).toEqual({
       's6.title': 'Fecho',
       's6.body': 'Final',
     });
     // Slide inexistente não inventa slot.
-    expect(template01SlotsFromContent(9, 'x', 'y')).toEqual({});
+    expect(template01SlotsFromContent(9, { title: 'x', description: 'y' })).toEqual({});
+  });
+});
+
+/**
+ * BUG do teste real: o chapéu da capa saía "*Barcelona FC cria fonte inspirada
+ * na arquiterua catalã" em TODO carrossel gerado, porque a geração só preenchia
+ * o par primário e o resto ficava no texto de fábrica do Figma.
+ */
+describe('TEMPLATE 1 — nenhum texto ilustrativo do Figma num deck gerado', () => {
+  const FIGMA = TEMPLATE_01_EDITABLE_SLOTS.filter((s) => s.kind === 'text' && s.defaultValue).map(
+    (s) => s.defaultValue
+  );
+
+  const deckGerado = () =>
+    Array.from({ length: 6 }, (_, i) => ({
+      ...template01SlotsFromContent(i, {
+        title: `Título ${i + 1}`,
+        description: `Corpo do slide ${i + 1}.`,
+        extras: { eyebrow: '*Manchete do tema', kicker: 'Remate', botTitle: 'Eixo', botBody: 'Texto' },
+      }),
+      ...template01CornerSlots('Marca do Rafael', '@rafa'),
+    }));
+
+  it('preenche TODOS os slots de texto do slide, não só o par primário', () => {
+    const capa = template01SlotsFromContent(0, {
+      title: 'T',
+      description: 'D',
+      extras: { eyebrow: '*Manchete' },
+    });
+    expect(capa['s1.eyebrow']).toBe('*Manchete');
+
+    const s5 = template01SlotsFromContent(4, {
+      title: 'T',
+      description: 'D',
+      extras: { botTitle: 'Baixo', botBody: 'Corpo de baixo' },
+    });
+    expect(s5['s5.bot.title']).toBe('Baixo');
+    expect(s5['s5.bot.body']).toBe('Corpo de baixo');
+  });
+
+  it('slot que a IA não escreveu sai VAZIO — nunca com a copy do Figma', () => {
+    const capa = template01SlotsFromContent(0, { title: 'T', description: 'D' });
+    expect(capa['s1.eyebrow']).toBe('');
+    expect(Object.keys(capa)).toContain('s1.eyebrow');
+  });
+
+  it('nenhum slot de um deck gerado carrega texto do Figma', () => {
+    for (const slots of deckGerado())
+      for (const [slot, value] of Object.entries(slots))
+        expect(FIGMA, `slot ${slot}`).not.toContain(value);
+  });
+
+  it('o render de um deck gerado não mostra a copy do Barcelona', () => {
+    deckGerado().forEach((slots, i) => {
+      const html = renderSlide(i, slots);
+      expect(html).not.toContain('Barcelona');
+      expect(html).not.toContain('OANDRELONA');
+    });
+  });
+
+  it('os cantos saem da marca e do @ do usuário', () => {
+    expect(template01CornerSlots('Marca do Rafael', 'rafa')).toEqual({
+      'cantos.left': 'MARCA DO RAFAEL',
+      'cantos.right': '@RAFA',
+    });
+    // Sem dado do onboarding, vazio — nunca o @ do Figma.
+    expect(template01CornerSlots('', '')).toEqual({ 'cantos.left': '', 'cantos.right': '' });
+  });
+
+  it('o caminho SEM slots continua caindo no texto do spec (é ele que dá o 0 px)', () => {
+    const html = renderSlide(0);
+    expect(html).toContain('Barcelona');
   });
 });
 
@@ -157,6 +240,13 @@ describe('TEMPLATE 1 — render', () => {
     const html = renderSlide(0, { 's1.eyebrow': '*Doze primeiros e o resto vem depois' });
     expect(html).toContain('font-weight:300');
     expect(html).toContain('*Doze primeir');
+  });
+
+  it('o corte bold→light do chapéu cai entre palavras, não no meio de uma', () => {
+    // O índice do spec (25) cairia em "mud|a"; o corte anda para o espaço.
+    const html = renderSlide(0, { 's1.eyebrow': '*Torrefação artesanal muda o sabor do grão' });
+    expect(html).toContain('*Torrefação artesanal muda </span>');
+    expect(html).not.toContain('mud</span>');
   });
 
   it('desenha a seta do slide 6 como SVG e não como texto', () => {
@@ -296,6 +386,7 @@ describe('TEMPLATE 1 — overrides do editor', () => {
     const html = renderSlide(0, undefined, {
       titleColor: '#FF0000',
       titleFont: 'Bebas Neue',
+      templateOverrides: { titleColor: true, titleFont: true },
     } as Partial<Slide>);
     expect(html).toContain('#FF0000');
     expect(html).toContain('Bebas Neue');
@@ -305,6 +396,7 @@ describe('TEMPLATE 1 — overrides do editor', () => {
     const headline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!;
     const html = renderSlide(0, undefined, {
       fontSize: { title: DEFAULT_SLIDE.fontSize.title * 2, description: DEFAULT_SLIDE.fontSize.description },
+      templateOverrides: { titleSize: true },
     } as Partial<Slide>);
     expect(html).toContain(`font-size:${headline.typography!.fontSizePx * 2}px`);
     // A entrelinha acompanha, senão as linhas colariam.
@@ -313,9 +405,12 @@ describe('TEMPLATE 1 — overrides do editor', () => {
 
   it('a cor de fundo do editor vence a do spec', () => {
     expect(renderSlide(3)).toContain('#FFFFFF');
-    expect(renderSlide(3, undefined, { backgroundColor: '#0A0A0A' } as Partial<Slide>)).toContain(
-      '#0A0A0A'
-    );
+    expect(
+      renderSlide(3, undefined, {
+        backgroundColor: '#0A0A0A',
+        templateOverrides: { background: true },
+      } as Partial<Slide>)
+    ).toContain('#0A0A0A');
   });
 
   it('desligar os cantos some com eles', () => {
@@ -332,5 +427,218 @@ describe('TEMPLATE 1 — overrides do editor', () => {
       />
     );
     expect(html).not.toContain('data-slot="cantos.left"');
+  });
+});
+
+/**
+ * O defeito mais caro do teste real: o carrossel gerado saiu com a cor da MARCA
+ * do usuário (creme claro, do onboarding) no fundo, os degradês do Figma
+ * apagados e o texto branco em cima — ilegível.
+ *
+ * A causa não era a cor: era o mecanismo. Override era "valor diferente do
+ * padrão do editor", e a geração gravava valores. A regra agora é estrutural —
+ * override só existe com MARCA, e só a barra lateral marca.
+ */
+describe('TEMPLATE 1 — geração não produz override', () => {
+  const MARCA_CLARA = '#F5F1E8';
+
+  /** O que o CreateWizard grava hoje num slide de template01. */
+  const slideGerado = (i: number): Slide =>
+    ({
+      ...DEFAULT_SLIDE,
+      id: `s${i}`,
+      position: i,
+      backgroundImageUrl: '',
+      gridImageUrl: '',
+      contentImageUrl: '',
+      templateSlots: template01SlotsFromContent(i, { title: 'Título', description: 'Corpo' }),
+    }) as Slide;
+
+  it('um slide recém-gerado não tem NENHUMA marca de override', () => {
+    for (let i = 0; i < 6; i++) expect(slideGerado(i).templateOverrides).toBeUndefined();
+  });
+
+  it('a paleta clara da marca NÃO vira fundo: o degradê do spec sobrevive', () => {
+    // Mesmo com a cor da marca no campo, sem marca de override ela não pinta.
+    const comMarca = {
+      ...slideGerado(0),
+      backgroundColor: MARCA_CLARA,
+      fontSize: { title: 90, description: 36 },
+    } as Slide;
+
+    const ov = template01Overrides(comMarca, DEFAULT_GLOBAL_SETTINGS);
+    expect(ov.background).toBeUndefined();
+    expect(ov.title.fontScale).toBe(1);
+
+    const html = renderToStaticMarkup(
+      <Template01Slide
+        slide={comMarca}
+        globalSettings={DEFAULT_GLOBAL_SETTINGS}
+        slideIndex={0}
+        totalSlides={TEMPLATE_01_SLIDE_COUNT}
+      />
+    );
+    expect(html).not.toContain(MARCA_CLARA);
+    // O degradê branco→preto da capa é o do Figma.
+    expect(html).toContain(TEMPLATE_01_SPEC.slides[0].background[0].css!);
+  });
+
+  it('a sombra de fábrica do editor não escurece o template', () => {
+    // DEFAULT_SLIDE.shadow é { style: 'base', opacity: 88 } — sem marca, nada.
+    expect(template01Overrides(slideGerado(1), DEFAULT_GLOBAL_SETTINGS).shadow).toBeUndefined();
+  });
+
+  it('marcar o controle — e só isso — faz o override existir', () => {
+    const semMarca = { ...slideGerado(0), backgroundColor: MARCA_CLARA } as Slide;
+    const comMarca = {
+      ...semMarca,
+      templateOverrides: markTemplate01Override(undefined, 'background'),
+    } as Slide;
+
+    expect(template01Overrides(semMarca, DEFAULT_GLOBAL_SETTINGS).background).toBeUndefined();
+    expect(template01Overrides(comMarca, DEFAULT_GLOBAL_SETTINGS).background).toBe(MARCA_CLARA);
+  });
+
+  it('a marca é acumulativa: mexer num controle não apaga os outros', () => {
+    const marks = markTemplate01Override(
+      markTemplate01Override(undefined, 'background'),
+      'titleSize'
+    );
+    expect(marks).toEqual({ background: true, titleSize: true });
+  });
+
+  it('os cantos seguem a mesma regra, no globalSettings', () => {
+    const gs = { ...DEFAULT_GLOBAL_SETTINGS, corners: { ...DEFAULT_CORNERS, color: '#FF0000' } };
+    expect(template01Overrides(slideGerado(2), gs).corner.color).toBeUndefined();
+
+    const marcado = {
+      ...gs,
+      templateOverrides: markTemplate01CornerOverride(undefined, 'cornerColor'),
+    };
+    expect(template01Overrides(slideGerado(2), marcado).corner.color).toBe('#FF0000');
+  });
+});
+
+/**
+ * BUG 3: os controles estavam DESENHADOS na barra lateral mas inertes — o
+ * renderer não lia nenhum deles. Cada teste aqui é "mexi no controle X, o
+ * render mudou".
+ */
+describe('TEMPLATE 1 — cada controle da barra lateral tem efeito no render', () => {
+  const com = (patch: Partial<Slide>, ...keys: Parameters<typeof markTemplate01Override>[1][]) =>
+    renderSlide(0, undefined, {
+      ...patch,
+      templateOverrides: markTemplate01Override(undefined, ...keys),
+    } as Partial<Slide>);
+
+  const headline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!;
+
+  it('posição: o deslocamento move os blocos de texto', () => {
+    const html = com({ textOffset: { x: 40, y: -25 } }, 'textOffset');
+    expect(html).toContain(`top:${headline.box.y - 25}px`);
+    expect(html).toContain('translateX(calc(-50% + 40px))');
+    // Sem marca, nada se move.
+    expect(renderSlide(0)).toContain(`top:${headline.box.y}px`);
+  });
+
+  it('alinhamento troca o text-align do spec', () => {
+    expect(headline.typography!.textAlignHorizontal.toLowerCase()).toBe('center');
+    expect(com({ textAlignment: 'left' }, 'textAlignment')).toContain('text-align:left');
+  });
+
+  it('tamanho do título escala fonte e entrelinha juntos', () => {
+    const html = com(
+      { fontSize: { title: DEFAULT_SLIDE.fontSize.title / 2, description: 36 } },
+      'titleSize'
+    );
+    expect(html).toContain(`font-size:${headline.typography!.fontSizePx / 2}px`);
+  });
+
+  it('tamanho da descrição não mexe no título', () => {
+    const html = com(
+      { fontSize: { title: DEFAULT_SLIDE.fontSize.title, description: DEFAULT_SLIDE.fontSize.description * 2 } },
+      'descriptionSize'
+    );
+    const subline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.subline')!;
+    expect(html).toContain(`font-size:${subline.typography!.fontSizePx * 2}px`);
+    expect(html).toContain(`font-size:${headline.typography!.fontSizePx}px`);
+  });
+
+  it('cor da descrição, sublinhado, letras e entrelinha entram', () => {
+    expect(com({ descriptionColor: '#00FF00' }, 'descriptionColor')).toContain('#00FF00');
+    expect(com({ titleUnderline: true }, 'titleUnderline')).toContain('text-decoration:underline');
+    expect(com({ titleLetterSpacing: 0.25 }, 'titleLetterSpacing')).toContain('letter-spacing:0.25em');
+    const lh = com({ lineHeight: 2 }, 'lineHeight');
+    expect(lh).toContain(`line-height:${headline.typography!.fontSizePx * 2}px`);
+  });
+
+  it('espaço título → descrição abre o vão dentro do grupo', () => {
+    const specTop = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!.box.y;
+    const tops = template01Tops(1, {}, {
+      titleGapDelta: 30,
+      isTitleSlot: (s) => s === 's1.headline' || s === 's1.eyebrow',
+    });
+    // Grupo ancorado no rodapé: a síntese fica, o título sobe 30px.
+    expect(tops['s1.subline']).toBe(
+      TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.subline')!.box.y
+    );
+    expect(tops['s1.headline']).toBe(specTop - 30);
+  });
+
+  it('degradê/overlay do editor entra por cima do degradê do template', () => {
+    const html = com({ shadow: { style: 'base', opacity: 60, color: '#123456' } }, 'shadow');
+    // O overlay sai em rgba() para poder variar a opacidade ao longo do degradê.
+    expect(html).toContain('rgba(18,52,86');
+    // Sem marca, a sombra de fábrica não pinta nada.
+    expect(renderSlide(0)).not.toContain('rgba(0,0,0,0.88)');
+    // O degradê do spec continua lá.
+    expect(html).toContain(TEMPLATE_01_SPEC.slides[0].background[0].css!);
+  });
+
+  it('imagem: posição, zoom e opacidade valem quando marcados', () => {
+    const slots = { 's1.image': 'https://exemplo/foto.jpg' };
+    const semMarca = renderSlide(0, slots);
+    expect(semMarca).toContain('background-size:cover');
+
+    const html = renderSlide(0, slots, {
+      imagePosition: { x: 10, y: 90, zoom: 250 },
+      backgroundImageOpacity: 40,
+      templateOverrides: markTemplate01Override(
+        undefined,
+        'backgroundImagePosition',
+        'backgroundImageOpacity'
+      ),
+    } as Partial<Slide>);
+    expect(html).toContain('scale(2.5)');
+    expect(html).toContain('background-position:10% 90%');
+    expect(html).toContain('opacity:0.4');
+  });
+
+  it('cantos: tamanho, cor, opacidade e distância das bordas mudam o render', () => {
+    const render = (corners: Partial<typeof DEFAULT_CORNERS>, ...keys: Template01CornerControl[]) =>
+      renderToStaticMarkup(
+        <Template01Slide
+          slide={{ ...DEFAULT_SLIDE, id: 's', position: 2 } as Slide}
+          globalSettings={{
+            ...DEFAULT_GLOBAL_SETTINGS,
+            corners: { ...DEFAULT_CORNERS, ...corners },
+            templateOverrides: markTemplate01CornerOverride(undefined, ...keys),
+          }}
+          slideIndex={2}
+          totalSlides={TEMPLATE_01_SLIDE_COUNT}
+        />
+      );
+
+    const cantoEsq = TEMPLATE_01_SPEC.slides[2].nodes.find((n) => n.slot === 'cantos.left')!;
+    expect(render({ color: '#FF00FF' }, 'cornerColor')).toContain('#FF00FF');
+    expect(render({ opacity: 30 }, 'cornerOpacity')).toContain('opacity:0.3');
+    expect(render({ fontSize: DEFAULT_CORNERS.fontSize * 2 }, 'cornerSize')).toContain(
+      `font-size:${cantoEsq.typography!.fontSizePx * 2}px`
+    );
+    // borderDistance padrão é 49: +20 afasta os dois cantos das bordas.
+    const afastado = render({ borderDistance: DEFAULT_CORNERS.borderDistance + 20 }, 'cornerDistance');
+    expect(afastado).toContain(`left:${cantoEsq.box.x + 20}px`);
+    const cantoDir = TEMPLATE_01_SPEC.slides[2].nodes.find((n) => n.slot === 'cantos.right')!;
+    expect(afastado).toContain(`right:${cantoDir.box.right + 20}px`);
   });
 });

@@ -4,13 +4,16 @@
  * O carrossel NASCE seguindo o template: enquanto o usuário não mexe em nada, o
  * spec é a única fonte de forma e o render sai idêntico ao gabarito do
  * `render.py`. Depois disso valem os mesmos controles dos outros estilos — cor,
- * tamanho de fonte, fonte, fundo, imagem, sombra, cantos.
+ * tamanho, fonte, posição, fundo, imagem, degradê, cantos.
  *
- * Como o `Slide` não tem "campo vazio" para a maioria desses controles (ele
- * nasce preenchido com `DEFAULT_SLIDE`), o que caracteriza um override é o valor
- * DIFERIR do padrão do editor. É por isso que este módulo compara com
- * `DEFAULT_SLIDE`/`DEFAULT_CORNERS` em vez de checar `undefined`: sem isso o
- * `#111111` de fábrica pintaria por cima do fundo do Figma no primeiro render.
+ * O QUE CARACTERIZA UM OVERRIDE é a MARCA em `slide.templateOverrides` /
+ * `globalSettings.templateOverrides`, gravada só pelos handlers da barra
+ * lateral. Nunca a comparação do valor com o padrão do editor.
+ *
+ * A versão anterior comparava (`backgroundColor !== DEFAULT_SLIDE.backgroundColor`)
+ * e quebrou no primeiro uso real: a geração gravava a cor da MARCA do usuário em
+ * todo slide, ela diferia de `#111111`, virava "escolha do usuário" e pintava
+ * chapado por cima dos degradês do Figma. Valor não é intenção; só o gesto é.
  */
 import {
   DEFAULT_CORNERS,
@@ -18,6 +21,8 @@ import {
   GlobalSettings,
   ImagePosition,
   Slide,
+  Template01CornerControl,
+  Template01SlideControl,
 } from '@/types';
 import { getElementFontCSS, getShadowOverlayGradient, ElementFontCSS } from '@/lib/utils';
 import { SpecNode } from './index';
@@ -45,6 +50,8 @@ export interface Template01TextOverride {
   /** Entrelinha como razão do tamanho da fonte; ausente = a razão do spec. */
   lineHeightRatio?: number;
   opacity?: number;
+  /** Alinhamento horizontal; ausente = o do spec. */
+  align?: 'left' | 'center' | 'right';
 }
 
 export interface Template01ImageOverride {
@@ -62,102 +69,156 @@ export interface Template01Overrides {
   /** Degradê de sombra/overlay; ausente = sem overlay extra. */
   shadow?: string;
   hideCorners: boolean;
+  /** Deslocamento dos blocos de texto, em px do canvas do spec. */
+  textOffset?: { x: number; y: number };
+  /** Vão extra entre título e corpo, em px do canvas. */
+  titleGapDelta?: number;
+  /** Distância dos cantos às bordas, em px; ausente = a do spec. */
+  cornerDistance?: number;
   backgroundImage: Template01ImageOverride;
   contentImage: Template01ImageOverride;
 }
 
-function samePosition(a: ImagePosition | undefined, b: ImagePosition): boolean {
-  return !a || (a.x === b.x && a.y === b.y && a.zoom === b.zoom && !a.objectFit);
+/** Marcou? O valor do usuário vale. Não marcou? O spec vale. */
+function touched(slide: Slide, key: Template01SlideControl): boolean {
+  return slide.templateOverrides?.[key] === true;
+}
+
+function cornerTouched(gs: GlobalSettings, key: Template01CornerControl): boolean {
+  return gs.templateOverrides?.[key] === true;
 }
 
 function textOverridesFor(
-  color: string | undefined,
-  defaultColor: string | undefined,
-  size: number,
-  defaultSize: number,
-  font: Slide['titleFont'],
-  underline: boolean | undefined,
-  letterSpacing: number | undefined,
-  lineHeight: number
+  slide: Slide,
+  keys: {
+    color: Template01SlideControl;
+    size: Template01SlideControl;
+    font: Template01SlideControl;
+    underline: Template01SlideControl;
+    letterSpacing?: Template01SlideControl;
+  },
+  values: {
+    color: string | undefined;
+    size: number;
+    defaultSize: number;
+    font: Slide['titleFont'];
+    underline: boolean | undefined;
+    letterSpacing: number | undefined;
+  }
 ): Template01TextOverride {
   return {
-    color: color && color !== defaultColor ? color : undefined,
-    fontScale: defaultSize ? size / defaultSize : 1,
-    font: font ? getElementFontCSS(font) : undefined,
-    underline: !!underline,
-    letterSpacingEm: letterSpacing,
-    lineHeightRatio: lineHeight !== DEFAULT_SLIDE.lineHeight ? lineHeight : undefined,
+    color: touched(slide, keys.color) ? values.color : undefined,
+    fontScale: touched(slide, keys.size) && values.defaultSize ? values.size / values.defaultSize : 1,
+    font: touched(slide, keys.font) && values.font ? getElementFontCSS(values.font) : undefined,
+    underline: touched(slide, keys.underline) && !!values.underline,
+    letterSpacingEm:
+      keys.letterSpacing && touched(slide, keys.letterSpacing) ? values.letterSpacing : undefined,
+    lineHeightRatio: touched(slide, 'lineHeight')
+      ? slide.lineHeight ?? DEFAULT_SLIDE.lineHeight
+      : undefined,
+    align: touched(slide, 'textAlignment') ? slide.textAlignment : undefined,
   };
 }
 
-/** Lê do `slide`/`globalSettings` só o que o usuário de fato mudou. */
+/** Lê do `slide`/`globalSettings` só o que o usuário de fato marcou. */
 export function template01Overrides(
   slide: Slide,
   globalSettings: GlobalSettings
 ): Template01Overrides {
   const corners = globalSettings.corners ?? DEFAULT_CORNERS;
   const shadow = slide.shadow ?? DEFAULT_SLIDE.shadow;
-  const shadowTouched =
-    shadow.style !== DEFAULT_SLIDE.shadow.style ||
-    shadow.opacity !== DEFAULT_SLIDE.shadow.opacity ||
-    shadow.color !== undefined ||
-    shadow.size !== undefined ||
-    shadow.distance !== undefined;
-
   const bgOpacity = slide.backgroundImageOpacity ?? 100;
 
   return {
     title: textOverridesFor(
-      slide.titleColor,
-      undefined,
-      slide.fontSize?.title ?? DEFAULT_SLIDE.fontSize.title,
-      DEFAULT_SLIDE.fontSize.title,
-      slide.titleFont,
-      slide.titleUnderline,
-      slide.titleLetterSpacing,
-      slide.lineHeight ?? DEFAULT_SLIDE.lineHeight
+      slide,
+      {
+        color: 'titleColor',
+        size: 'titleSize',
+        font: 'titleFont',
+        underline: 'titleUnderline',
+        letterSpacing: 'titleLetterSpacing',
+      },
+      {
+        color: slide.titleColor,
+        size: slide.fontSize?.title ?? DEFAULT_SLIDE.fontSize.title,
+        defaultSize: DEFAULT_SLIDE.fontSize.title,
+        font: slide.titleFont,
+        underline: slide.titleUnderline,
+        letterSpacing: slide.titleLetterSpacing,
+      }
     ),
     body: textOverridesFor(
-      slide.descriptionColor,
-      undefined,
-      slide.fontSize?.description ?? DEFAULT_SLIDE.fontSize.description,
-      DEFAULT_SLIDE.fontSize.description,
-      slide.descriptionFont,
-      slide.descriptionUnderline,
-      undefined,
-      slide.lineHeight ?? DEFAULT_SLIDE.lineHeight
+      slide,
+      {
+        color: 'descriptionColor',
+        size: 'descriptionSize',
+        font: 'descriptionFont',
+        underline: 'descriptionUnderline',
+      },
+      {
+        color: slide.descriptionColor,
+        size: slide.fontSize?.description ?? DEFAULT_SLIDE.fontSize.description,
+        defaultSize: DEFAULT_SLIDE.fontSize.description,
+        font: slide.descriptionFont,
+        underline: slide.descriptionUnderline,
+        letterSpacing: undefined,
+      }
     ),
     corner: {
-      color: corners.color && corners.color !== DEFAULT_CORNERS.color ? corners.color : undefined,
-      fontScale: corners.fontSize ? corners.fontSize / DEFAULT_CORNERS.fontSize : 1,
+      color: cornerTouched(globalSettings, 'cornerColor') ? corners.color : undefined,
+      fontScale:
+        cornerTouched(globalSettings, 'cornerSize') && corners.fontSize
+          ? corners.fontSize / DEFAULT_CORNERS.fontSize
+          : 1,
       font:
-        corners.elementFont && corners.elementFont !== DEFAULT_CORNERS.elementFont
+        cornerTouched(globalSettings, 'cornerFont') && corners.elementFont
           ? getElementFontCSS(corners.elementFont)
           : undefined,
       underline: false,
-      opacity: corners.opacity !== DEFAULT_CORNERS.opacity ? corners.opacity / 100 : undefined,
+      opacity: cornerTouched(globalSettings, 'cornerOpacity') ? corners.opacity / 100 : undefined,
     },
-    background:
-      slide.backgroundColor && slide.backgroundColor !== DEFAULT_SLIDE.backgroundColor
-        ? slide.backgroundColor
-        : undefined,
+    background: touched(slide, 'background') ? slide.backgroundColor : undefined,
     // O spec já traz o próprio degradê; o overlay do editor só entra quando o
     // usuário mexe no controle — senão a sombra de fábrica escureceria o
     // template inteiro no primeiro render.
     shadow:
-      shadowTouched && shadow.style !== 'none'
+      touched(slide, 'shadow') && shadow.style !== 'none'
         ? getShadowOverlayGradient(shadow.opacity, shadow.color, shadow.size, shadow.distance)
         : undefined,
     hideCorners: corners.show === false,
+    textOffset: touched(slide, 'textOffset') ? slide.textOffset : undefined,
+    titleGapDelta: touched(slide, 'titleDescriptionGap') ? slide.titleDescriptionGap : undefined,
+    cornerDistance: cornerTouched(globalSettings, 'cornerDistance')
+      ? corners.borderDistance
+      : undefined,
     backgroundImage: {
-      position: samePosition(slide.imagePosition, DEFAULT_SLIDE.imagePosition)
-        ? undefined
-        : slide.imagePosition,
-      opacity: bgOpacity !== 100 ? bgOpacity / 100 : undefined,
+      position: touched(slide, 'backgroundImagePosition') ? slide.imagePosition : undefined,
+      opacity: touched(slide, 'backgroundImageOpacity') ? bgOpacity / 100 : undefined,
     },
     contentImage: {
-      position: slide.contentImagePosition,
-      opacity: bgOpacity !== 100 ? bgOpacity / 100 : undefined,
+      position: touched(slide, 'contentImagePosition') ? slide.contentImagePosition : undefined,
+      opacity: touched(slide, 'backgroundImageOpacity') ? bgOpacity / 100 : undefined,
     },
   };
+}
+
+/** Marca um controle como mexido, preservando os anteriores. */
+export function markTemplate01Override(
+  current: Slide['templateOverrides'],
+  ...keys: Template01SlideControl[]
+): NonNullable<Slide['templateOverrides']> {
+  const next = { ...(current ?? {}) };
+  for (const k of keys) next[k] = true;
+  return next;
+}
+
+/** Idem para os cantos, que valem para o deck inteiro. */
+export function markTemplate01CornerOverride(
+  current: GlobalSettings['templateOverrides'],
+  ...keys: Template01CornerControl[]
+): NonNullable<GlobalSettings['templateOverrides']> {
+  const next = { ...(current ?? {}) };
+  for (const k of keys) next[k] = true;
+  return next;
 }

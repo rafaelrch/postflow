@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Slide, GlobalSettings } from '@/types';
+import { Slide, GlobalSettings, DEFAULT_CORNERS } from '@/types';
 import { getImageLayerStyle } from '@/lib/utils';
 import {
   TEMPLATE_01_SPEC,
@@ -75,6 +75,18 @@ function effectiveType(node: SpecNode, o: Template01TextOverride) {
   return { fontSizePx, lineHeightPx };
 }
 
+/**
+ * Deslocamento dos cantos pelo controle "distância das bordas".
+ *
+ * O spec põe os cantos em x=71/right=63 e y=44 — três números diferentes, então
+ * não dá para tratar o controle como distância absoluta sem redesenhar a linha.
+ * O que ele move é a DIFERENÇA para o padrão do editor, preservando o desenho
+ * quando o usuário não mexe.
+ */
+function cornerShift(ov: Template01Overrides): number {
+  return ov.cornerDistance == null ? 0 : ov.cornerDistance - DEFAULT_CORNERS.borderDistance;
+}
+
 /** Espelha `node_css()` do render.py, com os overrides do usuário por cima. */
 function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React.CSSProperties {
   const b = node.box;
@@ -82,21 +94,29 @@ function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React
 
   if (node.type === 'TEXT' && node.typography && node.anchor) {
     const t = node.typography;
-    const o = ov[template01Kind(node)];
+    const kind = template01Kind(node);
+    const o = ov[kind];
     const { fontSizePx, lineHeightPx } = effectiveType(node, o);
+    // Os cantos têm controle próprio (distância às bordas); o resto do texto
+    // anda junto no deslocamento do bloco.
+    const isCorner = kind === 'corner';
+    const dx = isCorner ? cornerShift(ov) : ov.textOffset?.x ?? 0;
+    const dy = isCorner ? cornerShift(ov) : ov.textOffset?.y ?? 0;
 
     if (node.anchor.mode === 'center-x') {
       css.left = '50%';
-      css.transform = 'translateX(-50%)';
+      css.transform = dx ? `translateX(calc(-50% + ${dx}px))` : 'translateX(-50%)';
       css.width = b.w;
     } else if (node.anchor.mode === 'right') {
-      css.right = b.right;
+      // A distância é medida da borda direita. No canto, `dx` AFASTA da borda
+      // (soma); num deslocamento de bloco, empurrar para a direita aproxima.
+      css.right = b.right + (isCorner ? dx : -dx);
       css.width = b.w;
     } else {
-      css.left = b.x;
+      css.left = b.x + dx;
       css.width = b.w;
     }
-    css.top = top ?? b.y;
+    css.top = (top ?? b.y) + dy;
     css.fontFamily = o.font ? o.font.fontFamily : fontStack(t.fontFamily);
     css.fontWeight = o.font ? o.font.fontWeight : t.fontWeight || 400;
     css.fontStyle = o.font ? o.font.fontStyle : t.italic ? 'italic' : 'normal';
@@ -104,7 +124,8 @@ function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React
     css.fontSize = `${fontSizePx}px`;
     css.lineHeight = `${lineHeightPx}px`;
     css.letterSpacing = `${o.letterSpacingEm ?? t.letterSpacingEm}em`;
-    css.textAlign = t.textAlignHorizontal.toLowerCase() as React.CSSProperties['textAlign'];
+    css.textAlign = (o.align ??
+      t.textAlignHorizontal.toLowerCase()) as React.CSSProperties['textAlign'];
     css.color = o.color ?? node.fills?.[0]?.css;
     if (o.underline) css.textDecoration = 'underline';
     css.margin = 0;
@@ -137,6 +158,24 @@ function nodeStyle(node: SpecNode, ov: Template01Overrides, top?: number): React
  * na barra lateral, os runs deixam de mexer em família e peso: a escolha dele
  * vale para o bloco inteiro.
  */
+/**
+ * O corte entre runs vem por índice de CARACTERE do spec. Com outro texto isso
+ * cai no meio de uma palavra ("*Torrefação artesanal mud|a o sabor"), o que
+ * parece defeito. Aqui o corte anda para o início da palavra mais próxima.
+ *
+ * O espaço fica sempre com o run da ESQUERDA (por isso `+ 1`): é assim que o
+ * spec corta, então com o texto do Figma esta função devolve o mesmo índice e a
+ * fidelidade de 0 px não se mexe.
+ */
+function snapToWord(value: string, end: number, cursor: number): number {
+  if (end <= cursor || end >= value.length) return end;
+  const before = value.lastIndexOf(' ', end);
+  const after = value.indexOf(' ', end);
+  const candidates = [before, after].filter((i) => i >= 0 && i + 1 > cursor).map((i) => i + 1);
+  if (!candidates.length) return end;
+  return candidates.reduce((best, i) => (Math.abs(i - end) < Math.abs(best - end) ? i : best));
+}
+
 function renderRuns(
   value: string,
   runs: SpecStyledRun[],
@@ -147,7 +186,7 @@ function renderRuns(
   runs.forEach((run, i) => {
     if (cursor >= value.length) return;
     const isLast = i === runs.length - 1;
-    const end = isLast ? value.length : Math.min(run.end, value.length);
+    const end = isLast ? value.length : snapToWord(value, Math.min(run.end, value.length), cursor);
     const chunk = value.slice(cursor, end);
     cursor = end;
     if (!chunk) return;
@@ -315,9 +354,21 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
     };
   });
 
+  const isTitleSlot = React.useCallback(
+    (slot: string) => {
+      const node = specSlide.nodes.find((n) => n.slot === slot);
+      return !!node && template01Kind(node) === 'title';
+    },
+    [specSlide]
+  );
+
   const tops = React.useMemo(
-    () => template01Tops(specSlide.index, metrics),
-    [specSlide.index, metrics]
+    () =>
+      template01Tops(specSlide.index, metrics, {
+        titleGapDelta: ov.titleGapDelta,
+        isTitleSlot,
+      }),
+    [specSlide.index, metrics, ov.titleGapDelta, isTitleSlot]
   );
 
   const bgLayers = specSlide.backgroundLayers ?? [];

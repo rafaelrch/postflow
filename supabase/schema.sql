@@ -186,6 +186,7 @@ create table if not exists public.slides (
   text_padding jsonb,
   content_layout text,
   template_slots jsonb,
+  template_overrides jsonb,
   editorial_title_offset_y smallint,
   editorial_desc_offset_y smallint,
   editorial_image_offset_y smallint,
@@ -214,6 +215,7 @@ alter table public.slides add column if not exists title_description_gap smallin
 alter table public.slides add column if not exists text_padding jsonb;
 alter table public.slides add column if not exists content_layout text;
 alter table public.slides add column if not exists template_slots jsonb;
+alter table public.slides add column if not exists template_overrides jsonb;
 alter table public.slides add column if not exists editorial_title_offset_y smallint;
 alter table public.slides add column if not exists editorial_desc_offset_y smallint;
 alter table public.slides add column if not exists editorial_image_offset_y smallint;

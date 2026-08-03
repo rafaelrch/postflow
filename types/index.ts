@@ -131,6 +131,44 @@ export interface ProfileData {
   followers?: string;
 }
 
+/**
+ * TEMPLATE 1 — controles cuja mexida o usuário precisa declarar.
+ *
+ * O nome da chave é o CONTROLE da barra lateral, não o campo do `Slide`: é o
+ * gesto do usuário que cria o override, e o valor continua morando no campo de
+ * sempre (`backgroundColor`, `fontSize.title`…). Ver `Slide.templateOverrides`.
+ */
+export type Template01SlideControl =
+  | 'background'
+  | 'shadow'
+  | 'titleColor'
+  | 'titleSize'
+  | 'titleFont'
+  | 'titleUnderline'
+  | 'titleLetterSpacing'
+  | 'descriptionColor'
+  | 'descriptionSize'
+  | 'descriptionFont'
+  | 'descriptionUnderline'
+  | 'lineHeight'
+  | 'titleDescriptionGap'
+  | 'textOffset'
+  | 'textAlignment'
+  | 'backgroundImagePosition'
+  | 'backgroundImageOpacity'
+  | 'contentImagePosition';
+
+/** Controles dos cantos — deck inteiro, então moram no `GlobalSettings`. */
+export type Template01CornerControl =
+  | 'cornerColor'
+  | 'cornerSize'
+  | 'cornerFont'
+  | 'cornerOpacity'
+  | 'cornerDistance';
+
+export type Template01SlideOverrideKeys = Partial<Record<Template01SlideControl, true>>;
+export type Template01CornerOverrideKeys = Partial<Record<Template01CornerControl, true>>;
+
 export interface Slide {
   id: string;
   carouselId?: string;
@@ -176,6 +214,19 @@ export interface Slide {
    * carrega tipografia/posição, apenas o texto e as URLs de imagem.
    */
   templateSlots?: Record<string, string>;
+  /**
+   * Controles do TEMPLATE 1 que o USUÁRIO mexeu na barra lateral.
+   *
+   * Existe porque o `Slide` nasce PREENCHIDO (`DEFAULT_SLIDE`) e não tem campo
+   * vazio para a maioria dos controles: sem uma marca explícita, a única forma
+   * de saber se `backgroundColor` é escolha do usuário seria comparar com o
+   * padrão — e qualquer coisa que grave um valor no slide (a geração, um
+   * default novo) viraria override por acidente. Foi assim que a paleta da
+   * marca apagou o degradê do template.
+   *
+   * Regra: GERAÇÃO NUNCA escreve aqui. Só os handlers da barra lateral.
+   */
+  templateOverrides?: Template01SlideOverrideKeys;
   editorialTitleOffsetY?: number;
   editorialDescOffsetY?: number;
   editorialImageOffsetY?: number;
@@ -198,6 +249,12 @@ export interface GlobalSettings {
   // Formato/proporção do carrossel. Serializa em global_settings (jsonb).
   // Ausência => '4:5' (projetos antigos).
   format?: SlideFormat;
+  /**
+   * TEMPLATE 1: controles de canto que o usuário mexeu. Mesma regra do
+   * `Slide.templateOverrides` — só a barra lateral escreve aqui. Serializa em
+   * global_settings (jsonb), sem coluna nova.
+   */
+  templateOverrides?: Template01CornerOverrideKeys;
 }
 
 export interface Carousel {
@@ -236,6 +293,12 @@ export interface SlideAIData {
   description: string;
   highlightWord: string;
   backgroundColor?: string;
+  /**
+   * Blocos de texto que existem no desenho além do par título/descrição —
+   * hoje só o TEMPLATE 1 pede (chapéu da capa, remate, coluna de baixo).
+   * Chaveado pelo nome curto do contrato (`eyebrow`, `kicker`, `botTitle`…).
+   */
+  extras?: Record<string, string>;
 }
 
 export interface CarouselAIResponse {

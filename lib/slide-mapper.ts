@@ -59,6 +59,7 @@ export function mapDbSlideToSlide(sl: DbRow): Slide {
     textPadding: (sl.text_padding as Slide['textPadding']) || undefined,
     contentLayout: (sl.content_layout as Slide['contentLayout']) || undefined,
     templateSlots: (sl.template_slots as Slide['templateSlots']) || undefined,
+    templateOverrides: (sl.template_overrides as Slide['templateOverrides']) || undefined,
     editorialTitleOffsetY: (sl.editorial_title_offset_y as number) ?? undefined,
     editorialDescOffsetY: (sl.editorial_desc_offset_y as number) ?? undefined,
     editorialImageOffsetY: (sl.editorial_image_offset_y as number) ?? undefined,
@@ -110,6 +111,7 @@ export function mapSlideToDbRow(slide: Slide, carouselId: string, position: numb
     // mantém o autosave dos outros estilos funcionando mesmo antes da migração
     // do template rodar (a coluna não existe → o insert falharia).
     ...(slide.templateSlots ? { template_slots: slide.templateSlots } : {}),
+    ...(slide.templateOverrides ? { template_overrides: slide.templateOverrides } : {}),
     editorial_title_offset_y: slide.editorialTitleOffsetY ?? null,
     editorial_desc_offset_y: slide.editorialDescOffsetY ?? null,
     editorial_image_offset_y: slide.editorialImageOffsetY ?? null,
@@ -127,5 +129,6 @@ export function mapDbCarouselToGlobalSettings(carousel: DbRow): GlobalSettings {
     metaBar: stored.metaBar || DEFAULT_GLOBAL_SETTINGS.metaBar,
     // Projetos antigos sem formato salvo assumem '4:5' (legado).
     format: stored.format || '4:5',
+    templateOverrides: stored.templateOverrides || undefined,
   };
 }
