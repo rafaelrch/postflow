@@ -3,9 +3,11 @@
 import React from 'react';
 import { Slide, GlobalSettings, DEFAULT_CORNERS } from '@/types';
 import { getImageLayerStyle } from '@/lib/utils';
+import { getFormat } from '@/lib/formats';
 import {
   TEMPLATE_01_WIDTH,
-  TEMPLATE_01_HEIGHT,
+  template01HeightRatio,
+  template01NodeSpan,
   Template01Slots,
   Template01BlockMetrics,
   template01SpecLines,
@@ -101,12 +103,19 @@ function cornerShift(ov: Template01Overrides): number {
   return ov.cornerDistance == null ? 0 : ov.cornerDistance - DEFAULT_CORNERS.borderDistance;
 }
 
-/** Espelha `node_css()` do render.py, com os overrides do usuário por cima. */
+/**
+ * Espelha `node_css()` do render.py, com os overrides do usuário por cima.
+ *
+ * `ratio` é a razão de altura do formato ativo e só toca a BANDA (imagem, seta):
+ * o texto é margem absoluta e nada nele — nem `x`, nem largura, nem corpo —
+ * depende do formato. No 4:5 a razão é 1 e a função devolve o spec cru.
+ */
 function nodeStyle(
   node: SpecNode,
   ov: Template01Overrides,
   top?: number,
-  alignBox?: SpecBox
+  alignBox?: SpecBox,
+  ratio = 1
 ): React.CSSProperties {
   // Com override de alinhamento os blocos da mesma coluna passam a usar a caixa
   // mais larga do grupo, senão as bordas divergem (ver TEMPLATE_01_ALIGN_GROUPS).
@@ -153,10 +162,11 @@ function nodeStyle(
     css.margin = 0;
     css.whiteSpace = 'pre-wrap';
   } else {
+    const span = template01NodeSpan(node, ratio);
     css.left = b.x;
-    css.top = b.y;
+    css.top = span.y;
     css.width = b.w;
-    css.height = b.h;
+    css.height = span.h;
     if (node.cornerRadius) css.borderRadius = node.cornerRadius;
     if (node.fills?.length) css.background = node.fills[0].css ?? 'transparent';
     if (node.strokes?.length) {
@@ -234,10 +244,14 @@ function renderRuns(
  * Seta vertical do slide 6. O `rotation: 90°` do Figma já vem aplicado no
  * bounding box (w≈0, h=127), então a linha é vertical; a ponta é desenhada pelo
  * stroke cap e extrapola o bbox — daí o `overflow: visible` e o padding lateral.
+ *
+ * A seta é BANDA: o comprimento e o `y` acompanham a altura do formato. A
+ * espessura do traço e a largura da ponta são horizontais e ficam intactas.
  */
-function ArrowNode({ node }: { node: SpecNode }) {
+function ArrowNode({ node, ratio = 1 }: { node: SpecNode; ratio?: number }) {
   const b = node.box;
-  const L = b.h;
+  const span = template01NodeSpan(node, ratio);
+  const L = span.h;
   const sw = node.strokeWeight || 2;
   const color = node.strokes?.[0]?.css ?? '#FFFFFF';
   const headW = node.arrowHeadWidth ?? 14.73;
@@ -249,7 +263,7 @@ function ArrowNode({ node }: { node: SpecNode }) {
   return (
     <svg
       data-slot={node.slot}
-      style={{ position: 'absolute', left: cx - pad, top: b.y, overflow: 'visible' }}
+      style={{ position: 'absolute', left: cx - pad, top: span.y, overflow: 'visible' }}
       width={w}
       height={h}
       viewBox={`0 0 ${w} ${h}`}
@@ -306,6 +320,12 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
   // `template01ModelOf`.
   const specSlide = template01SpecSlideOf(template01ModelOf(slide, slideIndex));
 
+  // Formato ativo. Os três compartilham a largura 1080 — só a ALTURA muda, e é
+  // só ela que o template adapta (ver a seção "Adaptação de formato" no módulo
+  // do template). No 4:5 a razão é 1 e todo o desenho sai igual ao gabarito.
+  const fmt = getFormat(globalSettings.format);
+  const ratio = template01HeightRatio(fmt.height);
+
   const ov = React.useMemo(
     () => template01Overrides(slide, globalSettings),
     [slide, globalSettings]
@@ -353,7 +373,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
     const measure = () => {
       const root = rootRef.current;
       if (!root) return;
-      const scale = root.getBoundingClientRect().height / TEMPLATE_01_HEIGHT;
+      const scale = root.getBoundingClientRect().height / fmt.height;
       if (!scale || !isFinite(scale)) return;
       const next: Record<string, Template01BlockMetrics> = {};
       textRefs.current.forEach((el, slot) => {
@@ -395,8 +415,9 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
       template01Tops(specSlide.index, metrics, {
         titleGapDelta: ov.titleGapDelta,
         isTitleSlot,
+        ratio,
       }),
-    [specSlide.index, metrics, ov.titleGapDelta, isTitleSlot]
+    [specSlide.index, metrics, ov.titleGapDelta, isTitleSlot, ratio]
   );
 
   // Caixa compartilhada só existe quando o usuário troca o alinhamento: é a
@@ -419,7 +440,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
       style={{
         position: 'relative',
         width: TEMPLATE_01_WIDTH,
-        height: TEMPLATE_01_HEIGHT,
+        height: fmt.height,
         overflow: 'hidden',
         // Sem imagem, mostra o degradê original do Figma — mesmo comportamento
         // do render.py, que serve de gabarito de inspeção.
@@ -455,7 +476,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
                 if (el) textRefs.current.set(slot, el);
                 else textRefs.current.delete(slot);
               }}
-              style={nodeStyle(node, ov, tops[slot], alignBoxes[slot])}
+              style={nodeStyle(node, ov, tops[slot], alignBoxes[slot], ratio)}
             >
               {runs?.length ? renderRuns(value, runs, hasFontOverride) : value}
             </div>
@@ -464,7 +485,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
 
         if (node.type === 'RECTANGLE') {
           const url = slots[slot] ?? slots[`${node.id}:image`];
-          const style = nodeStyle(node, ov);
+          const style = nodeStyle(node, ov, undefined, undefined, ratio);
           if (url) style.overflow = 'hidden';
           return (
             <div key={node.id} data-slot={slot} style={style}>
@@ -473,7 +494,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
           );
         }
 
-        if (node.type === 'VECTOR') return <ArrowNode key={node.id} node={node} />;
+        if (node.type === 'VECTOR') return <ArrowNode key={node.id} node={node} ratio={ratio} />;
 
         return null;
       })}

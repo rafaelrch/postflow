@@ -17,10 +17,9 @@ export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
 
   // O elemento capturado no export precisa ter a altura do formato ativo,
   // senão o PNG/ZIP sairia cortado no 1350 legado.
-  // O TEMPLATE 1 tem forma travada em 1080x1350 pelo spec e não segue o seletor.
   const fmt = getFormat(globalSettings.format);
-  const SLIDE_W = style === 'template01' ? 1080 : fmt.width;
-  const SLIDE_H = style === 'template01' ? 1350 : fmt.height;
+  const SLIDE_W = fmt.width;
+  const SLIDE_H = fmt.height;
 
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',

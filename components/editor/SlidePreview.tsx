@@ -28,11 +28,9 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
   ref
 ) {
   // Dimensões do formato ativo — a moldura escalada acompanha a proporção real.
-  // O TEMPLATE 1 é a exceção: a forma vem travada do spec em 1080x1350, então
-  // ele ignora o seletor de formato em vez de ser esticado para 1:1 ou 9:16.
   const fmt = getFormat(globalSettings.format);
-  const SLIDE_W = style === 'template01' ? 1080 : fmt.width;
-  const SLIDE_H = style === 'template01' ? 1350 : fmt.height;
+  const SLIDE_W = fmt.width;
+  const SLIDE_H = fmt.height;
 
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { FORMAT_LIST, getFormat } from '@/lib/formats';
+import { SlideFormat } from '@/types';
 import {
-  TEMPLATE_01_HEIGHT,
   TEMPLATE_01_MODELS,
   TEMPLATE_01_WIDTH,
   template01CornerSlots,
@@ -50,9 +51,21 @@ function base(position: number): Slide {
 
 export default function T01Lab() {
   const [cena, setCena] = useState<Cena>('gabarito');
+  const [formato, setFormato] = useState<SlideFormat>('4:5');
+  // Escala só da MOLDURA de inspeção: entra num wrapper por fora do slide, como
+  // no `SlidePreview`. O slide continua renderizando em px nativos — é ele que o
+  // reflow mede, e medir um layout já escalado invalidaria a fidelidade.
+  const [escala, setEscala] = useState(1);
+  // `solo` isola UM slide na tela — é assim que as evidências saem uma a uma,
+  // sem depender de rolagem.
+  const [solo, setSolo] = useState<number | null>(null);
   const [picked, setPicked] = useState<string>('');
 
   if (process.env.NODE_ENV === 'production') return null;
+
+  // O formato é ajuste de DECK: entra pelo globalSettings, como no editor.
+  const fmt = getFormat(formato);
+  const settings = { ...DEFAULT_GLOBAL_SETTINGS, format: formato };
 
   let slides: Slide[];
   if (cena === 'deck8') {
@@ -103,6 +116,60 @@ export default function T01Lab() {
             {c}
           </button>
         ))}
+        <span style={{ color: '#555', alignSelf: 'center' }}>|</span>
+        {FORMAT_LIST.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFormato(f.id)}
+            data-formato={f.id}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid #555',
+              background: f.id === formato ? '#8f8' : '#333',
+              color: f.id === formato ? '#000' : '#ccc',
+              font: '12px system-ui',
+            }}
+          >
+            {f.id}
+          </button>
+        ))}
+        <span style={{ color: '#555', alignSelf: 'center' }}>|</span>
+        {[1, 0.6, 0.5, 0.4].map((e) => (
+          <button
+            key={e}
+            onClick={() => setEscala(e)}
+            data-escala={e}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid #555',
+              background: e === escala ? '#88f' : '#333',
+              color: e === escala ? '#000' : '#ccc',
+              font: '12px system-ui',
+            }}
+          >
+            {e}×
+          </button>
+        ))}
+        <span style={{ color: '#555', alignSelf: 'center' }}>|</span>
+        {[null, 0, 1, 2, 3, 4, 5].map((s) => (
+          <button
+            key={String(s)}
+            onClick={() => setSolo(s)}
+            data-solo={String(s)}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: '1px solid #555',
+              background: s === solo ? '#fa0' : '#333',
+              color: s === solo ? '#000' : '#ccc',
+              font: '12px system-ui',
+            }}
+          >
+            {s == null ? 'todos' : `s${s + 1}`}
+          </button>
+        ))}
         <span style={{ color: '#8f8', font: '12px monospace', alignSelf: 'center' }}>{picked}</span>
       </div>
 
@@ -116,26 +183,52 @@ export default function T01Lab() {
         />
       ) : (
         <div id="lab-deck" style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-          {slides.map((slide, i) => (
+          {(solo == null ? slides : [slides[solo]]).map((slide, k) => {
+          const i = solo ?? k;
+          return (
             <div key={slide.id} data-slide-position={i} data-slide-model={slide.templateModel ?? ''}>
               <div style={{ color: '#aaa', font: '12px monospace', marginBottom: 4 }}>
                 pos {i} · modelo {slide.templateModel ?? '(da posição)'}
               </div>
-              {/* Escala NATIVA: 1080x1350 sem transform, senão a medida do
-                  reflow sai de um layout escalado e não vale como fidelidade. */}
+              {/* Escala NATIVA: a altura do formato sem transform, senão a
+                  medida do reflow sai de um layout escalado e não vale como
+                  fidelidade. */}
               <div
-                data-native-slide={i}
-                style={{ width: TEMPLATE_01_WIDTH, height: TEMPLATE_01_HEIGHT, overflow: 'hidden' }}
+                style={{
+                  width: TEMPLATE_01_WIDTH * escala,
+                  height: fmt.height * escala,
+                  overflow: 'hidden',
+                }}
               >
-                <Template01Slide
-                  slide={slide}
-                  globalSettings={DEFAULT_GLOBAL_SETTINGS}
-                  slideIndex={i}
-                  totalSlides={slides.length}
-                />
+                <div
+                  data-native-slide={i}
+                  data-formato={fmt.id}
+                  style={{
+                    width: TEMPLATE_01_WIDTH,
+                    height: fmt.height,
+                    overflow: 'hidden',
+                    transformOrigin: 'top left',
+                    transform: `scale(${escala})`,
+                  }}
+                >
+                  {/* `key` força REMONTAR ao trocar escala/formato. O reflow
+                      mede no `useLayoutEffect` e re-registra o ResizeObserver a
+                      cada render: mudar o tamanho renderizado com o componente
+                      montado realimenta a medição. Montar de novo é o que o
+                      editor já faz na prática (o `scale` do `SlidePreview` é
+                      fixado antes do mount). */}
+                  <Template01Slide
+                    key={`${formato}-${escala}`}
+                    slide={slide}
+                    globalSettings={settings}
+                    slideIndex={i}
+                    totalSlides={slides.length}
+                  />
+                </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
 

@@ -792,6 +792,110 @@ export const TEMPLATE_01_CENTER_PAIRS: Record<number, [string, string][]> = {
   ],
 };
 
+// ─── Adaptação de formato ───────────────────────────────────────
+//
+// Os três formatos compartilham a LARGURA 1080 (ver lib/formats.ts): só a
+// ALTURA muda — 4:5 = 1350, 1:1 = 1080, 9:16 = 1920. Por isso NADA horizontal
+// é tocado aqui: `x`, largura de caixa, tamanho de fonte, entrelinha, tracking
+// e alinhamento saem do spec em qualquer formato. O texto não deforma, não
+// reescala e não muda de corpo por causa do formato.
+//
+// O que varia é só o eixo vertical, e por duas regras diferentes:
+//
+//  BANDA — as imagens e a seta que o desenho ancora em posição proporcional
+//  acompanham a razão `altura / 1350`. A imagem full-bleed do slide 4 ocupa 63%
+//  da altura no 4:5 e continua ocupando 63% no 1:1 e no 9:16.
+//
+//  MARGEM — o resto é distância ABSOLUTA e não escala. O canto fica a 44px do
+//  topo em qualquer formato, e um bloco ancorado no rodapé mantém a mesma
+//  distância em px do rodapé. Margem que escala vira margem gigante no 9:16 e
+//  espremida no 1:1.
+//
+// No 4:5 a razão é 1.0 e tudo isto é no-op por construção: qualquer conta que
+// mude 1px no 4:5 é regra errada.
+
+/** Razão de altura do formato ativo contra o canvas do spec. 1.0 no 4:5. */
+export function template01HeightRatio(height: number): number {
+  return height / TEMPLATE_01_HEIGHT;
+}
+
+/**
+ * Nós que são BANDA: a imagem dos slides 3/4/5 e a seta do slide 6 — os únicos
+ * elementos cuja posição vertical o desenho define em proporção do frame. Todo
+ * o resto do spec é texto, e texto é margem.
+ */
+export function template01IsBand(node: SpecNode): boolean {
+  return node.type === 'RECTANGLE' || node.type === 'VECTOR';
+}
+
+/** Banda do slide, se houver. O slide 6 tem a seta; os slides 1 e 2, nenhuma. */
+function bandOf(slide: SpecSlide): SpecNode | undefined {
+  return slide.nodes.find(template01IsBand);
+}
+
+/**
+ * `y` e `h` de um nó no formato ativo. Banda escala com a altura; qualquer
+ * outro nó devolve a caixa do spec intacta (é a margem absoluta).
+ */
+export function template01NodeSpan(node: SpecNode, ratio = 1): { y: number; h: number } {
+  if (ratio === 1 || !template01IsBand(node)) return { y: node.box.y, h: node.box.h };
+  return { y: node.box.y * ratio, h: node.box.h * ratio };
+}
+
+/** Base do grupo no spec — usada para saber se a banda está abaixo dele. */
+function groupBottom(group: Template01FlowGroup, bySlot: Map<string, SpecNode>): number {
+  return group.slots.reduce((max, s) => {
+    const n = bySlot.get(s);
+    return n ? Math.max(max, n.box.y + n.box.h) : max;
+  }, 0);
+}
+
+/**
+ * A aresta em que o grupo de fluxo encosta, em px do canvas 4:5.
+ *
+ * `anchor: 'top'` pendura ABAIXO de um elemento fixo — sempre a base da banda
+ * (imagem do 3/4/5, seta do 6). `anchor: 'bottom'` encosta em algo ABAIXO: o
+ * topo da banda quando o grupo está acima dela, senão o rodapé do frame (é o
+ * caso da capa e do slide 2, que não têm banda).
+ */
+function flowEdge(
+  group: Template01FlowGroup,
+  band: SpecNode | undefined,
+  bySlot: Map<string, SpecNode>
+): number {
+  if (group.anchor === 'top') return band ? band.box.y + band.box.h : 0;
+  if (band && groupBottom(group, bySlot) <= band.box.y) return band.box.y;
+  return TEMPLATE_01_HEIGHT;
+}
+
+/**
+ * Quanto cada slot de fluxo anda no eixo vertical por causa do formato.
+ *
+ * A aresta de referência do grupo é recalculada no formato (`aresta × razão`
+ * quando é banda; a altura nova quando é o rodapé do frame) e o grupo INTEIRO
+ * acompanha a diferença. Assim o vão entre o bloco e a aresta — que é margem —
+ * fica em px absolutos, e o reflow continua mandando por cima: ele já opera em
+ * cima destes `top`.
+ *
+ * Devolve `{}` no 4:5, onde a razão é 1 e todo delta é zero.
+ */
+export function template01FormatShift(slideIndex: number, ratio = 1): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (ratio === 1) return out;
+  const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
+  if (!slide) return out;
+
+  const bySlot = new Map<string, SpecNode>();
+  for (const n of slide.nodes) if (n.slot) bySlot.set(n.slot, n);
+  const band = bandOf(slide);
+
+  for (const group of TEMPLATE_01_FLOW_GROUPS[slideIndex] ?? []) {
+    const delta = flowEdge(group, band, bySlot) * (ratio - 1);
+    for (const slot of group.slots) out[slot] = delta;
+  }
+  return out;
+}
+
 /**
  * Quantas linhas o spec assume para o bloco.
  *
@@ -825,11 +929,15 @@ export interface Template01BlockMetrics {
  *
  * Depois do fluxo, as colunas lado a lado passam a dividir o centro vertical —
  * ver TEMPLATE_01_CENTER_PAIRS.
+ *
+ * `ratio` é a razão de altura do formato ativo (1.0 no 4:5): ela desloca cada
+ * grupo para a aresta RECALCULADA do formato antes do reflow correr por cima —
+ * ver `template01FormatShift`.
  */
 export function template01Tops(
   slideIndex: number,
   metrics: Record<string, Template01BlockMetrics> = {},
-  options: { titleGapDelta?: number; isTitleSlot?: (slot: string) => boolean } = {}
+  options: { titleGapDelta?: number; isTitleSlot?: (slot: string) => boolean; ratio?: number } = {}
 ): Record<string, number> {
   const tops: Record<string, number> = {};
   const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
@@ -848,7 +956,10 @@ export function template01Tops(
   const bySlot = new Map<string, SpecNode>();
   for (const n of slide.nodes) if (n.slot) bySlot.set(n.slot, n);
 
-  const { titleGapDelta = 0, isTitleSlot } = options;
+  const { titleGapDelta = 0, isTitleSlot, ratio = 1 } = options;
+  // Deslocamento do formato: o grupo inteiro vai para a aresta recalculada, e o
+  // fluxo abaixo continua contando a partir dali. No 4:5 é sempre zero.
+  const shift = template01FormatShift(slideIndex, ratio);
 
   for (const group of TEMPLATE_01_FLOW_GROUPS[slideIndex] ?? []) {
     const nodes = group.slots
@@ -875,18 +986,20 @@ export function template01Tops(
         ? titleGapDelta
         : 0;
 
+    const dy = shift[group.slots[0]] ?? 0;
+
     if (group.anchor === 'top') {
       let acc = 0;
       nodes.forEach((n, i) => {
         acc += gapBefore(i);
-        tops[n.slot!] = n.box.y + acc;
+        tops[n.slot!] = n.box.y + dy + acc;
         acc += extra[i];
       });
     } else {
       let acc = 0;
       for (let i = nodes.length - 1; i >= 0; i--) {
         acc += extra[i];
-        tops[nodes[i].slot!] = nodes[i].box.y - acc;
+        tops[nodes[i].slot!] = nodes[i].box.y + dy - acc;
         acc += gapBefore(i);
       }
     }

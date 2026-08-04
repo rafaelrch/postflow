@@ -53,10 +53,7 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
   const scrollRef = useRef<HTMLDivElement>(null);  // faixa rolável horizontal
   const [availH, setAvailH] = useState(0);
 
-  // O TEMPLATE 1 vem do spec travado em 1080x1350; o seletor de formato não
-  // se aplica a ele, então o palco usa as dimensões do próprio template.
-  const isFixedFormat = style === 'template01';
-  const format = isFixedFormat ? { width: 1080, height: 1350 } : getFormat(globalSettings.format);
+  const format = getFormat(globalSettings.format);
 
   // Mede a altura disponível e recalcula no resize. Ao trocar de formato, o
   // scale abaixo recomputa sozinho (depende de availH + format.height).
@@ -138,9 +135,8 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
             →
           </button>
 
-          {/* Dropdown de formato — aplica a todos os slides. O TEMPLATE 1 tem
-              proporção fixa pelo spec, então o seletor não aparece nele. */}
-          {!isFixedFormat && <FormatDropdown value={globalSettings.format} onChange={setFormat} />}
+          {/* Dropdown de formato — aplica a todos os slides. */}
+          <FormatDropdown value={globalSettings.format} onChange={setFormat} />
         </div>
 
         <div className="flex items-center gap-2">
