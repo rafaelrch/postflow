@@ -965,3 +965,128 @@ export function template01Overflows(slots: Template01Slots): Template01Overflow[
   }
   return out;
 }
+
+// ─── Modelo do slide ────────────────────────────────────────────
+//
+// O template tem 6 MODELOS de slide (capa, texto-sobre-foto, foto+remate,
+// foto+corpo, duas colunas, fecho com seta). Até aqui o modelo era a POSIÇÃO do
+// slide no deck, o que só funciona num deck de exatamente 6, sem repetição: com
+// 8 slides o índice extrapolava e o `Math.min` fazia todo excedente cair no
+// modelo 6 — o "slide 7 azul" com a seta e o texto de fábrica do Figma.
+//
+// A partir daqui o modelo é um dado do slide (`Slide.templateModel`), não a
+// posição dele. Reordenar, repetir e passar de 6 continuam desenhando certo.
+
+/** Os modelos disponíveis, na ordem do spec. */
+export const TEMPLATE_01_MODELS: number[] = TEMPLATE_01_SPEC.slides.map((s) => s.index);
+
+export function isTemplate01Model(value: unknown): value is number {
+  return typeof value === 'number' && TEMPLATE_01_MODELS.includes(value);
+}
+
+/** Só o que interessa do slide para resolver o modelo. */
+export interface Template01Modeled {
+  templateModel?: number;
+}
+
+/**
+ * O modelo do slide (1-indexado, como o spec).
+ *
+ * 🔴 COMPATIBILIDADE: deck salvo antes deste campo não tem `templateModel`.
+ * Nesse caso o modelo continua saindo da POSIÇÃO com o mesmo clamp de antes,
+ * então um carrossel antigo reabre idêntico — byte a byte no render.
+ */
+export function template01ModelOf(
+  slide: Template01Modeled | null | undefined,
+  position: number
+): number {
+  if (isTemplate01Model(slide?.templateModel)) return slide.templateModel;
+  const last = TEMPLATE_01_MODELS.length - 1;
+  return TEMPLATE_01_MODELS[Math.min(Math.max(position, 0), last)];
+}
+
+/** O slide do spec de um modelo. Cai no modelo 1 se pedirem um inexistente. */
+export function template01SpecSlideOf(model: number): SpecSlide {
+  return TEMPLATE_01_SPEC.slides.find((s) => s.index === model) ?? TEMPLATE_01_SPEC.slides[0];
+}
+
+// ─── Lorem ipsum dentro dos limites ─────────────────────────────
+
+/**
+ * Palavras do lorem clássico. Fonte única para todo texto de exemplo: nenhum
+ * slide novo pode nascer com a copy do Figma ("Barcelona FC", "@OANDRELONA",
+ * "BRANDING & DESIGN DE MARCA") — isso é conteúdo ilustrativo de outra marca.
+ */
+const LOREM_WORDS = [
+  'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit',
+  'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore', 'et', 'dolore',
+  'magna', 'aliqua', 'enim', 'ad', 'minim', 'veniam', 'quis', 'nostrud',
+];
+
+/**
+ * Texto de exemplo com no MÁXIMO `budget` caracteres, cortado em palavra
+ * inteira. Determinístico: a mesma entrada dá sempre a mesma saída, senão os
+ * testes de limite virariam loteria.
+ */
+function loremUpTo(budget: number): string {
+  if (budget <= 0) return '';
+  let out = '';
+  for (let i = 0; out.length < budget; i++) {
+    const word = LOREM_WORDS[i % LOREM_WORDS.length];
+    const next = out ? `${out} ${word}` : word;
+    if (next.length > budget) break;
+    out = next;
+  }
+  // Orçamento menor que a primeira palavra: corta no seco, ainda dentro do limite.
+  if (!out) out = LOREM_WORDS[0].slice(0, budget);
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+
+/**
+ * Fração do orçamento que o lorem ocupa.
+ *
+ * `maxLines × maxCharsPerLine` pressupõe empacotamento perfeito, e a quebra real
+ * do navegador desperdiça o fim de cada linha. Encher o orçamento faria o texto
+ * transbordar para uma linha a mais no render mesmo com o contador no verde —
+ * exatamente o estouro que o slide novo não pode ter.
+ */
+const LOREM_FILL = 0.7;
+
+/**
+ * Texto de exemplo de UM slot, dentro dos limites dele.
+ *
+ * Sai como linha única de propósito: é assim que `template01Measure` conta
+ * (orçamento total, sem `\n`), então o contador da barra lateral nasce no verde.
+ */
+export function template01LoremForSlot(limits: {
+  maxLines?: number;
+  maxCharsPerLine?: number;
+}): string {
+  const { maxLines, maxCharsPerLine } = limits;
+  if (maxLines != null && maxCharsPerLine != null) {
+    return loremUpTo(Math.max(1, Math.floor(maxLines * maxCharsPerLine * LOREM_FILL)));
+  }
+  if (maxCharsPerLine != null) return loremUpTo(Math.floor(maxCharsPerLine * LOREM_FILL));
+  if (maxLines != null) return loremUpTo(maxLines * 28);
+  return loremUpTo(40);
+}
+
+/**
+ * Slots de um slide NOVO do modelo pedido: lorem em todo slot de texto, imagem
+ * vazia (o usuário escolhe a dele) e os cantos herdados do deck.
+ *
+ * Os cantos não são lorem: eles são marca e @ do usuário, vindos do onboarding,
+ * e valem para o deck inteiro — copiá-los do slide vizinho é o que mantém a
+ * regra que já existe.
+ */
+export function template01NewSlideSlots(model: number, inheritedCorners?: Template01Slots): Template01Slots {
+  const out: Template01Slots = {};
+  for (const d of template01SlotsForSlide(model)) {
+    if (d.slot.startsWith('cantos.')) continue;
+    if (d.kind === 'text') out[d.slot] = template01LoremForSlot(d);
+  }
+  for (const slot of ['cantos.left', 'cantos.right']) {
+    out[slot] = inheritedCorners?.[slot] ?? '';
+  }
+  return out;
+}

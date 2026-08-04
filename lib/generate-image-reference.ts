@@ -143,7 +143,19 @@ export async function downloadReferenceImage(
           accept: 'image/png,image/jpeg,image/webp',
           host: url.host,
         },
-        lookup: (_lookupHostname, _options, callback) => {
+        // O Node abre a conexão pedindo `all: true`, e nesse modo o contrato
+        // do lookup exige um ARRAY de { address, family }. Devolver a string
+        // fazia o socket ler `addresses[0].address` como undefined e estourar
+        // ERR_INVALID_IP_ADDRESS. Ambas as formas entregam o mesmo `selected`,
+        // já validado como público — não há segundo DNS aqui.
+        lookup: (_lookupHostname, options, callback) => {
+          if (typeof options === 'object' && options !== null && options.all) {
+            (callback as unknown as (
+              error: NodeJS.ErrnoException | null,
+              addresses: { address: string; family: number }[]
+            ) => void)(null, [{ address: selected.address, family: selected.family }]);
+            return;
+          }
           callback(null, selected.address, selected.family);
         },
       }, resolve);

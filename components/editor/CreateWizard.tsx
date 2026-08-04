@@ -392,6 +392,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         if (style === 'template01') {
           return {
             id: `tmp-${i}-${Date.now()}`,
+            // Deck gerado: 6 slides, um por modelo, na ordem do spec. Gravar o
+            // modelo em vez de deixá-lo sair da posição é o que mantém o desenho
+            // certo se o usuário reordenar ou inserir um slide depois.
+            templateModel: i + 1,
             templateSlots: {
               ...template01SlotsFromContent(i, {
                 title: sl.title,

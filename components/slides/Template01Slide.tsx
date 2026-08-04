@@ -4,7 +4,6 @@ import React from 'react';
 import { Slide, GlobalSettings, DEFAULT_CORNERS } from '@/types';
 import { getImageLayerStyle } from '@/lib/utils';
 import {
-  TEMPLATE_01_SPEC,
   TEMPLATE_01_WIDTH,
   TEMPLATE_01_HEIGHT,
   Template01Slots,
@@ -15,6 +14,8 @@ import {
   template01BaseType,
   template01Nodes,
   template01FallbackImage,
+  template01ModelOf,
+  template01SpecSlideOf,
   SpecBox,
   SpecNode,
   SpecSlide,
@@ -299,9 +300,11 @@ function sameMetrics(
 }
 
 export default function Template01Slide({ slide, globalSettings, slideIndex }: Template01SlideProps) {
-  // O deck tem 6 slides fixos; um índice fora da faixa cai no último.
-  const specSlide =
-    TEMPLATE_01_SPEC.slides[Math.min(slideIndex, TEMPLATE_01_SPEC.slides.length - 1)];
+  // O desenho vem do MODELO do slide, não da posição dele no deck: com modelo
+  // repetido ou mais de 6 slides a posição não identifica mais nada. Slide sem
+  // modelo gravado (deck antigo) volta a derivar da posição — ver
+  // `template01ModelOf`.
+  const specSlide = template01SpecSlideOf(template01ModelOf(slide, slideIndex));
 
   const ov = React.useMemo(
     () => template01Overrides(slide, globalSettings),

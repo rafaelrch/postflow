@@ -7,6 +7,8 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { getFormat } from '@/lib/formats';
 import SlidePreview from './SlidePreview';
 import FormatDropdown from './FormatDropdown';
+import Template01ModelPicker from './Template01ModelPicker';
+import { Slide } from '@/types';
 
 // Margem vertical total (topo + base) reservada em volta dos cards na faixa —
 // o card ocupa a altura da área menos isto, e o scale deriva daí (fit-to-height).
@@ -32,6 +34,20 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
     setActiveSlideIndex, reorderSlides, removeSlide, addSlide, setFormat,
     updateGlobalSettings, updateActiveSlide,
   } = useEditorStore();
+
+  // TEMPLATE 1: adicionar passa pelo popup de modelo. Nos outros estilos o
+  // slide novo continua sendo genérico — lá a forma é editável e não há modelo.
+  const [pickingModel, setPickingModel] = useState(false);
+  const isTemplate01 = style === 'template01';
+  const handleAdd = () => (isTemplate01 ? setPickingModel(true) : addSlide());
+  // Os cantos valem para o deck inteiro: o slide novo herda os que já existem.
+  const inheritedCorners = slides.reduce<Record<string, string>>((acc, sl) => {
+    for (const slot of ['cantos.left', 'cantos.right']) {
+      const value = sl.templateSlots?.[slot];
+      if (acc[slot] == null && value != null) acc[slot] = value;
+    }
+    return acc;
+  }, {});
 
   const previewRef = useRef<HTMLDivElement>(null); // área que mede a altura disponível
   const scrollRef = useRef<HTMLDivElement>(null);  // faixa rolável horizontal
@@ -129,7 +145,7 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
 
         <div className="flex items-center gap-2">
           <button
-            onClick={addSlide}
+            onClick={handleAdd}
             className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors border border-black/10 dark:border-white/10"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -266,7 +282,7 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
 
                   {/* Botão adicionar ao fim da faixa */}
                   <button
-                    onClick={addSlide}
+                    onClick={handleAdd}
                     className="flex flex-col items-center justify-center gap-1 border border-dashed border-black/15 dark:border-white/15 hover:border-black/30 dark:hover:border-white/30 transition-colors rounded-lg text-gray-900/25 dark:text-white/25 hover:text-gray-900/50 dark:hover:text-white/50 shrink-0"
                     style={{ width: cardW, height: cardHpx }}
                   >
@@ -279,6 +295,19 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
           </DragDropContext>
         </div>
       </div>
+
+      {pickingModel && slides[activeSlideIndex] && (
+        <Template01ModelPicker
+          globalSettings={globalSettings}
+          inheritedCorners={inheritedCorners}
+          baseSlide={slides[activeSlideIndex] as Slide}
+          onPick={(patch) => {
+            addSlide(patch);
+            setPickingModel(false);
+          }}
+          onClose={() => setPickingModel(false)}
+        />
+      )}
 
       {/* ── Status bar ── */}
       <div className="px-4 py-1.5 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">

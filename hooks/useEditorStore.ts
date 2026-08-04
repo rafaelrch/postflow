@@ -38,7 +38,8 @@ interface EditorState {
   setCaption: (caption: string) => void;
   setHashtags: (hashtags: string[]) => void;
 
-  addSlide: () => void;
+  /** `patch` existe para o TEMPLATE 1: o popup escolhe o modelo e o lorem dele. */
+  addSlide: (patch?: Partial<Slide>) => void;
   removeSlide: (index: number) => void;
   duplicateSlide: (index: number) => void;
   reorderSlides: (fromIndex: number, toIndex: number) => void;
@@ -92,9 +93,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCaption: (caption) => set({ caption }),
   setHashtags: (hashtags) => set({ hashtags }),
 
-  addSlide: () =>
+  addSlide: (patch) =>
     set((s) => {
-      const newSlide = createEmptySlide(s.slides.length);
+      const newSlide = { ...createEmptySlide(s.slides.length), ...patch };
       return {
         slides: [...s.slides, newSlide],
         activeSlideIndex: s.slides.length,

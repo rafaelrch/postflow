@@ -24,6 +24,7 @@ import {
 import {
   template01ImageSlot,
   template01SlideImageUrl,
+  template01ModelOf,
   template01SlideMedia,
   template01SlotDefaults,
   template01SlotsForSlide,
@@ -1028,15 +1029,18 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       },
     });
 
-  const t01Media = template01SlideMedia(activeSlideIndex + 1);
+  // Painéis do template seguem o MODELO do slide, não a posição: com modelo
+  // repetido ou deck maior que 6, a posição mostraria os campos de outro slide.
+  const t01Model = template01ModelOf(slide, activeSlideIndex);
+  const t01Media = template01SlideMedia(t01Model);
 
   /**
    * A imagem que o slide EXIBE — do slot ou dos campos genéricos do editor.
    * É ela que decide o painel: sem imagem não há preview nem slider, porque
    * slider de posição/zoom/opacidade sobre nada não mexe em coisa alguma.
    */
-  const t01ImageSlot = template01ImageSlot(activeSlideIndex + 1);
-  const t01ImageUrl = template01SlideImageUrl(slide, activeSlideIndex + 1);
+  const t01ImageSlot = template01ImageSlot(t01Model);
+  const t01ImageUrl = template01SlideImageUrl(slide, t01Model);
 
   /**
    * Tira a imagem do slot. Limpa TAMBÉM os campos genéricos: o render cai neles
@@ -1057,7 +1061,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
   // Os mesmos slots de texto que o painel de conteúdo mostra, na mesma ordem
   // visual — o usuário acha o bloco pelo lugar dele no slide, não pelo papel.
-  const t01TextSlots = template01SlotsForSlide(activeSlideIndex + 1).filter(
+  const t01TextSlots = template01SlotsForSlide(t01Model).filter(
     (d) => d.kind === 'text' && !d.slot.startsWith('cantos.')
   );
 

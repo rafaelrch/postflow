@@ -187,6 +187,9 @@ create table if not exists public.slides (
   content_layout text,
   template_slots jsonb,
   template_overrides jsonb,
+  -- TEMPLATE 1: qual dos 6 modelos do spec o slide desenha. NULL nos outros
+  -- estilos e em todo deck salvo antes da coluna (aí o modelo sai da posicao).
+  template_model smallint,
   editorial_title_offset_y smallint,
   editorial_desc_offset_y smallint,
   editorial_image_offset_y smallint,
@@ -195,7 +198,8 @@ create table if not exists public.slides (
   updated_at timestamptz not null default now(),
   unique (carousel_id, position),
   constraint slides_image_type_check check (image_type in ('background', 'grid', 'mixed')),
-  constraint slides_text_alignment_check check (text_alignment in ('left', 'center', 'right'))
+  constraint slides_text_alignment_check check (text_alignment in ('left', 'center', 'right')),
+  constraint slides_template_model_check check (template_model is null or template_model between 1 and 6)
 );
 
 alter table public.slides add column if not exists highlights jsonb not null default '[]'::jsonb;
@@ -216,6 +220,7 @@ alter table public.slides add column if not exists text_padding jsonb;
 alter table public.slides add column if not exists content_layout text;
 alter table public.slides add column if not exists template_slots jsonb;
 alter table public.slides add column if not exists template_overrides jsonb;
+alter table public.slides add column if not exists template_model smallint;
 alter table public.slides add column if not exists editorial_title_offset_y smallint;
 alter table public.slides add column if not exists editorial_desc_offset_y smallint;
 alter table public.slides add column if not exists editorial_image_offset_y smallint;

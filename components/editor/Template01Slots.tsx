@@ -7,7 +7,11 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { uploadImageFile } from '@/lib/upload-image';
 import { cn } from '@/lib/utils';
 import Section from './Section';
-import { template01SlotsForSlide, template01Measure } from '@/lib/templates/template-01';
+import {
+  template01SlotsForSlide,
+  template01Measure,
+  template01ModelOf,
+} from '@/lib/templates/template-01';
 
 /**
  * Editor de slots do TEMPLATE 1.
@@ -34,8 +38,10 @@ export default function Template01Slots() {
   if (!slide) return null;
 
   const slots = slide.templateSlots ?? {};
-  // O spec é 1-indexado; o editor, 0.
-  const descriptors = template01SlotsForSlide(activeSlideIndex + 1);
+  // Os campos são os do MODELO do slide, não os da posição dele: um deck pode
+  // repetir modelo e passar de 6 slides.
+  const model = template01ModelOf(slide, activeSlideIndex);
+  const descriptors = template01SlotsForSlide(model);
 
   const setSlot = (slot: string, value: string) => {
     // Os cantos são os mesmos em todos os slides que os exibem — editar em um

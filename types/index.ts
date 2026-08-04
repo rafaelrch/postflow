@@ -237,6 +237,17 @@ export interface Slide {
    */
   templateSlots?: Record<string, string>;
   /**
+   * TEMPLATE 1: QUAL dos 6 modelos do spec este slide desenha (1–6).
+   *
+   * Antes o modelo era a POSIÇÃO do slide, o que só fecha num deck de exatamente
+   * 6 sem repetição. Com o usuário podendo repetir modelo e passar de 6, a
+   * identidade de desenho tem de ser um dado do slide.
+   *
+   * 🔴 Ausente em todo deck salvo antes deste campo — e é isso que preserva a
+   * compatibilidade: sem ele o modelo volta a sair da posição (`template01ModelOf`).
+   */
+  templateModel?: number;
+  /**
    * Controles do TEMPLATE 1 que o USUÁRIO mexeu na barra lateral.
    *
    * Existe porque o `Slide` nasce PREENCHIDO (`DEFAULT_SLIDE`) e não tem campo

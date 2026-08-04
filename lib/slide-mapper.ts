@@ -59,6 +59,9 @@ export function mapDbSlideToSlide(sl: DbRow): Slide {
     textPadding: (sl.text_padding as Slide['textPadding']) || undefined,
     contentLayout: (sl.content_layout as Slide['contentLayout']) || undefined,
     templateSlots: (sl.template_slots as Slide['templateSlots']) || undefined,
+    // Deck salvo antes da coluna existir vem sem isto — e tem de continuar
+    // vindo: é a ausência que faz o modelo voltar a sair da posição.
+    templateModel: (sl.template_model as number) ?? undefined,
     templateOverrides: (sl.template_overrides as Slide['templateOverrides']) || undefined,
     editorialTitleOffsetY: (sl.editorial_title_offset_y as number) ?? undefined,
     editorialDescOffsetY: (sl.editorial_desc_offset_y as number) ?? undefined,
@@ -111,6 +114,7 @@ export function mapSlideToDbRow(slide: Slide, carouselId: string, position: numb
     // mantém o autosave dos outros estilos funcionando mesmo antes da migração
     // do template rodar (a coluna não existe → o insert falharia).
     ...(slide.templateSlots ? { template_slots: slide.templateSlots } : {}),
+    ...(slide.templateModel != null ? { template_model: slide.templateModel } : {}),
     ...(slide.templateOverrides ? { template_overrides: slide.templateOverrides } : {}),
     editorial_title_offset_y: slide.editorialTitleOffsetY ?? null,
     editorial_desc_offset_y: slide.editorialDescOffsetY ?? null,
