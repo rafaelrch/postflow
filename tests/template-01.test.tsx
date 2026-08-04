@@ -1061,3 +1061,161 @@ describe('TEMPLATE 1 — rótulos da barra lateral', () => {
     expect(new Set(labels).size).toBe(labels.length);
   });
 });
+
+/**
+ * CANTOS EM TODOS OS SLIDES — pedido do Rafael.
+ *
+ * O switch parecia morto no slide 1 e ninguém entendia por quê. Não era o
+ * switch: o Figma desenhou `cantos.left`/`cantos.right` só nos slides 3, 5 e 6,
+ * então nos slides 1, 2 e 4 não havia nó nenhum para ligar ou desligar.
+ *
+ * A partir daqui os cantos existem nos SEIS slides. Nos três que o Figma não
+ * desenhou eles são acréscimo deliberado, registrado em
+ * TEMPLATE_01_DESIGN_TWEAKS.extraCorners.
+ */
+describe('TEMPLATE 1 — cantos nos 6 slides', () => {
+  /** A constatação que originou o pedido: o Figma só desenhou 3 dos 6. */
+  it('o Figma tem cantos só nos slides 3, 5 e 6 — é esta a causa do switch morto', () => {
+    const comCanto = TEMPLATE_01_SPEC.slides
+      .filter((s) => s.nodes.some((n) => n.slot?.startsWith('cantos.')))
+      .map((s) => s.index);
+    expect(comCanto).toEqual([3, 5, 6]);
+  });
+
+  it('os slides que o Figma deixou sem canto estão registrados como desvio', () => {
+    expect(Object.keys(TEMPLATE_01_DESIGN_TWEAKS.extraCorners).map(Number).sort()).toEqual([1, 2, 4]);
+  });
+
+  it('todos os 6 slides renderizam os dois cantos', () => {
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const html = renderSlide(i);
+      expect(html, `slide ${i + 1} sem canto esquerdo`).toContain('data-slot="cantos.left"');
+      expect(html, `slide ${i + 1} sem canto direito`).toContain('data-slot="cantos.right"');
+    }
+  });
+
+  it('o switch desliga os cantos nos 6 slides de uma vez — é controle do deck', () => {
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const html = renderToStaticMarkup(
+        <Template01Slide
+          slide={{ ...DEFAULT_SLIDE, id: 's', position: i } as Slide}
+          globalSettings={{
+            ...DEFAULT_GLOBAL_SETTINGS,
+            corners: { ...DEFAULT_GLOBAL_SETTINGS.corners, show: false },
+          }}
+          slideIndex={i}
+          totalSlides={TEMPLATE_01_SLIDE_COUNT}
+        />
+      );
+      expect(html, `slide ${i + 1} manteve canto desligado`).not.toContain('data-slot="cantos.');
+    }
+  });
+
+  it('os cantos novos nascem LIGADOS, como os dos slides 3/5/6', () => {
+    // `show` ausente/true = ligado; é o padrão do editor e vale para o deck.
+    expect(DEFAULT_CORNERS.show).not.toBe(false);
+    expect(renderSlide(0)).toContain('data-slot="cantos.left"');
+  });
+
+  it('a geometria dos cantos novos é a MESMA dos slides 3/5/6', () => {
+    // x=71 à esquerda, right=63 à direita, y=44 nos dois — copiado do spec.
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const html = renderSlide(i);
+      const left = html.match(/data-slot="cantos\.left"[^>]*style="([^"]*)"/)?.[1] ?? '';
+      const right = html.match(/data-slot="cantos\.right"[^>]*style="([^"]*)"/)?.[1] ?? '';
+      expect(left, `slide ${i + 1}`).toContain('left:71px');
+      expect(left, `slide ${i + 1}`).toContain('top:44px');
+      expect(left, `slide ${i + 1}`).toContain('text-align:left');
+      expect(right, `slide ${i + 1}`).toContain('right:63px');
+      expect(right, `slide ${i + 1}`).toContain('top:44px');
+      expect(right, `slide ${i + 1}`).toContain('text-align:right');
+    }
+  });
+
+  it('a tipografia dos cantos novos é a MESMA dos slides 3/5/6', () => {
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const style = renderSlide(i).match(/data-slot="cantos\.left"[^>]*style="([^"]*)"/)?.[1] ?? '';
+      // 16.805px / Inter Display Medium — os números do spec, sem arredondar.
+      expect(style, `slide ${i + 1}`).toContain('font-size:16.805px');
+      expect(style, `slide ${i + 1}`).toContain('T01InterDisplay');
+      expect(style, `slide ${i + 1}`).toContain('font-weight:500');
+    }
+  });
+
+  it('o texto dos cantos é editável e vale para os 6 slides', () => {
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const html = renderSlide(i, { 'cantos.left': 'MINHA MARCA', 'cantos.right': '@MEUARROBA' });
+      expect(html, `slide ${i + 1}`).toContain('MINHA MARCA');
+      expect(html, `slide ${i + 1}`).toContain('@MEUARROBA');
+    }
+  });
+
+  it('continua havendo UM só par de campos de canto na barra lateral', () => {
+    // Os cantos repetem no desenho, mas são um slot só — editar seis vezes o
+    // mesmo texto seria o bug que o dedup evita.
+    const nomes = TEMPLATE_01_EDITABLE_SLOTS.map((s) => s.slot);
+    expect(nomes.filter((n) => n === 'cantos.left')).toHaveLength(1);
+    expect(nomes.filter((n) => n === 'cantos.right')).toHaveLength(1);
+  });
+
+  it('nenhum canto de um deck GERADO carrega a copy do Figma', () => {
+    // A regra dura da rodada passada, agora valendo também nos 3 slides novos.
+    const slots = { ...template01CornerSlots('Acme', '@acme') };
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const html = renderSlide(i, slots);
+      expect(html, `slide ${i + 1}`).not.toContain('OANDRELONA');
+      expect(html, `slide ${i + 1}`).not.toContain('BRANDING & DESIGN DE MARCA');
+      expect(html, `slide ${i + 1}`).toContain('ACME');
+    }
+  });
+
+  it('sem marca nem @, o canto sai VAZIO nos 6 slides — nunca com o do Figma', () => {
+    const slots = template01CornerSlots(undefined, undefined);
+    for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
+      const html = renderSlide(i, slots);
+      expect(html, `slide ${i + 1}`).not.toContain('OANDRELONA');
+      expect(html, `slide ${i + 1}`).not.toContain('BRANDING & DESIGN DE MARCA');
+    }
+  });
+
+  it('a cor do canto novo é a do slide de fundo CLARO (slide 5), não a do escuro', () => {
+    // Slides 1, 2 e 4 são brancos na faixa y=44: o degradê da capa só começa a
+    // escurecer em 30.26% e o do slide 2 em 36.85%. O precedente certo é o
+    // slide 5 (fundo branco, #AAAAAA), não o slide 3 (fundo #050416, #767682).
+    for (const i of [0, 1, 3]) {
+      const style = renderSlide(i).match(/data-slot="cantos\.left"[^>]*style="([^"]*)"/)?.[1] ?? '';
+      expect(style, `slide ${i + 1}`).toContain('#AAAAAA');
+    }
+  });
+
+  it('o controle de cor da barra lateral continua vencendo nos cantos novos', () => {
+    const html = renderToStaticMarkup(
+      <Template01Slide
+        slide={{ ...DEFAULT_SLIDE, id: 's', position: 0 } as Slide}
+        globalSettings={{
+          ...DEFAULT_GLOBAL_SETTINGS,
+          corners: { ...DEFAULT_GLOBAL_SETTINGS.corners, color: '#FF0000' },
+          templateOverrides: markTemplate01CornerOverride(undefined, 'cornerColor'),
+        }}
+        slideIndex={0}
+        totalSlides={TEMPLATE_01_SLIDE_COUNT}
+      />
+    );
+    const style = html.match(/data-slot="cantos\.left"[^>]*style="([^"]*)"/)?.[1] ?? '';
+    expect(style).toContain('#FF0000');
+  });
+
+  it('acrescentar canto NÃO mexe no resto do slide: os demais blocos ficam no y do spec', () => {
+    // O confinamento que a fidelidade exige — provado aqui por posição e, no
+    // relatório, por diff de pixel por região.
+    for (const idx of [1, 2, 4]) {
+      const spec = TEMPLATE_01_SPEC.slides.find((s) => s.index === idx)!;
+      const html = renderSlide(idx - 1);
+      for (const n of spec.nodes) {
+        if (n.type !== 'TEXT' || !n.slot) continue;
+        const style = html.match(new RegExp(`data-slot="${n.slot.replace('.', '\\.')}"[^>]*style="([^"]*)"`))?.[1] ?? '';
+        expect(style, `${n.slot} saiu do y do spec`).toContain(`top:${n.box.y}px`);
+      }
+    }
+  });
+});

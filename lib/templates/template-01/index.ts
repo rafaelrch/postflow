@@ -220,7 +220,77 @@ export const TEMPLATE_01_DESIGN_TWEAKS = {
   verticalCenter: {
     's5.bot.title': { specY: 1062, y: 1079 },
   } as Record<string, { specY: number; y: number }>,
+
+  /**
+   * Slides que ganham `cantos.left`/`cantos.right` que o Figma NÃO desenhou.
+   *
+   * O Figma só pôs cantos nos slides 3, 5 e 6. Como o liga/desliga é um
+   * controle do DECK, nos slides 1, 2 e 4 ele parecia morto — o usuário ligava e
+   * nada acontecia, porque não havia nó para exibir. Não era defeito do switch:
+   * era ausência no desenho.
+   *
+   * Pedido do Rafael: cantos disponíveis nos SEIS slides, ligando, desligando e
+   * editando os dois lados em qualquer um. Daí o acréscimo.
+   *
+   * Geometria e tipografia são COPIADAS dos slides 3/5/6 (x=71 / right=63,
+   * y=44, 16.805px Inter Display Medium, entrelinha 18.34, tracking -0.05em),
+   * para a linha ficar no mesmo lugar em todo o deck.
+   *
+   * A COR é o único parâmetro por slide, e não é presunção — é o precedente do
+   * fundo. Na faixa y=44 os três slides novos são BRANCOS: o degradê da capa só
+   * começa a escurecer em 30.26% (y≈408) e o do slide 2 em 36.85% (y≈497); o
+   * slide 4 é #FFFFFF chapado. O slide do spec com fundo branco é o 5, e nele o
+   * Figma usa #AAAAAA — é essa a cor herdada. O #767682 do slide 3 é a variante
+   * para o fundo escuro (#050416) e não se aplica aqui.
+   *
+   * O controle de cor da barra lateral continua valendo por cima, como nos
+   * cantos que já existiam.
+   */
+  extraCorners: {
+    1: { color: '#AAAAAA' },
+    2: { color: '#AAAAAA' },
+    4: { color: '#AAAAAA' },
+  } as Record<number, { color: string }>,
 } as const;
+
+// ─── Cantos sintéticos ──────────────────────────────────────────
+
+/**
+ * O par de cantos do spec, usado como MOLDE dos slides que não têm nenhum.
+ * Sai do slide 3 — o primeiro que os desenha — para que geometria, tipografia e
+ * âncora venham do Figma e não de números soltos aqui.
+ */
+function cornerTemplateNodes(): SpecNode[] {
+  const donor = TEMPLATE_01_SPEC.slides.find((s) =>
+    s.nodes.some((n) => n.slot?.startsWith('cantos.'))
+  );
+  return (donor?.nodes ?? []).filter((n) => n.slot?.startsWith('cantos.'));
+}
+
+/**
+ * Nós de um slide DEPOIS da camada de ajuste — é isto que o render desenha, no
+ * lugar de `slide.nodes` cru.
+ *
+ * Para os slides 3, 5 e 6 devolve exatamente os nós do spec (mesma ordem, mesmo
+ * objeto): é daí que sai a fidelidade de 0 px. Para os slides listados em
+ * `extraCorners` acrescenta o par de cantos ao FIM da lista, com a cor do slide.
+ *
+ * O `id` sintético é prefixado para nunca colidir com um id do Figma — ele só
+ * serve de chave de React.
+ */
+export function template01Nodes(slide: SpecSlide): SpecNode[] {
+  const extra = TEMPLATE_01_DESIGN_TWEAKS.extraCorners[slide.index];
+  if (!extra) return slide.nodes;
+  // Um slide que já tenha cantos nunca ganha um segundo par.
+  if (slide.nodes.some((n) => n.slot?.startsWith('cantos.'))) return slide.nodes;
+
+  const synth = cornerTemplateNodes().map((n) => ({
+    ...n,
+    id: `t01-extra-corner:${slide.index}:${n.slot}`,
+    fills: [{ ...(n.fills?.[0] ?? { type: 'SOLID' }), color: extra.color, css: extra.color }],
+  }));
+  return [...slide.nodes, ...synth];
+}
 
 /** Razão entrelinha/tamanho do spec, preservada quando o tamanho é ajustado. */
 function specLineHeightRatio(t: SpecTypography): number {
@@ -458,6 +528,44 @@ export function template01SlideMedia(slideIndex: number): {
     background: !!slide?.backgroundLayers?.some((l) => l.type === 'IMAGE_SLOT'),
     content: !!slide?.nodes.some((n) => n.type === 'RECTANGLE' && !!n.slot),
   };
+}
+
+/**
+ * Slot de imagem do slide (1-indexado), se houver. `undefined` no slide 6, que
+ * não tem imagem nenhuma no desenho.
+ */
+export function template01ImageSlot(slideIndex: number): string | undefined {
+  return TEMPLATE_01_EDITABLE_SLOTS.find((s) => s.kind === 'image' && s.slideIndex === slideIndex)
+    ?.slot;
+}
+
+/** Campos genéricos do editor que servem de imagem quando o slot está vazio. */
+export interface Template01ImageFallbacks {
+  backgroundImageUrl?: string;
+  gridImageUrl?: string;
+  contentImageUrl?: string;
+}
+
+export function template01FallbackImage(slide: Template01ImageFallbacks): string {
+  return slide.backgroundImageUrl || slide.gridImageUrl || slide.contentImageUrl || '';
+}
+
+/**
+ * A imagem que o slide EXIBE hoje — a do slot, ou a dos campos genéricos do
+ * editor quando o slot está vazio.
+ *
+ * A barra lateral e o render precisam concordar sobre isso: é esta função que
+ * decide se o painel mostra preview e sliders, e é a mesma regra que o
+ * `Template01Slide` usa para pintar. Origem não importa (IA ou upload): o que
+ * manda é o slot de imagem do slide.
+ */
+export function template01SlideImageUrl(
+  slide: Template01ImageFallbacks & { templateSlots?: Template01Slots },
+  slideIndex: number
+): string {
+  const slot = template01ImageSlot(slideIndex);
+  if (!slot) return '';
+  return slide.templateSlots?.[slot] || template01FallbackImage(slide);
 }
 
 /** Conteúdo original do Figma — usado como estado inicial de um carrossel novo. */

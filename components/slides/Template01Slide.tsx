@@ -13,6 +13,8 @@ import {
   template01Tops,
   template01AlignBoxes,
   template01BaseType,
+  template01Nodes,
+  template01FallbackImage,
   SpecBox,
   SpecNode,
   SpecSlide,
@@ -306,11 +308,15 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
     [slide, globalSettings]
   );
 
+  // Os nós DEPOIS da camada de ajuste: nos slides que o Figma deixou sem canto
+  // é aqui que o par entra (ver TEMPLATE_01_DESIGN_TWEAKS.extraCorners).
+  const nodes = React.useMemo(() => template01Nodes(specSlide), [specSlide]);
+
   const slots: Template01Slots = React.useMemo(() => {
     const fromSlide = slide.templateSlots ?? {};
     // A imagem escolhida pelos controles genéricos do editor vale como imagem
     // do slide quando o slot correspondente ainda está vazio.
-    const fallbackImage = slide.backgroundImageUrl || slide.gridImageUrl || slide.contentImageUrl || '';
+    const fallbackImage = template01FallbackImage(slide);
     if (!fallbackImage) return fromSlide;
     const merged = { ...fromSlide };
     for (const node of specSlide.nodes) {
@@ -333,12 +339,12 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
 
   const lineHeights = React.useMemo(() => {
     const out: Record<string, number> = {};
-    for (const node of specSlide.nodes) {
+    for (const node of nodes) {
       if (node.type !== 'TEXT' || !node.typography || !node.slot) continue;
       out[node.slot] = effectiveType(node, template01TextOverrideFor(node, ov)).lineHeightPx;
     }
     return out;
-  }, [specSlide, ov]);
+  }, [nodes, ov]);
 
   React.useLayoutEffect(() => {
     const measure = () => {
@@ -375,10 +381,10 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
 
   const isTitleSlot = React.useCallback(
     (slot: string) => {
-      const node = specSlide.nodes.find((n) => n.slot === slot);
+      const node = nodes.find((n) => n.slot === slot);
       return !!node && template01Kind(node) === 'title';
     },
-    [specSlide]
+    [nodes]
   );
 
   const tops = React.useMemo(
@@ -426,7 +432,7 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
       )}
       {ov.shadow && <div style={{ position: 'absolute', inset: 0, background: ov.shadow }} />}
 
-      {specSlide.nodes.map((node) => {
+      {nodes.map((node) => {
         // GROUP não gera caixa: os filhos já vêm achatados no spec.
         if (node.type === 'GROUP') return null;
 

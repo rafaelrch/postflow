@@ -22,6 +22,8 @@ import {
   ElementFont,
 } from '@/types';
 import {
+  template01ImageSlot,
+  template01SlideImageUrl,
   template01SlideMedia,
   template01SlotDefaults,
   template01SlotsForSlide,
@@ -1027,6 +1029,28 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     });
 
   const t01Media = template01SlideMedia(activeSlideIndex + 1);
+
+  /**
+   * A imagem que o slide EXIBE — do slot ou dos campos genéricos do editor.
+   * É ela que decide o painel: sem imagem não há preview nem slider, porque
+   * slider de posição/zoom/opacidade sobre nada não mexe em coisa alguma.
+   */
+  const t01ImageSlot = template01ImageSlot(activeSlideIndex + 1);
+  const t01ImageUrl = template01SlideImageUrl(slide, activeSlideIndex + 1);
+
+  /**
+   * Tira a imagem do slot. Limpa TAMBÉM os campos genéricos: o render cai neles
+   * quando o slot está vazio, então esvaziar só o slot faria a imagem voltar.
+   */
+  const removeT01Image = () => {
+    if (!t01ImageSlot) return;
+    updateActiveSlide({
+      templateSlots: { ...(slide.templateSlots ?? {}), [t01ImageSlot]: '' },
+      backgroundImageUrl: '',
+      gridImageUrl: '',
+      contentImageUrl: '',
+    });
+  };
   const t01Touched =
     Object.keys(slide.templateOverrides ?? {}).length > 0 ||
     Object.keys(slide.templateSlotStyles ?? {}).length > 0;
@@ -1056,31 +1080,42 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 generateOne(activeSlideIndex, t01Media.background ? 'background' : 'content', opts)
               }
             />
-            <Slider
-              label="Opacidade"
-              value={slide.backgroundImageOpacity ?? 100}
-              min={0}
-              max={100}
-              unit="%"
-              onChange={(v) => setT01({ backgroundImageOpacity: v }, 'backgroundImageOpacity')}
-            />
-            {t01Media.background ? (
+            {/* Miniatura da imagem que está no slide, com X para remover —
+                logo abaixo do botão de gerar, que é de onde ela costuma vir. */}
+            {t01ImageUrl && <ImageThumb url={t01ImageUrl} onRemove={removeT01Image} />}
+
+            {/* Sem imagem no slot não há o que posicionar: os sliders só
+                aparecem quando existe imagem, seja ela gerada por IA ou
+                enviada pelo usuário. */}
+            {t01ImageUrl && (
               <>
-                <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
-                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
-                <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
-                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
-                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
-                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
-              </>
-            ) : (
-              <>
-                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
-                  onChange={(v) => setT01({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
-                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
-                  onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
-                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
-                  onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } }, 'contentImagePosition')} />
+                <Slider
+                  label="Opacidade"
+                  value={slide.backgroundImageOpacity ?? 100}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => setT01({ backgroundImageOpacity: v }, 'backgroundImageOpacity')}
+                />
+                {t01Media.background ? (
+                  <>
+                    <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+                      onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
+                    <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+                      onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
+                    <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                      onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
+                  </>
+                ) : (
+                  <>
+                    <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
+                      onChange={(v) => setT01({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                    <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
+                      onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                    <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                      onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } }, 'contentImagePosition')} />
+                  </>
+                )}
               </>
             )}
           </>
