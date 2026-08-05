@@ -1,0 +1,28 @@
+-- TEMPLATE 1 — estilo POR SLOT de texto.
+--
+-- `slides.template_slot_styles` guarda o que o usuário mexeu em CADA bloco de
+-- texto do slide ({"s2.body": {"color": "#FF0000", "fontSize": 40}}). Só o
+-- estilo 'template01' preenche; nos outros fica NULL.
+--
+-- Por que existe: a barra lateral já escrevia `templateSlotStyles` no slide,
+-- mas o campo não passava pelo `slide-mapper` nem tinha coluna — o autosave
+-- descartava tudo em silêncio e o estilo por slot morria no reload. O usuário
+-- pintava o corpo do slide 2, o carrossel salvava "sem alterações pendentes" e
+-- ao reabrir o texto voltava preto.
+--
+-- Por que coluna própria e não dentro de `template_overrides`: aquele objeto é
+-- um mapa de flags por CONTROLE do slide inteiro ({"titleSize": true}); este é
+-- um mapa de VALORES por slot ({"s2.body": {...}}). Formatos diferentes e
+-- regras de leitura diferentes — juntar obrigaria o render a distinguir os dois
+-- pelo formato do valor.
+--
+-- A mesma regra dos irmãos vale aqui: a chave existir JÁ É o gesto do usuário,
+-- e GERAÇÃO NUNCA escreve nesta coluna — só a barra lateral.
+--
+-- 🔴 Compatibilidade: NULL em todo deck já salvo, de propósito. A ausência
+-- significa "este slide segue o spec", que é exatamente o que esses decks são
+-- hoje. Nenhum backfill.
+--
+-- Idempotente: pode rodar mais de uma vez.
+
+alter table public.slides add column if not exists template_slot_styles jsonb;

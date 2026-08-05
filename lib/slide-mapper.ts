@@ -63,6 +63,7 @@ export function mapDbSlideToSlide(sl: DbRow): Slide {
     // vindo: é a ausência que faz o modelo voltar a sair da posição.
     templateModel: (sl.template_model as number) ?? undefined,
     templateOverrides: (sl.template_overrides as Slide['templateOverrides']) || undefined,
+    templateSlotStyles: (sl.template_slot_styles as Slide['templateSlotStyles']) || undefined,
     editorialTitleOffsetY: (sl.editorial_title_offset_y as number) ?? undefined,
     editorialDescOffsetY: (sl.editorial_desc_offset_y as number) ?? undefined,
     editorialImageOffsetY: (sl.editorial_image_offset_y as number) ?? undefined,
@@ -116,6 +117,7 @@ export function mapSlideToDbRow(slide: Slide, carouselId: string, position: numb
     ...(slide.templateSlots ? { template_slots: slide.templateSlots } : {}),
     ...(slide.templateModel != null ? { template_model: slide.templateModel } : {}),
     ...(slide.templateOverrides ? { template_overrides: slide.templateOverrides } : {}),
+    ...(slide.templateSlotStyles ? { template_slot_styles: slide.templateSlotStyles } : {}),
     editorial_title_offset_y: slide.editorialTitleOffsetY ?? null,
     editorial_desc_offset_y: slide.editorialDescOffsetY ?? null,
     editorial_image_offset_y: slide.editorialImageOffsetY ?? null,

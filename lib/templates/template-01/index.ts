@@ -30,6 +30,8 @@ export interface SpecPaint {
   color?: string;
   alpha?: number;
   css?: string;
+  /** Só nos paints de degradê — os slides 1 e 2 do Template 1. */
+  stops?: { color: string; alpha?: number; position?: number }[];
 }
 
 export interface SpecTypography {
@@ -1121,6 +1123,34 @@ export function template01ModelOf(
 /** O slide do spec de um modelo. Cai no modelo 1 se pedirem um inexistente. */
 export function template01SpecSlideOf(model: number): SpecSlide {
   return TEMPLATE_01_SPEC.slides.find((s) => s.index === model) ?? TEMPLATE_01_SPEC.slides[0];
+}
+
+export interface Template01SpecBackground {
+  /** O CSS que o render aplica quando o slide segue o template. */
+  css: string;
+  /** Hex, só quando o desenho é cor CHAPADA. Ausente nos modelos com degradê. */
+  solid?: string;
+  /**
+   * Hex para o seletor de cor abrir mostrando algo verdadeiro do desenho: a cor
+   * chapada, ou — nos modelos 1 e 2 — a primeira parada do degradê. O seletor
+   * nativo e o campo hex só aceitam `#RRGGBB`; um degradê ali abriria em branco.
+   */
+  swatch: string;
+}
+
+/**
+ * Fundo do SPEC de um modelo.
+ *
+ * Existe para a barra lateral abrir mostrando a cor de fábrica daquele slide (o
+ * modelo 6 abre em `#0D39E4`) sem que o componente leia o JSON solto, e para
+ * distinguir os dois modelos de degradê — onde escolher uma cor SUBSTITUI o
+ * degradê inteiro por chapado.
+ */
+export function template01SpecBackground(model: number): Template01SpecBackground {
+  const paint = template01SpecSlideOf(model).background[0];
+  const css = paint?.css ?? '#FFFFFF';
+  const solid = paint?.type === 'SOLID' ? paint.color ?? css : undefined;
+  return { css, solid, swatch: solid ?? paint?.stops?.[0]?.color ?? '#FFFFFF' };
 }
 
 // ─── Lorem ipsum dentro dos limites ─────────────────────────────

@@ -60,16 +60,19 @@ function montaDeck(active: number, slideExtra: Partial<Slide> = {}) {
 }
 
 /**
- * Abre a seção "Imagem — Slide N" e devolve SÓ o bloco dela.
+ * Abre o painel "Imagem" e devolve SÓ o bloco dele.
  *
- * O escopo importa: o painel de conteúdo (Template01Slots) tem a própria seção
- * "Imagem", com upload e um X de remover. Buscar no container inteiro acharia os
- * dois e o teste passaria pelo motivo errado.
+ * O rótulo é único no sidebar inteiro — antes existiam DOIS painéis de imagem
+ * ("Imagem" no conteúdo e "Imagem — Slide N" no estilo), cada um escrevendo num
+ * campo diferente. `getByText` falha se a duplicata voltar, o que é de
+ * propósito: é o teste que trava a unificação.
  */
-function abreSecaoImagem(active: number): HTMLElement {
-  const header = screen.getByText(`Imagem — Slide ${active + 1}`);
-  fireEvent.click(header);
-  return header.closest('div') as HTMLElement;
+function abreSecaoImagem(_active: number): HTMLElement {
+  const painel = screen.getByText('Imagem').closest('[data-panel]') as HTMLElement;
+  // O painel de imagem já nasce aberto — clicar sem checar o fecharia.
+  const fechado = within(painel).queryAllByRole('button', { expanded: false });
+  if (fechado.length > 0) fireEvent.click(fechado[0]);
+  return painel;
 }
 
 const SLIDERS = ['Posição X', 'Posição Y', 'Zoom', 'Opacidade'];
@@ -148,14 +151,15 @@ describe('TEMPLATE 1 — painel de imagem', () => {
     expect(within(painel).queryByAltText('Imagem anexada')).toBeNull();
   });
 
-  it('slide 6 não tem slot de imagem: mantém o aviso, sem preview e sem slider', () => {
+  it('slide 6 não tem slot de imagem: o painel inteiro não aparece', () => {
+    // Antes o painel abria só para dizer "este slide não tem imagem no
+    // template" — uma linha de navegação que só servia para decepcionar. A
+    // condição vive na config do template (`when`), então ele some.
     montaDeck(5);
-    const painel = abreSecaoImagem(5);
 
-    expect(within(painel).getByText('Este slide não tem imagem no template.')).toBeTruthy();
-    expect(within(painel).queryByAltText('Imagem anexada')).toBeNull();
-    for (const s of SLIDERS) expect(within(painel).queryByText(s), s).toBeNull();
-    // Sem imagem no template, nem o botão de gerar faz sentido ali.
-    expect(within(painel).queryByText(/Gerar imagem com IA/)).toBeNull();
+    expect(screen.queryByText('Imagem')).toBeNull();
+    expect(screen.queryByAltText('Imagem anexada')).toBeNull();
+    for (const s of SLIDERS) expect(screen.queryByText(s), s).toBeNull();
+    expect(screen.queryByText(/Gerar imagem com IA/)).toBeNull();
   });
 });

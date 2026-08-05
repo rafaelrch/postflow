@@ -216,15 +216,31 @@ body {
   src: url('/fonts/template-01/InterDisplay-Medium.woff2') format('woff2');
   font-weight: 500; font-style: normal; font-display: block;
 }
-/* Substituta de IvyOra Text — ver fontSubstitutions no spec. */
+/* Serifada do TEMPLATE 1.
+   IvyOra Text é a fonte do Figma e vem PRIMEIRO — é ela o padrão do template.
+   O Cormorant Garamond é o plano B: IvyOra é comercial da Ivy Foundry e não
+   pode ser embutida (ver `fontSubstitutions` no spec), então quem não a tiver
+   disponível cai no substituto que o spec ranqueou como mais próximo.
+   O navegador usa a primeira `src` que resolver, nesta ordem.
+
+   ⚠️ Ter a fonte instalada no sistema pode não bastar: ativada por Adobe
+   Fonts, ela não fica acessível ao `local()` do navegador. Para valer para
+   todos os usuários — e para a exportação, que roda no navegador deles — é
+   preciso um projeto web do Adobe Fonts servindo a IvyOra como webfont.
+
+   O `weightShift` do spec (500 → 600) está no arquivo, não em código: o peso
+   500 carrega o Cormorant 600, porque ele é mais leve que a IvyOra. Quando a
+   IvyOra resolve, o 500 dela já é o Medium certo e nada precisa compensar. */
 @font-face {
   font-family: 'T01Serif';
-  src: url('/fonts/template-01/cormorant-garamond-600.woff2') format('woff2');
+  src: local('IvyOra Text Medium'), local('IvyOraText-Medium'),
+       url('/fonts/template-01/cormorant-garamond-600.woff2') format('woff2');
   font-weight: 500; font-style: normal; font-display: block;
 }
 @font-face {
   font-family: 'T01Serif';
-  src: url('/fonts/template-01/cormorant-garamond-ita.woff2') format('woff2');
+  src: local('IvyOra Text Italic'), local('IvyOraText-Italic'),
+       url('/fonts/template-01/cormorant-garamond-ita.woff2') format('woff2');
   font-weight: 400; font-style: italic; font-display: block;
 }
 

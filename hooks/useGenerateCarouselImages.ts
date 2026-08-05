@@ -6,6 +6,8 @@ import { useEditorStore } from './useEditorStore';
 import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
 import { handlePlanRequired } from './useUpgradeStore';
 import { Slide, SlideStyle } from '@/types';
+import { template01ModelOf } from '@/lib/templates/template-01';
+import { template01SetImage } from '@/lib/templates/template-01/image';
 
 /** Onde a imagem gerada é aplicada: fundo full-bleed do slide, ou imagem de conteúdo entre os textos. */
 export type ImageTarget = 'background' | 'content';
@@ -118,6 +120,29 @@ async function generateForSlideWithRetry(
   }
 }
 
+/**
+ * Onde a imagem gerada é gravada.
+ *
+ * No TEMPLATE 1 vai para o SLOT do slide — antes ia para os campos genéricos,
+ * que perdem do slot na hora de pintar: gerar por cima de um upload manual
+ * dizia "pronto!" e não mudava nada na tela. Nos outros estilos não existe
+ * slot, e o destino continua sendo o mesmo de sempre.
+ */
+function imagePatch(
+  slide: Slide,
+  style: SlideStyle,
+  index: number,
+  target: ImageTarget,
+  url: string
+): Partial<Slide> {
+  if (style === 'template01') {
+    return template01SetImage(slide, template01ModelOf(slide, index), url);
+  }
+  return target === 'content'
+    ? { contentImageUrl: url }
+    : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' };
+}
+
 export function useGenerateCarouselImages() {
   const { slides, style, updateSlide } = useEditorStore();
   const [generating, setGenerating] = useState(false);
@@ -156,9 +181,7 @@ export function useGenerateCarouselImages() {
           const url = await generateForSlideWithRetry(slide, i, slides.length, (waitSecs) => {
             toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
           });
-          updateSlide(i, target === 'content'
-            ? { contentImageUrl: url }
-            : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
+          updateSlide(i, imagePatch(slide, style, i, target, url));
         } catch (err) {
           // Plano free tentou IA: para o lote e abre o modal de upgrade.
           if (isPlanRequired(err)) {
@@ -213,9 +236,7 @@ export function useGenerateCarouselImages() {
       const url = await generateForSlideWithRetry(slide, index, slides.length, (waitSecs) => {
         toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
       }, opts);
-      updateSlide(index, target === 'content'
-        ? { contentImageUrl: url }
-        : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
+      updateSlide(index, imagePatch(slide, style, index, target, url));
       toast.success(`Slide ${index + 1} pronto!`, { id: toastId });
     } catch (err) {
       if (isPlanRequired(err)) {

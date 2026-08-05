@@ -61,13 +61,26 @@ export interface Template01SlideProps {
  *    usuário, `top` fixo abre buraco quando encurta e sobrepõe quando cresce.
  */
 
-// Família do Figma → família declarada em globals.css. Os nomes são prefixados
-// porque o app já tem uma face 'IvyOra Text' que resolve via local() e não
-// serve aqui: no template a serifada é a substituta embutida.
+// Família do Figma → família declarada em globals.css. Os nomes das sem-serifa
+// são prefixados para não colidirem com as faces do resto do app.
+//
+// A serifada é a IvyOra Text de verdade, servida pelo projeto web do Adobe
+// Fonts sob o nome `ivyora-text` (ver o <link> em app/layout.tsx). O `T01Serif`
+// (Cormorant Garamond, embutido) fica como rede: se o CDN do Adobe cair, o
+// slide sai no substituto que o spec ranqueou como mais próximo, em vez de
+// numa serifada qualquer do sistema.
+//
+// ⚠️ Não escreva `'IvyOra Text'` nesta pilha. O app declara um @font-face com
+// esse nome que resolve só por local(); quando ele não acha nada, o Chrome
+// trata a família como definida-e-vazia e pula direto para a `serif` genérica
+// — Georgia — sem cair no T01Serif. Medido: 334px (Georgia) contra 305px (o
+// substituto correto). `ivyora-text` não tem esse problema porque é uma face
+// que baixa de verdade: se o download falhar, a família some da cascata e o
+// próximo nome da lista vale.
 const FONT_STACK: Record<string, string> = {
   Inter: "'T01Inter', sans-serif",
   'Inter Display': "'T01InterDisplay', sans-serif",
-  'IvyOra Text': "'T01Serif', serif",
+  'IvyOra Text': "'ivyora-text', 'T01Serif', serif",
 };
 
 function fontStack(family: string): string {

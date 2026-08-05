@@ -5,6 +5,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Trash2, Plus, GripVertical, Save, CalendarPlus } from 'lucide-react';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { getFormat } from '@/lib/formats';
+import { fitCard } from '@/lib/canvas-fit';
 import SlidePreview from './SlidePreview';
 import FormatDropdown from './FormatDropdown';
 import Template01ModelPicker from './Template01ModelPicker';
@@ -13,6 +14,9 @@ import { Slide } from '@/types';
 // Margem vertical total (topo + base) reservada em volta dos cards na faixa —
 // o card ocupa a altura da área menos isto, e o scale deriva daí (fit-to-height).
 const V_MARGIN = 56;
+// Respiro horizontal da faixa (o `px-8` do trilho, dos dois lados). Entra na
+// conta do teto de largura: sem ele o card encostaria na borda da área.
+const H_MARGIN = 64;
 
 const STYLE_LABEL: Record<string, string> = {
   minimalist: 'Minimalista',
@@ -51,28 +55,35 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
 
   const previewRef = useRef<HTMLDivElement>(null); // área que mede a altura disponível
   const scrollRef = useRef<HTMLDivElement>(null);  // faixa rolável horizontal
-  const [availH, setAvailH] = useState(0);
+  const [avail, setAvail] = useState({ w: 0, h: 0 });
 
   const format = getFormat(globalSettings.format);
 
-  // Mede a altura disponível e recalcula no resize. Ao trocar de formato, o
-  // scale abaixo recomputa sozinho (depende de availH + format.height).
+  // Mede a área disponível e recalcula no resize. Ao trocar de formato, o
+  // scale abaixo recomputa sozinho (depende de `avail` + dimensões do formato).
   useEffect(() => {
     const el = previewRef.current;
     if (!el) return;
-    setAvailH(el.clientHeight);
+    // Objeto novo a cada callback tiraria a bail-out do React: o observer
+    // dispara a cada mudança de layout da faixa (a barra de rolagem horizontal
+    // aparecendo já basta) e o render voltaria a mexer no layout — laço.
+    const apply = (w: number, h: number) =>
+      setAvail((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    apply(el.clientWidth, el.clientHeight);
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) setAvailH(entry.contentRect.height);
+      for (const entry of entries) apply(entry.contentRect.width, entry.contentRect.height);
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Fit-to-height: card preenche a altura da área; largura segue a proporção.
-  const cardH = Math.max(0, availH - V_MARGIN);
-  const scale = cardH > 0 ? cardH / format.height : 0.4;
-  const cardW = Math.round(format.width * scale);
-  const cardHpx = Math.round(cardH);
+  // Altura manda; a largura entra só como teto, para o card não escapar da
+  // faixa em janela estreita e alta (ver lib/canvas-fit).
+  const { scale, cardW, cardH: cardHpx } = fitCard(
+    Math.max(0, avail.w - H_MARGIN),
+    Math.max(0, avail.h - V_MARGIN),
+    format
+  );
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;

@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import EditorSidebar from '@/components/editor/EditorSidebar';
+import { useEditorStore } from '@/hooks/useEditorStore';
 import { FORMAT_LIST, getFormat } from '@/lib/formats';
 import { SlideFormat } from '@/types';
 import {
@@ -33,10 +35,71 @@ import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
  *   deck8    — 8 slides com modelo repetido, o caso que quebrava.
  *   novo     — um slide novo de cada modelo, com o lorem.
  *   popup    — o popup de escolha de modelo.
+ *   barra    — a BARRA LATERAL de verdade ao lado do slide ativo. O editor
+ *              exige sessão; a barra não, porque lê só a store do Zustand.
+ *              É por aqui que se vê o painel mexendo no slide de fato.
  */
 
-const CENAS = ['gabarito', 'legado', 'modelo', 'deck8', 'novo', 'popup'] as const;
+const CENAS = ['gabarito', 'legado', 'modelo', 'deck8', 'novo', 'popup', 'barra'] as const;
 type Cena = (typeof CENAS)[number];
+
+/**
+ * A barra lateral ao vivo, com o slide ativo do lado. Sem sessão e sem
+ * Supabase: a barra só conversa com a store.
+ */
+function LabBarra({ formato, escala }: { formato: SlideFormat; escala: number }) {
+  const { slides, activeSlideIndex, globalSettings, setActiveSlideIndex } = useEditorStore();
+  const slide = slides[activeSlideIndex];
+  const fmt = getFormat(formato);
+  if (!slide) return null;
+
+  return (
+    <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+      <div style={{ height: 900, background: 'var(--surface, #fff)' }}>
+        <EditorSidebar onOpenWizard={() => {}} onDownloadSlide={() => {}} onDownloadAll={() => {}} />
+      </div>
+      <div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {slides.map((s, i) => (
+            <button
+              key={s.id}
+              data-barra-slide={i}
+              onClick={() => setActiveSlideIndex(i)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid #555',
+                background: i === activeSlideIndex ? '#fa0' : '#333',
+                color: i === activeSlideIndex ? '#000' : '#ccc',
+                font: '12px system-ui',
+              }}
+            >
+              s{i + 1}
+            </button>
+          ))}
+        </div>
+        <div style={{ width: TEMPLATE_01_WIDTH * escala, height: fmt.height * escala, overflow: 'hidden' }}>
+          <div
+            data-native-slide={activeSlideIndex}
+            style={{
+              width: TEMPLATE_01_WIDTH,
+              height: fmt.height,
+              transformOrigin: 'top left',
+              transform: `scale(${escala})`,
+            }}
+          >
+            <Template01Slide
+              slide={slide}
+              globalSettings={{ ...globalSettings, format: formato }}
+              slideIndex={activeSlideIndex}
+              totalSlides={slides.length}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function base(position: number): Slide {
   return {
@@ -60,6 +123,25 @@ export default function T01Lab() {
   // sem depender de rolagem.
   const [solo, setSolo] = useState<number | null>(null);
   const [picked, setPicked] = useState<string>('');
+
+  // A cena `barra` semeia a store uma vez ao entrar. Não depende de `solo`: a
+  // troca de slide ativo é da própria barra, e re-semear apagaria a edição.
+  useEffect(() => {
+    if (cena !== 'barra') return;
+    useEditorStore.setState({
+      slides: TEMPLATE_01_MODELS.map((model, i) => ({
+        ...base(i),
+        templateModel: model,
+        templateSlots: {
+          ...template01NewSlideSlots(model),
+          ...template01CornerSlots('MINHA MARCA', 'eu'),
+        },
+      })),
+      activeSlideIndex: 5,
+      style: 'template01',
+      globalSettings: DEFAULT_GLOBAL_SETTINGS,
+    });
+  }, [cena]);
 
   if (process.env.NODE_ENV === 'production') return null;
 
@@ -173,7 +255,9 @@ export default function T01Lab() {
         <span style={{ color: '#8f8', font: '12px monospace', alignSelf: 'center' }}>{picked}</span>
       </div>
 
-      {cena === 'popup' ? (
+      {cena === 'barra' ? (
+        <LabBarra formato={formato} escala={escala} />
+      ) : cena === 'popup' ? (
         <Template01ModelPicker
           globalSettings={DEFAULT_GLOBAL_SETTINGS}
           inheritedCorners={template01CornerSlots('MINHA MARCA', 'eu')}

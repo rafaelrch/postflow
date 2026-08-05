@@ -137,7 +137,12 @@ export interface ElementFontCSS {
 
 export function getElementFontCSS(font: ElementFont): ElementFontCSS {
   const SF    = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
-  const IVY   = "'IvyOra Text', 'Georgia', serif";
+  // IvyOra Text vem do projeto web do Adobe Fonts como `ivyora-text`. O
+  // Cormorant fica de rede — antes o plano B era Georgia, e como a IvyOra nunca
+  // resolvia (licença desktop não chega ao navegador), escolher "IvyOra Text"
+  // no seletor entregava Georgia enquanto o spec do Template 1 entregava
+  // Cormorant: duas serifadas diferentes no mesmo slide.
+  const IVY   = "'ivyora-text', 'T01Serif', serif";
   const BEBAS = "'Bebas Neue', sans-serif";
   const MONT  = "'Montserrat', sans-serif";
   const ANTON = "'Anton', sans-serif";

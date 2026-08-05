@@ -187,6 +187,8 @@ create table if not exists public.slides (
   content_layout text,
   template_slots jsonb,
   template_overrides jsonb,
+  -- TEMPLATE 1: estilo por SLOT de texto ({"s2.body": {"color": "#F00"}}).
+  template_slot_styles jsonb,
   -- TEMPLATE 1: qual dos 6 modelos do spec o slide desenha. NULL nos outros
   -- estilos e em todo deck salvo antes da coluna (aí o modelo sai da posicao).
   template_model smallint,
@@ -220,6 +222,7 @@ alter table public.slides add column if not exists text_padding jsonb;
 alter table public.slides add column if not exists content_layout text;
 alter table public.slides add column if not exists template_slots jsonb;
 alter table public.slides add column if not exists template_overrides jsonb;
+alter table public.slides add column if not exists template_slot_styles jsonb;
 alter table public.slides add column if not exists template_model smallint;
 alter table public.slides add column if not exists editorial_title_offset_y smallint;
 alter table public.slides add column if not exists editorial_desc_offset_y smallint;

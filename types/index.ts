@@ -262,7 +262,7 @@ export interface Slide {
   templateOverrides?: Template01SlideOverrideKeys;
   /**
    * TEMPLATE 1: estilo POR SLOT de texto. Chave presente = o usuário mexeu
-   * naquele bloco. Serializa junto do slide (jsonb), sem coluna nova.
+   * naquele bloco. Persiste em `slides.template_slot_styles` (jsonb).
    *
    * Regra igual à de `templateOverrides`: GERAÇÃO NUNCA escreve aqui.
    */
