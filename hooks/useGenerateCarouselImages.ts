@@ -8,6 +8,8 @@ import { handlePlanRequired } from './useUpgradeStore';
 import { Slide, SlideStyle } from '@/types';
 import { template01ModelOf } from '@/lib/templates/template-01';
 import { template01SetImage } from '@/lib/templates/template-01/image';
+import { template02ModelOf } from '@/lib/templates/template-02';
+import { template02SetImage } from '@/lib/templates/template-02/image';
 
 /** Onde a imagem gerada é aplicada: fundo full-bleed do slide, ou imagem de conteúdo entre os textos. */
 export type ImageTarget = 'background' | 'content';
@@ -123,10 +125,14 @@ async function generateForSlideWithRetry(
 /**
  * Onde a imagem gerada é gravada.
  *
- * No TEMPLATE 1 vai para o SLOT do slide — antes ia para os campos genéricos,
- * que perdem do slot na hora de pintar: gerar por cima de um upload manual
- * dizia "pronto!" e não mudava nada na tela. Nos outros estilos não existe
- * slot, e o destino continua sendo o mesmo de sempre.
+ * Nos TEMPLATES 1 e 2 vai para o SLOT do slide — antes ia para os campos
+ * genéricos, que perdem do slot na hora de pintar: gerar por cima de um upload
+ * manual dizia "pronto!" e não mudava nada na tela. Nos outros estilos não
+ * existe slot, e o destino continua sendo o mesmo de sempre.
+ *
+ * 🔴 O `target` não decide nada nos templates: quem decide é o MODELO do slide
+ * (a capa do T2 tem imagem de fundo, os internos têm o bloco), e o slot dele já
+ * é único. Fazer o destino depender do `target` recriaria a segunda verdade.
  */
 function imagePatch(
   slide: Slide,
@@ -137,6 +143,9 @@ function imagePatch(
 ): Partial<Slide> {
   if (style === 'template01') {
     return template01SetImage(slide, template01ModelOf(slide, index), url);
+  }
+  if (style === 'template02') {
+    return template02SetImage(slide, template02ModelOf(slide, index), url);
   }
   return target === 'content'
     ? { contentImageUrl: url }

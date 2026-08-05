@@ -6,6 +6,7 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Template01Slots from './Template01Slots';
+import Template02Slots from './Template02Slots';
 import SidebarGroup from './sidebar/SidebarGroup';
 import SidebarPanel from './sidebar/SidebarPanel';
 import ColorPicker from './sidebar/ColorPicker';
@@ -13,7 +14,7 @@ import ElementFontPicker from './sidebar/ElementFontPicker';
 import WordHighlightPicker from './sidebar/WordHighlightPicker';
 import AiGenPanel from './sidebar/AiGenPanel';
 import ImageThumb from './sidebar/ImageThumb';
-import { helpCls, inputCls, labelCls } from './sidebar/tokens';
+import { helpCls, inputCls, labelCls, numericCls } from './sidebar/tokens';
 import {
   PANEL_REGISTRY,
   PanelContext,
@@ -47,6 +48,21 @@ import {
   markTemplate01CornerOverride,
   markTemplate01Override,
 } from '@/lib/templates/template-01/overrides';
+import {
+  template02HeaderSlotsForModel,
+  template02ImageSlot,
+  template02ModelOf,
+  template02SlotColor,
+  template02SlotDefaults,
+  template02TextSlotsForModel,
+  template02Background,
+} from '@/lib/templates/template-02';
+import { template02ClearImage, template02SetImage, template02SlideImageUrl } from '@/lib/templates/template-02/image';
+import {
+  Template02SlideControl,
+  markTemplate02Override,
+  template02SlideChanges,
+} from '@/lib/templates/template-02/overrides';
 
 interface EditorSidebarProps {
   onOpenWizard: () => void;
@@ -59,6 +75,9 @@ const TEXT_POSITIONS: TextPosition[] = [
   'middle-left', 'center', 'middle-right',
   'bottom-left', 'bottom-center', 'bottom-right',
 ];
+
+const TEMPLATE_02_INFO =
+  'Template 2: a forma é fixa — posição, cor e tipografia vêm do Figma. Você edita texto e imagem, e pode ajustar o estilo depois. Se o texto não couber, encurte.';
 
 const TEMPLATE_01_INFO =
   'Template 1: a forma é fixa — posição, cor e tipografia vêm do Figma. Você edita texto e imagem, e pode ajustar o estilo depois. Se o texto não couber, encurte.';
@@ -135,6 +154,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const contentImageRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const t01ImageRef = useRef<HTMLInputElement>(null);
+  const t02ImageRef = useRef<HTMLInputElement>(null);
 
   const { generateAll, generateOne, generating, progress } = useGenerateCarouselImages();
 
@@ -161,12 +181,24 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       ? slide.backgroundColor
       : t01SpecBg?.swatch ?? '#111111';
 
+  // ── TEMPLATE 2 ────────────────────────────────────────────────────────────
+  // Mesma regra do T1: tudo segue o MODELO do slide, nunca a posição. Aqui isso
+  // pesa ainda mais — o deck do T2 não tem tamanho fixo.
+  const isT02 = style === 'template02';
+  const t02Model = isT02 ? template02ModelOf(slide, activeSlideIndex) : null;
+  const t02ImageUrl = t02Model != null ? template02SlideImageUrl(slide, t02Model) : '';
+  // A capa tem imagem de FUNDO full-bleed; os internos, o bloco de 380x1089.
+  const t02IsCover = t02Model === 1;
+  const t02TextSlots = t02Model != null ? template02TextSlotsForModel(t02Model) : [];
+  const t02HeaderSlots = t02Model != null ? template02HeaderSlotsForModel(t02Model) : [];
+
   const ctx: PanelContext = {
     style,
     slide,
     activeSlideIndex,
     globalSettings,
     template01Model: t01Model,
+    template02Model: t02Model,
     isEditorialCover,
   };
 
@@ -188,6 +220,10 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const handleContentFile = (f: File) => upload(f, (url) => updateActiveSlide({ contentImageUrl: url }));
   const handleT01File = (f: File) =>
     upload(f, (url) => t01Model != null && updateActiveSlide(template01SetImage(slide, t01Model, url)));
+  // Upload, IA e remoção escrevem no MESMO lugar (o slot) — ver
+  // `lib/templates/template-02/image.ts`.
+  const handleT02File = (f: File) =>
+    upload(f, (url) => t02Model != null && updateActiveSlide(template02SetImage(slide, t02Model, url)));
 
   const fileInputs = (
     <>
@@ -197,6 +233,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         onChange={(e) => e.target.files?.[0] && handleContentFile(e.target.files[0])} />
       <input ref={t01ImageRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT01File(f); e.target.value = ''; }} />
+      <input ref={t02ImageRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT02File(f); e.target.value = ''; }} />
       <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => e.target.files?.[0] && upload(
           e.target.files[0],
@@ -240,6 +278,30 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [slot]: value } })
     );
 
+  /* ── Escritas do TEMPLATE 2 ─────────────────────────────────────────────
+     Mesma disciplina do T1: o handler MARCA o controle em `templateOverrides`,
+     e é a marca — nunca o valor — que faz o override existir. Deck gerado não
+     tem nenhuma, e por isso nasce idêntico ao spec.
+  ────────────────────────────────────────────────────────────────────────── */
+  const setT02 = (patch: Partial<Slide>, ...keys: Template02SlideControl[]) =>
+    updateActiveSlide({ ...patch, templateOverrides: markTemplate02Override(slide.templateOverrides, ...keys) });
+
+  /** Estilo de UM slot. A chave existir já é o gesto do usuário — sem marca. */
+  const setT02Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
+    updateActiveSlide({
+      templateSlotStyles: {
+        ...(slide.templateSlotStyles ?? {}),
+        [slot]: { ...(slide.templateSlotStyles?.[slot] ?? {}), ...patch },
+      },
+    });
+
+  // O cabeçalho é o mesmo em TODOS os slides do deck — editar em um e ver os
+  // outros divergirem seria bug, não liberdade. Mesmo laço dos cantos do T1.
+  const setT02HeaderText = (slot: string, value: string) =>
+    slides.forEach((s, i) =>
+      updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [slot]: value } })
+    );
+
   const t01TextSlots = t01Model != null
     ? template01SlotsForSlide(t01Model).filter((d) => d.kind === 'text' && !d.slot.startsWith('cantos.'))
     : [];
@@ -247,9 +309,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     ? template01SlotsForSlide(t01Model).filter((d) => d.slot.startsWith('cantos.'))
     : [];
 
-  const t01SlideChanges =
-    Object.keys(slide.templateOverrides ?? {}).length +
-    Object.keys(slide.templateSlotStyles ?? {}).length;
+  // Vale para os DOIS templates: os campos são os mesmos (`templateOverrides` +
+  // `templateSlotStyles`), então o botão "Restaurar" conta igual nos dois.
+  const templateSlideChanges = template02SlideChanges(slide);
   const t01CornerChanges = Object.keys(globalSettings.templateOverrides ?? {}).length;
 
   const cornersShow = corners.show !== false;
@@ -301,6 +363,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
     conteudoSlide: isT01 ? (
       <Template01Slots />
+    ) : isT02 ? (
+      <Template02Slots />
     ) : (
       // profile: título + corpo, sem os controles de forma dos outros estilos.
       <>
@@ -333,7 +397,59 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     /* Um painel de imagem por slide, com upload, IA e ajustes juntos. Antes o
        upload e a geração viviam em painéis diferentes, gravando em campos
        diferentes, e um vencia o outro no render sem avisar ninguém. */
-    imagem: isT01 ? (
+    imagem: isT02 ? (
+      <>
+        <DropZone
+          label={t02ImageUrl ? 'Trocar imagem' : 'Clique ou arraste'}
+          onClick={() => t02ImageRef.current?.click()}
+          onFile={handleT02File}
+        />
+        <AiGenPanel
+          // A key precisa do índice: prompt e referência são estado local, e
+          // sem remontar ao trocar de slide o texto do slide 1 gera o slide 2.
+          key={`t02-img-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          onGenerate={(opts) => generateOne(activeSlideIndex, t02IsCover ? 'background' : 'content', opts)}
+        />
+        {!t02ImageUrl && !t02IsCover && (
+          <p className={helpCls}>
+            Sem imagem, o bloco aparece com o placeholder cinza escrito “Imagem”.
+          </p>
+        )}
+        {t02ImageUrl && (
+          <>
+            <ImageThumb
+              url={t02ImageUrl}
+              onRemove={() => t02Model != null && updateActiveSlide(template02ClearImage(slide, t02Model))}
+            />
+            <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} unit="%"
+              onChange={(v) => setT02({ backgroundImageOpacity: v }, 'backgroundImageOpacity')} />
+            {t02IsCover ? (
+              <>
+                <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
+                <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
+                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                  onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
+              </>
+            ) : (
+              <>
+                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                  onChange={(v) => setT02({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } }, 'contentImagePosition')} />
+              </>
+            )}
+          </>
+        )}
+      </>
+    ) : isT01 ? (
       <>
         <DropZone
           label={t01ImageUrl ? 'Trocar imagem' : 'Clique ou arraste'}
@@ -447,7 +563,41 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
        uma mexida pegava blocos diferentes de uma vez — no slide 5, as duas
        colunas juntas. Entrelinha e alinhamento ficam fora da repetição de
        propósito: são um controle só para o slide. */
-    estiloDoTexto: (
+    estiloDoTexto: isT02 ? (
+      <>
+        {t02TextSlots.map((d) => {
+          const st = slide.templateSlotStyles?.[d.slot] ?? {};
+          const base = template02SlotDefaults(d.slot);
+          // O seletor abre mostrando o que ESTÁ na tela: o número do spec
+          // daquele bloco, nunca um padrão do editor.
+          const specColor = t02Model != null ? template02SlotColor(d.slot, t02Model) : '#000000';
+          return (
+            <div key={d.slot} className="space-y-2 pt-3 border-t border-black/[0.05] dark:border-white/[0.05] first:border-t-0 first:pt-0">
+              <span className={labelCls}>{d.label}</span>
+              <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
+                min={10} max={160} unit="px" onChange={(v) => setT02Slot(d.slot, { fontSize: v })} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker label="Cor" value={st.color || specColor} onChange={(v) => setT02Slot(d.slot, { color: v })} />
+                <UnderlineToggle on={!!st.underline} onToggle={() => setT02Slot(d.slot, { underline: !st.underline })} />
+              </div>
+              <div>
+                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                <ElementFontPicker value={st.font} onChange={(v) => setT02Slot(d.slot, { font: v })} />
+              </div>
+              <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
+                min={-0.1} max={0.3} step={0.01} unit="em"
+                onChange={(v) => setT02Slot(d.slot, { letterSpacing: v })} />
+            </div>
+          );
+        })}
+        {/* Entrelinha e alinhamento ficam de fora de propósito: no T2 a
+            composição é flexbox centrado e os blocos ocupam colunas fixas do
+            spec — mexer nisso desfaz a regra estruturante do template. */}
+        <p className={cn(helpCls, 'pt-3 border-t border-black/[0.05] dark:border-white/[0.05]')}>
+          Os títulos serifados vêm na IvyOra Text. Trocar a fonte de um bloco muda só ele.
+        </p>
+      </>
+    ) : (
       <>
         {t01TextSlots.map((d) => {
           const st = slide.templateSlotStyles?.[d.slot] ?? {};
@@ -631,7 +781,25 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     /* No template é SÓ A COR. Upload e IA ficam de fora de propósito: a imagem
        do template tem painel próprio ("Imagem"), e repeti-la aqui recriaria a
        duplicata que essa refatoração acabou de eliminar. */
-    fundoDoSlide: isT01 ? (
+    fundoDoSlide: isT02 ? (
+      <>
+        <ColorPicker
+          label="Cor"
+          value={
+            slide.templateOverrides?.background && slide.backgroundColor
+              ? slide.backgroundColor
+              : t02Model != null ? template02Background(t02Model) : '#EEE5D9'
+          }
+          onChange={(v) => setT02({ backgroundColor: v }, 'background')}
+        />
+        {t02IsCover && (
+          <p className={helpCls}>
+            Na capa o fundo só aparece onde a imagem não cobre — sem imagem, ele é o preto do
+            template. O degradê continua por cima em qualquer caso.
+          </p>
+        )}
+      </>
+    ) : isT01 ? (
       <>
         <ColorPicker
           label="Cor"
@@ -749,6 +917,38 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
+    /* Categoria e @ do TEMPLATE 2. É CONTEÚDO do deck: escreve nos DOIS slots
+       de TODOS os slides, como os cantos do T1 — editar num slide e ver os
+       outros divergirem seria bug, não liberdade. */
+    cabecalho: (
+      <>
+        {t02HeaderSlots.map((d) => {
+          const value = slide.templateSlots?.[d.slot] ?? d.defaultValue;
+          const over = d.maxChars != null && value.length > d.maxChars && value !== d.defaultValue;
+          return (
+            <div key={d.slot} className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={labelCls}>{d.label}</span>
+                {d.maxChars != null && (
+                  <span className={cn(numericCls, over && 'text-red-500 font-semibold')}>
+                    {value.length}/{d.maxChars} car.
+                  </span>
+                )}
+              </div>
+              <input
+                className={cn(inputCls, over && 'border-red-500/60')}
+                value={value}
+                onChange={(e) => setT02HeaderText(d.slot, e.target.value)}
+              />
+            </div>
+          );
+        })}
+        <p className={helpCls}>
+          Aparece no topo de todos os slides. Passar do limite encosta no centro.
+        </p>
+      </>
+    ),
+
     restaurarTemplate: (
       <>
         <p className={helpCls}>
@@ -767,23 +967,29 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   /* ── Composição ──────────────────────────────────────────────────────── */
   const groups = visiblePanels(ctx);
 
-  const headerFor = (scope: PanelScope) =>
-    scope === 'slide'
+  // O rótulo do grupo vem da CONFIG quando ela declara um; senão, o padrão do
+  // escopo. Sem isso o grupo global do Template 2 — que é conteúdo, não estilo —
+  // apareceria como "ESTILO GLOBAL", e rótulo que mente é exatamente o que a
+  // refatoração desta barra veio acabar.
+  const headerFor = (g: { scope: PanelScope; label?: string; hint?: string }) => {
+    if (g.label) return { label: g.label, hint: g.hint };
+    return g.scope === 'slide'
       ? {
           label: 'Conteúdo',
           value: `SLIDE ${String(activeSlideIndex + 1).padStart(2, '0')}`,
-          info: isT01 ? TEMPLATE_01_INFO : undefined,
+          info: isT01 ? TEMPLATE_01_INFO : isT02 ? TEMPLATE_02_INFO : undefined,
         }
-      : scope === 'global'
+      : g.scope === 'global'
         ? { label: 'Estilo global', hint: 'aplica a todos os slides' }
         : {};
+  };
 
   // Painéis que já nascem abertos — o caminho principal de cada estilo.
   const OPEN_BY_DEFAULT: PanelId[] = ['perfil', 'conteudoSlide', 'imagem', 'textoDoSlide'];
 
   const renderPanel = (id: PanelId) => {
     const def = PANEL_REGISTRY[id];
-    const disabled = id === 'restaurarTemplate' && t01SlideChanges === 0;
+    const disabled = id === 'restaurarTemplate' && templateSlideChanges === 0;
     return (
       // 🔴 `key` é o id, nunca o índice: o aberto/fechado é estado local do
       // painel e migraria de posição quando a composição mudar.
@@ -793,7 +999,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         icon={def.icon}
         label={panelLabel(id, ctx)}
         defaultOpen={OPEN_BY_DEFAULT.includes(id) || (id === 'fundoDoSlide' && isEditorialCover)}
-        badge={id === 'restaurarTemplate' && t01SlideChanges > 0 ? `${t01SlideChanges}` : undefined}
+        badge={id === 'restaurarTemplate' && templateSlideChanges > 0 ? `${templateSlideChanges}` : undefined}
         disabled={disabled}
         disabledReason="Este slide ainda segue o template — não há estilo para restaurar."
       >
@@ -808,7 +1014,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
       <div className="flex-1 overflow-y-auto pb-3">
         {groups.map((g) => (
-          <SidebarGroup key={g.scope} {...headerFor(g.scope)}>
+          <SidebarGroup key={g.scope} {...headerFor(g)}>
             {g.ids.map(renderPanel)}
           </SidebarGroup>
         ))}

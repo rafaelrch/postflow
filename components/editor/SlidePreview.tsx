@@ -8,6 +8,7 @@ import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
+import Template02Slide from '@/components/slides/Template02Slide';
 
 interface SlidePreviewProps {
   slide: Slide;
@@ -68,7 +69,15 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
           pointerEvents: innerPointerEvents,
         }}
       >
-        {style === 'template01' ? (
+        {style === 'template02' ? (
+          <Template02Slide
+            slide={slide}
+            globalSettings={globalSettings}
+            slideIndex={slideIndex}
+            totalSlides={totalSlides}
+            forExport={forExport}
+          />
+        ) : style === 'template01' ? (
           <Template01Slide
             slide={slide}
             globalSettings={globalSettings}

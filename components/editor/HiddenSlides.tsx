@@ -7,6 +7,7 @@ import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
+import Template02Slide from '@/components/slides/Template02Slide';
 
 interface HiddenSlidesProps {
   registerRef: (id: string, el: HTMLDivElement | null) => void;
@@ -44,7 +45,15 @@ export default function HiddenSlides({ registerRef }: HiddenSlidesProps) {
           ref={(el) => registerRef(slide.id, el)}
           style={{ width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}
         >
-          {style === 'template01' ? (
+          {style === 'template02' ? (
+            <Template02Slide
+              slide={slide}
+              globalSettings={globalSettings}
+              slideIndex={i}
+              totalSlides={slides.length}
+              forExport
+            />
+          ) : style === 'template01' ? (
             <Template01Slide
               slide={slide}
               globalSettings={globalSettings}

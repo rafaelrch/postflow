@@ -7,6 +7,7 @@ import { CREDIT_COSTS } from '@/lib/credits';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { BrandContext, formatBrandContextAsPrompt, getBrandContext } from '@/lib/brand-context';
 import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
+import { template02Addendum } from '@/lib/templates/template-02';
 
 export const maxDuration = 60;
 
@@ -169,7 +170,7 @@ OBRIGATÓRIO: description de cada slide = máximo 2 frases. Curto, direto, sem e
 title de cada slide = máximo 7 palavras.
 O leitor deve querer ir para o próximo slide em cada etapa.${
     body.style === 'template01' ? TEMPLATE_01_ADDENDUM : ''
-  }`;
+  }${body.style === 'template02' ? template02Addendum() : ''}`;
 }
 
 /**

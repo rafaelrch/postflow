@@ -9,6 +9,16 @@ import { fitCard } from '@/lib/canvas-fit';
 import SlidePreview from './SlidePreview';
 import FormatDropdown from './FormatDropdown';
 import Template01ModelPicker from './Template01ModelPicker';
+import TemplateModelPicker from './TemplateModelPicker';
+import Template02Slide from '@/components/slides/Template02Slide';
+import {
+  TEMPLATE_02_HEIGHT,
+  TEMPLATE_02_MODELS,
+  TEMPLATE_02_WIDTH,
+  template02ModelOf,
+  template02NewSlideSlots,
+  template02NextModel,
+} from '@/lib/templates/template-02';
 import { Slide } from '@/types';
 
 // Margem vertical total (topo + base) reservada em volta dos cards na faixa —
@@ -23,6 +33,7 @@ const STYLE_LABEL: Record<string, string> = {
   profile: 'Profile',
   editorial: 'Editorial',
   template01: 'Template 1',
+  template02: 'Template 2',
 };
 
 interface SlideCanvasProps {
@@ -39,19 +50,35 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
     updateGlobalSettings, updateActiveSlide,
   } = useEditorStore();
 
-  // TEMPLATE 1: adicionar passa pelo popup de modelo. Nos outros estilos o
-  // slide novo continua sendo genérico — lá a forma é editável e não há modelo.
+  // Nos templates de forma fixa, adicionar passa pelo popup de MODELO. Nos
+  // outros estilos o slide novo continua genérico — lá a forma é editável e não
+  // existe modelo para escolher.
   const [pickingModel, setPickingModel] = useState(false);
   const isTemplate01 = style === 'template01';
-  const handleAdd = () => (isTemplate01 ? setPickingModel(true) : addSlide());
-  // Os cantos valem para o deck inteiro: o slide novo herda os que já existem.
-  const inheritedCorners = slides.reduce<Record<string, string>>((acc, sl) => {
-    for (const slot of ['cantos.left', 'cantos.right']) {
-      const value = sl.templateSlots?.[slot];
-      if (acc[slot] == null && value != null) acc[slot] = value;
-    }
-    return acc;
-  }, {});
+  const isTemplate02 = style === 'template02';
+  const isSpecTemplate = isTemplate01 || isTemplate02;
+  const handleAdd = () => (isSpecTemplate ? setPickingModel(true) : addSlide());
+
+  /** Slots de escopo DECK que o slide novo herda em vez de inventar. */
+  const inheritedSlots = (keys: string[]) =>
+    slides.reduce<Record<string, string>>((acc, sl) => {
+      for (const slot of keys) {
+        const value = sl.templateSlots?.[slot];
+        if (acc[slot] == null && value != null) acc[slot] = value;
+      }
+      return acc;
+    }, {});
+
+  // Os cantos (T1) e o cabeçalho (T2) valem para o deck inteiro.
+  const inheritedCorners = inheritedSlots(['cantos.left', 'cantos.right']);
+  const inheritedHeader = inheritedSlots(['header.category', 'header.handle']);
+
+  // O que CONTINUA a alternância do T2: depois da capa vem o modelo 2, e depois
+  // de um slide de conteúdo vem o outro. Pedido do Rafael com todas as letras.
+  const lastModel = slides.length
+    ? template02ModelOf(slides[slides.length - 1], slides.length - 1)
+    : 1;
+  const suggestedModel = template02NextModel(lastModel);
 
   const previewRef = useRef<HTMLDivElement>(null); // área que mede a altura disponível
   const scrollRef = useRef<HTMLDivElement>(null);  // faixa rolável horizontal
@@ -303,7 +330,35 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
         </div>
       </div>
 
-      {pickingModel && slides[activeSlideIndex] && (
+      {pickingModel && isTemplate02 && slides[activeSlideIndex] && (
+        <TemplateModelPicker
+          models={TEMPLATE_02_MODELS}
+          labels={{ 1: 'Capa', 2: 'Texto à esquerda', 3: 'Texto à direita' }}
+          suggested={suggestedModel}
+          title="Escolha o modelo do slide"
+          subtitle="Os 3 modelos do Template 2. Depois da capa, os internos alternam entre os dois — o sugerido é o que continua a alternância."
+          canvas={{ width: TEMPLATE_02_WIDTH, height: TEMPLATE_02_HEIGHT }}
+          globalSettings={globalSettings}
+          baseSlide={slides[activeSlideIndex] as Slide}
+          slotsForModel={(model) => template02NewSlideSlots(model, inheritedHeader)}
+          renderPreview={(slide, model) => (
+            <Template02Slide
+              slide={slide}
+              globalSettings={globalSettings}
+              slideIndex={model - 1}
+              totalSlides={TEMPLATE_02_MODELS.length}
+            />
+          )}
+          onPick={(patch) => {
+            addSlide(patch);
+            setPickingModel(false);
+          }}
+          onClose={() => setPickingModel(false)}
+          testIdPrefix="t02-model"
+        />
+      )}
+
+      {pickingModel && isTemplate01 && slides[activeSlideIndex] && (
         <Template01ModelPicker
           globalSettings={globalSettings}
           inheritedCorners={inheritedCorners}

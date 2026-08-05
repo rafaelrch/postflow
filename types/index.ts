@@ -1,4 +1,4 @@
-export type SlideStyle = 'minimalist' | 'profile' | 'editorial' | 'template01';
+export type SlideStyle = 'minimalist' | 'profile' | 'editorial' | 'template01' | 'template02';
 export type ContentLayout = 'cover' | 'text-image-text' | 'text-text-image' | 'image-text-text' | 'text-only';
 // Formato/proporção do slide. Todos compartilham largura 1080 (só a altura muda);
 // dimensões e labels vivem em lib/formats.ts. Ausência => '4:5' (legado).
@@ -190,6 +190,13 @@ export interface Template01SlotStyle {
   letterSpacing?: number;
   underline?: boolean;
 }
+
+/**
+ * O mesmo formato serve o Template 2 — `slides.template_slot_styles` é a coluna
+ * de todos os templates, não só do primeiro. O nome com "01" ficou por ser o
+ * template que o introduziu; use este alias em código novo.
+ */
+export type TemplateSlotStyle = Template01SlotStyle;
 
 export interface Slide {
   id: string;

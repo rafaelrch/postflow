@@ -1,6 +1,7 @@
 import {
   Baseline,
   CircleUser,
+  Captions,
   Contrast,
   Frame,
   Image as ImageIcon,
@@ -40,6 +41,7 @@ export type PanelId =
   | 'sombraOverlay'
   | 'fundoDoSlide'
   | 'cantos'
+  | 'cabecalho'
   | 'restaurarTemplate';
 
 /** O que as condições de renderização podem olhar. */
@@ -56,6 +58,11 @@ export interface PanelContext {
    * quebram na hora se a condição olhar a posição.
    */
   template01Model: number | null;
+  /**
+   * Modelo do TEMPLATE 2 (1..3) — `null` nos outros estilos. Mesma regra do
+   * `template01Model`: modelo não é posição.
+   */
+  template02Model: number | null;
   /** A capa do Editorial não tem shape de imagem de conteúdo. */
   isEditorialCover: boolean;
 }
@@ -82,6 +89,9 @@ export const PANEL_REGISTRY: Record<PanelId, PanelDef> = {
   sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: Contrast,         label: 'Sombra / Overlay' },
   fundoDoSlide:      { id: 'fundoDoSlide',      scope: 'slide',  icon: Palette,          label: 'Fundo do slide' },
   cantos:            { id: 'cantos',            scope: 'global', icon: Frame,            label: 'Cantos' },
+  // Categoria e @ do TEMPLATE 2. É CONTEÚDO de escopo global, não estilo — daí
+  // o grupo dele levar rótulo próprio (ver `SidebarGroupConfig.label`).
+  cabecalho:         { id: 'cabecalho',         scope: 'global', icon: Captions,         label: 'Cabeçalho' },
   restaurarTemplate: { id: 'restaurarTemplate', scope: 'slide',  icon: RotateCcw,        label: 'Restaurar estilo original deste slide' },
 };
 
@@ -96,6 +106,17 @@ type ConfiguredPanel = PanelId | { id: PanelId; when: (ctx: PanelContext) => boo
 export interface SidebarGroupConfig {
   scope: PanelScope;
   panels: ConfiguredPanel[];
+  /**
+   * Rótulo do cabeçalho do grupo. Ausente = o padrão do escopo.
+   *
+   * Existe porque o padrão do escopo `global` é "Estilo global", e o grupo
+   * global do Template 2 é CONTEÚDO (a categoria e o @ do deck). Rótulo que
+   * mente foi exatamente o que a refatoração da barra do T1 veio acabar — então
+   * quem tem um caso diferente declara o dele aqui, em vez de o componente
+   * forçar um nome só.
+   */
+  label?: string;
+  hint?: string;
 }
 
 /**
@@ -120,6 +141,25 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
       ],
     },
     { scope: 'global', panels: ['cantos'] },
+  ],
+
+  template02: [
+    {
+      scope: 'slide',
+      panels: [
+        'conteudoSlide',
+        // Todo modelo do T2 tem imagem: o fundo da capa, ou o bloco 380x1089
+        // dos internos. Não há o caso "modelo sem imagem" do T1.
+        'imagem',
+        'estiloDoTexto',
+        'fundoDoSlide',
+        // Sempre o ÚLTIMO do grupo: é o que desfaz tudo o que está acima.
+        'restaurarTemplate',
+      ],
+    },
+    // O cabeçalho vale para o deck inteiro, e é CONTEÚDO — por isso o rótulo
+    // próprio em vez do "Estilo global" padrão do escopo.
+    { scope: 'global', label: 'Conteúdo do carrossel', hint: 'aplica a todos os slides', panels: ['cabecalho'] },
   ],
 
   profile: [
@@ -149,9 +189,13 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
 };
 
 /** Resolve a config de um estilo para a lista de ids que de fato aparecem. */
-export function visiblePanels(ctx: PanelContext): { scope: PanelScope; ids: PanelId[] }[] {
+export function visiblePanels(
+  ctx: PanelContext
+): { scope: PanelScope; ids: PanelId[]; label?: string; hint?: string }[] {
   return TEMPLATE_SIDEBAR_CONFIG[ctx.style].map((group) => ({
     scope: group.scope,
+    label: group.label,
+    hint: group.hint,
     ids: group.panels
       .filter((p) => typeof p === 'string' || p.when(ctx))
       .map((p) => (typeof p === 'string' ? p : p.id)),

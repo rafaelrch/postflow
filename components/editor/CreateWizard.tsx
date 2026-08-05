@@ -18,6 +18,12 @@ import {
   template01SlotsFromContent,
   TEMPLATE_01_SLIDE_COUNT,
 } from '@/lib/templates/template-01';
+import {
+  TEMPLATE_02_DEFAULT_MODELS,
+  template02HeaderSlots,
+  template02ModelAt,
+  template02SlotsFromContent,
+} from '@/lib/templates/template-02';
 import { DEFAULT_SLIDE } from '@/types';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import { handlePlanRequired, handleProjectLimit } from '@/hooks/useUpgradeStore';
@@ -248,6 +254,11 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   const isFixedDeck = style === 'template01';
   const effectiveSlideCount = isFixedDeck ? TEMPLATE_01_SLIDE_COUNT : slideCount;
 
+  // O TEMPLATE 2 tem forma fixa mas deck ABERTO: 3 modelos que se alternam, sem
+  // dramaturgia fechada. O padrão é 5 (a `sequenciaPadrao` do spec) e o usuário
+  // muda no slider como em qualquer outro estilo.
+  const isT02 = style === 'template02';
+
   // Twitter/X (profile) pula a etapa Visual: a tipografia do template é fixa
   // e as cores vêm do tema claro/escuro do próprio Twitter.
   const totalSteps = 3;
@@ -424,6 +435,47 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           };
         }
 
+        // TEMPLATE 2: mesma disciplina do TEMPLATE 1 — a GERAÇÃO NÃO ESCREVE
+        // ESTILO. Os campos de estilo saem nos valores de `DEFAULT_SLIDE` e
+        // `templateOverrides` nasce AUSENTE, senão a paleta do onboarding viraria
+        // "escolha do usuário" e pintaria por cima do creme do template.
+        if (isT02) {
+          const model = template02ModelAt(i);
+          return {
+            id: `tmp-${i}-${Date.now()}`,
+            // Modelo GRAVADO, nunca inferido da posição: reordenar ou inserir um
+            // slide no meio continua desenhando certo.
+            templateModel: model,
+            templateSlots: {
+              ...template02SlotsFromContent(model, {
+                title: sl.title,
+                description: sl.description,
+                imageUrl: sl.imageUrl,
+                extras: sl.extras,
+              }),
+              // Marca e @ do onboarding — dados DELE, não estilo. Sem onboarding
+              // preenchido saem vazios, nunca com o "@OANDRELONA" do spec.
+              ...template02HeaderSlots(effectiveProfile.name, effectiveProfile.handle),
+            },
+            position: i,
+            title: sl.title,
+            description: sl.description,
+            highlightWord: sl.highlightWord,
+            highlights: [],
+            backgroundImageUrl: '',
+            gridImageUrl: '',
+            imageType: 'background' as const,
+            imagePosition: DEFAULT_SLIDE.imagePosition,
+            shadow: { ...DEFAULT_SLIDE.shadow },
+            backgroundColor: DEFAULT_SLIDE.backgroundColor,
+            textPosition: DEFAULT_SLIDE.textPosition,
+            textAlignment: DEFAULT_SLIDE.textAlignment,
+            fontSize: { ...DEFAULT_SLIDE.fontSize },
+            lineHeight: DEFAULT_SLIDE.lineHeight,
+            ctaButton: { ...DEFAULT_SLIDE.ctaButton },
+          };
+        }
+
         return ({
         id: `tmp-${i}-${Date.now()}`,
         position: i,
@@ -523,6 +575,37 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             };
           }
 
+          // Espelha o `editorSlides` acima. Aqui o `template_model` VAI para o
+          // banco: no T2 o deck é aberto e o modelo não pode voltar a sair da
+          // posição quando o carrossel for reaberto.
+          if (isT02) {
+            const editor = editorSlides[i] as Record<string, unknown>;
+            return {
+              carousel_id: carousel.id,
+              position: i,
+              title: sl.title,
+              description: sl.description,
+              highlight_word: sl.highlightWord,
+              background_image_url: '',
+              grid_image_url: '',
+              image_type: 'background',
+              image_position: DEFAULT_SLIDE.imagePosition,
+              shadow_style: DEFAULT_SLIDE.shadow.style,
+              shadow_opacity: DEFAULT_SLIDE.shadow.opacity,
+              text_position: DEFAULT_SLIDE.textPosition,
+              text_offset: null,
+              text_alignment: DEFAULT_SLIDE.textAlignment,
+              subtitle: '',
+              font_size: DEFAULT_SLIDE.fontSize,
+              line_height: DEFAULT_SLIDE.lineHeight,
+              title_description_gap: null,
+              cta_button: DEFAULT_SLIDE.ctaButton,
+              background_color: DEFAULT_SLIDE.backgroundColor,
+              template_slots: editor.templateSlots,
+              template_model: editor.templateModel,
+            };
+          }
+
           return ({
           carousel_id: carousel.id,
           position: i,
@@ -615,7 +698,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
           {/* ── STEP 1: Estilo ── */}
           {step === 1 && (
-            <div className="flex gap-4 mt-2">
+            <div className="grid grid-cols-2 gap-4 mt-2">
               {[
                 {
                   value: 'profile' as SlideStyle,
@@ -679,10 +762,40 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                     </div>
                   ),
                 },
+                {
+                  value: 'template02' as SlideStyle,
+                  label: 'Template 2',
+                  desc: 'Capa preta com marcador e slides creme com título serifado. Quantos slides você quiser',
+                  icon: (
+                    // Miniatura do modelo 2 (creme, texto à esquerda, bloco de
+                    // imagem à direita) com a faixa do cabeçalho no topo.
+                    <div className="w-full h-44 rounded-lg border border-white/10 flex flex-col overflow-hidden bg-[#EEE5D9]">
+                      <div className="flex items-center justify-between px-3 pt-2.5">
+                        <div className="w-12 h-1 bg-[#767682]/60 rounded" />
+                        <div className="w-8 h-1 bg-[#767682]/60 rounded" />
+                      </div>
+                      <div className="flex flex-1 gap-2.5 p-3">
+                        <div className="flex-1 flex flex-col justify-center gap-1.5">
+                          <div className="w-full h-2.5 bg-black/80 rounded" />
+                          <div className="w-2/3 h-2.5 bg-black/80 rounded mb-1" />
+                          <div className="w-full h-1.5 bg-[#727272]/50 rounded" />
+                          <div className="w-5/6 h-1.5 bg-[#727272]/50 rounded" />
+                          <div className="w-3/4 h-1.5 bg-[#727272]/50 rounded" />
+                        </div>
+                        <div className="w-[38%] bg-[#CBC9BF] rounded-md" />
+                      </div>
+                    </div>
+                  ),
+                },
               ].map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setStyle(opt.value)}
+                  onClick={() => {
+                    setStyle(opt.value);
+                    // O deck padrão do TEMPLATE 2 é a `sequenciaPadrao` do spec
+                    // (5 slides). Continua ajustável no slider da etapa 2.
+                    if (opt.value === 'template02') updateSlideCount(TEMPLATE_02_DEFAULT_MODELS.length);
+                  }}
                   className={cn('flex-1 rounded-xl p-5 border-2 transition-all text-left', style === opt.value ? 'border-gray-900 dark:border-white bg-black/5 dark:bg-white/5' : 'border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30')}
                 >
                   {opt.icon}
