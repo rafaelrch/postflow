@@ -204,7 +204,9 @@ describe('restaurar volta ao spec', () => {
 });
 
 describe('o painel na barra lateral', () => {
-  it('edita e desliga o cabeçalho somente no slide selecionado', () => {
+  // O TEXTO do canto vale para o deck inteiro (é a assinatura do carrossel);
+  // cor e visibilidade continuam por slide. Pedido do Rafael.
+  it('propaga o texto do canto ao deck e desliga só no slide selecionado', () => {
     montaDeck(1);
     const painel = abrePainel('cantos');
     expect(within(painel).getByText('Exibir cantos')).toBeTruthy();
@@ -216,11 +218,12 @@ describe('o painel na barra lateral', () => {
     const textos = within(painel).getAllByRole('textbox');
     expect((textos[0] as HTMLInputElement).value).toBe('LOREM IPSUM');
     expect((textos[1] as HTMLInputElement).value).toBe('@LOREMIPSUM');
-    fireEvent.change(textos[0], { target: { value: 'SÓ ESTE' } });
+    fireEvent.change(textos[0], { target: { value: 'CREATOOLS' } });
 
     let slides = useEditorStore.getState().slides;
-    expect(slides[1].templateSlots?.['cantos.left']).toBe('SÓ ESTE');
-    expect(slides[0].templateSlots?.['cantos.left']).toBeUndefined();
+    for (const s of slides) {
+      expect(s.templateSlots?.['cantos.left']).toBe('CREATOOLS');
+    }
 
     fireEvent.click(within(painel).getByRole('switch'));
     slides = useEditorStore.getState().slides;

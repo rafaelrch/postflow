@@ -166,25 +166,47 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
 });
 
 describe('TEMPLATE 2 — cantos', () => {
-  it('editar a categoria muda somente o slide ativo', () => {
+  // O canto é a ASSINATURA do carrossel, não conteúdo do slide: editar num
+  // slide só produzia um deck com assinaturas diferentes por página. Pedido do
+  // Rafael: "o texto do canto tem que ser editado em todos os slides".
+  it('editar a categoria propaga para TODOS os slides do deck', () => {
     montaDeck(2);
     const painel = abre('Cantos');
     const campo = within(painel).getAllByRole('textbox')[0];
     fireEvent.change(campo, { target: { value: 'ARKE STUDIO' } });
 
     const { slides } = useEditorStore.getState();
-    expect(slides[2].templateSlots?.['header.category']).toBe('ARKE STUDIO');
-    expect(slides[1].templateSlots?.['header.category']).toBeUndefined();
+    expect(slides).toHaveLength(5);
+    for (const s of slides) {
+      expect(s.templateSlots?.['header.category']).toBe('ARKE STUDIO');
+    }
   });
 
-  it('editar o @ também muda somente o slide ativo', () => {
+  it('editar o @ também propaga para TODOS os slides', () => {
     montaDeck(0);
     const painel = abre('Cantos');
     const campo = within(painel).getAllByRole('textbox')[1];
     fireEvent.change(campo, { target: { value: '@ARKEBRANDING' } });
-    const slides = useEditorStore.getState().slides;
-    expect(slides[0].templateSlots?.['header.handle']).toBe('@ARKEBRANDING');
-    expect(slides[1].templateSlots?.['header.handle']).toBeUndefined();
+
+    const { slides } = useEditorStore.getState();
+    for (const s of slides) {
+      expect(s.templateSlots?.['header.handle']).toBe('@ARKEBRANDING');
+    }
+  });
+
+  // Só o TEXTO é do deck. Cor e visibilidade seguem por slide de propósito: o
+  // mesmo canto precisa de cor diferente sobre slide claro e escuro.
+  it('propagar o texto NÃO arrasta a cor nem a visibilidade dos outros slides', () => {
+    montaDeck(1);
+    const painel = abre('Cantos');
+    fireEvent.change(within(painel).getAllByRole('textbox')[0], {
+      target: { value: 'CREATOOLS' },
+    });
+
+    const { slides } = useEditorStore.getState();
+    expect(slides[1].templateSlots?.['header.category']).toBe('CREATOOLS');
+    expect(slides[0].templateSlotStyles).toBeUndefined();
+    expect(slides[3].templateSlotStyles).toBeUndefined();
   });
 
   it('liga e desliga só no slide ativo e oferece fonte, cor, tamanho e margem', () => {

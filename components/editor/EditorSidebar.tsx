@@ -146,7 +146,7 @@ function DropZone({ label, onClick, onFile }: { label: string; onClick: () => vo
 export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: EditorSidebarProps) {
   const {
     slides, activeSlideIndex, style, globalSettings,
-    updateActiveSlide, updateGlobalSettings, updateCornersConfig,
+    updateActiveSlide, updateSlide, updateGlobalSettings, updateCornersConfig,
   } = useEditorStore();
 
   const slide = slides[activeSlideIndex];
@@ -280,8 +280,27 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       },
     });
 
-  const setT01CornerText = (slot: string, value: string) =>
-    updateActiveSlide({ templateSlots: { ...(slide.templateSlots ?? {}), [slot]: value } });
+  /**
+   * Texto de canto/cabeçalho — grava em TODOS os slides do deck.
+   *
+   * O canto é a assinatura do carrossel (marca e @), não conteúdo do slide: ele
+   * aparece igual nos seis, e editar num slide só produzia um deck com
+   * assinaturas diferentes por página — que ninguém quer e ninguém percebe
+   * enquanto não exporta.
+   *
+   * Pedido do Rafael, com estas palavras: "o texto do canto tem que ser editado
+   * em todos os slides".
+   *
+   * 🔸 Só o TEXTO é do deck. Cor e visibilidade continuam por slide de
+   * propósito: o mesmo canto precisa de cor diferente sobre um slide claro e um
+   * escuro, e há slide em que ele atrapalha a composição.
+   */
+  const setDeckSlotText = (slot: string, value: string) =>
+    slides.forEach((s, i) =>
+      updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [slot]: value } })
+    );
+
+  const setT01CornerText = (slot: string, value: string) => setDeckSlotText(slot, value);
 
   /* ── Escritas do TEMPLATE 2 ─────────────────────────────────────────────
      Mesma disciplina do T1: o handler MARCA o controle em `templateOverrides`,
@@ -300,8 +319,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       },
     });
 
-  const setT02HeaderText = (slot: string, value: string) =>
-    updateActiveSlide({ templateSlots: { ...(slide.templateSlots ?? {}), [slot]: value } });
+  /** Mesma regra do T1: a categoria e o @ valem para o deck inteiro. */
+  const setT02HeaderText = (slot: string, value: string) => setDeckSlotText(slot, value);
 
   const setHeaderStyles = (slots: string[], patch: Partial<Template01SlotStyle>) => {
     const next = { ...(slide.templateSlotStyles ?? {}) };
@@ -1008,7 +1027,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
-    /* Texto, cor e visibilidade pertencem ao slide; tipografia e margem são globais. */
+    /* TEXTO vale para o deck inteiro (ver `setDeckSlotText`); cor e visibilidade
+       são deste slide; tipografia e margem são globais. */
     cabecalho: (
       <>
         <Toggle

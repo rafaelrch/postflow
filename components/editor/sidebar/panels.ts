@@ -134,7 +134,8 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
         { id: 'imagem', when: (c) => c.template01Model != null && c.template01Model !== 6 },
         'estiloDoTexto',
         'fundoDoSlide',
-        // No Template 1 os cantos são o cabeçalho DESTE slide. Nos estilos
+        // O painel fica no grupo do slide porque cor e visibilidade são deste
+        // slide — mas o TEXTO do canto vale para o deck inteiro. Nos estilos
         // legados o mesmo painel continua global nas configs abaixo.
         'cantos',
         // Sempre o ÚLTIMO do grupo: é o que desfaz tudo o que está acima.
