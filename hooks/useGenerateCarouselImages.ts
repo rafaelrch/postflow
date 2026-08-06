@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { useEditorStore } from './useEditorStore';
 import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
 import { handlePlanRequired } from './useUpgradeStore';
-import { Slide, SlideStyle } from '@/types';
+import { DEFAULT_IMAGE_POSITION, Slide, SlideStyle } from '@/types';
 import { template01ModelOf } from '@/lib/templates/template-01';
 import { template01SetImage } from '@/lib/templates/template-01/image';
 import { template02ModelOf } from '@/lib/templates/template-02';
@@ -134,7 +134,7 @@ async function generateForSlideWithRetry(
  * (a capa do T2 tem imagem de fundo, os internos têm o bloco), e o slot dele já
  * é único. Fazer o destino depender do `target` recriaria a segunda verdade.
  */
-function imagePatch(
+export function imagePatch(
   slide: Slide,
   style: SlideStyle,
   index: number,
@@ -148,8 +148,13 @@ function imagePatch(
     return template02SetImage(slide, template02ModelOf(slide, index), url);
   }
   return target === 'content'
-    ? { contentImageUrl: url }
-    : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' };
+    ? { contentImageUrl: url, contentImagePosition: { ...DEFAULT_IMAGE_POSITION } }
+    : {
+        backgroundImageUrl: url,
+        gridImageUrl: url,
+        imageType: 'background',
+        imagePosition: { ...DEFAULT_IMAGE_POSITION },
+      };
 }
 
 export function useGenerateCarouselImages() {

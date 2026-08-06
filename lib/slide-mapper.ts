@@ -136,5 +136,6 @@ export function mapDbCarouselToGlobalSettings(carousel: DbRow): GlobalSettings {
     // Projetos antigos sem formato salvo assumem '4:5' (legado).
     format: stored.format || '4:5',
     templateOverrides: stored.templateOverrides || undefined,
+    templateCornerStyle: stored.templateCornerStyle || undefined,
   };
 }

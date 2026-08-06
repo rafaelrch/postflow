@@ -89,9 +89,7 @@ export const PANEL_REGISTRY: Record<PanelId, PanelDef> = {
   sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: Contrast,         label: 'Sombra / Overlay' },
   fundoDoSlide:      { id: 'fundoDoSlide',      scope: 'slide',  icon: Palette,          label: 'Fundo do slide' },
   cantos:            { id: 'cantos',            scope: 'global', icon: Frame,            label: 'Cantos' },
-  // Categoria e @ do TEMPLATE 2. É CONTEÚDO de escopo global, não estilo — daí
-  // o grupo dele levar rótulo próprio (ver `SidebarGroupConfig.label`).
-  cabecalho:         { id: 'cabecalho',         scope: 'global', icon: Captions,         label: 'Cabeçalho' },
+  cabecalho:         { id: 'cabecalho',         scope: 'slide',  icon: Captions,         label: 'Cantos' },
   restaurarTemplate: { id: 'restaurarTemplate', scope: 'slide',  icon: RotateCcw,        label: 'Restaurar estilo original deste slide' },
 };
 
@@ -136,11 +134,13 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
         { id: 'imagem', when: (c) => c.template01Model != null && c.template01Model !== 6 },
         'estiloDoTexto',
         'fundoDoSlide',
+        // No Template 1 os cantos são o cabeçalho DESTE slide. Nos estilos
+        // legados o mesmo painel continua global nas configs abaixo.
+        'cantos',
         // Sempre o ÚLTIMO do grupo: é o que desfaz tudo o que está acima.
         'restaurarTemplate',
       ],
     },
-    { scope: 'global', panels: ['cantos'] },
   ],
 
   template02: [
@@ -153,13 +153,11 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
         'imagem',
         'estiloDoTexto',
         'fundoDoSlide',
+        'cabecalho',
         // Sempre o ÚLTIMO do grupo: é o que desfaz tudo o que está acima.
         'restaurarTemplate',
       ],
     },
-    // O cabeçalho vale para o deck inteiro, e é CONTEÚDO — por isso o rótulo
-    // próprio em vez do "Estilo global" padrão do escopo.
-    { scope: 'global', label: 'Conteúdo do carrossel', hint: 'aplica a todos os slides', panels: ['cabecalho'] },
   ],
 
   profile: [

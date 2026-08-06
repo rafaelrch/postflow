@@ -204,6 +204,43 @@ describe('restaurar volta ao spec', () => {
 });
 
 describe('o painel na barra lateral', () => {
+  it('edita e desliga o cabeçalho somente no slide selecionado', () => {
+    montaDeck(1);
+    const painel = abrePainel('cantos');
+    expect(within(painel).getByText('Exibir cantos')).toBeTruthy();
+    expect(within(painel).getByText('Cor')).toBeTruthy();
+    expect(within(painel).getByText('Fonte')).toBeTruthy();
+    expect(within(painel).getByText('Tamanho fonte')).toBeTruthy();
+    expect(within(painel).getByText('Margem')).toBeTruthy();
+
+    const textos = within(painel).getAllByRole('textbox');
+    expect((textos[0] as HTMLInputElement).value).toBe('LOREM IPSUM');
+    expect((textos[1] as HTMLInputElement).value).toBe('@LOREMIPSUM');
+    fireEvent.change(textos[0], { target: { value: 'SÓ ESTE' } });
+
+    let slides = useEditorStore.getState().slides;
+    expect(slides[1].templateSlots?.['cantos.left']).toBe('SÓ ESTE');
+    expect(slides[0].templateSlots?.['cantos.left']).toBeUndefined();
+
+    fireEvent.click(within(painel).getByRole('switch'));
+    slides = useEditorStore.getState().slides;
+    expect(slides[1].templateSlotStyles?.['cantos.left']?.visible).toBe(false);
+    expect(slides[1].templateSlotStyles?.['cantos.right']?.visible).toBe(false);
+    expect(slides[0].templateSlotStyles).toBeUndefined();
+  });
+
+  it('tamanho e margem dos cantos valem para o carrossel inteiro', () => {
+    montaDeck(1);
+    const painel = abrePainel('cantos');
+    const sliders = within(painel).getAllByRole('slider');
+    fireEvent.change(sliders[0], { target: { value: '28' } });
+    fireEvent.change(sliders[1], { target: { value: '24' } });
+
+    const state = useEditorStore.getState();
+    expect(state.globalSettings.templateCornerStyle).toMatchObject({ fontSize: 28, margin: 24 });
+    expect(state.slides.every((slide) => slide.templateSlotStyles == null)).toBe(true);
+  });
+
   it('abre mostrando o hex do spec daquele slide', () => {
     montaDeck(MODELO_AZUL - 1);
     expect(campoHex(abrePainel('fundoDoSlide')).value).toBe(AZUL_DO_SPEC);
@@ -224,8 +261,9 @@ describe('o painel na barra lateral', () => {
     );
     expect(ids.indexOf('fundoDoSlide')).toBeGreaterThan(ids.indexOf('estiloDoTexto'));
     expect(ids.indexOf('fundoDoSlide')).toBeLessThan(ids.indexOf('restaurarTemplate'));
-    // O restaurar fecha o GRUPO do slide — só os painéis globais vêm depois.
-    expect(ids.indexOf('restaurarTemplate')).toBe(ids.indexOf('cantos') - 1);
+    // Os cantos agora pertencem ao slide selecionado e o restaurar fecha tudo.
+    expect(ids.indexOf('cantos')).toBeLessThan(ids.indexOf('restaurarTemplate'));
+    expect(ids.at(-1)).toBe('restaurarTemplate');
   });
 
   it('mostra SÓ a cor: nada de upload nem de IA', () => {
@@ -241,9 +279,9 @@ describe('o painel na barra lateral', () => {
     expect(screen.getAllByText('Fundo do slide')).toHaveLength(1);
   });
 
-  it.each(MODELOS_DEGRADE)('avisa que a cor substitui o degradê no modelo %i', (model) => {
+  it.each(MODELOS_DEGRADE)('não mostra explicação sobre degradê no modelo %i', (model) => {
     montaDeck(model - 1);
-    expect(within(abrePainel('fundoDoSlide')).getByText(/degradê/)).toBeTruthy();
+    expect(within(abrePainel('fundoDoSlide')).queryByText(/degradê/)).toBeNull();
   });
 
   it('não avisa de degradê em slide de cor chapada', () => {

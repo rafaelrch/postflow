@@ -17,7 +17,13 @@
  * usuário em todo slide, o valor diferia do padrão, virava "escolha do usuário"
  * e pintava chapado por cima do desenho. Valor não é intenção; só o gesto é.
  */
-import { ImagePosition, Slide, Template01SlideControl, TemplateSlotStyle } from '@/types';
+import {
+  GlobalSettings,
+  ImagePosition,
+  Slide,
+  Template01SlideControl,
+  TemplateSlotStyle,
+} from '@/types';
 import { ElementFontCSS, getElementFontCSS } from '@/lib/utils';
 import { Template02Type, template02SlotType, template02Type } from './index';
 
@@ -60,17 +66,32 @@ function touched(slide: Slide, key: Template02SlideControl): boolean {
 }
 
 /** Lê do `slide` só o que o usuário de fato marcou. */
-export function template02Overrides(slide: Slide): Template02Overrides {
+export function template02Overrides(
+  slide: Slide,
+  globalSettings?: GlobalSettings
+): Template02Overrides {
   const opacity = slide.backgroundImageOpacity ?? 100;
+  const slotStyles = { ...(slide.templateSlotStyles ?? {}) };
+  if (globalSettings?.templateCornerStyle) {
+    for (const slot of ['header.category', 'header.handle']) {
+      slotStyles[slot] = { ...(slotStyles[slot] ?? {}), ...globalSettings.templateCornerStyle };
+    }
+  }
   return {
-    slotStyles: slide.templateSlotStyles ?? {},
+    slotStyles,
     background: touched(slide, 'background') ? slide.backgroundColor : undefined,
     coverImage: {
-      position: touched(slide, 'backgroundImagePosition') ? slide.imagePosition : undefined,
+      position:
+        touched(slide, 'backgroundImagePosition') || slide.imagePosition.objectFit != null
+          ? slide.imagePosition
+          : undefined,
       opacity: touched(slide, 'backgroundImageOpacity') ? opacity / 100 : undefined,
     },
     contentImage: {
-      position: touched(slide, 'contentImagePosition') ? slide.contentImagePosition : undefined,
+      position:
+        touched(slide, 'contentImagePosition') || slide.contentImagePosition?.objectFit != null
+          ? slide.contentImagePosition
+          : undefined,
       opacity: touched(slide, 'backgroundImageOpacity') ? opacity / 100 : undefined,
     },
   };
@@ -92,6 +113,10 @@ export interface Template02EffectiveType extends Template02Type {
   font?: ElementFontCSS;
   underline: boolean;
   color: string;
+  /** Fundo do bloco; hoje só o marcador da capa usa. */
+  background?: string;
+  /** `true` quando a COR do texto foi escolhida pelo usuário. */
+  colorIsExplicit: boolean;
 }
 
 /**
@@ -112,7 +137,7 @@ export function template02TypeFor(
 ): Template02EffectiveType {
   const base = template02Type(template02SlotType(slot) ?? 'slideBody');
   const st = ov.slotStyles[slot];
-  if (!st) return { ...base, underline: false, color: specColor };
+  if (!st) return { ...base, underline: false, color: specColor, colorIsExplicit: false };
 
   const fontSize = st.fontSize ?? base.fontSize;
   // Divisão de floats idênticos dá exatamente 1: sem override de tamanho, nem o
@@ -127,6 +152,8 @@ export function template02TypeFor(
     font: st.font ? getElementFontCSS(st.font) : undefined,
     underline: st.underline ?? false,
     color: st.color ?? specColor,
+    background: st.background,
+    colorIsExplicit: st.color != null,
   };
 }
 

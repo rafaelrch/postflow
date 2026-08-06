@@ -18,13 +18,19 @@ export type ElementFont =
   | 'SF Pro Display Medium'
   | 'SF Pro Display SemiBold'
   | 'SF Pro Display Bold'
+  | 'Inter Display Light'
+  | 'Inter Display Regular'
+  | 'Inter Display Medium'
+  | 'Inter Display Bold'
   | 'IvyOra Text Medium'
   | 'IvyOra Text Medium Italic'
   | 'Bebas Neue'
   | 'Montserrat'
+  | 'Montserrat Regular'
   | 'Anton'
   | 'Archivo Black'
   | 'Fjalla One'
+  | 'Oswald Regular'
   | 'Oswald Bold'
   | 'Oswald SemiBold'
   | 'Montserrat Bold'
@@ -34,11 +40,15 @@ export type ElementFont =
   | 'Poppins Bold'
   | 'Raleway Bold'
   | 'Raleway ExtraBold'
+  | 'Inter Light'
   | 'Inter Regular'
+  | 'Inter Medium'
+  | 'Inter SemiBold'
   | 'Inter Bold'
   | 'Inter Black'
   | 'Barlow Condensed Bold'
   | 'Barlow Condensed ExtraBold'
+  | 'Playfair Display Regular'
   | 'Playfair Display Bold'
   | 'Playfair Display ExtraBold'
   | 'Cormorant Garamond Regular'
@@ -46,7 +56,23 @@ export type ElementFont =
   | 'Cormorant Garamond Bold'
   | 'Lora Regular'
   | 'Lora Bold'
-  | 'DM Serif Display';
+  | 'DM Serif Display'
+  | 'Space Grotesk Regular'
+  | 'Space Grotesk Medium'
+  | 'Space Grotesk Bold'
+  | 'Lato Regular'
+  | 'Lato Bold'
+  | 'Roboto Regular'
+  | 'Roboto Medium'
+  | 'Open Sans Regular'
+  | 'Open Sans SemiBold'
+  | 'Syne Regular'
+  | 'Syne SemiBold'
+  | 'Syne Bold'
+  | 'Syne ExtraBold'
+  | 'DM Sans Regular'
+  | 'DM Sans Medium'
+  | 'DM Sans Bold';
 export type SlideTheme = 'dark' | 'light';
 export type ImageType = 'background' | 'grid' | 'mixed';
 export type TextPosition =
@@ -74,6 +100,20 @@ export interface ImagePosition {
   // Ausência mantém o comportamento legado (backgroundSize = zoom%).
   objectFit?: 'cover' | 'contain';
 }
+
+/**
+ * Enquadramento de uma imagem recém-inserida.
+ *
+ * A imagem preenche a moldura sem deformar: `cover` preserva a proporção
+ * original e amplia só o necessário. Quando as proporções diferem, o excedente
+ * fica fora da moldura e o usuário ainda pode reposicionar/ajustar o zoom.
+ */
+export const DEFAULT_IMAGE_POSITION: ImagePosition = {
+  x: 50,
+  y: 50,
+  zoom: 100,
+  objectFit: 'cover',
+};
 
 export interface FontSize {
   title: number;
@@ -189,6 +229,23 @@ export interface Template01SlotStyle {
   /** Espaçamento de caractere em `em`. */
   letterSpacing?: number;
   underline?: boolean;
+  /** Visibilidade por slot; usada pelo cabeçalho/cantos de cada slide. */
+  visible?: boolean;
+  /** Margem adicional para dentro, em px do canvas; usada nos cabeçalhos. */
+  margin?: number;
+  /**
+   * Fundo do bloco. Hoje só o marcador da capa do TEMPLATE 2 usa (a tarja atrás
+   * do destaque), e o Rafael pediu poder trocar a cor dele.
+   *
+   * Mora AQUI, e não num slot próprio, porque a cor do marcador é estilo do
+   * bloco `cover.highlight` — que já tem entrada neste mapa. Um
+   * `templateSlots['cover.highlightColor']` criaria um segundo lugar para a
+   * mesma ideia e ainda misturaria estilo com CONTEÚDO, que é o que
+   * `templateSlots` guarda.
+   *
+   * Campo opcional e aditivo: o Template 1 nunca escreve nele.
+   */
+  background?: string;
 }
 
 /**
@@ -302,6 +359,12 @@ export interface GlobalSettings {
    * global_settings (jsonb), sem coluna nova.
    */
   templateOverrides?: Template01CornerOverrideKeys;
+  /**
+   * Família, peso, tamanho e margem compartilhados pelos cantos dos templates.
+   * Texto, cor e visibilidade continuam em `slides.template_*`, pois podem
+   * variar de card para card.
+   */
+  templateCornerStyle?: Pick<Template01SlotStyle, 'font' | 'fontSize' | 'margin'>;
 }
 
 export interface Carousel {
@@ -403,6 +466,8 @@ export const DEFAULT_SLIDE: Omit<Slide, 'id' | 'position'> = {
   backgroundImageUrl: '',
   gridImageUrl: '',
   imageType: 'grid',
+  // Fallback de decks antigos. Toda INSERÇÃO nova substitui pelo
+  // DEFAULT_IMAGE_POSITION (cover/100) no caminho que recebeu a imagem.
   imagePosition: { x: 50, y: 50, zoom: 175 },
   shadow: { style: 'base', opacity: 88 },
   backgroundColor: '#111111',

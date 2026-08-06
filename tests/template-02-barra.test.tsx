@@ -3,15 +3,14 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
-import { TEMPLATE_02_DEFAULT_MODELS } from '@/lib/templates/template-02';
+import { TEMPLATE_02_DEFAULT_MODELS, template02Limits } from '@/lib/templates/template-02';
 
 /**
  * BARRA LATERAL DO TEMPLATE 2 (fatia S2) — renderizada de verdade.
  *
  * Testar só a config de painéis provaria que a lista existe, não que o usuário
  * consegue editar. O que importa aqui é o que ele vê e o que acontece quando
- * mexe: os painéis certos, o cabeçalho propagando pelo deck, o aviso quando o
- * marcador não vai aparecer, e o "Restaurar" sabendo se há o que restaurar.
+ * mexe: os painéis certos, os cantos, a seleção do destaque e o "Restaurar".
  */
 
 vi.mock('@/hooks/useGenerateCarouselImages', () => ({
@@ -65,7 +64,7 @@ function abre(painel: string): HTMLElement {
 afterEach(cleanup);
 
 describe('TEMPLATE 2 — painéis na tela', () => {
-  it('mostra os painéis do slide e o do carrossel', () => {
+  it('mostra todos os painéis dentro do slide selecionado', () => {
     montaDeck(1);
     for (const p of [
       'Conteúdo do slide',
@@ -73,7 +72,7 @@ describe('TEMPLATE 2 — painéis na tela', () => {
       'Estilo do texto',
       'Fundo do slide',
       'Restaurar estilo original deste slide',
-      'Cabeçalho',
+      'Cantos',
     ]) {
       expect(screen.getByText(p), p).toBeTruthy();
     }
@@ -81,17 +80,15 @@ describe('TEMPLATE 2 — painéis na tela', () => {
 
   it('NÃO mostra os painéis que são de outro estilo', () => {
     montaDeck(1);
-    // "Cantos" é do Template 1; o equivalente do T2 é o "Cabeçalho".
-    expect(screen.queryByText('Cantos')).toBeNull();
+    expect(screen.queryByText('Cabeçalho')).toBeNull();
     expect(screen.queryByText('Perfil')).toBeNull();
     expect(screen.queryByText('Sombra / Overlay')).toBeNull();
   });
 
-  it('o grupo global diz CONTEÚDO DO CARROSSEL, não "estilo global"', () => {
+  it('não cria grupo global para o cabeçalho', () => {
     montaDeck(1);
-    // O cabeçalho do T2 é conteúdo. Rótulo que mente foi o que a refatoração
-    // desta barra veio acabar.
-    expect(screen.getByText('Conteúdo do carrossel')).toBeTruthy();
+    expect(screen.getByText('SLIDE 02')).toBeTruthy();
+    expect(screen.queryByText('Conteúdo do carrossel')).toBeNull();
     expect(screen.queryByText('Estilo global')).toBeNull();
   });
 });
@@ -121,56 +118,115 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
     expect(slides[2].templateSlots?.['content.title']).toBeUndefined();
   });
 
-  it('avisa quando o destaque não está em nenhuma linha do título', () => {
-    // Sem o aviso, o marcador simplesmente não desenha e o usuário não tem como
-    // descobrir por quê.
+  it('mostra as palavras do título em sequência e marca as já destacadas', () => {
     montaDeck(0, {
-      templateSlots: { 'cover.headline': 'LINHA UM\nLINHA DOIS', 'cover.highlight': 'INEXISTENTE' },
+      templateSlots: {
+        'cover.headline': 'STARTUPS ERRAM A\nIDENTIDADE',
+        'cover.highlight': 'ERRAM A',
+      },
     });
-    expect(screen.getByText(/não está em nenhuma linha do título/i)).toBeTruthy();
+    const picker = screen.getByRole('group', { name: 'Palavras em destaque' });
+    expect(within(picker).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'STARTUPS',
+      'ERRAM',
+      'A',
+      'IDENTIDADE',
+    ]);
+    expect(within(picker).getByRole('button', { name: 'ERRAM' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+    expect(within(picker).getByRole('button', { name: 'A' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    );
   });
 
-  it('não avisa quando o destaque cabe numa linha', () => {
+  it('um clique atualiza imediatamente o destaque na ordem do título', () => {
     montaDeck(0, {
       templateSlots: { 'cover.headline': 'STARTUPS ERRAM A\nIDENTIDADE', 'cover.highlight': 'ERRAM A' },
     });
-    expect(screen.queryByText(/não está em nenhuma linha do título/i)).toBeNull();
+    const picker = screen.getByRole('group', { name: 'Palavras em destaque' });
+    fireEvent.click(within(picker).getByRole('button', { name: 'STARTUPS' }));
+    expect(useEditorStore.getState().slides[0].templateSlots?.['cover.highlight']).toBe(
+      'STARTUPS, ERRAM, A'
+    );
   });
 
-  it('acusa o estouro do limite do spec', () => {
-    montaDeck(1, { templateSlots: { 'content.title': 'a'.repeat(41) } });
-    expect(screen.getByText('41/40 car.')).toBeTruthy();
+  it('acusa o estouro do limite', () => {
+    const limite = template02Limits('content.title').maxChar!;
+    montaDeck(1, { templateSlots: { 'content.title': 'a'.repeat(limite + 1) } });
+    expect(screen.getByText(`${limite + 1}/${limite} car.`)).toBeTruthy();
     expect(screen.getByText(/Estourou o limite do slot/i)).toBeTruthy();
   });
 
-  it('diz que a quebra da capa é decisão do usuário', () => {
-    // O spec manda quebrar por sentido; se a interface não disser, ele escreve
-    // corrido e o template quebra onde couber.
+  it('não mostra textos explicativos na sidebar', () => {
     montaDeck(0);
-    expect(screen.getByText(/Enter quebra a linha, e é você que decide onde/i)).toBeTruthy();
+    expect(screen.queryByText(/Enter quebra a linha/i)).toBeNull();
+    expect(screen.queryByText(/Separe por vírgula/i)).toBeNull();
   });
 });
 
-describe('TEMPLATE 2 — cabeçalho é do deck', () => {
-  it('editar a categoria propaga para TODOS os slides', () => {
+describe('TEMPLATE 2 — cantos', () => {
+  it('editar a categoria muda somente o slide ativo', () => {
     montaDeck(2);
-    const painel = abre('Cabeçalho');
+    const painel = abre('Cantos');
     const campo = within(painel).getAllByRole('textbox')[0];
     fireEvent.change(campo, { target: { value: 'ARKE STUDIO' } });
 
     const { slides } = useEditorStore.getState();
-    // Editar num slide e ver outro divergir seria bug, não liberdade.
-    for (const s of slides) expect(s.templateSlots?.['header.category']).toBe('ARKE STUDIO');
+    expect(slides[2].templateSlots?.['header.category']).toBe('ARKE STUDIO');
+    expect(slides[1].templateSlots?.['header.category']).toBeUndefined();
   });
 
-  it('editar o @ propaga também', () => {
+  it('editar o @ também muda somente o slide ativo', () => {
     montaDeck(0);
-    const painel = abre('Cabeçalho');
+    const painel = abre('Cantos');
     const campo = within(painel).getAllByRole('textbox')[1];
     fireEvent.change(campo, { target: { value: '@ARKEBRANDING' } });
-    for (const s of useEditorStore.getState().slides) {
-      expect(s.templateSlots?.['header.handle']).toBe('@ARKEBRANDING');
-    }
+    const slides = useEditorStore.getState().slides;
+    expect(slides[0].templateSlots?.['header.handle']).toBe('@ARKEBRANDING');
+    expect(slides[1].templateSlots?.['header.handle']).toBeUndefined();
+  });
+
+  it('liga e desliga só no slide ativo e oferece fonte, cor, tamanho e margem', () => {
+    montaDeck(1);
+    const painel = abre('Cantos');
+
+    expect(within(painel).getByText('Exibir cantos')).toBeTruthy();
+    expect(within(painel).getByText('Cor')).toBeTruthy();
+    expect(within(painel).getByText('Fonte')).toBeTruthy();
+    expect(within(painel).getByText('Tamanho fonte')).toBeTruthy();
+    expect(within(painel).getByText('Margem')).toBeTruthy();
+
+    fireEvent.click(within(painel).getByText('Exibir cantos'));
+    const slides = useEditorStore.getState().slides;
+    expect(slides[1].templateSlotStyles?.['header.category']?.visible).toBe(false);
+    expect(slides[1].templateSlotStyles?.['header.handle']?.visible).toBe(false);
+    expect(slides[0].templateSlotStyles).toBeUndefined();
+  });
+
+  it('tamanho e margem são globais e não poluem o estilo de nenhum slide', () => {
+    montaDeck(2);
+    const painel = abre('Cantos');
+    const sliders = within(painel).getAllByRole('slider');
+    fireEvent.change(sliders[0], { target: { value: '30' } });
+    fireEvent.change(sliders[1], { target: { value: '18' } });
+
+    const state = useEditorStore.getState();
+    expect(state.globalSettings.templateCornerStyle).toMatchObject({ fontSize: 30, margin: 18 });
+    expect(state.slides.every((slide) => slide.templateSlotStyles == null)).toBe(true);
+  });
+
+  it('família e peso dos cantos também são globais', () => {
+    montaDeck(1);
+    const painel = abre('Cantos');
+    fireEvent.change(within(painel).getByRole('combobox', { name: 'Fonte' }), {
+      target: { value: 'Inter' },
+    });
+    fireEvent.change(within(painel).getByRole('combobox', { name: 'Peso da fonte' }), {
+      target: { value: 'Inter Bold' },
+    });
+
+    expect(useEditorStore.getState().globalSettings.templateCornerStyle?.font).toBe('Inter Bold');
   });
 });
 
@@ -180,7 +236,7 @@ describe('TEMPLATE 2 — imagem', () => {
     const painel = screen.getByText('Imagem').closest('[data-panel]') as HTMLElement;
     expect(within(painel).queryByText('Opacidade')).toBeNull();
     expect(within(painel).queryByText('Zoom')).toBeNull();
-    expect(within(painel).getByText(/placeholder cinza/i)).toBeTruthy();
+    expect(within(painel).queryByText(/placeholder cinza/i)).toBeNull();
   });
 
   it('com imagem, aparecem a miniatura e os ajustes', () => {
@@ -205,6 +261,18 @@ describe('TEMPLATE 2 — imagem', () => {
 });
 
 describe('TEMPLATE 2 — estilo e restauração', () => {
+  it('o Destaque oferece somente fonte e cor do marcador', () => {
+    montaDeck(0);
+    const painel = abre('Estilo do texto');
+    const destaque = within(painel).getByText('Destaque').parentElement!;
+
+    expect(within(destaque).getByText('Cor do marcador')).toBeTruthy();
+    expect(within(destaque).getByText('Fonte')).toBeTruthy();
+    expect(within(destaque).queryByText('Tamanho')).toBeNull();
+    expect(within(destaque).queryByText('Espaçamento de letras')).toBeNull();
+    expect(within(destaque).queryByTitle('Sublinhado')).toBeNull();
+  });
+
   it('o seletor de tamanho abre no número do spec, não num padrão do editor', () => {
     montaDeck(1);
     const painel = abre('Estilo do texto');

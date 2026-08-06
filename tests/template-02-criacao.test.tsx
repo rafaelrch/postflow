@@ -19,6 +19,7 @@ import {
   template02SlotsFromContent,
   template02TextSlotsForModel,
   template02Addendum,
+  template02Limits,
 } from '@/lib/templates/template-02';
 import { TEMPLATE_SIDEBAR_CONFIG } from '@/components/editor/sidebar/panels';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide, SlideStyle } from '@/types';
@@ -217,18 +218,18 @@ describe('TEMPLATE 2 — a geração não deixa copy do spec', () => {
 
 describe('TEMPLATE 2 — o contrato da IA cabe no desenho', () => {
   it('texto no limite do spec não estoura em nenhum modelo', () => {
-    const L = TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto;
-    const linha = 'a'.repeat(L['cover.headline'].maxCharPorLinha!);
+    const L = (slot: string) => template02Limits(slot);
+    const linha = 'a'.repeat(L('cover.headline').maxCharPorLinha!);
     const capa = template02SlotsFromContent(1, {
-      title: Array.from({ length: L['cover.headline'].maxLinhas! }, () => linha).join('\n'),
+      title: Array.from({ length: L('cover.headline').maxLinhas! }, () => linha).join('\n'),
       description: '',
-      extras: { highlight: linha, cta: 'c'.repeat(L['cover.cta'].maxChar!) },
+      extras: { highlight: linha, cta: 'c'.repeat(L('cover.cta').maxChar!) },
     });
     expect(template02Overflows(1, capa)).toEqual([]);
 
     const conteudo = template02SlotsFromContent(2, {
-      title: 't'.repeat(L['content.title'].maxChar!),
-      description: 'd'.repeat(L['content.body'].maxChar!),
+      title: 't'.repeat(L('content.title').maxChar!),
+      description: 'd'.repeat(L('content.body').maxChar!),
     });
     expect(template02Overflows(2, conteudo)).toEqual([]);
   });
@@ -265,12 +266,12 @@ describe('TEMPLATE 2 — adicionar slide', () => {
     expect(template02NextModel(ultimo)).toBe(2);
   });
 
-  it('o slide novo herda o cabeçalho do deck e nasce dentro dos limites', () => {
+  it('o slide novo nasce com cabeçalho lorem independente e dentro dos limites', () => {
     const herdado = { 'header.category': 'ARKE STUDIO', 'header.handle': '@ARKEBRANDING' };
     for (const model of TEMPLATE_02_MODELS) {
       const slots = template02NewSlideSlots(model, herdado);
-      expect(slots['header.category']).toBe('ARKE STUDIO');
-      expect(slots['header.handle']).toBe('@ARKEBRANDING');
+      expect(slots['header.category']).toBe('LOREM IPSUM');
+      expect(slots['header.handle']).toBe('@LOREMIPSUM');
       expect(template02Overflows(model, slots)).toEqual([]);
       const html = markup(model, slots);
       for (const copy of COPY_DO_SPEC) expect(html, `${model}: ${copy}`).not.toContain(copy);
@@ -286,22 +287,23 @@ describe('TEMPLATE 2 — adicionar slide', () => {
 
 describe('TEMPLATE 2 — addendum do prompt', () => {
   const addendum = template02Addendum();
-  const L = TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto;
 
-  it('os limites saem do SPEC, não redigitados', () => {
-    // Uma cópia à mão envelheceria em silêncio na primeira vez que o spec
-    // mudasse; lendo de lá, o prompt acompanha sozinho.
-    expect(addendum).toContain(String(L['cover.headline'].maxCharPorLinha));
-    expect(addendum).toContain(String(L['cover.headline'].maxLinhas));
-    expect(addendum).toContain(String(L['cover.cta'].maxChar));
-    expect(addendum).toContain(String(L['content.title'].maxChar));
-    expect(addendum).toContain(String(L['content.body'].maxChar));
+  it('os limites saem dos EFETIVOS, não redigitados', () => {
+    // Uma cópia à mão envelheceria em silêncio no primeiro ajuste; lendo da
+    // fonte única, o prompt acompanha sozinho. Depois da fatia 5 isso importa
+    // mais ainda: pedir 17 car./linha à IA e aceitar 25 na barra seria mentira.
+    expect(addendum).toContain(String(template02Limits('cover.headline').maxCharPorLinha));
+    expect(addendum).toContain(String(template02Limits('cover.headline').maxLinhas));
+    expect(addendum).toContain(String(template02Limits('cover.cta').maxChar));
+    expect(addendum).toContain(String(template02Limits('content.title').maxChar));
+    expect(addendum).toContain(String(template02Limits('content.body').maxChar));
   });
 
   it('diz as duas regras que não são sugestão', () => {
     // 1) a headline vaza a caixa acima do limite POR LINHA;
     expect(addendum).toMatch(/POR LINHA/);
-    expect(addendum).toContain('836px');
+    expect(addendum).toContain('1080px');
+    expect(addendum).not.toContain('836px');
     // 2) o marcador tem de caber numa única linha, senão não aparece.
     expect(addendum).toMatch(/ÚNICA linha da headline/);
     expect(addendum).toMatch(/marcador simplesmente não aparece/);

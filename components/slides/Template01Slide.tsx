@@ -6,6 +6,7 @@ import { getImageLayerStyle } from '@/lib/utils';
 import { getFormat } from '@/lib/formats';
 import {
   TEMPLATE_01_WIDTH,
+  TEMPLATE_01_DEFAULT_CORNERS,
   template01HeightRatio,
   template01NodeSpan,
   Template01Slots,
@@ -144,8 +145,9 @@ function nodeStyle(
     // Os cantos têm controle próprio (distância às bordas); o resto do texto
     // anda junto no deslocamento do bloco.
     const isCorner = kind === 'corner';
-    const dx = isCorner ? cornerShift(ov) : ov.textOffset?.x ?? 0;
-    const dy = isCorner ? cornerShift(ov) : ov.textOffset?.y ?? 0;
+    const slotMargin = isCorner && node.slot ? ov.slotStyles[node.slot]?.margin ?? 0 : 0;
+    const dx = isCorner ? cornerShift(ov) + slotMargin : ov.textOffset?.x ?? 0;
+    const dy = isCorner ? cornerShift(ov) + slotMargin : ov.textOffset?.y ?? 0;
 
     if (node.anchor.mode === 'center-x') {
       css.left = '50%';
@@ -476,8 +478,17 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
         const slot = node.slot || node.name;
 
         if (node.type === 'TEXT' && node.text) {
-          if (ov.hideCorners && template01Kind(node) === 'corner') return null;
-          const value = slots[slot] ?? slots[node.id] ?? node.text.characters;
+          const isCorner = template01Kind(node) === 'corner';
+          const slotVisibility = ov.slotStyles[slot]?.visible;
+          // A configuração global fica como fallback de decks antigos. Assim
+          // que este slide recebe seu próprio toggle, ele passa a mandar.
+          if (isCorner && (slotVisibility === false || (slotVisibility == null && ov.hideCorners))) {
+            return null;
+          }
+          const fallback = isCorner
+            ? TEMPLATE_01_DEFAULT_CORNERS[slot] ?? node.text.characters
+            : node.text.characters;
+          const value = slots[slot] ?? slots[node.id] ?? fallback;
           const runs = node.text.styledRuns;
           const hasFontOverride = !!ov[template01Kind(node)].font;
           return (

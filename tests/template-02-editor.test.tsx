@@ -30,7 +30,7 @@ import {
   TEMPLATE_SIDEBAR_CONFIG,
   visiblePanels,
 } from '@/components/editor/sidebar/panels';
-import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
+import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_IMAGE_POSITION, DEFAULT_SLIDE, Slide } from '@/types';
 
 /**
  * TEMPLATE 2 × EDITOR (fatia S2).
@@ -126,6 +126,17 @@ describe('TEMPLATE 2 — imagem tem uma verdade só', () => {
     expect(template02SetImage(slideOf(3), 3, 'u').templateSlots).toHaveProperty('content.image', 'u');
   });
 
+  it('toda imagem nova preenche a moldura sem deformar, na posição do modelo', () => {
+    expect(template02SetImage(slideOf(1), 1, 'u').imagePosition).toEqual(DEFAULT_IMAGE_POSITION);
+    expect(template02SetImage(slideOf(2), 2, 'u').contentImagePosition).toEqual(DEFAULT_IMAGE_POSITION);
+    expect(template02SetImage(slideOf(3), 3, 'u').contentImagePosition).toEqual(DEFAULT_IMAGE_POSITION);
+
+    const capa = slideOf(1);
+    expect(markup(1, { ...capa, ...template02SetImage(capa, 1, 'u') })).toContain(
+      'background-size:cover'
+    );
+  });
+
   it('remover limpa dos DOIS lados, senão a imagem volta sozinha', () => {
     const slide = slideOf(2, {
       templateSlots: { 'content.image': 'https://x/a.jpg' },
@@ -174,6 +185,33 @@ describe('TEMPLATE 2 — estilo por slot', () => {
     expect(t.letterSpacing).toBe(spec.letterSpacing);
     expect(t.color).toBe(TEMPLATE_02_COLORS.ink);
     expect(t.underline).toBe(false);
+  });
+
+  it('tipografia e margem globais vencem nos dois cantos sem apagar cor e visibilidade do slide', () => {
+    const ov = template02Overrides(
+      slideOf(2, {
+        templateSlotStyles: {
+          'header.category': { color: '#FF0000', visible: false, fontSize: 12 },
+        },
+      }),
+      {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        templateCornerStyle: { font: 'Inter Display Bold', fontSize: 30, margin: 18 },
+      }
+    );
+
+    expect(ov.slotStyles['header.category']).toMatchObject({
+      color: '#FF0000',
+      visible: false,
+      font: 'Inter Display Bold',
+      fontSize: 30,
+      margin: 18,
+    });
+    expect(ov.slotStyles['header.handle']).toMatchObject({
+      font: 'Inter Display Bold',
+      fontSize: 30,
+      margin: 18,
+    });
   });
 
   it('trocar o tamanho leva a entrelinha e o tracking na mesma razão', () => {
@@ -309,7 +347,7 @@ describe('TEMPLATE 2 — ajuste de imagem', () => {
   });
 });
 
-describe('TEMPLATE 2 — cabeçalho é do deck', () => {
+describe('TEMPLATE 2 — cabeçalho é do slide', () => {
   it('os dois slots globais aparecem em todos os modelos', () => {
     for (const model of TEMPLATE_02_MODELS) {
       expect(template02HeaderSlotsForModel(model).map((d) => d.slot)).toEqual([
@@ -327,18 +365,10 @@ describe('TEMPLATE 2 — cabeçalho é do deck', () => {
     }
   });
 
-  it('o grupo global do T2 se chama CONTEÚDO, não "Estilo global"', () => {
-    // O cabeçalho é conteúdo do carrossel. Rótulo que mente foi o que a
-    // refatoração desta barra veio acabar.
-    const grupo = visiblePanels(ctxFor(1)).find((g) => g.scope === 'global')!;
-    expect(grupo.ids).toEqual(['cabecalho']);
-    expect(grupo.label).toBe('Conteúdo do carrossel');
-    expect(grupo.label).not.toMatch(/estilo/i);
-    // E o Template 1 continua no padrão do escopo — nada mudou para ele.
-    const t01 = visiblePanels({ ...ctxFor(1), style: 'template01', template01Model: 1 }).find(
-      (g) => g.scope === 'global'
-    )!;
-    expect(t01.label).toBeUndefined();
+  it('o cabeçalho fica no grupo do slide, sem grupo global', () => {
+    const grupos = visiblePanels(ctxFor(1));
+    expect(grupos.find((g) => g.scope === 'global')).toBeUndefined();
+    expect(grupos.find((g) => g.scope === 'slide')?.ids).toContain('cabecalho');
   });
 });
 
@@ -352,6 +382,7 @@ describe('TEMPLATE 2 — painéis', () => {
         'imagem',
         'estiloDoTexto',
         'fundoDoSlide',
+        'cabecalho',
         'restaurarTemplate',
       ]);
       // É o que desfaz o que está acima: fora do fim, ele desfaz o que o

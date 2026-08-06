@@ -27,7 +27,7 @@ import {
  *     é do próprio usuário é sempre liberado; criar um reel NOVO é barrado para
  *     free que já tem >= 1 reel (403 free_reel_limit). Falha fechada.
  */
-export const REELS_BUCKET = 'postflow-reels';
+const REELS_BUCKET = 'postflow-reels';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

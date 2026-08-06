@@ -59,20 +59,6 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
   const isSpecTemplate = isTemplate01 || isTemplate02;
   const handleAdd = () => (isSpecTemplate ? setPickingModel(true) : addSlide());
 
-  /** Slots de escopo DECK que o slide novo herda em vez de inventar. */
-  const inheritedSlots = (keys: string[]) =>
-    slides.reduce<Record<string, string>>((acc, sl) => {
-      for (const slot of keys) {
-        const value = sl.templateSlots?.[slot];
-        if (acc[slot] == null && value != null) acc[slot] = value;
-      }
-      return acc;
-    }, {});
-
-  // Os cantos (T1) e o cabeçalho (T2) valem para o deck inteiro.
-  const inheritedCorners = inheritedSlots(['cantos.left', 'cantos.right']);
-  const inheritedHeader = inheritedSlots(['header.category', 'header.handle']);
-
   // O que CONTINUA a alternância do T2: depois da capa vem o modelo 2, e depois
   // de um slide de conteúdo vem o outro. Pedido do Rafael com todas as letras.
   const lastModel = slides.length
@@ -338,9 +324,8 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
           title="Escolha o modelo do slide"
           subtitle="Os 3 modelos do Template 2. Depois da capa, os internos alternam entre os dois — o sugerido é o que continua a alternância."
           canvas={{ width: TEMPLATE_02_WIDTH, height: TEMPLATE_02_HEIGHT }}
-          globalSettings={globalSettings}
           baseSlide={slides[activeSlideIndex] as Slide}
-          slotsForModel={(model) => template02NewSlideSlots(model, inheritedHeader)}
+          slotsForModel={(model) => template02NewSlideSlots(model)}
           renderPreview={(slide, model) => (
             <Template02Slide
               slide={slide}
@@ -361,7 +346,6 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
       {pickingModel && isTemplate01 && slides[activeSlideIndex] && (
         <Template01ModelPicker
           globalSettings={globalSettings}
-          inheritedCorners={inheritedCorners}
           baseSlide={slides[activeSlideIndex] as Slide}
           onPick={(patch) => {
             addSlide(patch);

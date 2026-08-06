@@ -121,7 +121,7 @@ export function getFontFamilies(fontPair: string): { title: string; body: string
 
 // URL única que carrega TODAS as fontes Google usadas no app
 export const ALL_GOOGLE_FONTS_URL =
-  'https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@700;800&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=Fjalla+One&family=Inter:wght@400;700;900&family=Lato:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;600;700&family=Raleway:wght@700;800&family=Roboto:wght@400;500&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap';
+  'https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@700;800&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=Fjalla+One&family=Inter:wght@300;400;500;600;700;900&family=Lato:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;600;700&family=Raleway:wght@700;800&family=Roboto:wght@400;500&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap';
 
 export function getFontGoogleUrl(fontPair: string): string {
   // Retorna a URL única com todas as fontes — ignora o par específico
@@ -137,6 +137,7 @@ export interface ElementFontCSS {
 
 export function getElementFontCSS(font: ElementFont): ElementFontCSS {
   const SF    = "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif";
+  const INTER_DISPLAY = "'T01InterDisplay', 'Inter', sans-serif";
   // IvyOra Text vem do projeto web do Adobe Fonts como `ivyora-text`. O
   // Cormorant fica de rede — antes o plano B era Georgia, e como a IvyOra nunca
   // resolvia (licença desktop não chega ao navegador), escolher "IvyOra Text"
@@ -157,6 +158,12 @@ export function getElementFontCSS(font: ElementFont): ElementFontCSS {
   const PLAY  = "'Playfair Display', serif";
   const POPP  = "'Poppins', sans-serif";
   const RALE  = "'Raleway', sans-serif";
+  const SPACE = "'Space Grotesk', sans-serif";
+  const LATO  = "'Lato', sans-serif";
+  const ROBOT = "'Roboto', sans-serif";
+  const OPEN  = "'Open Sans', sans-serif";
+  const SYNE  = "'Syne', sans-serif";
+  const DMSAN = "'DM Sans', sans-serif";
 
   switch (font) {
     // SF Pro Display
@@ -165,6 +172,11 @@ export function getElementFontCSS(font: ElementFont): ElementFontCSS {
     case 'SF Pro Display Medium':          return { fontFamily: SF,    fontWeight: 500, fontStyle: 'normal' };
     case 'SF Pro Display SemiBold':        return { fontFamily: SF,    fontWeight: 600, fontStyle: 'normal' };
     case 'SF Pro Display Bold':            return { fontFamily: SF,    fontWeight: 700, fontStyle: 'normal' };
+    // Inter Display
+    case 'Inter Display Light':            return { fontFamily: INTER_DISPLAY, fontWeight: 300, fontStyle: 'normal' };
+    case 'Inter Display Regular':          return { fontFamily: INTER_DISPLAY, fontWeight: 400, fontStyle: 'normal' };
+    case 'Inter Display Medium':           return { fontFamily: INTER_DISPLAY, fontWeight: 500, fontStyle: 'normal' };
+    case 'Inter Display Bold':             return { fontFamily: INTER_DISPLAY, fontWeight: 700, fontStyle: 'normal' };
     // IvyOra
     case 'IvyOra Text Medium':             return { fontFamily: IVY,   fontWeight: 500, fontStyle: 'normal' };
     case 'IvyOra Text Medium Italic':      return { fontFamily: IVY,   fontWeight: 500, fontStyle: 'italic' };
@@ -173,10 +185,12 @@ export function getElementFontCSS(font: ElementFont): ElementFontCSS {
     case 'Archivo Black':                  return { fontFamily: ARCH,  fontWeight: 900, fontStyle: 'normal' };
     case 'Bebas Neue':                     return { fontFamily: BEBAS, fontWeight: 400, fontStyle: 'normal' };
     case 'Fjalla One':                     return { fontFamily: FJAL,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Oswald Regular':                 return { fontFamily: OSWD,  fontWeight: 400, fontStyle: 'normal' };
     case 'Oswald Bold':                    return { fontFamily: OSWD,  fontWeight: 700, fontStyle: 'normal' };
     case 'Oswald SemiBold':                return { fontFamily: OSWD,  fontWeight: 600, fontStyle: 'normal' };
     // Sans-serif
     case 'Montserrat':                     return { fontFamily: MONT,  fontWeight: 600, fontStyle: 'normal' };
+    case 'Montserrat Regular':             return { fontFamily: MONT,  fontWeight: 400, fontStyle: 'normal' };
     case 'Montserrat Bold':                return { fontFamily: MONT,  fontWeight: 700, fontStyle: 'normal' };
     case 'Montserrat ExtraBold':           return { fontFamily: MONT,  fontWeight: 800, fontStyle: 'normal' };
     case 'Poppins Regular':                return { fontFamily: POPP,  fontWeight: 400, fontStyle: 'normal' };
@@ -184,12 +198,16 @@ export function getElementFontCSS(font: ElementFont): ElementFontCSS {
     case 'Poppins Bold':                   return { fontFamily: POPP,  fontWeight: 700, fontStyle: 'normal' };
     case 'Raleway Bold':                   return { fontFamily: RALE,  fontWeight: 700, fontStyle: 'normal' };
     case 'Raleway ExtraBold':              return { fontFamily: RALE,  fontWeight: 800, fontStyle: 'normal' };
+    case 'Inter Light':                    return { fontFamily: INTER, fontWeight: 300, fontStyle: 'normal' };
     case 'Inter Regular':                  return { fontFamily: INTER, fontWeight: 400, fontStyle: 'normal' };
+    case 'Inter Medium':                   return { fontFamily: INTER, fontWeight: 500, fontStyle: 'normal' };
+    case 'Inter SemiBold':                 return { fontFamily: INTER, fontWeight: 600, fontStyle: 'normal' };
     case 'Inter Bold':                     return { fontFamily: INTER, fontWeight: 700, fontStyle: 'normal' };
     case 'Inter Black':                    return { fontFamily: INTER, fontWeight: 900, fontStyle: 'normal' };
     case 'Barlow Condensed Bold':          return { fontFamily: BARLC, fontWeight: 700, fontStyle: 'normal' };
     case 'Barlow Condensed ExtraBold':     return { fontFamily: BARLC, fontWeight: 800, fontStyle: 'normal' };
     // Serif
+    case 'Playfair Display Regular':       return { fontFamily: PLAY,  fontWeight: 400, fontStyle: 'normal' };
     case 'Playfair Display Bold':          return { fontFamily: PLAY,  fontWeight: 700, fontStyle: 'normal' };
     case 'Playfair Display ExtraBold':     return { fontFamily: PLAY,  fontWeight: 900, fontStyle: 'normal' };
     case 'Cormorant Garamond Regular':     return { fontFamily: CORM,  fontWeight: 400, fontStyle: 'normal' };
@@ -198,6 +216,23 @@ export function getElementFontCSS(font: ElementFont): ElementFontCSS {
     case 'Lora Regular':                   return { fontFamily: LORA,  fontWeight: 400, fontStyle: 'normal' };
     case 'Lora Bold':                      return { fontFamily: LORA,  fontWeight: 700, fontStyle: 'normal' };
     case 'DM Serif Display':               return { fontFamily: DMSRF, fontWeight: 400, fontStyle: 'normal' };
+    // Famílias usadas nos pares globais
+    case 'Space Grotesk Regular':          return { fontFamily: SPACE, fontWeight: 400, fontStyle: 'normal' };
+    case 'Space Grotesk Medium':           return { fontFamily: SPACE, fontWeight: 500, fontStyle: 'normal' };
+    case 'Space Grotesk Bold':             return { fontFamily: SPACE, fontWeight: 700, fontStyle: 'normal' };
+    case 'Lato Regular':                   return { fontFamily: LATO,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Lato Bold':                      return { fontFamily: LATO,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Roboto Regular':                 return { fontFamily: ROBOT, fontWeight: 400, fontStyle: 'normal' };
+    case 'Roboto Medium':                  return { fontFamily: ROBOT, fontWeight: 500, fontStyle: 'normal' };
+    case 'Open Sans Regular':              return { fontFamily: OPEN,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Open Sans SemiBold':             return { fontFamily: OPEN,  fontWeight: 600, fontStyle: 'normal' };
+    case 'Syne Regular':                   return { fontFamily: SYNE,  fontWeight: 400, fontStyle: 'normal' };
+    case 'Syne SemiBold':                  return { fontFamily: SYNE,  fontWeight: 600, fontStyle: 'normal' };
+    case 'Syne Bold':                      return { fontFamily: SYNE,  fontWeight: 700, fontStyle: 'normal' };
+    case 'Syne ExtraBold':                 return { fontFamily: SYNE,  fontWeight: 800, fontStyle: 'normal' };
+    case 'DM Sans Regular':                return { fontFamily: DMSAN, fontWeight: 400, fontStyle: 'normal' };
+    case 'DM Sans Medium':                 return { fontFamily: DMSAN, fontWeight: 500, fontStyle: 'normal' };
+    case 'DM Sans Bold':                   return { fontFamily: DMSAN, fontWeight: 700, fontStyle: 'normal' };
   }
 }
 

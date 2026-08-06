@@ -213,8 +213,18 @@ body {
 }
 @font-face {
   font-family: 'T01InterDisplay';
+  src: url('/fonts/template-01/Inter-Light.woff2') format('woff2');
+  font-weight: 300; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'T01InterDisplay';
   src: url('/fonts/template-01/InterDisplay-Medium.woff2') format('woff2');
   font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'T01InterDisplay';
+  src: url('/fonts/template-01/Inter-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: block;
 }
 /* Serifada do TEMPLATE 1.
    IvyOra Text é a fonte do Figma e vem PRIMEIRO — é ela o padrão do template.

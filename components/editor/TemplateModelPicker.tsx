@@ -1,8 +1,8 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { GlobalSettings, Slide } from '@/types';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { Check, X } from 'lucide-react';
+import { Slide } from '@/types';
 
 /**
  * Popup de escolha do MODELO ao adicionar um slide num template de forma fixa.
@@ -16,10 +16,8 @@ import { GlobalSettings, Slide } from '@/types';
  * desenha depois. Ele é renderizado com o mesmo conteúdo que o slide vai nascer
  * tendo, então a miniatura é literalmente o resultado.
  *
- * 🔸 Esta é a versão genérica, escrita para o Template 2 e desenhada para servir
- * os dois. O `Template01ModelPicker` continua existindo separado porque migrá-lo
- * agora mexeria no Template 1, que está fechado — a troca é de poucas linhas e é
- * decisão do Orquestrador, não desta fatia.
+ * Esta é a versão compartilhada pelos Templates 1 e 2. Clicar numa miniatura só
+ * seleciona; a criação acontece no botão "Adicionar card".
  */
 
 const PREVIEW_W = 168;
@@ -33,9 +31,8 @@ export interface TemplateModelPickerProps {
   title: string;
   subtitle: string;
   canvas: { width: number; height: number };
-  globalSettings: GlobalSettings;
   baseSlide: Slide;
-  /** Slots com que o slide daquele modelo nasce (lorem + herdados do deck). */
+  /** Slots com que o slide daquele modelo nasce. */
   slotsForModel: (model: number) => Record<string, string>;
   /** Miniatura do modelo: o componente real do template. */
   renderPreview: (slide: Slide, model: number) => ReactNode;
@@ -52,7 +49,6 @@ export default function TemplateModelPicker({
   title,
   subtitle,
   canvas,
-  globalSettings,
   baseSlide,
   slotsForModel,
   renderPreview,
@@ -60,13 +56,24 @@ export default function TemplateModelPicker({
   onClose,
   testIdPrefix,
 }: TemplateModelPickerProps) {
+  const [selectedModel, setSelectedModel] = useState<number | null>(null);
+
+  const confirmSelection = useCallback(() => {
+    if (selectedModel == null) return;
+    onPick({
+      templateSlots: slotsForModel(selectedModel),
+      templateModel: selectedModel,
+    });
+  }, [onPick, selectedModel, slotsForModel]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      if (e.key === 'Enter') confirmSelection();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [confirmSelection, onClose]);
 
   const scale = PREVIEW_W / canvas.width;
 
@@ -103,15 +110,18 @@ export default function TemplateModelPicker({
             // modelo manda — a posição não interessa aqui.
             const previewSlide: Slide = { ...baseSlide, templateSlots, templateModel: model };
             const isSuggested = model === suggested;
+            const isSelected = model === selectedModel;
             return (
               <button
                 key={model}
-                onClick={() => onPick({ templateSlots, templateModel: model })}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setSelectedModel(model)}
                 className={
-                  'group relative flex flex-col items-center gap-2 rounded-xl p-2 ring-1 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ' +
-                  (isSuggested
-                    ? 'ring-blue-500 ring-2'
-                    : 'ring-black/10 dark:ring-white/10 hover:ring-blue-500')
+                  'group relative flex flex-col items-center gap-2 rounded-xl p-2 ring-1 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 active:scale-[0.98] ' +
+                  (isSelected
+                    ? 'ring-blue-500 ring-2 bg-blue-500/[0.06] shadow-lg shadow-blue-500/15'
+                    : 'ring-black/10 dark:ring-white/10 hover:ring-blue-500 hover:shadow-md')
                 }
               >
                 {isSuggested && (
@@ -120,6 +130,11 @@ export default function TemplateModelPicker({
                     className="absolute -top-2 right-2 rounded-full bg-blue-500 px-2 py-0.5 text-[9px] font-semibold text-white shadow-sm"
                   >
                     sugerido
+                  </span>
+                )}
+                {isSelected && (
+                  <span className="absolute -top-2 left-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm">
+                    <Check className="h-3 w-3" />
                   </span>
                 )}
                 <div
@@ -144,6 +159,24 @@ export default function TemplateModelPicker({
               </button>
             );
           })}
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-black/[0.07] bg-[var(--surface)] px-5 py-4 dark:border-white/[0.07] dark:bg-[#141414]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-black/10 px-4 py-2 text-xs font-medium text-gray-900/60 transition-colors hover:border-black/20 hover:text-gray-900 dark:border-white/10 dark:text-white/55 dark:hover:border-white/20 dark:hover:text-white"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmSelection}
+            disabled={selectedModel == null}
+            className="rounded-lg bg-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-blue-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Adicionar card
+          </button>
         </div>
       </div>
     </div>

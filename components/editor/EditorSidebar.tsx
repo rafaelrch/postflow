@@ -14,7 +14,7 @@ import ElementFontPicker from './sidebar/ElementFontPicker';
 import WordHighlightPicker from './sidebar/WordHighlightPicker';
 import AiGenPanel from './sidebar/AiGenPanel';
 import ImageThumb from './sidebar/ImageThumb';
-import { helpCls, inputCls, labelCls, numericCls } from './sidebar/tokens';
+import { inputCls, labelCls, numericCls } from './sidebar/tokens';
 import {
   PANEL_REGISTRY,
   PanelContext,
@@ -28,34 +28,37 @@ import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
 import {
   DEFAULT_CORNERS,
+  DEFAULT_IMAGE_POSITION,
   Slide,
-  Template01CornerControl,
   Template01SlideControl,
   Template01SlotStyle,
   TextPosition,
 } from '@/types';
 import {
+  TEMPLATE_01_DEFAULT_CORNERS,
   template01ImageSlot,
   template01SlideImageUrl,
   template01ModelOf,
   template01SlideMedia,
   template01SpecBackground,
   template01SlotDefaults,
+  template01SlotFontName,
+  template01SlotColor,
   template01SlotsForSlide,
 } from '@/lib/templates/template-01';
 import { template01ClearImage, template01SetImage } from '@/lib/templates/template-01/image';
+import { markTemplate01Override } from '@/lib/templates/template-01/overrides';
 import {
-  markTemplate01CornerOverride,
-  markTemplate01Override,
-} from '@/lib/templates/template-01/overrides';
-import {
+  TEMPLATE_02_DEFAULT_HEADER,
   template02HeaderSlotsForModel,
   template02ImageSlot,
   template02ModelOf,
   template02SlotColor,
   template02SlotDefaults,
+  template02SlotFontName,
   template02TextSlotsForModel,
   template02Background,
+  TEMPLATE_02_HIGHLIGHT_COLOR,
 } from '@/lib/templates/template-02';
 import { template02ClearImage, template02SetImage, template02SlideImageUrl } from '@/lib/templates/template-02/image';
 import {
@@ -76,18 +79,17 @@ const TEXT_POSITIONS: TextPosition[] = [
   'bottom-left', 'bottom-center', 'bottom-right',
 ];
 
-const TEMPLATE_02_INFO =
-  'Template 2: a forma é fixa — posição, cor e tipografia vêm do Figma. Você edita texto e imagem, e pode ajustar o estilo depois. Se o texto não couber, encurte.';
-
-const TEMPLATE_01_INFO =
-  'Template 1: a forma é fixa — posição, cor e tipografia vêm do Figma. Você edita texto e imagem, e pode ajustar o estilo depois. Se o texto não couber, encurte.';
-
 /** Toggle reaproveitado pelos painéis — era copiado em quatro lugares. */
 function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer select-none">
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className="flex items-center gap-2 cursor-pointer select-none"
+    >
       <div
-        onClick={onToggle}
         className={cn(
           'w-8 h-4 rounded-full relative transition-colors shrink-0',
           on ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10'
@@ -101,7 +103,7 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
         />
       </div>
       <span className="text-[12px] text-gray-900/55 dark:text-white/50">{label}</span>
-    </label>
+    </button>
   );
 }
 
@@ -144,11 +146,16 @@ function DropZone({ label, onClick, onFile }: { label: string; onClick: () => vo
 export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: EditorSidebarProps) {
   const {
     slides, activeSlideIndex, style, globalSettings,
-    updateActiveSlide, updateSlide, updateGlobalSettings, updateCornersConfig,
+    updateActiveSlide, updateGlobalSettings, updateCornersConfig,
   } = useEditorStore();
 
   const slide = slides[activeSlideIndex];
   const { corners, profileBadge, accentColor, theme } = globalSettings;
+  const [pairTitleFontName = 'SF Pro Display', pairBodyFontName = 'IvyOra Text'] =
+    globalSettings.fontPair.split(' + ');
+  // O template de perfil desenha em SF Pro independentemente do par global.
+  const defaultTitleFontName = style === 'profile' ? 'SF Pro Display' : pairTitleFontName;
+  const defaultBodyFontName = style === 'profile' ? 'SF Pro Display' : pairBodyFontName;
 
   const bgImageRef = useRef<HTMLInputElement>(null);
   const contentImageRef = useRef<HTMLInputElement>(null);
@@ -216,8 +223,20 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   // Fundo do slide: mantém os dois campos em sincronia porque cada template lê
   // um deles (editorial prefere gridImageUrl, minimalist decide por imageType).
   const handleBackgroundFile = (f: File) =>
-    upload(f, (url) => updateActiveSlide({ backgroundImageUrl: url, gridImageUrl: url }));
-  const handleContentFile = (f: File) => upload(f, (url) => updateActiveSlide({ contentImageUrl: url }));
+    upload(f, (url) =>
+      updateActiveSlide({
+        backgroundImageUrl: url,
+        gridImageUrl: url,
+        imagePosition: { ...DEFAULT_IMAGE_POSITION },
+      })
+    );
+  const handleContentFile = (f: File) =>
+    upload(f, (url) =>
+      updateActiveSlide({
+        contentImageUrl: url,
+        contentImagePosition: { ...DEFAULT_IMAGE_POSITION },
+      })
+    );
   const handleT01File = (f: File) =>
     upload(f, (url) => t01Model != null && updateActiveSlide(template01SetImage(slide, t01Model, url)));
   // Upload, IA e remoção escrevem no MESMO lugar (o slot) — ver
@@ -252,16 +271,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const setT01 = (patch: Partial<Slide>, ...keys: Template01SlideControl[]) =>
     updateActiveSlide({ ...patch, templateOverrides: markTemplate01Override(slide.templateOverrides, ...keys) });
 
-  const setT01Corner = (
-    patch: Parameters<typeof updateCornersConfig>[0],
-    ...keys: Template01CornerControl[]
-  ) => {
-    updateCornersConfig(patch);
-    updateGlobalSettings({
-      templateOverrides: markTemplate01CornerOverride(globalSettings.templateOverrides, ...keys),
-    });
-  };
-
   /** Estilo de UM slot. A chave existir já é o gesto do usuário — sem marca. */
   const setT01Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
     updateActiveSlide({
@@ -271,12 +280,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       },
     });
 
-  // Os cantos são os mesmos em todos os slides que os exibem — editar em um e
-  // ver o outro divergir seria bug, não liberdade.
   const setT01CornerText = (slot: string, value: string) =>
-    slides.forEach((s, i) =>
-      updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [slot]: value } })
-    );
+    updateActiveSlide({ templateSlots: { ...(slide.templateSlots ?? {}), [slot]: value } });
 
   /* ── Escritas do TEMPLATE 2 ─────────────────────────────────────────────
      Mesma disciplina do T1: o handler MARCA o controle em `templateOverrides`,
@@ -295,12 +300,27 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       },
     });
 
-  // O cabeçalho é o mesmo em TODOS os slides do deck — editar em um e ver os
-  // outros divergirem seria bug, não liberdade. Mesmo laço dos cantos do T1.
   const setT02HeaderText = (slot: string, value: string) =>
-    slides.forEach((s, i) =>
-      updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [slot]: value } })
-    );
+    updateActiveSlide({ templateSlots: { ...(slide.templateSlots ?? {}), [slot]: value } });
+
+  const setHeaderStyles = (slots: string[], patch: Partial<Template01SlotStyle>) => {
+    const next = { ...(slide.templateSlotStyles ?? {}) };
+    for (const slot of slots) next[slot] = { ...(next[slot] ?? {}), ...patch };
+    updateActiveSlide({ templateSlotStyles: next });
+  };
+
+  const setTemplateCornerStyle = (
+    patch: Partial<NonNullable<typeof globalSettings.templateCornerStyle>>
+  ) =>
+    updateGlobalSettings({
+      templateCornerStyle: { ...(globalSettings.templateCornerStyle ?? {}), ...patch },
+    });
+
+  const withContentImagePosition = (patch: Partial<typeof DEFAULT_IMAGE_POSITION>) => ({
+    ...DEFAULT_IMAGE_POSITION,
+    ...(slide.contentImagePosition ?? {}),
+    ...patch,
+  });
 
   const t01TextSlots = t01Model != null
     ? template01SlotsForSlide(t01Model).filter((d) => d.kind === 'text' && !d.slot.startsWith('cantos.'))
@@ -312,9 +332,25 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   // Vale para os DOIS templates: os campos são os mesmos (`templateOverrides` +
   // `templateSlotStyles`), então o botão "Restaurar" conta igual nos dois.
   const templateSlideChanges = template02SlideChanges(slide);
-  const t01CornerChanges = Object.keys(globalSettings.templateOverrides ?? {}).length;
-
-  const cornersShow = corners.show !== false;
+  const t01CornerSlotNames = t01CornerSlots.map((d) => d.slot);
+  const t02HeaderSlotNames = t02HeaderSlots.map((d) => d.slot);
+  const t01HasVisibility = t01CornerSlotNames.some(
+    (slot) => slide.templateSlotStyles?.[slot]?.visible != null
+  );
+  const t01HeaderVisible = t01HasVisibility
+    ? t01CornerSlotNames.every((slot) => slide.templateSlotStyles?.[slot]?.visible !== false)
+    : corners.show !== false;
+  const t02HeaderVisible = t02HeaderSlotNames.every(
+    (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
+  );
+  const t01HeaderStyle = {
+    ...(slide.templateSlotStyles?.[t01CornerSlotNames[0]] ?? {}),
+    ...(globalSettings.templateCornerStyle ?? {}),
+  };
+  const t02HeaderStyle = {
+    ...(slide.templateSlotStyles?.[t02HeaderSlotNames[0]] ?? {}),
+    ...(globalSettings.templateCornerStyle ?? {}),
+  };
 
   /* ── Conteúdo de cada painel ─────────────────────────────────────────── */
   const content: Record<PanelId, ReactNode> = {
@@ -414,11 +450,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           slideDescription={slide.description || ''}
           onGenerate={(opts) => generateOne(activeSlideIndex, t02IsCover ? 'background' : 'content', opts)}
         />
-        {!t02ImageUrl && !t02IsCover && (
-          <p className={helpCls}>
-            Sem imagem, o bloco aparece com o placeholder cinza escrito “Imagem”.
-          </p>
-        )}
         {t02ImageUrl && (
           <>
             <ImageThumb
@@ -439,11 +470,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             ) : (
               <>
                 <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
-                  onChange={(v) => setT02({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                  onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ x: v }) }, 'contentImagePosition')} />
                 <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
-                  onChange={(v) => setT02({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                  onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ y: v }) }, 'contentImagePosition')} />
                 <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
-                  onChange={(v) => setT02({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } }, 'contentImagePosition')} />
+                  onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ zoom: v }) }, 'contentImagePosition')} />
               </>
             )}
           </>
@@ -488,11 +519,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             ) : (
               <>
                 <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
-                  onChange={(v) => setT01({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                  onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ x: v }) }, 'contentImagePosition')} />
                 <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
-                  onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } }, 'contentImagePosition')} />
+                  onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ y: v }) }, 'contentImagePosition')} />
                 <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
-                  onChange={(v) => setT01({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v } }, 'contentImagePosition')} />
+                  onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ zoom: v }) }, 'contentImagePosition')} />
               </>
             )}
           </>
@@ -551,11 +582,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
         )}
         <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
-          onChange={(v) => updateActiveSlide({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } })} />
+          onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ x: v }) })} />
         <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
-          onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} />
+          onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ y: v }) })} />
         <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
-          onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v, objectFit: slide.contentImagePosition?.objectFit } })} />
+          onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ zoom: v }) })} />
       </>
     ),
 
@@ -571,31 +602,52 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           // O seletor abre mostrando o que ESTÁ na tela: o número do spec
           // daquele bloco, nunca um padrão do editor.
           const specColor = t02Model != null ? template02SlotColor(d.slot, t02Model) : '#000000';
+          const isHighlight = d.slot === 'cover.highlight';
           return (
             <div key={d.slot} className="space-y-2 pt-3 border-t border-black/[0.05] dark:border-white/[0.05] first:border-t-0 first:pt-0">
               <span className={labelCls}>{d.label}</span>
-              <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
-                min={10} max={160} unit="px" onChange={(v) => setT02Slot(d.slot, { fontSize: v })} />
-              <div className="flex items-center gap-2 flex-wrap">
-                <ColorPicker label="Cor" value={st.color || specColor} onChange={(v) => setT02Slot(d.slot, { color: v })} />
-                <UnderlineToggle on={!!st.underline} onToggle={() => setT02Slot(d.slot, { underline: !st.underline })} />
-              </div>
-              <div>
-                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
-                <ElementFontPicker value={st.font} onChange={(v) => setT02Slot(d.slot, { font: v })} />
-              </div>
-              <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
-                min={-0.1} max={0.3} step={0.01} unit="em"
-                onChange={(v) => setT02Slot(d.slot, { letterSpacing: v })} />
+              {isHighlight ? (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ColorPicker
+                      label="Cor do marcador"
+                      value={st.background || TEMPLATE_02_HIGHLIGHT_COLOR}
+                      onChange={(v) => setT02Slot(d.slot, { background: v })}
+                    />
+                  </div>
+                  <div>
+                    <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                    <ElementFontPicker
+                      value={st.font}
+                      defaultFontName={template02SlotFontName(d.slot) ?? 'Inter Bold'}
+                      onChange={(v) => setT02Slot(d.slot, { font: v })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
+                    min={10} max={160} unit="px" onChange={(v) => setT02Slot(d.slot, { fontSize: v })} />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ColorPicker label="Cor" value={st.color || specColor} onChange={(v) => setT02Slot(d.slot, { color: v })} />
+                    <UnderlineToggle on={!!st.underline} onToggle={() => setT02Slot(d.slot, { underline: !st.underline })} />
+                  </div>
+                  <div>
+                    <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                    <ElementFontPicker
+                      value={st.font}
+                      defaultFontName={template02SlotFontName(d.slot) ?? 'Inter Display Regular'}
+                      onChange={(v) => setT02Slot(d.slot, { font: v })}
+                    />
+                  </div>
+                  <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
+                    min={-0.1} max={0.3} step={0.01} unit="em"
+                    onChange={(v) => setT02Slot(d.slot, { letterSpacing: v })} />
+                </>
+              )}
             </div>
           );
         })}
-        {/* Entrelinha e alinhamento ficam de fora de propósito: no T2 a
-            composição é flexbox centrado e os blocos ocupam colunas fixas do
-            spec — mexer nisso desfaz a regra estruturante do template. */}
-        <p className={cn(helpCls, 'pt-3 border-t border-black/[0.05] dark:border-white/[0.05]')}>
-          Os títulos serifados vêm na IvyOra Text. Trocar a fonte de um bloco muda só ele.
-        </p>
       </>
     ) : (
       <>
@@ -613,7 +665,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               </div>
               <div>
                 <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
-                <ElementFontPicker value={st.font} onChange={(v) => setT01Slot(d.slot, { font: v })} />
+                <ElementFontPicker
+                  value={st.font}
+                  defaultFontName={template01SlotFontName(d.slot) ?? 'Inter Regular'}
+                  onChange={(v) => setT01Slot(d.slot, { font: v })}
+                />
               </div>
               <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
                 min={-0.1} max={0.3} step={0.01} unit="em"
@@ -661,7 +717,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         </div>
         <div>
           <span className={cn(labelCls, 'block mb-1')}>Fonte título</span>
-          <ElementFontPicker value={slide.titleFont} onChange={(v) => updateActiveSlide({ titleFont: v })} />
+          <ElementFontPicker
+            value={slide.titleFont}
+            defaultFontName={defaultTitleFontName}
+            onChange={(v) => updateActiveSlide({ titleFont: v })}
+          />
         </div>
 
         <div className="pt-1">
@@ -679,7 +739,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         </div>
         <div>
           <span className={cn(labelCls, 'block mb-1')}>Fonte descrição</span>
-          <ElementFontPicker value={slide.descriptionFont} onChange={(v) => updateActiveSlide({ descriptionFont: v })} />
+          <ElementFontPicker
+            value={slide.descriptionFont}
+            defaultFontName={defaultBodyFontName}
+            onChange={(v) => updateActiveSlide({ descriptionFont: v })}
+          />
         </div>
 
         <Slider label="Espaço título → descrição" value={slide.titleDescriptionGap ?? 16} min={0} max={80} unit="px"
@@ -699,6 +763,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             updateActiveSlide({ highlights: [...other, ...titleHls] });
           }}
           accentColor={accentColor}
+          defaultFontName={slide.titleFont ?? defaultTitleFontName}
         />
         {slide.description && (
           <WordHighlightPicker
@@ -710,6 +775,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               updateActiveSlide({ highlights: [...other, ...descHls] });
             }}
             accentColor={accentColor}
+            defaultFontName={slide.descriptionFont ?? defaultBodyFontName}
           />
         )}
       </>
@@ -792,12 +858,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           }
           onChange={(v) => setT02({ backgroundColor: v }, 'background')}
         />
-        {t02IsCover && (
-          <p className={helpCls}>
-            Na capa o fundo só aparece onde a imagem não cobre — sem imagem, ele é o preto do
-            template. O degradê continua por cima em qualquer caso.
-          </p>
-        )}
       </>
     ) : isT01 ? (
       <>
@@ -806,12 +866,6 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           value={t01BgValue}
           onChange={(v) => setT01({ backgroundColor: v }, 'background')}
         />
-        {t01SpecBg && !t01SpecBg.solid && (
-          <p className={helpCls}>
-            Este slide tem degradê no template. Escolher uma cor substitui o degradê inteiro por
-            fundo chapado — “Restaurar” traz o degradê de volta.
-          </p>
-        )}
       </>
     ) : (
       <>
@@ -845,115 +899,195 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
-    /* Um painel só: o TEXTO dos cantos e a APARÊNCIA deles. Antes eram dois
-       painéis com o mesmo rótulo, separados por outras seções — o usuário via
-       "Cantos" duas vezes e não tinha como saber qual era qual. */
-    cantos: (
+    /* No T1, os cantos são o cabeçalho do slide selecionado. Nos estilos
+       antigos este mesmo painel preserva o comportamento global legado. */
+    cantos: isT01 ? (
       <>
-        {/* UM liga/desliga para os DOIS: eles são uma linha só do desenho —
-            exibir um sem o outro deixa a composição torta. */}
         <Toggle
-          on={isT01 ? cornersShow : !!corners.show}
-          onToggle={() => (isT01 ? updateCornersConfig({ show: !cornersShow }) : updateCornersConfig({ show: !corners.show }))}
+          on={t01HeaderVisible}
+          onToggle={() => setHeaderStyles(t01CornerSlotNames, { visible: !t01HeaderVisible })}
           label="Exibir cantos"
         />
 
-        {(isT01 ? cornersShow : corners.show) && (
+        {t01HeaderVisible && (
           <>
-            {isT01
-              ? t01CornerSlots.map((d) => (
-                  <div key={d.slot} className="space-y-1">
-                    <span className={labelCls}>{d.label}</span>
-                    <input className={inputCls}
-                      value={slide.templateSlots?.[d.slot] ?? d.defaultValue}
-                      onChange={(e) => setT01CornerText(d.slot, e.target.value)} />
-                  </div>
-                ))
-              : (['topLeft', 'topRight'] as const).map((key) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <div
-                      onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
-                      className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0',
-                        corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
-                      {corners[key].visible && <span className="text-black text-[9px] font-bold">✓</span>}
-                    </div>
-                    <input className={cn(inputCls, 'flex-1')} value={corners[key].text} placeholder={key}
-                      onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} />
-                  </div>
-                ))}
-
+            {t01CornerSlots.map((d) => (
+              <div key={d.slot} className="space-y-1">
+                <span className={labelCls}>{d.label}</span>
+                <input
+                  className={inputCls}
+                  value={slide.templateSlots?.[d.slot] ?? TEMPLATE_01_DEFAULT_CORNERS[d.slot]}
+                  onChange={(e) => setT01CornerText(d.slot, e.target.value)}
+                />
+              </div>
+            ))}
+            <div className="space-y-3 border-t border-black/[0.05] pt-3 dark:border-white/[0.05]">
+              <Slider
+                label="Tamanho fonte"
+                value={Math.round(
+                  t01HeaderStyle.fontSize ??
+                    template01SlotDefaults(t01CornerSlotNames[0])?.fontSizePx ??
+                    17
+                )}
+                min={8}
+                max={64}
+                unit="px"
+                onChange={(v) => setTemplateCornerStyle({ fontSize: v })}
+              />
+              <Slider
+                label="Margem"
+                value={t01HeaderStyle.margin ?? 0}
+                min={0}
+                max={150}
+                unit="px"
+                onChange={(v) => setTemplateCornerStyle({ margin: v })}
+              />
+              <ColorPicker
+                label="Cor"
+                value={
+                  t01HeaderStyle.color ||
+                  (t01Model != null
+                    ? template01SlotColor(t01CornerSlotNames[0], t01Model)
+                    : '#FFFFFF')
+                }
+                onChange={(v) => setHeaderStyles(t01CornerSlotNames, { color: v })}
+              />
+              <div>
+                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                <ElementFontPicker
+                  value={t01HeaderStyle.font}
+                  defaultFontName={
+                    template01SlotFontName(t01CornerSlotNames[0]) ?? 'Inter Display Medium'
+                  }
+                  onChange={(v) => setTemplateCornerStyle({ font: v })}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </>
+    ) : (
+      <>
+        <Toggle
+          on={!!corners.show}
+          onToggle={() => updateCornersConfig({ show: !corners.show })}
+          label="Exibir cantos"
+        />
+        {corners.show && (
+          <>
+            {(['topLeft', 'topRight'] as const).map((key) => (
+              <div key={key} className="flex items-center gap-2">
+                <div
+                  onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
+                  className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0',
+                    corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
+                  {corners[key].visible && <span className="text-black text-[9px] font-bold">✓</span>}
+                </div>
+                <input className={cn(inputCls, 'flex-1')} value={corners[key].text} placeholder={key}
+                  onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} />
+              </div>
+            ))}
             <div className="pt-3 border-t border-black/[0.05] dark:border-white/[0.05] space-y-3">
               <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} unit="px"
-                onChange={(v) => (isT01 ? setT01Corner({ fontSize: v }, 'cornerSize') : updateCornersConfig({ fontSize: v }))} />
+                onChange={(v) => updateCornersConfig({ fontSize: v })} />
               <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} unit="px"
-                onChange={(v) => (isT01 ? setT01Corner({ borderDistance: v }, 'cornerDistance') : updateCornersConfig({ borderDistance: v }))} />
+                onChange={(v) => updateCornersConfig({ borderDistance: v })} />
               <Slider label="Opacidade" value={corners.opacity} min={0} max={100} unit="%"
-                onChange={(v) => (isT01 ? setT01Corner({ opacity: v }, 'cornerOpacity') : updateCornersConfig({ opacity: v }))} />
+                onChange={(v) => updateCornersConfig({ opacity: v })} />
               <ColorPicker label="Cor" value={corners.color || DEFAULT_CORNERS.color || '#FFFFFF'}
-                onChange={(v) => (isT01 ? setT01Corner({ color: v }, 'cornerColor') : updateCornersConfig({ color: v }))} />
+                onChange={(v) => updateCornersConfig({ color: v })} />
               <div>
                 <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
                 <ElementFontPicker value={corners.elementFont}
-                  onChange={(v) => (isT01 ? setT01Corner({ elementFont: v }, 'cornerFont') : updateCornersConfig({ elementFont: v }))} />
+                  defaultFontName={defaultBodyFontName}
+                  onChange={(v) => updateCornersConfig({ elementFont: v })} />
               </div>
-
-              {/* Restauração PRÓPRIA dos cantos: eles são do deck, e o botão do
-                  slide não tem como desfazê-los — antes essa mudança ficava sem
-                  volta, com o botão do slide cinza e nada explicando. */}
-              {isT01 && (
-                <button
-                  onClick={() => updateGlobalSettings({ templateOverrides: undefined })}
-                  disabled={t01CornerChanges === 0}
-                  title={t01CornerChanges === 0 ? 'Os cantos ainda seguem o template.' : undefined}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[11px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Restaurar cantos
-                </button>
-              )}
             </div>
           </>
         )}
       </>
     ),
 
-    /* Categoria e @ do TEMPLATE 2. É CONTEÚDO do deck: escreve nos DOIS slots
-       de TODOS os slides, como os cantos do T1 — editar num slide e ver os
-       outros divergirem seria bug, não liberdade. */
+    /* Texto, cor e visibilidade pertencem ao slide; tipografia e margem são globais. */
     cabecalho: (
       <>
-        {t02HeaderSlots.map((d) => {
-          const value = slide.templateSlots?.[d.slot] ?? d.defaultValue;
-          const over = d.maxChars != null && value.length > d.maxChars && value !== d.defaultValue;
-          return (
-            <div key={d.slot} className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className={labelCls}>{d.label}</span>
-                {d.maxChars != null && (
-                  <span className={cn(numericCls, over && 'text-red-500 font-semibold')}>
-                    {value.length}/{d.maxChars} car.
-                  </span>
+        <Toggle
+          on={t02HeaderVisible}
+          onToggle={() => setHeaderStyles(t02HeaderSlotNames, { visible: !t02HeaderVisible })}
+          label="Exibir cantos"
+        />
+        {t02HeaderVisible && (
+          <>
+            {t02HeaderSlots.map((d) => {
+              const value = slide.templateSlots?.[d.slot] ?? TEMPLATE_02_DEFAULT_HEADER[d.slot];
+              const over = d.maxChars != null && value.length > d.maxChars;
+              return (
+                <div key={d.slot} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={labelCls}>{d.label}</span>
+                    {d.maxChars != null && (
+                      <span className={cn(numericCls, over && 'text-red-500 font-semibold')}>
+                        {value.length}/{d.maxChars} car.
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    className={cn(inputCls, over && 'border-red-500/60')}
+                    value={value}
+                    onChange={(e) => setT02HeaderText(d.slot, e.target.value)}
+                  />
+                </div>
+              );
+            })}
+            <div className="space-y-3 border-t border-black/[0.05] pt-3 dark:border-white/[0.05]">
+              <Slider
+                label="Tamanho fonte"
+                value={Math.round(
+                  t02HeaderStyle.fontSize ??
+                    template02SlotDefaults(t02HeaderSlotNames[0])?.fontSizePx ??
+                    17
                 )}
-              </div>
-              <input
-                className={cn(inputCls, over && 'border-red-500/60')}
-                value={value}
-                onChange={(e) => setT02HeaderText(d.slot, e.target.value)}
+                min={8}
+                max={64}
+                unit="px"
+                onChange={(v) => setTemplateCornerStyle({ fontSize: v })}
               />
+              <Slider
+                label="Margem"
+                value={t02HeaderStyle.margin ?? 0}
+                min={0}
+                max={150}
+                unit="px"
+                onChange={(v) => setTemplateCornerStyle({ margin: v })}
+              />
+              <ColorPicker
+                label="Cor"
+                value={
+                  t02HeaderStyle.color ||
+                  (t02Model != null
+                    ? template02SlotColor('header.category', t02Model)
+                    : '#767682')
+                }
+                onChange={(v) => setHeaderStyles(t02HeaderSlotNames, { color: v })}
+              />
+              <div>
+                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                <ElementFontPicker
+                  value={t02HeaderStyle.font}
+                  defaultFontName={
+                    template02SlotFontName(t02HeaderSlotNames[0]) ?? 'Inter Display Medium'
+                  }
+                  onChange={(v) => setTemplateCornerStyle({ font: v })}
+                />
+              </div>
             </div>
-          );
-        })}
-        <p className={helpCls}>
-          Aparece no topo de todos os slides. Passar do limite encosta no centro.
-        </p>
+          </>
+        )}
       </>
     ),
 
     restaurarTemplate: (
       <>
-        <p className={helpCls}>
-          Volta cores, fontes e posições ao template. Seu texto e sua imagem não mudam.
-        </p>
         <button
           onClick={() => updateActiveSlide({ templateOverrides: undefined, templateSlotStyles: undefined })}
           className="w-full py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-semibold hover:opacity-90 transition-opacity"
@@ -977,10 +1111,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       ? {
           label: 'Conteúdo',
           value: `SLIDE ${String(activeSlideIndex + 1).padStart(2, '0')}`,
-          info: isT01 ? TEMPLATE_01_INFO : isT02 ? TEMPLATE_02_INFO : undefined,
         }
       : g.scope === 'global'
-        ? { label: 'Estilo global', hint: 'aplica a todos os slides' }
+        ? { label: 'Estilo global' }
         : {};
   };
 

@@ -97,13 +97,12 @@ Chaves de `Slide.templateSlots`. São as mesmas do spec — não invente nomes n
 | `content.title` | 2, 3 | texto | Título |
 | `content.body` | 2, 3 | texto, parágrafos separados por `\n\n` | Descrição |
 | `content.image` | 2, 3 | imagem (bloco 380×1089) | Imagem |
-| `header.category` | todos | texto, GLOBAL do deck | Categoria |
-| `header.handle` | todos | texto, GLOBAL do deck | @ do perfil |
+| `header.category` | todos | texto do slide | Categoria |
+| `header.handle` | todos | texto do slide | @ do perfil |
 
 `content.*` repete entre os slides de conteúdo, e isso está certo: `templateSlots` é por slide,
-então não há colisão. Só `header.*` é global — trate igual aos `cantos.*` do T1 (edita uma vez,
-propaga para o deck; o spec permite override por slide, mas **não** implemente isso agora, é
-escopo extra).
+então não há colisão. `header.*` também é por slide: categoria e @ podem ser exibidos, ocultados e
+editados de forma independente no card selecionado.
 
 Limites de texto: leia de `regrasDeGeracao.limitesDeTexto` no spec. Não redigite os números.
 
@@ -161,7 +160,7 @@ de texto (85/586, 147, 409×1089), container da headline (0, 755, 1080×334.13),
 porta 3100) e chegou aos mesmos números, mais o 9:16 com o centro do texto e o centro do bloco de
 imagem batendo em 976.5 — desvio 0.00.
 
-Critério final: **0px contra o gabarito EXCETO três divergências deliberadas**, listadas em
+Critério final: **0px de geometria contra o gabarito EXCETO quatro divergências deliberadas**, listadas em
 `TEMPLATE_02_GABARITO_DIVERGENCES` (`lib/templates/template-02/index.ts`) com motivo e data:
 
 | o quê | gabarito | aqui | por quê |
@@ -169,14 +168,16 @@ Critério final: **0px contra o gabarito EXCETO três divergências deliberadas*
 | serifada | Newsreader | `'ivyora-text','T01Serif',serif` | O spec trocou por licença; o motivo caducou e o Rafael pediu IvyOra. |
 | margem do cabeçalho | 85 (`grid.marginX`) | 71 (`grid.headerMarginX`) | O spec diz 71 em três lugares e recomenda normalizar 71/71. O `generate.py` colapsou a margem do cabeçalho na do conteúdo. |
 | `body`/`ui` | `Inter` | `T01InterDisplay` | O spec pede o corte Display; o `generate.py` só carrega `Inter` do Google Fonts, que não o serve. O corpo quebra em MENOS linhas, então os limites do spec continuam valendo com folga. |
+| scrim da capa | `0% .60 · 22% .25 · 62% .75 · 100% .96` | `0%/50% transparentes · 78% .45 · 100% 1` | O Rafael pediu o degradê apenas na metade de baixo e mais forte na base. O custo de contraste está medido na S5. |
 
 Essa lista existe para quem rodar o `generate.py` no futuro achar a explicação num lugar só, em vez
 de recomeçar a investigação.
 
 ## Fatias — TODAS ENTREGUES
 
-Estado: S1 a S4 entregues na branch `feat/template-02`, **sem commit**. Gate de cada fatia
-verificado pelo Builder e reconferido pelo Orquestrador.
+Estado: S1 a S4 estão no commit `6e79153` da branch `feat/template-02`. A S5 está no worktree,
+ainda sem commit. Os gates de S1 a S4 foram verificados pelo Builder e reconferidos pelo
+Orquestrador; a S5 foi retomada pelo Codex após o limite diário interromper o Builder.
 
 | fatia | o que entregou | testes |
 |---|---|---|
@@ -184,6 +185,7 @@ verificado pelo Builder e reconferido pelo Orquestrador.
 | S2 | barra lateral | 722 → 769 |
 | S3 | criação | 769 → 813 |
 | S4 | exportação + fechamento | 813 → 813 |
+| S5 | ajustes do teste do Rafael | 813 → 848 |
 
 ### S1 — fundação + render
 
@@ -208,14 +210,13 @@ que os controles de posição/zoom modulam. Visualmente idêntico ao `object-fit
 - `lib/templates/template-02/image.ts` — escrita canônica no slot; `useGenerateCarouselImages`
   ganhou o braço `template02`.
 - `lib/templates/template-02/overrides.ts` — a camada de override, com a mesma disciplina do T1.
-- Painéis no registry + o painel `cabecalho` (global).
+- Painéis no registry + o painel `cabecalho` por slide.
 
 **Diferença deliberada em relação ao T1:** aqui a LEITURA da imagem também é só o slot. O T1 precisa
 do fallback nos campos genéricos por dívida de deck salvo; o T2 nasceu com uma verdade só.
 
-**`SidebarGroupConfig` ganhou `label`/`hint` opcionais.** O grupo global do T2 é CONTEÚDO (a
-categoria e o @ do deck), e o `headerFor` forçava "ESTILO GLOBAL" em todo escopo global. Agora a
-config declara o rótulo quando o padrão mentiria; o T1 não passa nada e continua idêntico.
+O cabeçalho fica no mesmo grupo do slide. O toggle e os estilos são persistidos em
+`templateSlotStyles['header.category'|'header.handle']`, sem coluna nova no banco.
 
 **Fora do painel de estilo do T2, de propósito:** entrelinha e alinhamento. A composição é flexbox
 centrado em colunas fixas do spec — deslocar bloco desfaz a regra estruturante. Há uma frase no
@@ -226,10 +227,10 @@ painel explicando, para ninguém "completar" o painel depois.
 - Card no `CreateWizard` (os quatro passaram a grid 2×2). `isFixedDeck` continua **só do T1**: o T2
   mantém o slider de quantidade e abre em 5.
 - Os DOIS ramos do wizard (`editorSlides` e `slidesPayload`): estilo nos valores de `DEFAULT_SLIDE`,
-  `templateOverrides` ausente, `templateModel` gravado, cabeçalho de `template02HeaderSlots`.
+  `templateOverrides` ausente, `templateModel` gravado, cabeçalho em `LOREM IPSUM` / `@LOREMIPSUM`.
 - `template02Addendum()` + `template02SlotsFromContent`.
-- `components/editor/TemplateModelPicker.tsx` — picker genérico, com o modelo que continua a
-  alternância marcado como sugerido.
+- `components/editor/TemplateModelPicker.tsx` — picker compartilhado pelos dois templates, com o
+  modelo sugerido marcado. Clicar seleciona; só `Adicionar card` confirma a criação.
 
 **O addendum NÃO ficou no route.** Mora em `lib/templates/template-02/index.ts` e o route importa.
 Dois motivos: é conhecimento do template, e o `route.ts` do App Router não aceita export solto sem
@@ -267,6 +268,94 @@ As faces `'IvyOra Text'` (as que resolvem só por `local()`) aparecem no CSS com
 que é exatamente por que essa família nunca pode entrar numa pilha de fonte. Ver o aviso em
 `TEMPLATE_02_DESIGN_TWEAKS.serif`.
 
+### S5 — ajustes do Rafael depois do teste no navegador
+
+Quatro itens que ele trouxe testando a capa. O degradê e os limites são desvios
+deliberados registrados em `TEMPLATE_02_DESIGN_TWEAKS`, com o valor do spec ao
+lado; o problema da headline é correção de bug e o marcador é evolução do
+editor. O `spec.json` continua intocado.
+
+**1. Degradê da capa menor.** Palavras dele: *"deixe menor, pelo menos até a
+metade do card. Deixe um pouco mais forte da base e até o final mais
+transparente."* Paradas novas: `0% e 50% transparentes · 78% .45 · 100% 1`
+(spec: `0% .60 · 22% .25 · 62% .75 · 100% .96`).
+
+⚠️ **CUSTO MEDIDO E NÃO RESOLVIDO.** A parada de topo do spec existia para o
+CABEÇALHO. Sobre uma foto clara (#F0EDE6, o pior caso), com o degradê novo:
+
+| faixa | contraste do fundo vs branco |
+|---|---|
+| cabeçalho (y 44–62) | **1.17:1** |
+| headline, topo (y 755–840) | **1.64:1** |
+| headline, base (y 920–1006) | 2.77:1 |
+| pílula de CTA | 7.81:1 |
+
+O mínimo aceitável para texto é 3:1. Com foto escura ou sem foto (fundo preto do
+template) nada disso acontece — o risco é condicional à foto que o usuário
+escolhe. O menor scrim de topo que salvaria o cabeçalho: **rgba(0,0,0,0.38)**
+para 3:1 e **0.50** para 4.5:1. É decisão de produto, e está com o Rafael.
+
+**2. Headline que sobrepunha ao aumentar a fonte.** Duas causas, as duas
+corrigidas em `CoverHeadline`:
+- cada linha era um `div` com `height` travado no `lineHeight`; quando o texto
+  não cabia na largura o navegador quebrava e a segunda linha visual caía POR
+  CIMA da linha seguinte (medido a 110px: `scrollHeight` 247 num div de 120).
+  A altura agora é a natural — uma linha que quebra EMPURRA;
+- o bloco era ancorado pelo topo e crescia contra a pílula de CTA (a 110px
+  sobravam 11.9px). Agora pendura pela BASE e cresce para cima, como o
+  `anchor: 'bottom'` do Template 1, sem o motor de lá. O vão para a pílula é
+  constante em 37.8px, e com as 4 linhas do spec o topo continua em 755.
+
+Nos slides internos o flexbox **não** resolvia sozinho: a 120px o título subia
+para y=47, por cima do cabeçalho (que termina em y=62). Resolvido com
+`justify-content: safe center` — centralizado enquanto couber, alinhado ao topo
+quando não couber, e no-op quando cabe. Efeito colateral aceito: em tamanho
+extremo o excedente passa a sair pela BASE e o `overflow:hidden` do slide corta
+o fim do corpo, em vez de colidir com o cabeçalho.
+
+**3. Limites de caractere maiores.** Não foram escolhidos: foram MEDIDOS no
+Chromium com a face, o corpo e o tracking reais.
+- `cover.headline`: 17 → **25**. O spec mediu numa caixa de 836px, mas o render
+  (e o `generate.py`) desenha a headline em `left:0; width:1080`. Medido a
+  76.5495px/-4.593/Inter Bold: 25 e 26 caracteres em 1080 para duas frases reais
+  (19 e 21 na caixa de 836). Fica o menor dos dois.
+- `content.title`: 40 → **52** (3 → 4 linhas). `content.body`: 220 → **300**
+  (9 → 12 linhas). Estes dois estavam CERTOS para a contagem de linhas que o
+  spec assume (~13 e ~25 car./linha na coluna de 409px); o que afrouxou foi o
+  orçamento vertical, que sobrava: 3 linhas de título + vão + 9 de corpo davam
+  647px num container de 1089. Com 4 e 12: 852px, ainda 236px de folga.
+
+`template02Limits()` é a fonte única — a barra, a auditoria de estouro e o
+addendum da IA leem todos dali, então nenhum deles pode divergir dos outros.
+
+**4. Marcador com vários termos e cor à escolha.** O campo Destaque aceita
+termos separados por VÍRGULA, cada um virando uma tarja; a regra do spec
+(marcador não cruza duas linhas) vale POR TERMO, e cada termo marca só a
+primeira ocorrência. O aviso da barra diz QUAL termo falhou, não que "algo"
+falhou.
+
+A cor mora em `TemplateSlotStyle.background` — campo opcional e aditivo, que o
+Template 1 nunca escreve. Não virou slot próprio porque a cor do marcador é
+ESTILO do bloco `cover.highlight`, que já tem entrada nesse mapa; um
+`templateSlots['cover.highlightColor']` criaria um segundo lugar para a mesma
+ideia e ainda misturaria estilo com conteúdo.
+
+O texto sobre a tarja acompanha a luminância dela (preto ou branco, o que
+contrastar mais), senão um marcador escuro sairia com o texto preto do template
+e ilegível. O painel oferece apenas fonte e cor do marcador; tamanho, tracking,
+sublinhado e cor manual do texto não fazem parte desse bloco.
+
+### S6 — ajustes de edição pedidos em 05/08/2026
+
+- imagens novas entram com `objectFit: 'cover'`, zoom 100 e centro 50/50, tanto em upload quanto
+  em geração por IA; decks antigos sem `objectFit` preservam o `cover` legado;
+- o cabeçalho/cantos dos Templates 1 e 2 pertence ao slide selecionado, nasce em `LOREM IPSUM` / `@LOREMIPSUM`
+  e permite ligar/desligar, trocar fonte e cor;
+- o popup de novo card separa seleção de confirmação e dá feedback visual ao modelo escolhido;
+- `Template01ModelPicker` passou a compor o picker genérico; não há mais dois fluxos de confirmação;
+- a migração `allow_template02_style` libera `template02` nas constraints de `carousels` e
+  `templates`, alinhando o Supabase com o valor que o wizard e o auto-save persistem.
+
 ## Pendências (não são desta entrega)
 
 1. **O Typekit serve `ivyora-text` só nos pesos 400 e 700.** O spec pede 500 no título interno, e o
@@ -275,15 +364,11 @@ que é exatamente por que essa família nunca pode entrar numa pilha de fonte. V
 2. **O `slidesPayload` do TEMPLATE 1 não grava `template_model`.** Deck do T1 gerado hoje reabre
    derivando o modelo da POSIÇÃO — reordenar um slide troca o desenho dele. É bug real, e a correção
    é uma linha, mas o T1 está congelado esperando revisão: não foi mexido.
-3. **Migrar o `Template01ModelPicker` para o `TemplateModelPicker`.** ~10 linhas; quebra o gate de
-   diff vazio do T1, então é decisão do Orquestrador.
 
 ## Gate de cada fatia
 
-- `npx vitest run` — verde, e o número de testes **sobe** (baseline inicial: 671 em 53 arquivos;
-  final: 813 em 60)
+- `npm test -- --run` — verde, e o número de testes **sobe** (baseline inicial: 671 em
+  53 arquivos; S4: 813 em 60; S5: 848 em 61; S6: 863 em 63)
 - `npx tsc --noEmit` — limpo
-- `git diff --stat` dos 4 arquivos protegidos — vazio
-- `git diff --stat` do TEMPLATE 1 inteiro — vazio
 - `lib/templates/template-02/spec.json` e `.claude/skills/` — intocados
 - Relatório do que foi **verificado de fato**, separado do que foi **presumido**

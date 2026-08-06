@@ -226,10 +226,9 @@ export const TEMPLATE_01_DESIGN_TWEAKS = {
   /**
    * Slides que ganham `cantos.left`/`cantos.right` que o Figma NÃO desenhou.
    *
-   * O Figma só pôs cantos nos slides 3, 5 e 6. Como o liga/desliga é um
-   * controle do DECK, nos slides 1, 2 e 4 ele parecia morto — o usuário ligava e
-   * nada acontecia, porque não havia nó para exibir. Não era defeito do switch:
-   * era ausência no desenho.
+   * O Figma só pôs cantos nos slides 3, 5 e 6. Nos slides 1, 2 e 4 o controle
+   * parecia morto: não havia nó para exibir. Não era defeito do switch, mas
+   * ausência no desenho.
    *
    * Pedido do Rafael: cantos disponíveis nos SEIS slides, ligando, desligando e
    * editando os dois lados em qualquer um. Daí o acréscimo.
@@ -338,6 +337,17 @@ export function template01SlotDefaults(
   return undefined;
 }
 
+/** Nome legível da face que o spec realmente desenha naquele slot. */
+export function template01SlotFontName(slot: string): string | undefined {
+  for (const slide of TEMPLATE_01_SPEC.slides) {
+    const node = slide.nodes.find((n) => n.slot === slot && n.type === 'TEXT' && n.typography);
+    if (!node?.typography) continue;
+    const { fontFamily, fontStyle } = node.typography;
+    return [fontFamily, fontStyle].filter(Boolean).join(' ');
+  }
+  return undefined;
+}
+
 // ─── Grupos de alinhamento ──────────────────────────────────────
 
 /**
@@ -403,6 +413,12 @@ export const TEMPLATE_01_SLIDE_COUNT = TEMPLATE_01_SPEC.slides.length;
 
 /** Texto ou URL de imagem por slot, ex: `{ 's1.headline': 'linha 1\nlinha 2' }`. */
 export type Template01Slots = Record<string, string>;
+
+/** Texto inicial do cabeçalho/cantos de cada slide novo. */
+export const TEMPLATE_01_DEFAULT_CORNERS: Template01Slots = {
+  'cantos.left': 'LOREM IPSUM',
+  'cantos.right': '@LOREMIPSUM',
+};
 
 export interface Template01SlotDescriptor {
   slot: string;
@@ -580,7 +596,7 @@ export function template01DefaultSlots(): Template01Slots {
 }
 
 /**
- * Slots que pertencem a um slide (1-indexado), incluindo os cantos globais, na
+ * Slots que pertencem a um slide (1-indexado), incluindo seu cabeçalho/cantos, na
  * ordem VISUAL do slide (de cima para baixo).
  *
  * A ordem dos nós no spec é a do Figma, não a da tela: na capa o título vem
@@ -590,7 +606,13 @@ export function template01DefaultSlots(): Template01Slots {
 export function template01SlotsForSlide(slideIndex: number): Template01SlotDescriptor[] {
   return TEMPLATE_01_EDITABLE_SLOTS.filter(
     (s) => s.slideIndex === slideIndex || s.slot.startsWith('cantos.')
-  ).sort((a, b) => a.y - b.y);
+  )
+    .map((s) =>
+      s.slot.startsWith('cantos.')
+        ? { ...s, defaultValue: TEMPLATE_01_DEFAULT_CORNERS[s.slot] }
+        : s
+    )
+    .sort((a, b) => a.y - b.y);
 }
 
 /**
@@ -675,9 +697,8 @@ export function template01SlotsFromContent(
 }
 
 /**
- * Cantos de um deck gerado: assinatura e @ do usuário. São dados DELE (marca e
- * handle do onboarding), não estilo — por isso a geração pode escrevê-los. Sem
- * marca nem handle o slot sai vazio, nunca com o "@OANDRELONA" do Figma.
+ * Helper legado para converter marca e @ em slots. Novos slides usam
+ * `TEMPLATE_01_DEFAULT_CORNERS` e não herdam estes valores entre cards.
  */
 export function template01CornerSlots(brandName?: string, handle?: string): Template01Slots {
   const at = (handle ?? '').trim().replace(/^@+/, '');
@@ -1125,6 +1146,12 @@ export function template01SpecSlideOf(model: number): SpecSlide {
   return TEMPLATE_01_SPEC.slides.find((s) => s.index === model) ?? TEMPLATE_01_SPEC.slides[0];
 }
 
+/** Cor de fábrica de um slot no modelo atual, já incluindo cantos sintéticos. */
+export function template01SlotColor(slot: string, model: number): string {
+  const node = template01Nodes(template01SpecSlideOf(model)).find((n) => n.slot === slot);
+  return node?.fills?.[0]?.css ?? '#FFFFFF';
+}
+
 export interface Template01SpecBackground {
   /** O CSS que o render aplica quando o slide segue o template. */
   css: string;
@@ -1216,20 +1243,21 @@ export function template01LoremForSlot(limits: {
 
 /**
  * Slots de um slide NOVO do modelo pedido: lorem em todo slot de texto, imagem
- * vazia (o usuário escolhe a dele) e os cantos herdados do deck.
- *
- * Os cantos não são lorem: eles são marca e @ do usuário, vindos do onboarding,
- * e valem para o deck inteiro — copiá-los do slide vizinho é o que mantém a
- * regra que já existe.
+ * vazia (o usuário escolhe a dele) e cabeçalho próprio em
+ * LOREM IPSUM/@LOREMIPSUM.
  */
-export function template01NewSlideSlots(model: number, inheritedCorners?: Template01Slots): Template01Slots {
+export function template01NewSlideSlots(
+  model: number,
+  /** @deprecated Mantido apenas para chamadas antigas; não há mais herança. */
+  _inheritedCorners?: Template01Slots
+): Template01Slots {
   const out: Template01Slots = {};
   for (const d of template01SlotsForSlide(model)) {
     if (d.slot.startsWith('cantos.')) continue;
     if (d.kind === 'text') out[d.slot] = template01LoremForSlot(d);
   }
   for (const slot of ['cantos.left', 'cantos.right']) {
-    out[slot] = inheritedCorners?.[slot] ?? '';
+    out[slot] = TEMPLATE_01_DEFAULT_CORNERS[slot];
   }
   return out;
 }

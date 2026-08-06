@@ -17,12 +17,16 @@ import {
   template02ContentBox,
   template02CoverTops,
   template02ElementX,
-  template02HighlightLine,
   template02LayoutOf,
   template02ModelOf,
+  template02HighlightParts,
+  template02HighlightTerms,
+  template02HighlightTextColor,
+  template02ScrimStops,
   template02SlotColor,
   template02SlotsForModel,
   template02Type,
+  TEMPLATE_02_HIGHLIGHT_COLOR,
 } from '@/lib/templates/template-02';
 import {
   Template02ImageOverride,
@@ -134,30 +138,42 @@ function Header({
 }) {
   const color = onImage ? TEMPLATE_02_COLORS.textHeaderOnImage : TEMPLATE_02_COLORS.textHeader;
   const base: React.CSSProperties = { position: 'absolute', zIndex: 2, top: TEMPLATE_02_HEADER_Y };
+  const categoryStyle = ov.slotStyles['header.category'];
+  const handleStyle = ov.slotStyles['header.handle'];
+  const categoryVisible = categoryStyle?.visible !== false;
+  const handleVisible = handleStyle?.visible !== false;
+  const categoryMargin = categoryStyle?.margin ?? 0;
+  const handleMargin = handleStyle?.margin ?? 0;
   return (
     <>
-      <div
-        data-slot="header.category"
-        style={{
-          ...textStyle('header.category', color, ov),
-          ...base,
-          left: TEMPLATE_02_HEADER_MARGIN_X,
-          textAlign: 'left',
-        }}
-      >
-        {category}
-      </div>
-      <div
-        data-slot="header.handle"
-        style={{
-          ...textStyle('header.handle', color, ov),
-          ...base,
-          right: TEMPLATE_02_HEADER_MARGIN_X,
-          textAlign: 'right',
-        }}
-      >
-        {handle}
-      </div>
+      {categoryVisible && (
+        <div
+          data-slot="header.category"
+          style={{
+            ...textStyle('header.category', color, ov),
+            ...base,
+            top: TEMPLATE_02_HEADER_Y + categoryMargin,
+            left: TEMPLATE_02_HEADER_MARGIN_X + categoryMargin,
+            textAlign: 'left',
+          }}
+        >
+          {category}
+        </div>
+      )}
+      {handleVisible && (
+        <div
+          data-slot="header.handle"
+          style={{
+            ...textStyle('header.handle', color, ov),
+            ...base,
+            top: TEMPLATE_02_HEADER_Y + handleMargin,
+            right: TEMPLATE_02_HEADER_MARGIN_X + handleMargin,
+            textAlign: 'right',
+          }}
+        >
+          {handle}
+        </div>
+      )}
     </>
   );
 }
@@ -259,7 +275,12 @@ function TextColumn({
         height,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        // `safe center` = centralizado enquanto couber e, quando o texto passa
+        // da caixa, alinhado ao topo em vez de vazar para os dois lados. Sem o
+        // `safe`, um título grande sobe por cima do cabeçalho (medido: título a
+        // 120px começava em y=47, e o cabeçalho termina em y=62). É no-op quando
+        // o conteúdo cabe, então a fidelidade de 0px não se mexe.
+        justifyContent: 'safe center',
       }}
     >
       <div
@@ -291,10 +312,15 @@ const FOCUS_POSITION: Record<string, string> = {
   bottom: '50% 100%',
 };
 
-/** CSS do scrim da capa, montado com as paradas do spec. */
-function scrimCss(layers: Template02BackgroundLayer[]): string {
-  const scrim = layers.find((c) => c.tipo === 'gradient');
-  const stops = (scrim?.stops ?? [])
+/**
+ * CSS do scrim da capa.
+ *
+ * As paradas vêm de `TEMPLATE_02_DESIGN_TWEAKS.scrim`, que é desvio deliberado
+ * do spec pedido pelo Rafael — metade de cima limpa, escurecendo só a partir do
+ * meio. As paradas ORIGINAIS estão anotadas lá ao lado.
+ */
+function scrimCss(): string {
+  const stops = template02ScrimStops()
     .map((s) => `${s.color} ${Math.round(s.pos * 100)}%`)
     .join(', ');
   return `linear-gradient(180deg, ${stops})`;
@@ -339,80 +365,102 @@ function CoverBackground({
       )}
       <div
         data-slot="cover.scrim"
-        style={{ position: 'absolute', inset: 0, zIndex: 1, background: scrimCss(layers) }}
+        style={{ position: 'absolute', inset: 0, zIndex: 1, background: scrimCss() }}
       />
     </>
   );
 }
 
 /**
- * Headline da capa com o marcador lime.
+ * Headline da capa com o marcador.
  *
- * As quebras são MANUAIS (`\n`): cada linha vira um bloco de altura igual à
- * entrelinha. O marcador é procurado dentro de UMA linha — é o que garante a
- * regra do spec de que ele nunca cruza duas faixas. O texto sobre o lime fica
- * preto.
+ * As quebras são MANUAIS (`\n`): cada `\n` vira um bloco. O marcador é
+ * procurado dentro de UMA linha — é o que garante a regra do spec de que ele
+ * nunca cruza duas faixas — e o campo aceita VÁRIOS termos separados por
+ * vírgula, cada um virando uma tarja.
+ *
+ * 🔴 Duas coisas que este bloco NÃO pode fazer, e por quê:
+ *
+ * 1. **Travar a altura da linha.** Antes cada linha era um div com
+ *    `height: lineHeight`. Quando o texto do usuário não cabia na largura, o
+ *    navegador quebrava em duas linhas visuais, a segunda vazava da caixa
+ *    travada e caía POR CIMA da linha seguinte — texto sobre texto. Medido a
+ *    110px: `scrollHeight` 247 num div de 120. A altura agora é a natural, então
+ *    uma linha que quebra EMPURRA em vez de sobrepor.
+ * 2. **Crescer para baixo.** O bloco era ancorado pelo topo e crescia na direção
+ *    da pílula de CTA, que está a 223px do rodapé: a 110px sobravam 11.9px. Ele
+ *    agora pendura pela BASE e cresce para CIMA, onde só existe imagem — o mesmo
+ *    princípio do `anchor: 'bottom'` do Template 1, sem precisar do motor de lá
+ *    (aqui é um bloco só).
+ *
+ * A distância da base é a do desenho: com as 4 linhas do spec o topo cai
+ * exatamente em 755, então o gabarito continua a 0px.
  */
 function CoverHeadline({
   text,
   highlight,
-  top,
+  bottom,
   ov,
 }: {
   text: string;
   highlight: string;
-  top: number;
+  bottom: number;
   ov: Template02Overrides;
 }) {
   const style = textStyle('cover.headline', TEMPLATE_02_COLORS.surface, ov);
-  const lineHeight = template02TypeFor('cover.headline', TEMPLATE_02_COLORS.surface, ov).lineHeight;
-  const lines = text.split('\n');
-  const hlLine = template02HighlightLine(text, highlight);
-  // A cor do marcador acompanha o estilo do próprio marcador, que o usuário
-  // pode ter mexido; o fundo lime é do template.
-  const hlColor = template02TypeFor('cover.highlight', TEMPLATE_02_COLORS.ink, ov).color;
+  const marca = template02TypeFor('cover.highlight', TEMPLATE_02_COLORS.ink, ov);
+  const fundo = marca.background ?? TEMPLATE_02_HIGHLIGHT_COLOR;
+  // O destaque tem exatamente dois ajustes: fundo e fonte. A cor do texto é
+  // sempre automática para nunca perder contraste com o marcador.
+  const corDoTexto = template02HighlightTextColor(fundo);
+  const termos = template02HighlightTerms(highlight);
+
   return (
     <div
       data-slot="cover.headline"
       style={{
         position: 'absolute',
         left: 0,
-        top,
+        bottom,
         width: TEMPLATE_02_WIDTH,
         ...style,
         textAlign: 'center',
         zIndex: 2,
       }}
     >
-      {lines.map((line, i) => {
-        if (i !== hlLine) {
-          return (
-            <div key={i} style={{ height: lineHeight }}>
-              {line}
-            </div>
-          );
-        }
-        const at = line.indexOf(highlight);
-        return (
-          <div key={i} style={{ height: lineHeight }}>
-            {line.slice(0, at)}
-            <span
-              data-slot="cover.highlight"
-              style={{
-                background: TEMPLATE_02_COLORS.accent,
-                color: hlColor,
-                padding: '0 14px',
-                margin: '0 -2px',
-                boxDecorationBreak: 'clone',
-                WebkitBoxDecorationBreak: 'clone',
-              }}
-            >
-              {highlight}
-            </span>
-            {line.slice(at + highlight.length)}
-          </div>
-        );
-      })}
+      {text.split('\n').map((line, i) => (
+        <div key={i}>
+          {line === ''
+            ? '\u00A0'
+            : template02HighlightParts(line, termos).map((part, j) =>
+                part.marked ? (
+                  <span
+                    key={j}
+                    data-slot="cover.highlight"
+                    style={{
+                      background: fundo,
+                      color: corDoTexto,
+                      ...(marca.font
+                        ? {
+                            fontFamily: marca.font.fontFamily,
+                            fontWeight: marca.font.fontWeight,
+                            fontStyle: marca.font.fontStyle,
+                          }
+                        : {}),
+                      padding: '0 14px',
+                      margin: '0 -2px',
+                      boxDecorationBreak: 'clone',
+                      WebkitBoxDecorationBreak: 'clone',
+                    }}
+                  >
+                    {part.text}
+                  </span>
+                ) : (
+                  part.text
+                )
+              )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -453,7 +501,10 @@ export default function Template02Slide({ slide, globalSettings, slideIndex }: T
   // ao gabarito.
   const fmt = getFormat(globalSettings.format);
 
-  const ov = React.useMemo(() => template02Overrides(slide), [slide]);
+  const ov = React.useMemo(
+    () => template02Overrides(slide, globalSettings),
+    [slide, globalSettings]
+  );
 
   const slots: Template02Slots = slide.templateSlots ?? {};
   const value = (slot: string): string => {
@@ -492,7 +543,7 @@ export default function Template02Slide({ slide, globalSettings, slideIndex }: T
         <CoverHeadline
           text={value('cover.headline')}
           highlight={value('cover.highlight')}
-          top={tops.headline}
+          bottom={tops.headlineBottom}
           ov={ov}
         />
         {/* Sem chamada, a pílula some em vez de sair como uma cápsula branca

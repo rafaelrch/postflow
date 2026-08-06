@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { SlideStyle } from '@/types';
 import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import { normalizeHandle } from '@/lib/utils';
+import { duplicateCarouselPayload, duplicateSlidesPayload } from '@/lib/carousel-duplicate';
 import { handleProjectLimit } from '@/hooks/useUpgradeStore';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
@@ -89,6 +90,7 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
   const [carousels, setCarousels] = useState(initialCarousels);
   const [showWizard, setShowWizard] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -117,47 +119,70 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
   };
 
   const handleDuplicate = async (id: string) => {
+    if (duplicating) return;
+    setDuplicating(id);
     const supabase = createClient();
-    const { data: carousel } = await supabase
-      .from('carousels')
-      .select('*, slides(*)')
-      .eq('id', id)
-      .single();
-    if (!carousel) return;
 
-    const { data: newCarousel, error } = await supabase
-      .from('carousels')
-      .insert({
-        title: `${carousel.title} (cópia)`,
-        style: carousel.style,
-        theme: carousel.theme,
-        font_pair: carousel.font_pair,
-        accent_color: carousel.accent_color,
-        global_settings: carousel.global_settings,
-      })
-      .select()
-      .single();
+    try {
+      const { data: carousel, error: sourceError } = await supabase
+        .from('carousels')
+        .select('*, slides(*)')
+        .eq('id', id)
+        .single();
 
-    if (error || !newCarousel) {
-      // Teto de 5 carrosséis do plano free: nada foi apagado, abre upgrade.
-      if (handleProjectLimit(error)) return;
-      toast.error('Erro ao duplicar');
-      return;
-    }
+      if (sourceError || !carousel) {
+        toast.error('Não foi possível carregar o carrossel original');
+        return;
+      }
 
-    if (carousel.slides?.length) {
-      await supabase.from('slides').insert(
-        carousel.slides.map((sl: Record<string, unknown>) => ({
-          ...sl,
-          id: undefined,
-          carousel_id: newCarousel.id,
-        }))
+      const sourceSlides = (carousel.slides ?? []) as Record<string, unknown>[];
+      if (sourceSlides.length === 0) {
+        toast.error('Este carrossel não possui slides para duplicar');
+        return;
+      }
+
+      const { data: newCarousel, error } = await supabase
+        .from('carousels')
+        .insert(duplicateCarouselPayload(carousel))
+        .select()
+        .single();
+
+      if (error || !newCarousel) {
+        // Teto de 5 carrosséis do plano free: nada foi apagado, abre upgrade.
+        if (handleProjectLimit(error)) return;
+        toast.error('Erro ao duplicar');
+        return;
+      }
+
+      const { error: slidesError } = await supabase
+        .from('slides')
+        .insert(duplicateSlidesPayload(sourceSlides, newCarousel.id));
+
+      if (slidesError) {
+        // A cópia só existe se for completa. O cascade elimina qualquer slide
+        // parcial e evita um novo card de "0 slides" no dashboard.
+        await supabase.from('carousels').delete().eq('id', newCarousel.id);
+        toast.error('Não foi possível copiar os slides');
+        return;
+      }
+
+      const orderedSlides = [...sourceSlides].sort(
+        (a, b) => Number(a.position ?? 0) - Number(b.position ?? 0)
       );
-    }
+      const dashboardCopy = {
+        ...newCarousel,
+        slides: [{ count: sourceSlides.length }],
+        coverSlide: orderedSlides.find((slide) => Number(slide.position) === 0) ?? orderedSlides[0],
+      } as DashboardCarousel;
 
-    toast.success('Carrossel duplicado');
-    router.refresh();
-    setCarousels((prev) => [{ ...newCarousel, slides: carousel.slides, coverSlide: null }, ...prev]);
+      setCarousels((prev) => [dashboardCopy, ...prev]);
+      toast.success('Carrossel duplicado');
+      router.refresh();
+    } catch {
+      toast.error('Erro ao duplicar');
+    } finally {
+      setDuplicating(null);
+    }
   };
 
   const handleEdit = (id: string) => {
@@ -311,7 +336,11 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
                       <IconActionButton onClick={() => handleEdit(carousel.id)} title="Editar">
                         <Edit2 className="w-3.5 h-3.5" />
                       </IconActionButton>
-                      <IconActionButton onClick={() => handleDuplicate(carousel.id)} title="Duplicar">
+                      <IconActionButton
+                        onClick={() => handleDuplicate(carousel.id)}
+                        disabled={duplicating === carousel.id}
+                        title="Duplicar"
+                      >
                         <Copy className="w-3.5 h-3.5" />
                       </IconActionButton>
                       <IconActionButton

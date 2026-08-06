@@ -26,6 +26,7 @@ import {
   template02Overflows,
   template02SlotsForModel,
   template02Type,
+  template02Limits,
 } from '@/lib/templates/template-02';
 import { FORMAT_LIST, getFormat } from '@/lib/formats';
 import { TEMPLATE_SIDEBAR_CONFIG } from '@/components/editor/sidebar/panels';
@@ -196,7 +197,7 @@ describe('TEMPLATE 2 — slots', () => {
     ]);
   });
 
-  it('cada modelo expõe os seus slots mais o cabeçalho global', () => {
+  it('cada modelo expõe os seus slots mais o cabeçalho editável do card', () => {
     const cover = template02SlotsForModel(1).map((d) => d.slot);
     expect(cover).toEqual([
       'header.category',
@@ -217,16 +218,23 @@ describe('TEMPLATE 2 — slots', () => {
     }
   });
 
-  it('só o cabeçalho é global do deck', () => {
+  it('o cabeçalho tem painel próprio, mas continua salvo por slide', () => {
     for (const model of TEMPLATE_02_MODELS) {
       for (const d of template02SlotsForModel(model)) {
-        expect(d.scope, d.slot).toBe(d.slot.startsWith('header.') ? 'deck' : 'slide');
+        expect(d.scope, d.slot).toBe(d.slot.startsWith('header.') ? 'header' : 'slide');
       }
     }
   });
 
-  it('lê os limites de texto do spec, sem redigitar número', () => {
-    const limites = TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto;
+  it('lê os limites EFETIVOS (spec + ajuste medido), sem redigitar número', () => {
+    // Depois da fatia 5 alguns limites são ajuste deliberado — ver
+    // TEMPLATE_02_DESIGN_TWEAKS.limitesDeTexto. A barra, a auditoria e o prompt
+    // da IA têm de ler todos do MESMO lugar.
+    const limites = Object.fromEntries(
+      ['cover.headline', 'cover.cta', 'content.title', 'content.body', 'header.handle'].map(
+        (s) => [s, template02Limits(s)]
+      )
+    );
     const byslot = (model: number, slot: string) =>
       template02SlotsForModel(model).find((d) => d.slot === slot)!;
 
@@ -258,7 +266,7 @@ describe('TEMPLATE 2 — slots', () => {
     expect(template02DefaultSlots(1)['cover.cta']).toBeTruthy();
   });
 
-  it('o cabeçalho de um deck gerado é a marca do usuário, nunca a do spec', () => {
+  it('o helper legado converte a marca do usuário, nunca a do spec', () => {
     expect(template02HeaderSlots('Arke Studio', 'arkebranding')).toEqual({
       'header.category': 'ARKE STUDIO',
       'header.handle': '@ARKEBRANDING',
@@ -278,9 +286,9 @@ describe('TEMPLATE 2 — slide novo', () => {
       expect(texto).not.toContain('Barcelona');
       expect(texto).not.toContain('OANDRELONA');
       expect(texto).not.toContain('BRANDING & DESIGN');
-      // O cabeçalho é herdado do deck, não gerado.
-      expect(slots['header.category']).toBe('ARKE');
-      expect(slots['header.handle']).toBe('@ARKE');
+      // Cada slide nasce com seu próprio texto de exemplo editável.
+      expect(slots['header.category']).toBe('LOREM IPSUM');
+      expect(slots['header.handle']).toBe('@LOREMIPSUM');
       // A imagem fica vazia: quem escolhe é o usuário.
       expect(slots[template02ImageSlot(model)]).toBeUndefined();
     }
@@ -308,17 +316,20 @@ describe('TEMPLATE 2 — slide novo', () => {
 describe('TEMPLATE 2 — medição', () => {
   it('a headline é medida por LINHA, porque a quebra dela é manual', () => {
     const d = template02SlotsForModel(1).find((s) => s.slot === 'cover.headline')!;
+    const limite = d.maxCharsPerLine!;
     expect(template02Measure('POR QUE 9 EM CADA\nSTARTUPS ERRAM', d).over).toBe(false);
-    // 18 caracteres numa linha: vaza a caixa de 836px.
-    expect(template02Measure('POR QUE 9 EM CADA1', d).over).toBe(true);
+    // No limite passa; um caractere acima, não. O número em si é medido — ver
+    // TEMPLATE_02_DESIGN_TWEAKS.limitesDeTexto.
+    expect(template02Measure('A'.repeat(limite), d).over).toBe(false);
+    expect(template02Measure('A'.repeat(limite + 1), d).over).toBe(true);
     // 5 linhas colidem com o CTA.
     expect(template02Measure('A\nB\nC\nD\nE', d).over).toBe(true);
   });
 
   it('o corpo é medido pelo TOTAL de caracteres, porque quem quebra é o navegador', () => {
     const d = template02SlotsForModel(2).find((s) => s.slot === 'content.body')!;
-    expect(template02Measure('a'.repeat(220), d).over).toBe(false);
-    expect(template02Measure('a'.repeat(221), d).over).toBe(true);
+    expect(template02Measure('a'.repeat(d.maxChars!), d).over).toBe(false);
+    expect(template02Measure('a'.repeat(d.maxChars! + 1), d).over).toBe(true);
     // Dois parágrafos separados por \n\n continuam dentro da regra.
     expect(template02Measure('Um parágrafo.\n\nOutro parágrafo.', d).over).toBe(false);
   });
@@ -330,9 +341,10 @@ describe('TEMPLATE 2 — medição', () => {
   });
 
   it('acusa o slot que o usuário estourou, dizendo qual é', () => {
-    const over = template02Overflows(2, { 'content.title': 'a'.repeat(41) });
+    const limite = template02Limits('content.title').maxChar!;
+    const over = template02Overflows(2, { 'content.title': 'a'.repeat(limite + 1) });
     expect(over.map((o) => o.slot)).toEqual(['content.title']);
-    expect(over[0].maxChars).toBe(40);
+    expect(over[0].maxChars).toBe(limite);
   });
 });
 
@@ -396,12 +408,24 @@ describe('TEMPLATE 2 — capa', () => {
     expect(html).not.toContain('data-slot="cover.image"');
   });
 
-  it('monta o scrim com as quatro paradas do spec, na ordem', () => {
+  it('monta o scrim com as paradas do AJUSTE, na ordem', () => {
+    // Desvio deliberado pedido pelo Rafael: metade de cima limpa, base mais
+    // forte. As paradas do spec ficam anotadas em TEMPLATE_02_DESIGN_TWEAKS.
     const scrim = styles(markup(1))['cover.scrim'].background;
-    const bg = TEMPLATE_02_SPEC.layouts[0].background;
-    const stops = typeof bg === 'object' ? bg.camadas.find((c) => c.tipo === 'gradient')!.stops! : [];
-    expect(stops).toHaveLength(4);
-    for (const s of stops) expect(scrim).toContain(`${s.color} ${Math.round(s.pos * 100)}%`);
+    for (const s of TEMPLATE_02_DESIGN_TWEAKS.scrim.stops) {
+      expect(scrim).toContain(`${s.color} ${Math.round(s.pos * 100)}%`);
+    }
+    // E a parada de topo do spec NÃO está mais lá.
+    expect(scrim).not.toContain('rgba(0,0,0,0.60) 0%');
+  });
+
+  it('a metade de cima do scrim é transparente', () => {
+    const stops = TEMPLATE_02_DESIGN_TWEAKS.scrim.stops;
+    // "pelo menos até a metade do card" — palavras do Rafael.
+    for (const s of stops.filter((x) => x.pos <= 0.5)) expect(s.color).toBe('rgba(0,0,0,0)');
+    // "um pouco mais forte da base": a base fecha acima do .96 do spec.
+    expect(stops[stops.length - 1].color).toBe('rgba(0,0,0,1)');
+    expect(TEMPLATE_02_DESIGN_TWEAKS.scrim.spec[0].color).toBe('rgba(0,0,0,0.60)');
   });
 
   it('a imagem da capa é full-bleed sob o scrim', () => {
@@ -451,7 +475,9 @@ describe('TEMPLATE 2 — slides internos', () => {
     const col = styles(markup(2))['content.column'];
     expect(col.display).toBe('flex');
     expect(col['flex-direction']).toBe('column');
-    expect(col['justify-content']).toBe('center');
+    // `safe center`: centralizado enquanto couber, alinhado ao topo quando o
+    // texto passa da caixa — senão um título grande sobe por cima do cabeçalho.
+    expect(col['justify-content']).toBe('safe center');
     // O container é o MESMO do bloco de imagem: é daí que sai o centro em 691.5.
     expect(col.top).toBe('147px');
     expect(col.height).toBe('1089px');
@@ -493,7 +519,7 @@ describe('TEMPLATE 2 — formato', () => {
   it('4:5 é NO-OP: bate número a número com o spec', () => {
     const g = TEMPLATE_02_GRID;
     expect(template02ContentBox(1350)).toEqual({ top: g.contentTop, height: g.contentHeight });
-    expect(template02CoverTops(1350)).toEqual({ headline: 755, pill: 1127 });
+    expect(template02CoverTops(1350)).toMatchObject({ headline: 755, pill: 1127 });
 
     const conteudo = styles(markup(2, undefined, '4:5'));
     expect(conteudo['content.image']).toMatchObject({
@@ -503,7 +529,11 @@ describe('TEMPLATE 2 — formato', () => {
       'border-radius': '17px',
     });
     const capa = styles(markup(1, undefined, '4:5'));
-    expect(capa['cover.headline'].top).toBe('755px');
+    // A headline pendura pela BASE e cresce para cima (ver `CoverHeadline`). A
+    // distância é a do desenho: com as 4 linhas do spec o topo cai em 755.
+    const t = template02Type('coverHeadline');
+    expect(capa['cover.headline'].bottom).toBe(`${template02CoverTops(1350).headlineBottom}px`);
+    expect(1350 - template02CoverTops(1350).headlineBottom - 4 * t.lineHeight).toBeCloseTo(755, 6);
     expect(capa['cover.cta'].top).toBe('1127px');
   });
 
@@ -531,7 +561,10 @@ describe('TEMPLATE 2 — formato', () => {
       expect(h - tops.headline, id).toBe(595); // 1350 − 755
       expect(h - tops.pill, id).toBe(223); // 1350 − 1127
       const s = styles(markup(1, undefined, id));
-      expect(s['cover.headline'].top).toBe(`${tops.headline}px`);
+      // A base da headline é absoluta e igual em todo formato — é o que mantém
+      // o vão para a pílula constante.
+      expect(s['cover.headline'].bottom).toBe(`${tops.headlineBottom}px`);
+      expect(tops.headlineBottom, id).toBe(template02CoverTops(1350).headlineBottom);
       expect(s['cover.cta'].top).toBe(`${tops.pill}px`);
     }
   });

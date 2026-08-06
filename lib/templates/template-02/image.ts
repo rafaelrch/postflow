@@ -1,4 +1,4 @@
-import { Slide } from '@/types';
+import { DEFAULT_IMAGE_POSITION, Slide } from '@/types';
 import { template02ImageSlot } from './index';
 
 /**
@@ -27,6 +27,9 @@ import { template02ImageSlot } from './index';
 export function template02SetImage(slide: Slide, model: number, url: string): Partial<Slide> {
   return {
     templateSlots: { ...(slide.templateSlots ?? {}), [template02ImageSlot(model)]: url },
+    ...(model === 1
+      ? { imagePosition: { ...DEFAULT_IMAGE_POSITION } }
+      : { contentImagePosition: { ...DEFAULT_IMAGE_POSITION } }),
     // Os genéricos não são lidos pelo T2. Zerá-los evita que um deck que trocou
     // de estilo carregue uma imagem invisível que reaparece se alguém voltar.
     backgroundImageUrl: '',

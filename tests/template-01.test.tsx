@@ -538,6 +538,31 @@ describe('TEMPLATE 1 — overrides do editor', () => {
     expect(ov.hideCorners).toBe(false);
   });
 
+  it('tipografia e margem globais entram nos dois cantos sem apagar a cor do slide', () => {
+    const ov = template01Overrides(
+      {
+        ...slideBase,
+        templateSlotStyles: { 'cantos.left': { color: '#FF0000', fontSize: 12 } },
+      },
+      {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        templateCornerStyle: { font: 'Inter Display Bold', fontSize: 30, margin: 18 },
+      }
+    );
+
+    expect(ov.slotStyles['cantos.left']).toMatchObject({
+      color: '#FF0000',
+      font: 'Inter Display Bold',
+      fontSize: 30,
+      margin: 18,
+    });
+    expect(ov.slotStyles['cantos.right']).toMatchObject({
+      font: 'Inter Display Bold',
+      fontSize: 30,
+      margin: 18,
+    });
+  });
+
   it('sem override, o render é o do spec', () => {
     const headline = TEMPLATE_01_SPEC.slides[0].nodes.find((n) => n.slot === 's1.headline')!;
     const html = renderSlide(0);
@@ -1094,7 +1119,7 @@ describe('TEMPLATE 1 — cantos nos 6 slides', () => {
     }
   });
 
-  it('o switch desliga os cantos nos 6 slides de uma vez — é controle do deck', () => {
+  it('mantém compatibilidade com o antigo switch global de cantos', () => {
     for (let i = 0; i < TEMPLATE_01_SLIDE_COUNT; i++) {
       const html = renderToStaticMarkup(
         <Template01Slide
@@ -1112,7 +1137,7 @@ describe('TEMPLATE 1 — cantos nos 6 slides', () => {
   });
 
   it('os cantos novos nascem LIGADOS, como os dos slides 3/5/6', () => {
-    // `show` ausente/true = ligado; é o padrão do editor e vale para o deck.
+    // `show` ausente/true = ligado; é também o fallback para decks antigos.
     expect(DEFAULT_CORNERS.show).not.toBe(false);
     expect(renderSlide(0)).toContain('data-slot="cantos.left"');
   });

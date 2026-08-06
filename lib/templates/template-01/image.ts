@@ -1,5 +1,5 @@
-import { Slide } from '@/types';
-import { template01ImageSlot } from './index';
+import { DEFAULT_IMAGE_POSITION, Slide } from '@/types';
+import { template01ImageSlot, template01SlideMedia } from './index';
 
 /**
  * Fonte única da imagem de um slide do TEMPLATE 1.
@@ -25,8 +25,11 @@ import { template01ImageSlot } from './index';
 export function template01SetImage(slide: Slide, model: number, url: string): Partial<Slide> {
   const slot = template01ImageSlot(model);
   if (!slot) return {};
+  const media = template01SlideMedia(model);
   return {
     templateSlots: { ...(slide.templateSlots ?? {}), [slot]: url },
+    ...(media.background ? { imagePosition: { ...DEFAULT_IMAGE_POSITION } } : {}),
+    ...(media.content ? { contentImagePosition: { ...DEFAULT_IMAGE_POSITION } } : {}),
     // Os genéricos existem só como fallback de deck antigo. Deixá-los
     // preenchidos aqui recriaria a segunda verdade que este módulo elimina.
     backgroundImageUrl: '',

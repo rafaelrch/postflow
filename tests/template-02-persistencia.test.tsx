@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Template02Slide from '@/components/slides/Template02Slide';
 import SlidePreview from '@/components/editor/SlidePreview';
-import { mapDbSlideToSlide, mapSlideToDbRow } from '@/lib/slide-mapper';
+import {
+  mapDbCarouselToGlobalSettings,
+  mapDbSlideToSlide,
+  mapSlideToDbRow,
+} from '@/lib/slide-mapper';
 import {
   template02HeaderSlots,
   template02ModelAt,
@@ -54,6 +58,19 @@ function markup(slide: Slide, index: number): string {
 }
 
 describe('TEMPLATE 2 — ida e volta do banco', () => {
+  it('reabre a tipografia e a margem globais dos cantos', () => {
+    const settings = mapDbCarouselToGlobalSettings({
+      global_settings: {
+        templateCornerStyle: { font: 'Inter Display Bold', fontSize: 30, margin: 18 },
+      },
+    });
+    expect(settings.templateCornerStyle).toEqual({
+      font: 'Inter Display Bold',
+      fontSize: 30,
+      margin: 18,
+    });
+  });
+
   it('o slide gerado desenha IGUAL depois de salvar e reabrir', () => {
     for (let i = 0; i < 5; i++) {
       const antes = slideGerado(i);

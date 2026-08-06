@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import EditorSidebar from '@/components/editor/EditorSidebar';
 import SlideCanvas from '@/components/editor/SlideCanvas';
 import HiddenSlides from '@/components/editor/HiddenSlides';
@@ -14,6 +15,7 @@ import { createClient } from '@/lib/supabase';
 import { Slide, SlideStyle } from '@/types';
 import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import toast from 'react-hot-toast';
+import GeneratorLoading from '@/components/editor/GeneratorLoading';
 
 export default function GeneratorClient() {
   const searchParams = useSearchParams();
@@ -21,12 +23,22 @@ export default function GeneratorClient() {
 
   const {
     slides, activeSlideIndex, saveStatus,
-    setActiveSlideIndex, addSlide, removeSlide,
-    loadCarousel,
+    setActiveSlideIndex, loadCarousel,
   } = useEditorStore();
 
   const [showWizard, setShowWizard] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [loadedCarouselId, setLoadedCarouselId] = useState<string | null>(null);
+  const [failedCarouselId, setFailedCarouselId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
+
+  // Derivado do id da URL: se o usuário trocar de carrossel sem desmontar a
+  // rota, o loading entra já no primeiro render — não há um frame do deck velho.
+  const loadState = !carouselIdParam || loadedCarouselId === carouselIdParam
+    ? 'ready'
+    : failedCarouselId === carouselIdParam
+      ? 'error'
+      : 'loading';
 
   const { saveNow } = useAutoSave();
   const { registerSlideRef, downloadSlide, downloadAll } = useExport();
@@ -34,21 +46,39 @@ export default function GeneratorClient() {
   // ── Load carousel from URL param ──────────────────────────────────────────
   useEffect(() => {
     if (!carouselIdParam) return;
+
+    let cancelled = false;
+    setFailedCarouselId(null);
+    setLoadError('');
+
     const load = async () => {
       const supabase = createClient();
-      const { data: carousel } = await supabase
+      const { data: carousel, error } = await supabase
         .from('carousels')
         .select('*, slides(*)')
         .eq('id', carouselIdParam)
         .single();
 
-      if (!carousel) { toast.error('Carrossel não encontrado'); return; }
+      if (cancelled) return;
+      if (error || !carousel) {
+        setLoadError('Carrossel não encontrado.');
+        setFailedCarouselId(carouselIdParam);
+        toast.error('Carrossel não encontrado');
+        return;
+      }
 
-      const sortedSlides: Slide[] = (carousel.slides || [])
+      const sortedSlides: Slide[] = [...(carousel.slides || [])]
         .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
           (a.position as number) - (b.position as number)
         )
         .map((sl: Record<string, unknown>) => mapDbSlideToSlide(sl));
+
+      if (sortedSlides.length === 0) {
+        setLoadError('Este carrossel não possui slides salvos.');
+        setFailedCarouselId(carouselIdParam);
+        toast.error('Este carrossel não possui slides');
+        return;
+      }
 
       const globalSettings = mapDbCarouselToGlobalSettings(carousel);
 
@@ -61,13 +91,17 @@ export default function GeneratorClient() {
         caption:        (carousel.caption   as string)   || '',
         hashtags:       (carousel.hashtags  as string[]) || [],
       });
+      setLoadedCarouselId(carouselIdParam);
     };
-    load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carouselIdParam]);
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [carouselIdParam, loadCarousel]);
 
   // ── Auto-save: 2,5s após a última edição, salva sozinho ──────────────────
   useEffect(() => {
+    if (loadState !== 'ready') return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = useEditorStore.subscribe((state) => {
       if (state.saveStatus !== 'unsaved') return;
@@ -78,11 +112,11 @@ export default function GeneratorClient() {
       if (timer) clearTimeout(timer);
       unsub();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadState, saveNow]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
+    if (loadState !== 'ready') return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -106,14 +140,35 @@ export default function GeneratorClient() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSlideIndex, slides.length, setActiveSlideIndex]);
+  }, [activeSlideIndex, loadState, saveNow, slides.length, setActiveSlideIndex]);
 
   // ── Manual save ───────────────────────────────────────────────────────────
   const handleManualSave = async () => {
     await saveNow();
     toast.success('Carrossel salvo!');
   };
+
+  if (loadState === 'loading') return <GeneratorLoading />;
+
+  if (loadState === 'error') {
+    return (
+      <div className="h-full flex items-center justify-center p-8" style={{ background: 'var(--paper)' }}>
+        <div className="brand-card max-w-md w-full p-8 text-center">
+          <h1 className="font-display text-2xl" style={{ color: 'var(--ink)' }}>
+            Não foi possível abrir
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--ink-dim)' }}>{loadError}</p>
+          <Link
+            href="/dashboard"
+            className="mt-6 inline-flex rounded-lg px-4 py-2 text-sm font-semibold"
+            style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+          >
+            Voltar aos carrosséis
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

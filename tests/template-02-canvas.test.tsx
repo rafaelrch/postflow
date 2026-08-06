@@ -104,19 +104,27 @@ describe('TEMPLATE 2 — popup de modelo', () => {
     expect(screen.getAllByTestId('t02-model-suggested')).toHaveLength(1);
   });
 
-  it('escolher um modelo cria o slide com `templateModel` GRAVADO', () => {
+  it('clicar no modelo só seleciona; o slide nasce apenas ao confirmar', () => {
     montaDeck(TEMPLATE_02_DEFAULT_MODELS);
     clicaAdicionar();
+    const antes = useEditorStore.getState().slides.length;
     fireEvent.click(screen.getByTestId('t02-model-preview-3'));
+
+    expect(useEditorStore.getState().slides).toHaveLength(antes);
+    const selecionado = screen.getByTestId('t02-model-preview-3').closest('button')!;
+    expect(selecionado.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar card' }));
 
     const { slides } = useEditorStore.getState();
     expect(slides).toHaveLength(6);
     const novo = slides[5];
     // Sem isto o desenho voltaria a sair da posição.
     expect(novo.templateModel).toBe(3);
-    // E o cabeçalho é herdado do deck, não inventado.
-    expect(novo.templateSlots?.['header.category']).toBe('ARKE STUDIO');
-    expect(novo.templateSlots?.['header.handle']).toBe('@ARKEBRANDING');
+    // O cabeçalho nasce editável e independente dos demais slides.
+    expect(novo.templateSlots?.['header.category']).toBe('LOREM IPSUM');
+    expect(novo.templateSlots?.['header.handle']).toBe('@LOREMIPSUM');
     // Texto de exemplo, nunca a copy do spec.
     expect(JSON.stringify(novo.templateSlots)).not.toContain('Barcelona');
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -137,5 +145,20 @@ describe('TEMPLATE 1 — o popup dele continua o de sempre', () => {
     expect(screen.getByTestId('t01-model-preview-6')).toBeTruthy();
     expect(screen.queryByTestId('t02-model-suggested')).toBeNull();
     expect(screen.queryByTestId('t02-model-preview-1')).toBeNull();
+  });
+
+  it('também exige confirmação antes de adicionar o card', () => {
+    montaDeck([1, 2, 3], 'template01');
+    clicaAdicionar();
+    const antes = useEditorStore.getState().slides.length;
+
+    fireEvent.click(screen.getByTestId('t01-model-preview-4'));
+    expect(useEditorStore.getState().slides).toHaveLength(antes);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar card' }));
+    const novo = useEditorStore.getState().slides.at(-1)!;
+    expect(novo.templateModel).toBe(4);
+    expect(novo.templateSlots?.['cantos.left']).toBe('LOREM IPSUM');
+    expect(novo.templateSlots?.['cantos.right']).toBe('@LOREMIPSUM');
   });
 });

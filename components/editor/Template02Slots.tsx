@@ -2,123 +2,163 @@
 
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { cn } from '@/lib/utils';
-import { helpCls, inputCls, labelCls, numericCls } from './sidebar/tokens';
+import { inputCls, labelCls, numericCls } from './sidebar/tokens';
 import {
   Template02SlotDescriptor,
-  template02HighlightLine,
+  template02HighlightTerms,
   template02Measure,
   template02ModelOf,
   template02TextSlotsForModel,
 } from '@/lib/templates/template-02';
 
-/**
- * Conteúdo de TEXTO do TEMPLATE 2 — um campo por slot do modelo ativo.
- *
- * Só o texto do SLIDE mora aqui. O cabeçalho (categoria e @) é do deck inteiro e
- * tem painel próprio; a imagem tem o painel "Imagem". Juntar tudo aqui repetiria
- * o problema que a barra do Template 1 foi refatorada para acabar: dois painéis
- * com o mesmo nome, um com o texto e outro com a aparência.
- *
- * A forma continua imutável — não há controle de posição de propósito. O que
- * existe é o limite do spec: estourar não deixa "apertado", empurra o desenho.
- */
+interface HeadlineWord {
+  display: string;
+  value: string;
+  normalized: string;
+}
+
+function cleanHeadlineWord(word: string): string {
+  return word.replace(/^[^\p{L}\p{N}@#]+|[^\p{L}\p{N}@#]+$/gu, '') || word;
+}
+
+function normalizeHeadlineWord(word: string): string {
+  return cleanHeadlineWord(word).toLocaleLowerCase('pt-BR');
+}
+
+function headlineWords(headline: string): HeadlineWord[] {
+  return headline
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((display) => {
+      const value = cleanHeadlineWord(display);
+      return { display, value, normalized: normalizeHeadlineWord(value) };
+    });
+}
+
+/** Conteúdo de texto do Template 2, um controle por slot do modelo ativo. */
 export default function Template02Slots() {
   const { slides, activeSlideIndex, updateActiveSlide } = useEditorStore();
   const slide = slides[activeSlideIndex];
   if (!slide) return null;
 
   const slots = slide.templateSlots ?? {};
-  // Os campos são os do MODELO do slide, não os da posição dele: o deck não tem
-  // tamanho fixo e o usuário pode reordenar à vontade.
   const model = template02ModelOf(slide, activeSlideIndex);
   const textSlots = template02TextSlotsForModel(model);
 
   const setSlot = (slot: string, value: string) =>
     updateActiveSlide({ templateSlots: { ...slots, [slot]: value } });
 
-  const headline = slots['cover.headline'] ?? '';
-  const highlight = slots['cover.highlight'] ?? '';
+  const headlineDescriptor = textSlots.find((descriptor) => descriptor.slot === 'cover.headline');
+  const highlightDescriptor = textSlots.find((descriptor) => descriptor.slot === 'cover.highlight');
+  const headline = slots['cover.headline'] ?? headlineDescriptor?.defaultValue ?? '';
+  const highlight = slots['cover.highlight'] ?? highlightDescriptor?.defaultValue ?? '';
+  const words = headlineWords(headline);
+  const selectedWords = new Set(
+    template02HighlightTerms(highlight)
+      .flatMap((term) => term.split(/\s+/))
+      .filter(Boolean)
+      .map(normalizeHeadlineWord)
+  );
 
-  /** Contador do campo, na língua do limite que de fato prende aquele slot. */
-  const counter = (d: Template02SlotDescriptor, value: string) => {
-    const m = template02Measure(value, d);
-    if (d.maxCharsPerLine != null) {
+  const toggleHighlight = (word: HeadlineWord) => {
+    const nextSelected = new Set(selectedWords);
+    if (nextSelected.has(word.normalized)) nextSelected.delete(word.normalized);
+    else nextSelected.add(word.normalized);
+
+    const seen = new Set<string>();
+    const ordered = words.flatMap((candidate) => {
+      if (!nextSelected.has(candidate.normalized) || seen.has(candidate.normalized)) return [];
+      seen.add(candidate.normalized);
+      return [candidate.value];
+    });
+    setSlot('cover.highlight', ordered.join(', '));
+  };
+
+  const counter = (descriptor: Template02SlotDescriptor, value: string) => {
+    const measurement = template02Measure(value, descriptor);
+    if (descriptor.maxCharsPerLine != null) {
       return {
-        over: m.over,
+        over: measurement.over,
         text: [
-          d.maxLines != null && `${m.lines}/${d.maxLines} linhas`,
-          `${m.longestLine}/${d.maxCharsPerLine} car. na maior linha`,
+          descriptor.maxLines != null && `${measurement.lines}/${descriptor.maxLines} linhas`,
+          `${measurement.longestLine}/${descriptor.maxCharsPerLine} car. na maior linha`,
         ]
           .filter(Boolean)
           .join(' · '),
       };
     }
     return {
-      over: m.over,
-      text: d.maxChars != null ? `${m.chars}/${d.maxChars} car.` : `${m.chars} car.`,
+      over: measurement.over,
+      text:
+        descriptor.maxChars != null
+          ? `${measurement.chars}/${descriptor.maxChars} car.`
+          : `${measurement.chars} car.`,
     };
   };
 
   return (
     <>
-      {textSlots.map((d) => {
-        const value = slots[d.slot] ?? d.defaultValue;
-        const m = counter(d, value);
-        // Texto de fábrica não é acusado — ver `template02Overflows`.
-        const over = m.over && value !== d.defaultValue;
+      {textSlots.map((descriptor) => {
+        if (descriptor.slot === 'cover.highlight') {
+          return (
+            <div key={descriptor.slot} className="space-y-2">
+              <span className={labelCls}>{descriptor.label}</span>
+              <div
+                role="group"
+                aria-label="Palavras em destaque"
+                className="flex flex-wrap gap-1.5"
+              >
+                {words.map((word, index) => {
+                  const selected = selectedWords.has(word.normalized);
+                  return (
+                    <button
+                      key={`${word.display}-${index}`}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => toggleHighlight(word)}
+                      className={cn(
+                        'rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors',
+                        selected
+                          ? 'border-[#C9D900] bg-[#EFFF00] text-black'
+                          : 'border-black/[0.08] bg-black/[0.025] text-gray-900/55 hover:border-black/20 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/55 dark:hover:border-white/20'
+                      )}
+                    >
+                      {word.display}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        const value = slots[descriptor.slot] ?? descriptor.defaultValue;
+        const measurement = counter(descriptor, value);
+        const over = measurement.over && value !== descriptor.defaultValue;
         const lines = value.split('\n').length;
 
-        // O marcador só aparece no slide se o trecho estiver contido em UMA
-        // linha do headline. Sem este aviso ele simplesmente não desenha e o
-        // usuário não tem como descobrir por quê.
-        const highlightMissing =
-          d.slot === 'cover.highlight' &&
-          value.trim() !== '' &&
-          template02HighlightLine(headline || d.defaultValue, value) === -1;
-
         return (
-          <div key={d.slot} className="space-y-1">
+          <div key={descriptor.slot} className="space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <span className={labelCls}>{d.label}</span>
-              <span className={cn(numericCls, over && 'text-red-500 font-semibold')}>{m.text}</span>
+              <span className={labelCls}>{descriptor.label}</span>
+              <span className={cn(numericCls, over && 'text-red-500 font-semibold')}>
+                {measurement.text}
+              </span>
             </div>
 
             <textarea
               value={value}
-              onChange={(e) => setSlot(d.slot, e.target.value)}
-              rows={d.multiline ? Math.min(Math.max(lines + 2, 4), 12) : 2}
-              className={cn(
-                inputCls,
-                'resize-y leading-relaxed',
-                (over || highlightMissing) && 'border-red-500/60'
-              )}
+              onChange={(event) => setSlot(descriptor.slot, event.target.value)}
+              rows={
+                descriptor.slot === 'cover.headline'
+                  ? Math.min(Math.max(lines + 3, 8), 14)
+                  : descriptor.multiline
+                    ? Math.min(Math.max(lines + 2, 4), 12)
+                    : 2
+              }
+              className={cn(inputCls, 'resize-y leading-relaxed', over && 'border-red-500/60')}
             />
 
-            {/* A quebra da capa é DECISÃO do usuário, não do navegador: o spec
-                manda quebrar por sentido. Se a interface não disser isso, ele
-                escreve corrido e o template quebra onde couber. */}
-            {d.slot === 'cover.headline' && (
-              <p className={helpCls}>
-                Enter quebra a linha, e é você que decide onde. Quebre por sentido — nunca deixe
-                uma linha com uma palavra só.
-              </p>
-            )}
-            {d.slot === 'content.body' && (
-              <p className={helpCls}>Deixe uma linha em branco para separar parágrafos.</p>
-            )}
-            {d.slot === 'cover.highlight' && !highlightMissing && (
-              <p className={helpCls}>
-                O trecho precisa estar escrito no título, numa linha só — é ele que ganha o
-                marcador amarelo.
-              </p>
-            )}
-
-            {highlightMissing && (
-              <p className="text-[11px] text-red-500">
-                Este trecho não está em nenhuma linha do título, então o marcador não aparece.
-                Escreva exatamente como está lá — e sem atravessar a quebra de linha.
-              </p>
-            )}
             {over && (
               <p className="text-[11px] text-red-500">
                 Estourou o limite do slot — o texto vai furar a composição.
@@ -127,15 +167,6 @@ export default function Template02Slots() {
           </div>
         );
       })}
-
-      {/* Sem marcador nenhum a capa perde a ênfase que o template inteiro foi
-          desenhado para ter. O spec pede exatamente 1 por carrossel. */}
-      {model === 1 && highlight.trim() === '' && (
-        <p className={helpCls}>
-          Sem destaque, a capa sai sem o marcador amarelo. Escolha a palavra que carrega a
-          tensão da frase.
-        </p>
-      )}
     </>
   );
 }

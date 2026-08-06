@@ -206,16 +206,98 @@ export const TEMPLATE_02_DESIGN_TWEAKS = {
     stack: "'ivyora-text', 'T01Serif', serif",
     motivo: 'Rafael tem a licença da IvyOra; o Typekit já serve `ivyora-text`.',
   },
+
+  /**
+   * Paradas do scrim da capa.
+   *
+   * spec (`layouts[0].background.camadas[1].stops`):
+   *   0% rgba(0,0,0,.60) · 22% .25 · 62% .75 · 100% .96
+   *
+   * Pedido do Rafael, palavras dele: *"deixe menor, pelo menos até a metade do
+   * card. Deixe um pouco mais forte da base e até o final mais transparente."*
+   * Ou seja: metade de cima limpa, escurecendo só a partir do meio e chegando
+   * mais forte na base do que os .96 de hoje.
+   *
+   * ⚠️ CUSTO MEDIDO: a parada de topo do spec existia para o CABEÇALHO — sem
+   * ela o texto passa a sentar na foto crua. O contraste foi medido depois da
+   * troca e está no relatório da fatia 5; a decisão de aceitar é do Rafael.
+   */
+  scrim: {
+    spec: [
+      { pos: 0, color: 'rgba(0,0,0,0.60)' },
+      { pos: 0.22, color: 'rgba(0,0,0,0.25)' },
+      { pos: 0.62, color: 'rgba(0,0,0,0.75)' },
+      { pos: 1, color: 'rgba(0,0,0,0.96)' },
+    ],
+    stops: [
+      { pos: 0, color: 'rgba(0,0,0,0)' },
+      // Metade de cima inteiramente limpa — "pelo menos até a metade do card".
+      { pos: 0.5, color: 'rgba(0,0,0,0)' },
+      // Base mais forte que o spec (.96 → 1), e o escurecimento acelera no
+      // último quarto para não subir cedo demais na foto.
+      { pos: 0.78, color: 'rgba(0,0,0,0.45)' },
+      { pos: 1, color: 'rgba(0,0,0,1)' },
+    ],
+    motivo: 'Pedido do Rafael em 05/08/2026 — degradê ocupando só a metade de baixo.',
+  },
+
+  /**
+   * Limites de texto que substituem os de `regrasDeGeracao.limitesDeTexto`.
+   *
+   * 🔴 Não são chute: cada número saiu de MEDIÇÃO no Chromium, com a face, o
+   * corpo e o tracking reais, na caixa que o render de fato desenha.
+   *
+   * `cover.headline` — spec: 17 car./linha, "medido em Inter Bold 76.55 / caixa
+   * 836px". **A caixa está errada**: o render (e o próprio `generate.py`)
+   * desenha a headline em `left:0; width:1080`, não numa caixa de 836. Medido a
+   * 76.5495px / tracking -4.593 / Inter Bold:
+   *   · "SEM GRITAR EM ANÚNCIOS QUE NINGUÉM LÊ NO FEED" → 25 car. em 1080 (19 em 836)
+   *   · "POR QUE 9 EM CADA 10 STARTUPS ERRAM A IDENTIDADE" → 26 car. em 1080 (21 em 836)
+   * O limite vira 25: o menor dos dois, para o contador avisar antes de quebrar.
+   *
+   * `content.title` / `content.body` — os totais do spec (40 e 220) estão
+   * CERTOS para a contagem de linhas que ele assume: medidos na coluna de 409px
+   * dão ~13 car./linha no título (×3 = 40) e ~25 no corpo (×9 = 225). O que
+   * afrouxa aqui é o ORÇAMENTO VERTICAL, que sobrava:
+   *   título 3 linhas (239.6) + vão 31.74 + corpo 9 linhas (376.1) = 647.4px
+   *   num container de 1089px — 441.6px ociosos.
+   * Com 4 linhas de título e 12 de corpo: 319.4 + 31.74 + 501.4 = 852.5px, ainda
+   * 236px de folga. Daí 4×13 = 52 e 12×25 = 300.
+   */
+  limitesDeTexto: {
+    'cover.headline': { maxCharPorLinha: 25, maxLinhas: 4 },
+    'content.title': { maxChar: 52, maxLinhas: 4 },
+    'content.body': { maxChar: 300, maxLinhas: 12 },
+  } as Record<string, Template02Limits>,
 } as const;
+
+/** Paradas do scrim que o render usa: as do ajuste, com as do spec de lado. */
+export function template02ScrimStops(): { pos: number; color: string }[] {
+  return TEMPLATE_02_DESIGN_TWEAKS.scrim.stops.map((s) => ({ ...s }));
+}
+
+/**
+ * Limites EFETIVOS de um slot: os do spec, com o ajuste por cima.
+ *
+ * Fonte única — a barra lateral, a auditoria de estouro e o addendum da IA leem
+ * todos daqui. Um deles lendo o spec cru mostraria número diferente dos outros.
+ */
+export function template02Limits(slot: string): Template02Limits {
+  return {
+    ...(TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto[slot] ?? {}),
+    ...(TEMPLATE_02_DESIGN_TWEAKS.limitesDeTexto[slot] ?? {}),
+  };
+}
 
 /**
  * DIVERGÊNCIAS CONHECIDAS CONTRA O GABARITO (`scripts/generate.py` da skill).
  *
  * Quem rodar o `generate.py` e comparar com o app VAI ver diferença. São estas
- * três, todas deliberadas e todas já decididas — a lista existe para ninguém
- * recomeçar a investigação. Fora daqui, a conferência de 05/08/2026 mediu
+ * quatro, todas deliberadas e todas já decididas — a lista existe para ninguém
+ * recomeçar a investigação. Antes da S5, a conferência de 05/08/2026 mediu
  * **0.00px** em toda a geometria do spec (bloco de imagem, coluna de texto,
- * container da headline, pílula de CTA, scrim, canvas).
+ * container da headline, pílula de CTA e canvas). A S5 preserva essa geometria,
+ * mas troca deliberadamente os pixels do scrim.
  *
  * O critério, então, é: 0px contra o gabarito EXCETO nos três itens abaixo.
  */
@@ -251,6 +333,15 @@ export const TEMPLATE_02_GABARITO_DIVERGENCES = [
       'É limitação do gabarito, não decisão de desenho. Efeito visível: o corpo quebra em ' +
       'MENOS linhas que no PNG de referência, ou seja, os limites de caractere do spec ' +
       'continuam valendo com folga e nunca estouram. Decidido pelo Orquestrador em 05/08/2026.',
+  },
+  {
+    o_que: 'scrim da capa',
+    gabarito: '0% .60 · 22% .25 · 62% .75 · 100% .96',
+    aqui: '0% e 50% transparentes · 78% .45 · 100% 1',
+    porque:
+      'Rafael pediu o degradê apenas na metade de baixo e mais forte na base. ' +
+      'O custo de contraste do cabeçalho sobre foto clara foi medido e está documentado ' +
+      'em docs/template-02-integracao.md. Decidido por Rafael em 05/08/2026.',
   },
 ] as const;
 
@@ -423,13 +514,34 @@ const COVER_HEADLINE_BOTTOM = TEMPLATE_02_HEIGHT - 755;
 const COVER_PILL_BOTTOM = TEMPLATE_02_HEIGHT - 1127;
 
 /**
- * `top` da headline e da pílula de CTA da capa. As duas são ancoradas ao RODAPÉ:
- * a imagem e o scrim são full-bleed e acompanham a altura, mas a composição de
- * texto encosta embaixo.
+ * Distância da BASE da headline ao rodapé.
+ *
+ * O bloco pendura pela base e cresce para cima, não para baixo: crescer para
+ * baixo o joga contra a pílula de CTA (ver o comentário do `CoverHeadline`). O
+ * número é derivado do desenho — com as `linhas` que o spec desenha, a base fica
+ * em `755 + linhas × entrelinha`, então o topo de uma headline do tamanho do
+ * gabarito continua caindo exatamente em 755 e a fidelidade não se mexe.
  */
-export function template02CoverTops(height: number): { headline: number; pill: number } {
+const COVER_HEADLINE_BASE = (() => {
+  const el = TEMPLATE_02_SPEC.layouts[0].elementos.find((e) => e.id === 'cover.headline');
+  const linhas = (el as { linhas?: number } | undefined)?.linhas ?? 4;
+  return TEMPLATE_02_HEIGHT - (755 + linhas * TEMPLATE_02_SPEC.tokens.typeScale.coverHeadline.lineHeight);
+})();
+
+/**
+ * Âncoras da composição da capa. Todas ao RODAPÉ: a imagem e o scrim são
+ * full-bleed e acompanham a altura, mas o texto encosta embaixo.
+ *
+ * `headline` continua exposto (é o `top` que a headline do gabarito ocupa) para
+ * o teste de formato poder afirmar a distância absoluta; quem desenha usa o
+ * `headlineBottom`.
+ */
+export function template02CoverTops(
+  height: number
+): { headline: number; headlineBottom: number; pill: number } {
   return {
     headline: height - COVER_HEADLINE_BOTTOM,
+    headlineBottom: COVER_HEADLINE_BASE,
     pill: height - COVER_PILL_BOTTOM,
   };
 }
@@ -459,16 +571,22 @@ export const TEMPLATE_02_HEADER_MARGIN_X = TEMPLATE_02_GRID.headerMarginX;
 /** Texto ou URL de imagem por slot, ex: `{ 'content.title': 'Marca não é logo' }`. */
 export type Template02Slots = Record<string, string>;
 
+/** Texto inicial do cabeçalho de cada slide novo. */
+export const TEMPLATE_02_DEFAULT_HEADER: Template02Slots = {
+  'header.category': 'LOREM IPSUM',
+  'header.handle': '@LOREMIPSUM',
+};
+
 export interface Template02SlotDescriptor {
   slot: string;
   kind: 'text' | 'image';
   /** Rótulo da barra lateral. É só interface — a CHAVE do slot nunca muda. */
   label: string;
   /**
-   * `deck` = vale para o carrossel inteiro (o cabeçalho, editado uma vez só).
-   * `slide` = por slide.
+   * `header` = cabeçalho do slide, com painel próprio.
+   * `slide` = demais slots do slide.
    */
-  scope: 'slide' | 'deck';
+  scope: 'slide' | 'header';
   /** Ordem VISUAL do campo no slide — a barra lateral segue esta ordem. */
   order: number;
   /** Quebras manuais (`\n`) fazem parte do conteúdo. */
@@ -487,7 +605,7 @@ interface SlotDef {
   models: number[];
   kind: 'text' | 'image';
   label: string;
-  scope: 'slide' | 'deck';
+  scope: 'slide' | 'header';
   order: number;
   multiline: boolean;
   /** Papel tipográfico, para derivar a caixa-alta do spec. */
@@ -497,12 +615,12 @@ interface SlotDef {
 /**
  * Os slots do template, na ordem visual do slide.
  *
- * `content.*` repete entre os slides de conteúdo e isso está certo:
- * `templateSlots` é por slide, então não há colisão. Só `header.*` é global.
+ * Todos os slots vivem no slide. `header.*` só recebe um escopo separado para
+ * aparecer em seu próprio painel.
  */
 const SLOT_DEFS: SlotDef[] = [
-  { slot: 'header.category', models: [1, 2, 3], kind: 'text',  label: 'Categoria',       scope: 'deck',  order: 0, multiline: false, style: 'headerMeta' },
-  { slot: 'header.handle',   models: [1, 2, 3], kind: 'text',  label: '@ do perfil',     scope: 'deck',  order: 1, multiline: false, style: 'headerMeta' },
+  { slot: 'header.category', models: [1, 2, 3], kind: 'text',  label: 'Categoria',       scope: 'header', order: 0, multiline: false, style: 'headerMeta' },
+  { slot: 'header.handle',   models: [1, 2, 3], kind: 'text',  label: '@ do perfil',     scope: 'header', order: 1, multiline: false, style: 'headerMeta' },
   { slot: 'cover.image',     models: [1],       kind: 'image', label: 'Imagem de fundo', scope: 'slide', order: 2, multiline: false },
   { slot: 'cover.headline',  models: [1],       kind: 'text',  label: 'Título',          scope: 'slide', order: 3, multiline: true,  style: 'coverHeadline' },
   { slot: 'cover.highlight', models: [1],       kind: 'text',  label: 'Destaque',        scope: 'slide', order: 4, multiline: false, style: 'coverHeadline' },
@@ -530,7 +648,7 @@ function limitsOf(slot: string): Pick<
   Template02SlotDescriptor,
   'maxLines' | 'maxCharsPerLine' | 'maxChars'
 > {
-  const l = TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto[slot] ?? {};
+  const l = template02Limits(slot);
   return {
     maxLines: l.maxLinhas,
     maxCharsPerLine: l.maxCharPorLinha,
@@ -541,7 +659,8 @@ function limitsOf(slot: string): Pick<
 /**
  * Conteúdo de fábrica de um slot, no modelo pedido.
  *
- * Os textos do cabeçalho vêm de `camposEditaveis.global`; os do slide, do
+ * Os textos-base do cabeçalho vêm do catálogo `camposEditaveis.global` do spec;
+ * cada slide recebe a própria cópia editável. Os demais vêm do
  * `conteudoExemplo` do elemento no layout — e por isso `content.title` do modelo
  * 2 é diferente do modelo 3, exatamente como no spec.
  */
@@ -557,6 +676,7 @@ const SPEC_ELEMENT_ID: Record<string, string> = {
 };
 
 function defaultValueOf(slot: string, model: number): string {
+  if (slot in TEMPLATE_02_DEFAULT_HEADER) return TEMPLATE_02_DEFAULT_HEADER[slot];
   const global = TEMPLATE_02_SPEC.camposEditaveis.global[slot];
   if (global) return global.default;
   // O spec não dá `conteudoExemplo` para o marcador. Ele sai da primeira linha
@@ -588,16 +708,15 @@ export function template02SlotsForModel(model: number): Template02SlotDescriptor
 /**
  * Slots de TEXTO do slide, sem o cabeçalho.
  *
- * O cabeçalho é do DECK e tem painel próprio (editar num slide e ver os outros
- * divergirem seria bug, não liberdade) — por isso ele sai daqui.
+ * O cabeçalho tem painel próprio no slide selecionado — por isso ele sai daqui.
  */
 export function template02TextSlotsForModel(model: number): Template02SlotDescriptor[] {
   return template02SlotsForModel(model).filter((d) => d.kind === 'text' && d.scope === 'slide');
 }
 
-/** Os slots globais do cabeçalho, na ordem em que aparecem no slide. */
+/** Os slots do cabeçalho, na ordem em que aparecem no slide. */
 export function template02HeaderSlotsForModel(model: number): Template02SlotDescriptor[] {
-  return template02SlotsForModel(model).filter((d) => d.scope === 'deck');
+  return template02SlotsForModel(model).filter((d) => d.scope === 'header');
 }
 
 /** Papel tipográfico de um slot, ou `undefined` nos slots de imagem. */
@@ -620,6 +739,20 @@ export function template02SlotDefaults(
   if (!name) return undefined;
   const t = template02Type(name);
   return { fontSizePx: t.fontSize, letterSpacingEm: t.letterSpacing / t.fontSize };
+}
+
+/** Nome legível da face efetivamente usada no render daquele slot. */
+export function template02SlotFontName(slot: string): string | undefined {
+  const name = template02SlotType(slot);
+  if (!name) return undefined;
+  const role = TEMPLATE_02_SPEC.tokens.typeScale[name].font;
+
+  // O app usa a IvyOra licenciada no lugar da Newsreader anotada no spec.
+  if (role === 'serif') return 'IvyOra Text Medium';
+
+  const token = TEMPLATE_02_SPEC.tokens.font[role];
+  const variant = token.postScript.split('-').at(-1);
+  return [token.family, variant].filter(Boolean).join(' ');
 }
 
 /**
@@ -724,9 +857,8 @@ export function template02SlotsFromContent(
 }
 
 /**
- * Cabeçalho de um deck gerado: assinatura e @ do usuário. São dados DELE (marca
- * e handle do onboarding), não estilo — por isso a geração pode escrevê-los. Sem
- * marca nem handle o slot sai vazio, nunca com o "@OANDRELONA" do spec.
+ * Helper legado para converter marca e @ em slots. Novos slides usam
+ * `TEMPLATE_02_DEFAULT_HEADER` e não herdam estes valores entre cards.
  */
 export function template02HeaderSlots(brandName?: string, handle?: string): Template02Slots {
   const at = (handle ?? '').trim().replace(/^@+/, '');
@@ -739,17 +871,131 @@ export function template02HeaderSlots(brandName?: string, handle?: string): Temp
 // ─── Marcador da capa ───────────────────────────────────────────
 
 /**
+ * Cor de fábrica do marcador. O usuário pode trocar por qualquer outra —
+ * `templateSlotStyles['cover.highlight'].background`.
+ */
+export const TEMPLATE_02_HIGHLIGHT_COLOR = TEMPLATE_02_COLORS.accent;
+
+/**
+ * Os termos escritos no campo Destaque, separados por VÍRGULA.
+ *
+ * Pedido do Rafael: *"eu quero que o usuário consiga colocar o destaque da
+ * palavra… talvez escrevendo naquele campo, separando por vírgula"*. Vazios são
+ * descartados, então "A, ,B" vira ["A","B"] e o campo tolera vírgula sobrando.
+ */
+export function template02HighlightTerms(highlight?: string): string[] {
+  return (highlight ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/**
  * Índice da linha do headline que contém o marcador, ou -1.
  *
  * A regra do spec é "o marcador nunca cruza duas linhas": como o destaque é
  * procurado DENTRO de cada linha, ele é estruturalmente impossível de cruzar —
- * ou cabe numa linha, ou não aparece. Esta função é o que o render e a validação
- * usam para saber qual é o caso.
+ * ou cabe numa linha, ou não aparece. Com vários termos, a regra vale POR TERMO.
  */
 export function template02HighlightLine(headline: string, highlight?: string): number {
-  const h = (highlight ?? '').trim();
-  if (!h) return -1;
-  return headline.split('\n').findIndex((line) => line.includes(h));
+  const termos = template02HighlightTerms(highlight);
+  if (!termos.length) return -1;
+  const linhas = headline.split('\n');
+  for (let i = 0; i < linhas.length; i++) {
+    if (termos.some((t) => linhas[i].includes(t))) return i;
+  }
+  return -1;
+}
+
+/**
+ * Termos que NÃO estão em nenhuma linha do headline.
+ *
+ * Sem esta lista o marcador simplesmente não desenha e o usuário não descobre
+ * por quê — e com vários termos "algo falhou" não basta: ele precisa saber QUAL.
+ */
+export function template02MissingHighlightTerms(headline: string, highlight?: string): string[] {
+  const linhas = headline.split('\n');
+  return template02HighlightTerms(highlight).filter((t) => !linhas.some((l) => l.includes(t)));
+}
+
+export interface Template02HighlightPart {
+  text: string;
+  /** `true` = trecho que recebe o marcador. */
+  marked: boolean;
+}
+
+/**
+ * Quebra UMA linha do headline nos pedaços marcados e não marcados.
+ *
+ * Cada termo marca a PRIMEIRA ocorrência dele na linha, não todas: marcar todas
+ * transformaria um termo curto ("A") em tarja em cima de meia frase. Vários
+ * termos na mesma linha funcionam — a varredura pega sempre a ocorrência mais à
+ * esquerda entre os termos que ainda não foram usados.
+ */
+export function template02HighlightParts(line: string, terms: string[]): Template02HighlightPart[] {
+  const restantes = terms.filter(Boolean);
+  const usados = new Set<number>();
+  const parts: Template02HighlightPart[] = [];
+  let cursor = 0;
+
+  for (;;) {
+    let melhor = -1;
+    let indice = -1;
+    restantes.forEach((t, i) => {
+      if (usados.has(i)) return;
+      const at = line.indexOf(t, cursor);
+      if (at < 0) return;
+      // Empate na mesma posição: vence o termo mais longo, que é o que o
+      // usuário quis marcar ("MARCA" antes de "MAR").
+      if (melhor < 0 || at < melhor || (at === melhor && t.length > restantes[indice].length)) {
+        melhor = at;
+        indice = i;
+      }
+    });
+    if (melhor < 0) break;
+    usados.add(indice);
+    const termo = restantes[indice];
+    if (melhor > cursor) parts.push({ text: line.slice(cursor, melhor), marked: false });
+    parts.push({ text: termo, marked: true });
+    cursor = melhor + termo.length;
+  }
+
+  if (cursor < line.length) parts.push({ text: line.slice(cursor), marked: false });
+  return parts;
+}
+
+/** Luminância relativa (WCAG) de uma cor `#rgb`/`#rrggbb`. */
+function relativeLuminance(hex: string): number {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  if (full.length !== 6) return 0;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(full.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Razão de contraste WCAG entre duas cores hex. */
+export function template02Contrast(a: string, b: string): number {
+  const [l1, l2] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+/**
+ * Cor do texto SOBRE o marcador.
+ *
+ * No template ele é preto, porque o marcador é o lime. Com o usuário livre para
+ * escolher a cor, preto sobre um fundo escuro sai ilegível — então a cor segue a
+ * luminância do marcador: fica no preto do template enquanto ele contrastar
+ * mais, e vira branco quando não contrastar. Escolha explícita do usuário
+ * (`slotStyles['cover.highlight'].color`) continua vencendo isto.
+ */
+export function template02HighlightTextColor(background: string): string {
+  const { ink, surface } = TEMPLATE_02_COLORS;
+  return template02Contrast(background, ink) >= template02Contrast(background, surface)
+    ? ink
+    : surface;
 }
 
 // ─── Medição contra os limites ──────────────────────────────────
@@ -836,10 +1082,12 @@ export function template02Overflows(model: number, slots: Template02Slots): Temp
  * envelheceria em silêncio na primeira vez que o spec mudasse.
  */
 export function template02Addendum(): string {
-  const L = TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto;
-  const headline = L['cover.headline'];
-  const titulo = L['content.title'];
-  const corpo = L['content.body'];
+  // Limites EFETIVOS, com os ajustes medidos por cima do spec — senão o prompt
+  // pediria à IA um texto mais curto do que a barra lateral aceita.
+  const L = (slot: string) => template02Limits(slot);
+  const headline = L('cover.headline');
+  const titulo = L('content.title');
+  const corpo = L('content.body');
 
   return `
 
@@ -848,19 +1096,19 @@ TEMPLATE 2 — a CAPA é diferente dos demais slides.
 O slide 1 é a capa e NÃO tem descrição. Nele:
 - "title" é a headline, em CAIXA ALTA, com as quebras de linha escritas por você
   usando \\n. Máximo ${headline.maxLinhas} linhas e ${headline.maxCharPorLinha} caracteres POR LINHA — acima
-  disso o texto vaza a caixa de 836px do desenho. Quebre por SENTIDO, e nunca
-  deixe uma linha com uma palavra só.
+  disso passa do limite conservador medido na caixa real de 1080px da capa.
+  Quebre por SENTIDO, e nunca deixe uma linha com uma palavra só.
 - "description" do slide 1 é ignorada. Não gaste texto nela.
 - "extras": { "highlight": "...", "cta": "..." }
   · highlight é o trecho que recebe o marcador amarelo. Ele TEM de estar contido
     em UMA ÚNICA linha da headline, escrito exatamente igual — se não estiver, o
     marcador simplesmente não aparece e o usuário não descobre por quê. Escolha a
     palavra que carrega a tensão da frase, nunca um conectivo.
-  · cta é a chamada da pílula, em CAIXA ALTA, até ${L['cover.cta'].maxChar} caracteres.
+  · cta é a chamada da pílula, em CAIXA ALTA, até ${L('cover.cta').maxChar} caracteres.
 
 Nos demais slides (2 em diante), "title" e "description" são usados normalmente:
 - title: até ${titulo.maxChar} caracteres, no máximo ${titulo.maxLinhas} linhas.
-- description: até ${corpo.maxChar} caracteres, ${corpo.paragrafos}.
+- description: até ${corpo.maxChar} caracteres, ${corpo.paragrafos ?? '1 a 2 parágrafos, separados por \\n\\n'}.
 Cada slide entrega UMA ideia: o título é a afirmação, a descrição é a
 justificativa. Se o título precisa da descrição para fazer sentido, ele está
 fraco. O último slide fecha com consequência ou virada, nunca com "e é isso".
@@ -929,19 +1177,18 @@ export function template02LoremForSlot(d: Template02SlotDescriptor): string {
 
 /**
  * Slots de um slide NOVO do modelo pedido: lorem em todo slot de texto, imagem
- * vazia (o usuário escolhe a dele) e o cabeçalho herdado do deck.
- *
- * O cabeçalho não é lorem: é marca e @ do usuário, vindos do onboarding, e vale
- * para o deck inteiro — copiá-lo do slide vizinho é o que mantém a regra.
+ * vazia (o usuário escolhe a dele) e cabeçalho próprio em
+ * LOREM IPSUM/@LOREMIPSUM.
  */
 export function template02NewSlideSlots(
   model: number,
-  inheritedHeader?: Template02Slots
+  /** @deprecated Mantido apenas para chamadas antigas; não há mais herança. */
+  _inheritedHeader?: Template02Slots
 ): Template02Slots {
   const out: Template02Slots = {};
   for (const d of template02SlotsForModel(model)) {
-    if (d.scope === 'deck') {
-      out[d.slot] = inheritedHeader?.[d.slot] ?? '';
+    if (d.scope === 'header') {
+      out[d.slot] = TEMPLATE_02_DEFAULT_HEADER[d.slot];
       continue;
     }
     if (d.kind === 'text') out[d.slot] = template02LoremForSlot(d);

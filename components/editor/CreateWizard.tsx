@@ -10,21 +10,29 @@ import {
 import Button from '@/components/ui/Button';
 import { cn, normalizeHandle } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
-import { SlideStyle, FontPair, TwitterFormat, DEFAULT_GLOBAL_SETTINGS, ProfileData, TextPosition } from '@/types';
+import {
+  SlideStyle,
+  FontPair,
+  TwitterFormat,
+  DEFAULT_GLOBAL_SETTINGS,
+  DEFAULT_IMAGE_POSITION,
+  DEFAULT_SLIDE,
+  ProfileData,
+  TextPosition,
+} from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import {
-  template01CornerSlots,
+  TEMPLATE_01_DEFAULT_CORNERS,
   template01SlotsFromContent,
   TEMPLATE_01_SLIDE_COUNT,
 } from '@/lib/templates/template-01';
 import {
   TEMPLATE_02_DEFAULT_MODELS,
-  template02HeaderSlots,
+  TEMPLATE_02_DEFAULT_HEADER,
   template02ModelAt,
   template02SlotsFromContent,
 } from '@/lib/templates/template-02';
-import { DEFAULT_SLIDE } from '@/types';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import { handlePlanRequired, handleProjectLimit } from '@/hooks/useUpgradeStore';
 import toast from 'react-hot-toast';
@@ -414,7 +422,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                 imageUrl: sl.imageUrl,
                 extras: sl.extras,
               }),
-              ...template01CornerSlots(effectiveProfile.name, effectiveProfile.handle),
+              ...TEMPLATE_01_DEFAULT_CORNERS,
             },
             position: i,
             title: sl.title,
@@ -424,7 +432,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             backgroundImageUrl: '',
             gridImageUrl: '',
             imageType: 'background' as const,
-            imagePosition: DEFAULT_SLIDE.imagePosition,
+            imagePosition: { ...DEFAULT_IMAGE_POSITION },
+            contentImagePosition: { ...DEFAULT_IMAGE_POSITION },
             shadow: { ...DEFAULT_SLIDE.shadow },
             backgroundColor: DEFAULT_SLIDE.backgroundColor,
             textPosition: DEFAULT_SLIDE.textPosition,
@@ -453,9 +462,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                 imageUrl: sl.imageUrl,
                 extras: sl.extras,
               }),
-              // Marca e @ do onboarding — dados DELE, não estilo. Sem onboarding
-              // preenchido saem vazios, nunca com o "@OANDRELONA" do spec.
-              ...template02HeaderSlots(effectiveProfile.name, effectiveProfile.handle),
+              ...TEMPLATE_02_DEFAULT_HEADER,
             },
             position: i,
             title: sl.title,
@@ -465,7 +472,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             backgroundImageUrl: '',
             gridImageUrl: '',
             imageType: 'background' as const,
-            imagePosition: DEFAULT_SLIDE.imagePosition,
+            imagePosition: { ...DEFAULT_IMAGE_POSITION },
+            contentImagePosition: { ...DEFAULT_IMAGE_POSITION },
             shadow: { ...DEFAULT_SLIDE.shadow },
             backgroundColor: DEFAULT_SLIDE.backgroundColor,
             textPosition: DEFAULT_SLIDE.textPosition,
@@ -486,7 +494,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         backgroundImageUrl: sl.imageUrl || '',
         gridImageUrl: sl.imageUrl || '',
         imageType: 'background' as const,
-        imagePosition: { x: 50, y: 50, zoom: 175 },
+        imagePosition: { ...DEFAULT_IMAGE_POSITION },
         shadow: { style: isEditorialContent ? 'none' : 'base', opacity: 88 } as const,
         backgroundColor: slideBg,
         textPosition: (isEditorialContent ? 'middle-left' : i === 0 ? 'bottom-center' : 'bottom-left') as TextPosition,
@@ -559,7 +567,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
               background_image_url: '',
               grid_image_url: '',
               image_type: 'background',
-              image_position: DEFAULT_SLIDE.imagePosition,
+              image_position: DEFAULT_IMAGE_POSITION,
+              content_image_position: DEFAULT_IMAGE_POSITION,
               shadow_style: DEFAULT_SLIDE.shadow.style,
               shadow_opacity: DEFAULT_SLIDE.shadow.opacity,
               text_position: DEFAULT_SLIDE.textPosition,
@@ -589,7 +598,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
               background_image_url: '',
               grid_image_url: '',
               image_type: 'background',
-              image_position: DEFAULT_SLIDE.imagePosition,
+              image_position: DEFAULT_IMAGE_POSITION,
+              content_image_position: DEFAULT_IMAGE_POSITION,
               shadow_style: DEFAULT_SLIDE.shadow.style,
               shadow_opacity: DEFAULT_SLIDE.shadow.opacity,
               text_position: DEFAULT_SLIDE.textPosition,
@@ -615,7 +625,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           background_image_url: sl.imageUrl || '',
           grid_image_url: sl.imageUrl || '',
           image_type: 'background',
-          image_position: { x: 50, y: 50, zoom: 175 },
+          image_position: DEFAULT_IMAGE_POSITION,
           shadow_style: isEditorialContent ? 'none' : 'base',
           shadow_opacity: 88,
           text_position: isEditorialContent ? 'middle-left' : i === 0 ? 'bottom-center' : 'bottom-left',

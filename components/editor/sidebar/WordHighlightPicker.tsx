@@ -40,12 +40,15 @@ export default function WordHighlightPicker({
   highlights,
   onChange,
   accentColor,
+  defaultFontName,
 }: {
   label: string;
   text: string;
   highlights: TextHighlight[];
   onChange: (highlights: TextHighlight[]) => void;
   accentColor: string;
+  /** Fonte herdada do bloco enquanto o destaque não tem uma fonte própria. */
+  defaultFontName: string;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingColor, setPendingColor] = useState(accentColor);
@@ -162,6 +165,7 @@ export default function WordHighlightPicker({
             <span className={cn(labelCls, 'block mb-1.5')}>Fonte</span>
             <ElementFontPicker
               value={pendingFont}
+              defaultFontName={defaultFontName}
               onChange={(f) => { setPendingFont(f); applyLive(selected, pendingColor, f, pendingUnderline); }}
             />
           </div>

@@ -142,6 +142,12 @@ export function template01Overrides(
   const corners = globalSettings.corners ?? DEFAULT_CORNERS;
   const shadow = slide.shadow ?? DEFAULT_SLIDE.shadow;
   const bgOpacity = slide.backgroundImageOpacity ?? 100;
+  const slotStyles = { ...(slide.templateSlotStyles ?? {}) };
+  if (globalSettings.templateCornerStyle) {
+    for (const slot of ['cantos.left', 'cantos.right']) {
+      slotStyles[slot] = { ...(slotStyles[slot] ?? {}), ...globalSettings.templateCornerStyle };
+    }
+  }
 
   return {
     title: textOverridesFor(
@@ -193,7 +199,7 @@ export function template01Overrides(
       opacity: cornerTouched(globalSettings, 'cornerOpacity') ? corners.opacity / 100 : undefined,
     },
     // Sem marca à parte: a chave existir JÁ é o gesto do usuário.
-    slotStyles: slide.templateSlotStyles ?? {},
+    slotStyles,
     background: touched(slide, 'background') ? slide.backgroundColor : undefined,
     // O spec já traz o próprio degradê; o overlay do editor só entra quando o
     // usuário mexe no controle — senão a sombra de fábrica escureceria o
@@ -209,11 +215,20 @@ export function template01Overrides(
       ? corners.borderDistance
       : undefined,
     backgroundImage: {
-      position: touched(slide, 'backgroundImagePosition') ? slide.imagePosition : undefined,
+      // `objectFit` explícito identifica a política nova de inserção (preenche
+      // sem deformar). Deck legado não tem o campo e continua seguindo o cover do
+      // spec até receber uma imagem nova.
+      position:
+        touched(slide, 'backgroundImagePosition') || slide.imagePosition.objectFit != null
+          ? slide.imagePosition
+          : undefined,
       opacity: touched(slide, 'backgroundImageOpacity') ? bgOpacity / 100 : undefined,
     },
     contentImage: {
-      position: touched(slide, 'contentImagePosition') ? slide.contentImagePosition : undefined,
+      position:
+        touched(slide, 'contentImagePosition') || slide.contentImagePosition?.objectFit != null
+          ? slide.contentImagePosition
+          : undefined,
       opacity: touched(slide, 'backgroundImageOpacity') ? bgOpacity / 100 : undefined,
     },
   };
@@ -255,7 +270,7 @@ export function markTemplate01Override(
   return next;
 }
 
-/** Idem para os cantos, que valem para o deck inteiro. */
+/** Compatibilidade dos controles globais de cantos gravados por decks antigos. */
 export function markTemplate01CornerOverride(
   current: GlobalSettings['templateOverrides'],
   ...keys: Template01CornerControl[]

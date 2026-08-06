@@ -14,7 +14,8 @@ import {
   template01SpecSlideOf,
 } from '@/lib/templates/template-01';
 import { mapDbSlideToSlide, mapSlideToDbRow } from '@/lib/slide-mapper';
-import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
+import { template01SetImage } from '@/lib/templates/template-01/image';
+import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_IMAGE_POSITION, DEFAULT_SLIDE, Slide } from '@/types';
 
 /**
  * O MODELO do slide passou a ser um dado dele (`templateModel`) em vez da
@@ -187,15 +188,77 @@ describe('TEMPLATE 1 — slide novo com lorem ipsum', () => {
     }
   });
 
-  it('os cantos são herdados do deck, nunca inventados', () => {
+  it('os cantos nascem com lorem próprio, sem herdar outro slide', () => {
     const herdados = { 'cantos.left': 'MINHA MARCA', 'cantos.right': '@EU' };
     const slots = template01NewSlideSlots(3, herdados);
-    expect(slots['cantos.left']).toBe('MINHA MARCA');
-    expect(slots['cantos.right']).toBe('@EU');
-    // Sem deck para herdar, saem VAZIOS — nunca com o @ do Figma.
+    expect(slots['cantos.left']).toBe('LOREM IPSUM');
+    expect(slots['cantos.right']).toBe('@LOREMIPSUM');
     const semDeck = template01NewSlideSlots(3);
-    expect(semDeck['cantos.left']).toBe('');
-    expect(semDeck['cantos.right']).toBe('');
+    expect(semDeck['cantos.left']).toBe('LOREM IPSUM');
+    expect(semDeck['cantos.right']).toBe('@LOREMIPSUM');
+  });
+});
+
+describe('TEMPLATE 1 — imagem preenche a moldura sem deformar', () => {
+  it('usa cover na imagem de fundo e na imagem interna', () => {
+    const base = { ...DEFAULT_SLIDE, id: 's', position: 0 } as Slide;
+    const capa = template01SetImage(base, 1, 'u');
+    const interno = template01SetImage(base, 3, 'u');
+
+    expect(capa.imagePosition).toEqual(DEFAULT_IMAGE_POSITION);
+    expect(interno.contentImagePosition).toEqual(DEFAULT_IMAGE_POSITION);
+    expect(render({ templateModel: 1, ...capa }, 0)).toContain('background-size:cover');
+    expect(render({ templateModel: 3, ...interno }, 0)).toContain('background-size:cover');
+  });
+});
+
+describe('TEMPLATE 1 — cabeçalho por slide', () => {
+  it('a visibilidade, a fonte e a cor do slot vencem somente neste slide', () => {
+    const escondido = render(
+      {
+        templateModel: 2,
+        templateSlotStyles: {
+          'cantos.left': { visible: false },
+          'cantos.right': { visible: false },
+        },
+      },
+      1
+    );
+    expect(escondido).not.toContain('data-slot="cantos.left"');
+    expect(escondido).not.toContain('data-slot="cantos.right"');
+
+    const estilizado = render(
+      {
+        templateModel: 2,
+        templateSlotStyles: {
+          'cantos.left': { color: '#123456', font: 'Montserrat' },
+        },
+      },
+      1
+    );
+    const canto = estilizado.slice(estilizado.indexOf('data-slot="cantos.left"'));
+    expect(canto).toContain('color:#123456');
+    expect(canto).toContain("font-family:&#x27;Montserrat&#x27;, sans-serif");
+  });
+
+  it('o tamanho e a margem movem o cabeçalho para dentro', () => {
+    const html = render(
+      {
+        templateModel: 2,
+        templateSlotStyles: {
+          'cantos.left': { fontSize: 30, margin: 20 },
+          'cantos.right': { fontSize: 30, margin: 20 },
+        },
+      },
+      1
+    );
+    const left = html.match(/data-slot="cantos\.left"[^>]*style="([^"]*)"/)?.[1] ?? '';
+    const right = html.match(/data-slot="cantos\.right"[^>]*style="([^"]*)"/)?.[1] ?? '';
+    expect(left).toContain('font-size:30px');
+    expect(left).toContain('left:91px');
+    expect(left).toContain('top:64px');
+    expect(right).toContain('right:83px');
+    expect(right).toContain('top:64px');
   });
 });
 
