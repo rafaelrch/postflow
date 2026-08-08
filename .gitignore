@@ -42,5 +42,9 @@ next-env.d.ts
 
 # Backup dos PNGs originais do hero (nao versionar)
 /public/cards_para_hero_backup_png/
+
+# Core do ffmpeg.wasm (~31MB): copiado de node_modules pelo prebuild
+# (scripts/copy-ffmpeg-core.mjs). Reproduzivel pelo package-lock, nao versionar.
+/public/ffmpeg/
 .maestri/
 .next_root_owned_backup/
