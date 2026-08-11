@@ -194,14 +194,52 @@ export function sanitizeReelFilename(name: string | undefined): string {
 
 // ── ffmpeg.wasm runtime ───────────────────────────────────────────────────────
 
-/** Base do core do ffmpeg.wasm (single-thread). Sem segredo — CDN público. */
-const FFMPEG_CORE_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
+/**
+ * Base do core do ffmpeg.wasm (variante ESM, single-thread), servida pelo NOSSO
+ * domínio a partir de public/ffmpeg/.
+ *
+ * Antes isto apontava para um CDN público de terceiro (o host do npm), baixado
+ * a cada sessão de export. Era a CAUSA RAIZ do travamento do download de Reels:
+ * CDN fora do ar (ou bloqueado por rede corporativa/adblock) = export morto,
+ * inclusive para cliente pagante. Agora os 2 arquivos vêm de `@ffmpeg/core`
+ * (dependência com versão exata), copiados para public/ pelo prebuild —
+ * ver scripts/copy-ffmpeg-core.mjs. Caminho relativo à raiz: mesma origem,
+ * sem DNS/TLS de terceiro e sem CORS.
+ *
+ * ATENÇÃO ao trocar de variante: o worker do @ffmpeg/ffmpeg é `type: "module"`,
+ * então o core PRECISA ser o build ESM (tem `export default`). O build UMD
+ * quebra com "failed to import ffmpeg-core.js" — era o que a URL antiga
+ * apontava. Detalhes em scripts/copy-ffmpeg-core.mjs.
+ */
 
 /**
- * Teto para CARREGAR o core do ffmpeg (fetch do CDN + wasm compile). O core vem
- * de um CDN externo (unpkg) via toBlobURL, que não tem timeout: se o CDN não
- * responder, o export ficava preso em 0% PARA SEMPRE, sem erro. Com o teto, a
- * carga falha rápido com mensagem clara e o modal libera o usuário.
+ * Versão do core servida. FONTE DE VERDADE ÚNICA do caminho: o prebuild LÊ esta
+ * constante para decidir onde gravar os arquivos e ABORTA (exit 1) se ela não
+ * bater com o pin de `@ffmpeg/core` no package.json nem com o que está
+ * instalado em node_modules. Assim runtime e build não têm como divergir e
+ * servir 404 — ver scripts/copy-ffmpeg-core.mjs.
+ */
+export const FFMPEG_CORE_VERSION = '0.12.10';
+
+/**
+ * O caminho é VERSIONADO de propósito. Os arquivos são servidos com
+ * `Cache-Control: immutable, max-age=1 ano` (next.config.ts), que é uma promessa
+ * de que aquela URL nunca muda de conteúdo. Num caminho fixo, subir a versão do
+ * core deixaria o browser de quem já exportou servindo o core ANTIGO do cache
+ * por até um ano, possivelmente pareado com um `@ffmpeg/ffmpeg` novo — e
+ * incompatibilidade entre core e ffmpeg quebra o export INTEIRO (foi o que
+ * aconteceu com a variante UMD). Com a versão na URL, um core novo é uma URL
+ * nova: cache velho fica órfão e ninguém carrega par incompatível.
+ */
+export const FFMPEG_CORE_BASE = `/ffmpeg/${FFMPEG_CORE_VERSION}`;
+
+/**
+ * Teto para CARREGAR o core do ffmpeg (fetch + wasm compile). O fetch via
+ * toBlobURL não tem timeout próprio: se a resposta pendurar, o export ficava
+ * preso em 0% PARA SEMPRE, sem erro. Servir do nosso domínio remove o unpkg da
+ * jogada, mas NÃO substitui este teto — nosso próprio host também pode falhar
+ * (deploy incompleto, rede do usuário, disco cheio). Defesa em profundidade:
+ * a carga falha rápido com mensagem clara e o modal libera o usuário.
  */
 export const FFMPEG_LOAD_TIMEOUT_MS = 60_000;
 
@@ -230,7 +268,9 @@ let ffmpegSingleton: FFmpegInstance | null = null;
 // fiel e não acumula handlers a cada export.
 let progressCb: ((ratio: number) => void) | null = null;
 
-async function getFFmpeg(): Promise<FFmpegInstance> {
+/** Exportada só para teste: permite verificar de QUAIS URLs o core é buscado
+ *  (nenhuma pode sair do nosso domínio). O pipeline segue chamando internamente. */
+export async function getFFmpeg(): Promise<FFmpegInstance> {
   const { FFmpeg } = await import('@ffmpeg/ffmpeg');
   const { toBlobURL } = await import('@ffmpeg/util');
 
@@ -240,7 +280,7 @@ async function getFFmpeg(): Promise<FFmpegInstance> {
       progressCb?.(Math.min(Math.max(progress, 0), 1));
     });
     // O fetch do core (toBlobURL) é a parte que pendurava em 0%. Todo o bloco
-    // fetch+load vai sob um timeout — se estourar, rejeita com mensagem clara.
+    // fetch+load segue sob timeout mesmo servindo local — ver FFMPEG_CORE_BASE.
     await withTimeout(
       (async () => {
         const coreURL = await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.js`, 'text/javascript');
