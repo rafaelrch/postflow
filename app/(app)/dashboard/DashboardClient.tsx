@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit2, Copy, Trash2, Calendar, Layers, Search } from 'lucide-react';
 import Button from '@/components/ui/Button';
@@ -18,7 +18,7 @@ import Template02Slide from '@/components/slides/Template02Slide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import Pagination from '@/components/ui/Pagination';
 import type { DashboardCarousel } from './page';
-import { DASHBOARD_PAGE_SIZE, type DashboardLoadError } from '@/lib/dashboard-data';
+import { DASHBOARD_PAGE_SIZE, dashboardHref, type DashboardLoadError } from '@/lib/dashboard-data';
 
 interface DashboardClientProps {
   initialCarousels: DashboardCarousel[];
@@ -36,7 +36,17 @@ interface DashboardClientProps {
    * página. `null` quando a carga falhou: aí não se sabe quantos existem.
    */
   totalCarousels?: number | null;
+  /**
+   * Termo do `?q` — a busca é do BANCO, então quem já buscou é o servidor e
+   * esta lista JÁ é o resultado. Vazio significa "não está buscando".
+   */
+  searchTerm?: string;
 }
+
+/** Espera antes de levar o termo ao URL: buscar a cada tecla seria uma ida ao
+ *  banco por letra. 350ms é o intervalo em que se para de digitar sem que a
+ *  espera apareça como travada. */
+const BUSCA_DEBOUNCE_MS = 350;
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('pt-BR', {
@@ -107,6 +117,7 @@ export default function DashboardClient({
   page = 1,
   totalPages = 1,
   totalCarousels = null,
+  searchTerm = '',
 }: DashboardClientProps) {
   const router = useRouter();
   const [carousels, setCarousels] = useState(initialCarousels);
@@ -116,18 +127,32 @@ export default function DashboardClient({
   useEffect(() => { setCarousels(initialCarousels); }, [initialCarousels]);
 
   const irParaPagina = (p: number) => {
-    router.push(p <= 1 ? '/dashboard' : `/dashboard?page=${p}`);
+    router.push(dashboardHref(p, searchTerm));
   };
   const [showWizard, setShowWizard] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return carousels;
-    const q = query.toLowerCase();
-    return carousels.filter((c) => c.title.toLowerCase().includes(q));
-  }, [carousels, query]);
+  // O que está digitado. A LISTA já é o resultado da busca do servidor — este
+  // estado existe só para o campo não engasgar entre a tecla e a navegação.
+  const [query, setQuery] = useState(searchTerm);
+  useEffect(() => { setQuery(searchTerm); }, [searchTerm]);
+
+  /**
+   * Termo digitado → URL, com folga entre teclas.
+   *
+   * `replace` e não `push`: cada letra viraria uma entrada no histórico, e o
+   * botão "voltar" teria de ser apertado uma vez por caractere.
+   *
+   * Volta SEMPRE para a página 1 — página 3 de "zebra" não é página 3 de
+   * "gato", e manter o número mostraria vazio sobre uma busca que tem resposta.
+   */
+  useEffect(() => {
+    const limpo = query.trim();
+    if (limpo === searchTerm) return;
+    const t = setTimeout(() => router.replace(dashboardHref(1, limpo)), BUSCA_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query, searchTerm, router]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Deletar este carrossel? Esta ação não pode ser desfeita.')) return;
@@ -230,10 +255,10 @@ export default function DashboardClient({
   // página só quando o total não veio (carga falhada).
   const total = totalCarousels ?? carousels.length;
 
-  // ⚠️ A busca filtra apenas os carrosséis DESTA página, porque só eles estão
-  // carregados. Antes da paginação ela varria todos. Está anotado no LOG para
-  // o Orquestrador decidir se vira busca no banco.
-  const buscando = query.trim().length > 0;
+  // Buscando é o que o SERVIDOR buscou. Usar o que está digitado faria a tela
+  // dizer "nenhum resultado" durante os 350ms antes de a busca sequer sair.
+  const buscando = searchTerm.length > 0;
+  const semResultado = buscando && !loadError && total === 0;
 
   return (
     <div
@@ -294,18 +319,21 @@ export default function DashboardClient({
               aqui em cima, ele não compete com o título nem obriga a rolar a
               lista inteira para trocar de página. */}
           <div className="flex items-center gap-8 mt-2">
-            <Stat label="Total" value={total} />
+            {/* Buscando, o número é o de ACHADOS — dizer "Total 2" sobre um
+                acervo de 14 seria contar outra coisa com o mesmo rótulo. */}
+            <Stat label={buscando ? 'Achados' : 'Total'} value={total} />
             <span className="hairline soft flex-1" />
-            {!buscando && (
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalItems={total}
-                pageSize={DASHBOARD_PAGE_SIZE}
-                onChange={irParaPagina}
-                label="Paginação dos carrosséis"
-              />
-            )}
+            {/* O resultado da busca pagina igual à lista: mesmo controle, mesmo
+                tamanho de página. Uma busca com 40 respostas não pode despejar
+                40 cards de uma vez só porque é busca. */}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={total}
+              pageSize={DASHBOARD_PAGE_SIZE}
+              onChange={irParaPagina}
+              label="Paginação dos carrosséis"
+            />
           </div>
         </header>
 
@@ -334,13 +362,23 @@ export default function DashboardClient({
           </div>
         )}
 
+        {/* 🔴 Os QUATRO desfechos, cada um com sua tela:
+            falhou → o alerta acima (e nada aqui, para não desmentir o alerta);
+            buscou e não achou → "nenhum carrossel", que fala do TERMO;
+            não tem nada → o convite de criar o primeiro;
+            tem → a lista. */}
         {total === 0 ? (
-          loadError ? null : <EmptyState onCreate={() => setShowWizard(true)} />
+          loadError ? null : semResultado ? (
+            <SemResultado termo={searchTerm} onLimpar={() => setQuery('')} />
+          ) : (
+            <EmptyState onCreate={() => setShowWizard(true)} />
+          )
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {/* Create card — dashed brutalist */}
-              <button
+              {/* Create card — dashed brutalist. Some durante a busca: no meio
+                  de resultados ele seria o único card que não é resultado. */}
+              {!buscando && <button
                 onClick={() => setShowWizard(true)}
                 className="
                   aspect-[4/5] rounded-[14px] flex flex-col items-center justify-center gap-3
@@ -371,9 +409,9 @@ export default function DashboardClient({
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="font-mono text-[11px] uppercase tracking-[0.14em]">Novo carrossel</span>
-              </button>
+              </button>}
 
-              {filtered.map((carousel) => (
+              {carousels.map((carousel) => (
                 <div
                   key={carousel.id}
                   className="group relative overflow-hidden brand-card interactive"
@@ -529,6 +567,35 @@ function IconActionButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Busca sem resposta — NÃO é o mesmo que acervo vazio.
+ *
+ * Quem chegou aqui tem carrosséis; só nenhum com esse título. Oferecer "crie o
+ * primeiro" seria afirmar o contrário, e é por isso que esta tela existe
+ * separada do `EmptyState`. Também não é falha de carga: falha tem alerta
+ * próprio, com "tentar de novo".
+ */
+function SemResultado({ termo, onLimpar }: { termo: string; onLimpar: () => void }) {
+  return (
+    <div
+      className="rounded-[14px] px-8 py-16 text-center flex flex-col items-center gap-4"
+      style={{ border: '1.5px dashed var(--ink)', background: 'var(--paper-2)' }}
+    >
+      <Search className="w-6 h-6" style={{ color: 'var(--ink-dim)' }} aria-hidden />
+      <p className="font-display text-[26px] leading-tight" style={{ color: 'var(--ink)' }}>
+        Nenhum carrossel com “{termo}”
+      </p>
+      <p className="text-[13px] max-w-sm leading-relaxed" style={{ color: 'var(--ink-dim)' }}>
+        A busca varre todos os seus carrosséis, não só os desta página. Confira a
+        grafia ou tente outra palavra do título.
+      </p>
+      <Button variant="secondary" size="md" onClick={onLimpar} className="mt-1">
+        Limpar busca
+      </Button>
+    </div>
   );
 }
 

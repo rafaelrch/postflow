@@ -2,12 +2,16 @@ import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import {
   DASHBOARD_PAGE_SIZE,
-  DASHBOARD_SELECT,
+  dashboardCarouselsQuery,
+  dashboardCountQuery,
+  dashboardHref,
   loadDashboardCarousels,
   pageRedirectTarget,
   parsePageParam,
+  parseSearchParam,
   rangeForPage,
   totalPagesFor,
+  type DashboardSupabase,
 } from '@/lib/dashboard-data';
 import DashboardClient from './DashboardClient';
 
@@ -36,22 +40,31 @@ export default async function DashboardPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const supabase = await createServerSupabaseClient();
-  const pedida = parsePageParam((await searchParams).page);
+  const sp = await searchParams;
+  const pedida = parsePageParam(sp.page);
+
+  // 🔴 A BUSCA É DO BANCO. Filtrar no cliente só varria os 10 da página aberta,
+  // e um título que existe na página 2 aparecia como "não encontrado". O termo
+  // entra nas DUAS queries abaixo, para o total e o número de páginas falarem
+  // do resultado da busca, e não do acervo inteiro.
+  const termo = parseSearchParam(sp.q);
+  const db = supabase as unknown as DashboardSupabase;
 
   // 🔴 Contagem ANTES do recorte, com `head: true` (traz só o cabeçalho, zero
   // linha). Não é luxo: pedir um `.range()` além do fim faz o PostgREST
   // responder ERRO, e sem isto uma URL como `?page=99` caía no desfecho
   // "falhou ao carregar" — o QUARTO caso disfarçado de um dos três, que é
   // justamente o que a carga desta tela existe para impedir.
-  const { count: totalBruto } = await supabase
-    .from('carousels')
-    .select('id', { count: 'exact', head: true });
+  const { count: totalBruto } = await (dashboardCountQuery(db, termo) as unknown as PromiseLike<{
+    count: number | null;
+  }>);
   const totalConhecido = typeof totalBruto === 'number' ? totalBruto : null;
 
   // Passou do fim (URL chutada, ou o último item da última página foi apagado):
-  // manda para a última página REAL, para o endereço combinar com a tela.
+  // manda para a última página REAL, para o endereço combinar com a tela. O
+  // termo vai junto: perder a busca no caminho jogaria o usuário no acervo.
   const destino = pageRedirectTarget(pedida, totalConhecido, DASHBOARD_PAGE_SIZE);
-  if (destino !== null) redirect(destino <= 1 ? '/dashboard' : `/dashboard?page=${destino}`);
+  if (destino !== null) redirect(dashboardHref(destino, termo));
 
   const pagina = pedida;
   const { from, to } = rangeForPage(pagina);
@@ -63,12 +76,7 @@ export default async function DashboardPage({
   // 🔴 O recorte é do BANCO (`.range()`), não do cliente: são 10 linhas por
   // página em vez de todas. `count: 'exact'` traz o total na MESMA query, sem
   // uma segunda ida ao banco só para contar.
-  const carouselsQuery = supabase
-    .from('carousels')
-    .select(DASHBOARD_SELECT, { count: 'exact' })
-    .eq('coverSlide.position', 0)
-    .order('updated_at', { ascending: false })
-    .range(from, to);
+  const carouselsQuery = dashboardCarouselsQuery(db, { from, to, termo });
 
   type CarouselRow = Omit<DashboardCarousel, 'coverSlide'> & { coverSlide: Record<string, unknown>[] | null };
 
@@ -99,6 +107,7 @@ export default async function DashboardPage({
       page={pagina}
       totalPages={totalPaginas}
       totalCarousels={totalFinal}
+      searchTerm={termo}
     />
   );
 }
