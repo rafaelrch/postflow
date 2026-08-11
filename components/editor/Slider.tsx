@@ -18,10 +18,10 @@ export default function Slider({ label, value, min, max, step = 1, onChange, uni
     <div className="flex flex-col gap-1.5">
       {label && (
         <div className="flex justify-between items-center">
-          <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]">
+          <span className="text-[9px] font-semibold text-[var(--ink-dim)] uppercase tracking-[0.08em]">
             {label}
           </span>
-          <span className="text-[10px] font-mono text-gray-900 dark:text-white bg-black/[0.06] dark:bg-white/[0.08] px-1.5 py-px rounded-md tabular-nums leading-relaxed">
+          <span className="text-[10px] font-mono text-[var(--ink)] bg-black/[0.06] dark:bg-white/[0.08] px-1.5 py-px rounded-md tabular-nums leading-relaxed">
             {display}{unit}
           </span>
         </div>
@@ -32,7 +32,7 @@ export default function Slider({ label, value, min, max, step = 1, onChange, uni
         {/* Track background */}
         <div className="absolute left-0 right-0 h-[3px] rounded-full bg-black/[0.1] dark:bg-white/[0.1] overflow-hidden">
           <div
-            className="h-full rounded-full bg-gray-900 dark:bg-white transition-none"
+            className="h-full rounded-full bg-[var(--ink)] transition-none"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -49,7 +49,7 @@ export default function Slider({ label, value, min, max, step = 1, onChange, uni
         />
         {/* Thumb indicator */}
         <div
-          className="absolute w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-white shadow-sm border-2 border-white dark:border-[#111] pointer-events-none transition-none"
+          className="absolute w-3.5 h-3.5 rounded-full bg-[var(--ink)] shadow-sm border-2 border-white dark:border-[#111] pointer-events-none transition-none"
           style={{ left: `calc(${percent}% - 7px)` }}
         />
       </div>

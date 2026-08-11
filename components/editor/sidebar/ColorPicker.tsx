@@ -33,7 +33,7 @@ export default function ColorPicker({ label, value, onChange, className }: Color
       {label && <span className={cn(labelCls, 'shrink-0')}>{label}</span>}
       <label className="relative shrink-0 cursor-pointer group">
         <span
-          className="block w-7 h-7 rounded-lg border border-black/10 dark:border-white/10 shadow-sm group-hover:scale-105 transition-transform"
+          className="block w-7 h-7 rounded-lg border border-[var(--line-strong)] shadow-sm group-hover:scale-105 transition-transform"
           style={{ background: validHex }}
         />
         <input
@@ -47,7 +47,7 @@ export default function ColorPicker({ label, value, onChange, className }: Color
         type="text"
         value={hex}
         onChange={(e) => handleHex(e.target.value)}
-        className="w-[82px] px-2 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] font-mono focus:outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
+        className="w-[82px] px-2 py-1.5 rounded-lg bg-[var(--paper)] border border-[var(--line)] text-[var(--ink)] text-[11px] font-mono focus:outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
         placeholder="#000000"
         maxLength={7}
       />

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Slide, GlobalSettings } from '@/types';
 import { getFormat } from '@/lib/formats';
+import { cornerGrowthTop, cornerTop } from '@/lib/utils';
 import { getImageLayerStyle } from '@/lib/utils';
 import {
   TEMPLATE_02_COLORS,
@@ -14,6 +15,7 @@ import {
   Template02BackgroundLayer,
   Template02Slots,
   template02Background,
+  template02SlotDefaults,
   template02ContentBox,
   template02CoverTops,
   template02ElementX,
@@ -70,7 +72,12 @@ const { radius } = TEMPLATE_02_SPEC.tokens;
  */
 function textStyle(slot: string, specColor: string, ov: Template02Overrides): React.CSSProperties {
   const t = template02TypeFor(slot, specColor, ov);
+  // MARGEM por slot — a mesma da aba Cantos. O cabeçalho fica de fora porque o
+  // `Header` já posiciona por `top`/`left` com a margem embutida; somar aqui
+  // valeria em dobro só ali.
+  const margin = slot.startsWith('header.') ? 0 : ov.slotStyles[slot]?.margin ?? 0;
   return {
+    ...(margin ? { marginTop: margin, marginLeft: margin } : {}),
     fontFamily: t.font ? t.font.fontFamily : t.fontFamily,
     fontWeight: t.font ? t.font.fontWeight : t.fontWeight,
     fontStyle: t.font ? t.font.fontStyle : 'normal',
@@ -144,6 +151,16 @@ function Header({
   const handleVisible = handleStyle?.visible !== false;
   const categoryMargin = categoryStyle?.margin ?? 0;
   const handleMargin = handleStyle?.margin ?? 0;
+  // O canto cresce a partir do próprio centro, sem sair do slide.
+  const topOf = (slot: string, margin: number) => {
+    const ref = template02SlotDefaults(slot)?.fontSizePx ?? 17;
+    return cornerTop(
+      TEMPLATE_02_HEADER_Y,
+      cornerGrowthTop(margin, ov.slotStyles[slot]?.fontSize ?? ref, ref),
+    );
+  };
+  const opacityOf = (style: { opacity?: number } | undefined) =>
+    style?.opacity !== undefined ? { opacity: style.opacity / 100 } : {};
   return (
     <>
       {categoryVisible && (
@@ -152,7 +169,8 @@ function Header({
           style={{
             ...textStyle('header.category', color, ov),
             ...base,
-            top: TEMPLATE_02_HEADER_Y + categoryMargin,
+            ...opacityOf(categoryStyle),
+            top: topOf('header.category', categoryMargin),
             left: TEMPLATE_02_HEADER_MARGIN_X + categoryMargin,
             textAlign: 'left',
           }}
@@ -166,7 +184,8 @@ function Header({
           style={{
             ...textStyle('header.handle', color, ov),
             ...base,
-            top: TEMPLATE_02_HEADER_Y + handleMargin,
+            ...opacityOf(handleStyle),
+            top: topOf('header.handle', handleMargin),
             right: TEMPLATE_02_HEADER_MARGIN_X + handleMargin,
             textAlign: 'right',
           }}

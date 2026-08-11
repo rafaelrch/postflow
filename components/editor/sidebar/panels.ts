@@ -37,6 +37,7 @@ export type PanelId =
   | 'imagem'
   | 'estiloDoTexto'
   | 'textoDoSlide'
+  | 'destaquesDoTexto'
   | 'layoutDoSlide'
   | 'sombraOverlay'
   | 'fundoDoSlide'
@@ -85,6 +86,10 @@ export const PANEL_REGISTRY: Record<PanelId, PanelDef> = {
   imagem:            { id: 'imagem',            scope: 'slide',  icon: ImageIcon,        label: 'Imagem' },
   estiloDoTexto:     { id: 'estiloDoTexto',     scope: 'slide',  icon: Baseline,         label: 'Estilo do texto' },
   textoDoSlide:      { id: 'textoDoSlide',      scope: 'slide',  icon: Type,             label: 'Texto do slide' },
+  // Só o Perfil usa: os outros estilos já trazem o mesmo controle dentro do
+  // painel de texto. Aqui ele é o painel inteiro porque o Perfil não tem
+  // "Texto do slide" — a tipografia dele é fixa (ver `ProfileSlide`).
+  destaquesDoTexto:  { id: 'destaquesDoTexto',  scope: 'slide',  icon: Baseline,         label: 'Destaques no texto' },
   layoutDoSlide:     { id: 'layoutDoSlide',     scope: 'slide',  icon: LayoutPanelLeft,  label: 'Layout do slide' },
   sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: Contrast,         label: 'Sombra / Overlay' },
   fundoDoSlide:      { id: 'fundoDoSlide',      scope: 'slide',  icon: Palette,          label: 'Fundo do slide' },
@@ -163,7 +168,7 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
 
   profile: [
     { scope: 'post', panels: ['perfil', 'tema'] },
-    { scope: 'slide', panels: ['conteudoSlide', 'imagem'] },
+    { scope: 'slide', panels: ['conteudoSlide', 'destaquesDoTexto', 'imagem'] },
   ],
 
   editorial: [

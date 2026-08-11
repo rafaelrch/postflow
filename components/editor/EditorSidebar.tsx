@@ -1,7 +1,11 @@
 'use client';
 
 import { ReactNode, useRef } from 'react';
-import { Download, Archive, Upload, Image, Underline, Sparkles, RotateCcw } from 'lucide-react';
+import { Download, Archive, Upload, Image, Underline, Sparkles, RotateCcw, ArrowLeft } from 'lucide-react';
+// `Image` já é o ícone do lucide neste arquivo — o componente do Next entra
+// com outro nome em vez de renomear as ~10 chamadas do ícone.
+import NextImage from 'next/image';
+import Link from 'next/link';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
@@ -11,6 +15,7 @@ import SidebarGroup from './sidebar/SidebarGroup';
 import SidebarPanel from './sidebar/SidebarPanel';
 import ColorPicker from './sidebar/ColorPicker';
 import ElementFontPicker from './sidebar/ElementFontPicker';
+import CornersPanel from './sidebar/CornersPanel';
 import WordHighlightPicker from './sidebar/WordHighlightPicker';
 import AiGenPanel from './sidebar/AiGenPanel';
 import ImageThumb from './sidebar/ImageThumb';
@@ -92,7 +97,7 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
       <div
         className={cn(
           'w-8 h-4 rounded-full relative transition-colors shrink-0',
-          on ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10'
+          on ? 'bg-[var(--accent)]' : 'bg-black/10 dark:bg-white/10'
         )}
       >
         <div
@@ -102,7 +107,7 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
           )}
         />
       </div>
-      <span className="text-[12px] text-gray-900/55 dark:text-white/50">{label}</span>
+      <span className="text-[12px] text-[var(--ink-dim)]">{label}</span>
     </button>
   );
 }
@@ -116,8 +121,8 @@ function UnderlineToggle({ on, onToggle }: { on: boolean; onToggle: () => void }
       className={cn(
         'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
         on
-          ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-          : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+          ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+          : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-dim)] hover:border-[var(--ink)] hover:text-[var(--ink)]'
       )}
     >
       <Underline className="w-3 h-3" />
@@ -128,7 +133,7 @@ function UnderlineToggle({ on, onToggle }: { on: boolean; onToggle: () => void }
 function DropZone({ label, onClick, onFile }: { label: string; onClick: () => void; onFile: (f: File) => void }) {
   return (
     <div
-      className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
+      className="border-2 border-dashed border-[var(--line-strong)] rounded-xl p-4 text-center cursor-pointer hover:border-[var(--ink)] hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
       onClick={onClick}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -137,8 +142,8 @@ function DropZone({ label, onClick, onFile }: { label: string; onClick: () => vo
         if (f?.type.startsWith('image/')) onFile(f);
       }}
     >
-      <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
-      <span className="text-[11px] text-gray-900/35 dark:text-white/35 font-medium">{label}</span>
+      <Upload className="w-4 h-4 mx-auto mb-1.5 text-[var(--ink-muted)] group-hover:text-[var(--ink-dim)] transition-colors" />
+      <span className="text-[11px] text-[var(--ink-muted)] font-medium">{label}</span>
     </div>
   );
 }
@@ -168,6 +173,14 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   if (!slide) return null;
 
   const isEditorialCover = isEditorialCoverSlide(style, slide, activeSlideIndex);
+  /**
+   * A imagem de fundo deste slide de fato PINTA alguma coisa?
+   *
+   * No Editorial só a capa usa fundo de imagem desde a F4 — nos internos a
+   * imagem mora no card. Nos demais estilos que têm a aba (o Minimalista) o
+   * fundo continua valendo em qualquer slide.
+   */
+  const bgImageIsLive = style !== 'editorial' || isEditorialCover;
   const contentSlidesCount = slides.filter((s, i) => !isEditorialCoverSlide(style, s, i)).length;
 
   // ── TEMPLATE 1 ────────────────────────────────────────────────────────────
@@ -377,13 +390,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       <>
         <div className="flex items-center gap-2">
           <div
-            className="w-10 h-10 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden cursor-pointer border border-black/10 dark:border-white/10 shrink-0"
+            className="w-10 h-10 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden cursor-pointer border border-[var(--line-strong)] shrink-0"
             onClick={() => profilePhotoRef.current?.click()}
             title="Clique para trocar a foto"
           >
             {profileBadge.photo
               ? <img src={profileBadge.photo} alt="" className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center text-gray-900/20 dark:text-white/20 text-[9px]">foto</div>}
+              : <div className="w-full h-full flex items-center justify-center text-[var(--ink-muted)] text-[9px]">foto</div>}
           </div>
           <div className="flex-1 flex flex-col gap-1">
             <input className={inputCls} placeholder="Nome" value={profileBadge.name}
@@ -406,8 +419,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             className={cn(
               'flex-1 px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all',
               theme === t
-                ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900/70 dark:hover:text-white/70'
+                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                : 'text-[var(--ink-dim)] hover:text-[var(--ink-2)]'
             )}
           >
             {t === 'dark' ? 'Escuro' : 'Claro'}
@@ -560,7 +573,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
         />
         <button onClick={() => generateAll()} disabled={generating}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[11px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--line)] text-[11px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
           <Sparkles className="w-3.5 h-3.5" />
           {generating && progress.total > 1
             ? `Gerando ${progress.done}/${progress.total}…`
@@ -591,7 +604,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
         />
         <button onClick={() => generateAll('content')} disabled={generating}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[11px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--line)] text-[11px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
           <Sparkles className="w-3.5 h-3.5" />
           {generating && progress.total > 1
             ? `Gerando ${progress.done}/${progress.total}…`
@@ -623,7 +636,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           const specColor = t02Model != null ? template02SlotColor(d.slot, t02Model) : '#000000';
           const isHighlight = d.slot === 'cover.highlight';
           return (
-            <div key={d.slot} className="space-y-2 pt-3 border-t border-black/[0.05] dark:border-white/[0.05] first:border-t-0 first:pt-0">
+            <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
               <span className={labelCls}>{d.label}</span>
               {isHighlight ? (
                 <>
@@ -662,6 +675,10 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
                     min={-0.1} max={0.3} step={0.01} unit="em"
                     onChange={(v) => setT02Slot(d.slot, { letterSpacing: v })} />
+                  {/* Mesma faixa e mesmo campo do slider "Margem" da aba
+                      Cantos: empurra o bloco para dentro. */}
+                  <Slider label="Margem" value={st.margin ?? 0} min={0} max={150} unit="px"
+                    onChange={(v) => setT02Slot(d.slot, { margin: v })} />
                 </>
               )}
             </div>
@@ -674,7 +691,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           const st = slide.templateSlotStyles?.[d.slot] ?? {};
           const base = template01SlotDefaults(d.slot);
           return (
-            <div key={d.slot} className="space-y-2 pt-3 border-t border-black/[0.05] dark:border-white/[0.05] first:border-t-0 first:pt-0">
+            <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
               <span className={labelCls}>{d.label}</span>
               <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
                 min={10} max={160} unit="px" onChange={(v) => setT01Slot(d.slot, { fontSize: v })} />
@@ -693,11 +710,15 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
                 min={-0.1} max={0.3} step={0.01} unit="em"
                 onChange={(v) => setT01Slot(d.slot, { letterSpacing: v })} />
+              {/* Mesma faixa e mesmo campo do slider "Margem" da aba Cantos:
+                  empurra o bloco para dentro a partir da borda do spec. */}
+              <Slider label="Margem" value={st.margin ?? 0} min={0} max={150} unit="px"
+                onChange={(v) => setT01Slot(d.slot, { margin: v })} />
             </div>
           );
         })}
 
-        <div className="pt-3 border-t border-black/[0.05] dark:border-white/[0.05] space-y-2">
+        <div className="pt-3 border-t border-[var(--line)] space-y-2">
           <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
             onChange={(v) => setT01({ lineHeight: v }, 'lineHeight')} />
           {/* No template os blocos são ancorados pelo spec (a capa centraliza, o
@@ -710,8 +731,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 <button key={align} onClick={() => setT01({ textAlignment: align }, 'textAlignment')}
                   className={cn('h-7 rounded text-[10px] transition-colors border',
                     slide.templateOverrides?.textAlignment && slide.textAlignment === align
-                      ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm'
-                      : 'bg-[var(--surface-elevated)] text-gray-900/35 dark:text-white/30 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20')}>
+                      ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                      : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}>
                   {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
                 </button>
               ))}
@@ -800,8 +821,74 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
+    /* PERFIL — negrito parcial e cor por palavra. É o mesmo picker do Editorial
+       e do Minimalista; o que faltava era o estilo `profile` oferecê-lo e o
+       `ProfileSlide` ler `slide.highlights` (ver `lib/text-highlights.tsx`).
+       A fonte padrão é a do template, que é fixa. */
+    destaquesDoTexto: (
+      <>
+        <WordHighlightPicker
+          label="Destaques no título"
+          text={slide.title}
+          highlights={(slide.highlights || []).filter((h) => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
+          onChange={(titleHls) => {
+            const other = (slide.highlights || []).filter((h) => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
+            updateActiveSlide({ highlights: [...other, ...titleHls] });
+          }}
+          accentColor={accentColor}
+          defaultFontName={defaultTitleFontName}
+        />
+        {slide.description && (
+          <WordHighlightPicker
+            label="Destaques na descrição"
+            text={slide.description}
+            highlights={(slide.highlights || []).filter((h) => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
+            onChange={(descHls) => {
+              const other = (slide.highlights || []).filter((h) => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
+              updateActiveSlide({ highlights: [...other, ...descHls] });
+            }}
+            accentColor={accentColor}
+            defaultFontName={defaultBodyFontName}
+          />
+        )}
+      </>
+    ),
+
     layoutDoSlide: (
       <>
+        {/* SEQUÊNCIA do slide — onde a imagem entra em relação aos dois blocos
+            de texto. Os três valores já existiam em `ContentLayout` e o
+            `EditorialSlide` já desenhava cada um; faltava poder escolher.
+            A capa fica de fora: ela não é uma sequência, é a capa. */}
+        {!isEditorialCover && (
+          <div>
+            <span className={cn(labelCls, 'block mb-1.5')}>Posição da imagem</span>
+            <div className="grid grid-cols-3 gap-1">
+              {([
+                ['image-text-text', 'Imagem em cima', '▣ ≡ ≡'],
+                ['text-image-text', 'Imagem no meio', '≡ ▣ ≡'],
+                ['text-text-image', 'Imagem embaixo', '≡ ≡ ▣'],
+              ] as const).map(([value, label, glyph]) => {
+                const active = (slide.contentLayout ?? 'text-image-text') === value;
+                return (
+                  <button
+                    key={value}
+                    aria-label={label}
+                    aria-pressed={active}
+                    title={label}
+                    onClick={() => updateActiveSlide({ contentLayout: value })}
+                    className={cn('h-7 rounded text-[10px] transition-colors border',
+                      active
+                        ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                        : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}
+                  >
+                    {glyph}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div>
           <span className={cn(labelCls, 'block mb-1.5')}>Posição do texto</span>
           <div className="grid grid-cols-3 gap-1">
@@ -814,8 +901,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                 }}
                 className={cn('h-7 rounded text-[10px] transition-colors border',
                   slide.textPosition === pos
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm'
-                    : 'bg-[var(--surface-elevated)] text-gray-900/35 dark:text-white/30 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20')}>
+                    ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                    : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}>
                 {pos === 'top-left' ? '↖' : pos === 'top-center' ? '↑' : pos === 'top-right' ? '↗'
                   : pos === 'middle-left' ? '←' : pos === 'center' ? '·' : pos === 'middle-right' ? '→'
                   : pos === 'bottom-left' ? '↙' : pos === 'bottom-center' ? '↓' : '↘'}
@@ -827,8 +914,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               <button key={align} onClick={() => updateActiveSlide({ textAlignment: align })}
                 className={cn('h-7 rounded text-[10px] transition-colors border',
                   slide.textAlignment === align
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm'
-                    : 'bg-[var(--surface-elevated)] text-gray-900/35 dark:text-white/30 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20')}>
+                    ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                    : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}>
                 {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
               </button>
             ))}
@@ -890,7 +977,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       <>
         <ColorPicker label="Cor" value={slide.backgroundColor || '#111111'}
           onChange={(v) => updateActiveSlide({ backgroundColor: v })} />
-        <DropZone label="Clique ou arraste uma imagem de fundo" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
+        {/* No EDITORIAL a imagem de fundo só existe na CAPA: nos internos ela
+            vai no card (F4), e o upload aqui virou controle órfão — aceitava
+            arquivo que não entrava em slide nenhum. O Minimalista continua
+            usando fundo de imagem em qualquer slide, então mantém tudo. */}
+        {bgImageIsLive && (
+          <DropZone label="Clique ou arraste uma imagem de fundo" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
+        )}
         {isEditorialCover && (
           <AiGenPanel
             key={`cover-bg-${activeSlideIndex}`}
@@ -901,7 +994,26 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
           />
         )}
-        {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+        {/* Carrossel editorial antigo pode ter fundo gravado num slide interno.
+            O dado NÃO é apagado sozinho — mas sem nenhum controle viraria lixo
+            invisível e sem como limpar, então sobra o botão de remover. */}
+        {!bgImageIsLive && (slide.backgroundImageUrl || slide.gridImageUrl) && (
+          <div className="space-y-2 rounded-xl border border-[var(--line)] p-2">
+            <p className="text-[10px] leading-snug text-[var(--ink-muted)]">
+              Este slide tem uma imagem de fundo salva que não é mais usada — no
+              Editorial a imagem entra no card.
+            </p>
+            <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+              onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
+            <button
+              onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })}
+              className="w-full py-1.5 rounded-lg border border-[var(--line)] text-[10px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all"
+            >
+              Remover imagem de fundo
+            </button>
+          </div>
+        )}
+        {bgImageIsLive && (slide.backgroundImageUrl || slide.gridImageUrl) && (
           <>
             <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
               onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
@@ -918,199 +1030,132 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
-    /* No T1, os cantos são o cabeçalho do slide selecionado. Nos estilos
-       antigos este mesmo painel preserva o comportamento global legado. */
+    /* Aba CANTOS — o MESMO componente nos três templates que a têm. Cada um só
+       traduz o seu modelo de persistência (config global de cantos no legado,
+       slots do spec no T1/T2) para as props do painel. */
     cantos: isT01 ? (
-      <>
-        <Toggle
-          on={t01HeaderVisible}
-          onToggle={() => setHeaderStyles(t01CornerSlotNames, { visible: !t01HeaderVisible })}
-          label="Exibir cantos"
-        />
-
-        {t01HeaderVisible && (
-          <>
-            {t01CornerSlots.map((d) => (
-              <div key={d.slot} className="space-y-1">
-                <span className={labelCls}>{d.label}</span>
-                <input
-                  className={inputCls}
-                  value={slide.templateSlots?.[d.slot] ?? TEMPLATE_01_DEFAULT_CORNERS[d.slot]}
-                  onChange={(e) => setT01CornerText(d.slot, e.target.value)}
-                />
-              </div>
-            ))}
-            <div className="space-y-3 border-t border-black/[0.05] pt-3 dark:border-white/[0.05]">
-              <Slider
-                label="Tamanho fonte"
-                value={Math.round(
-                  t01HeaderStyle.fontSize ??
-                    template01SlotDefaults(t01CornerSlotNames[0])?.fontSizePx ??
-                    17
-                )}
-                min={8}
-                max={64}
-                unit="px"
-                onChange={(v) => setTemplateCornerStyle({ fontSize: v })}
-              />
-              <Slider
-                label="Margem"
-                value={t01HeaderStyle.margin ?? 0}
-                min={0}
-                max={150}
-                unit="px"
-                onChange={(v) => setTemplateCornerStyle({ margin: v })}
-              />
-              <ColorPicker
-                label="Cor"
-                value={
-                  t01HeaderStyle.color ||
-                  (t01Model != null
-                    ? template01SlotColor(t01CornerSlotNames[0], t01Model)
-                    : '#FFFFFF')
-                }
-                onChange={(v) => setHeaderStyles(t01CornerSlotNames, { color: v })}
-              />
-              <div>
-                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
-                <ElementFontPicker
-                  value={t01HeaderStyle.font}
-                  defaultFontName={
-                    template01SlotFontName(t01CornerSlotNames[0]) ?? 'Inter Display Medium'
-                  }
-                  onChange={(v) => setTemplateCornerStyle({ font: v })}
-                />
-              </div>
-            </div>
-          </>
+      <CornersPanel
+        show={t01HeaderVisible}
+        onToggleShow={() => setHeaderStyles(t01CornerSlotNames, { visible: !t01HeaderVisible })}
+        rows={t01CornerSlots.map((d) => ({
+          key: d.slot,
+          label: d.label,
+          value: slide.templateSlots?.[d.slot] ?? TEMPLATE_01_DEFAULT_CORNERS[d.slot],
+          onChange: (v) => setT01CornerText(d.slot, v),
+          visible: slide.templateSlotStyles?.[d.slot]?.visible !== false,
+          onToggleVisible: () =>
+            setHeaderStyles([d.slot], {
+              visible: slide.templateSlotStyles?.[d.slot]?.visible === false,
+            }),
+        }))}
+        fontSize={Math.round(
+          t01HeaderStyle.fontSize ??
+            template01SlotDefaults(t01CornerSlotNames[0])?.fontSizePx ??
+            17
         )}
-      </>
+        onFontSize={(v) => setTemplateCornerStyle({ fontSize: v })}
+        margin={t01HeaderStyle.margin ?? 0}
+        onMargin={(v) => setTemplateCornerStyle({ margin: v })}
+        opacity={t01HeaderStyle.opacity ?? 100}
+        onOpacity={(v) => setTemplateCornerStyle({ opacity: v })}
+        color={
+          t01HeaderStyle.color ||
+          (t01Model != null ? template01SlotColor(t01CornerSlotNames[0], t01Model) : '#FFFFFF')
+        }
+        onColor={(v) => setHeaderStyles(t01CornerSlotNames, { color: v })}
+        font={t01HeaderStyle.font}
+        defaultFontName={template01SlotFontName(t01CornerSlotNames[0]) ?? 'Inter Display Medium'}
+        onFont={(v) => setTemplateCornerStyle({ font: v })}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
     ) : (
-      <>
-        <Toggle
-          on={!!corners.show}
-          onToggle={() => updateCornersConfig({ show: !corners.show })}
-          label="Exibir cantos"
-        />
-        {corners.show && (
-          <>
-            {(['topLeft', 'topRight'] as const).map((key) => (
-              <div key={key} className="flex items-center gap-2">
-                <div
-                  onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
-                  className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0',
-                    corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
-                  {corners[key].visible && <span className="text-black text-[9px] font-bold">✓</span>}
-                </div>
-                <input className={cn(inputCls, 'flex-1')} value={corners[key].text} placeholder={key}
-                  onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} />
-              </div>
-            ))}
-            <div className="pt-3 border-t border-black/[0.05] dark:border-white/[0.05] space-y-3">
-              <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} unit="px"
-                onChange={(v) => updateCornersConfig({ fontSize: v })} />
-              <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} unit="px"
-                onChange={(v) => updateCornersConfig({ borderDistance: v })} />
-              <Slider label="Opacidade" value={corners.opacity} min={0} max={100} unit="%"
-                onChange={(v) => updateCornersConfig({ opacity: v })} />
-              <ColorPicker label="Cor" value={corners.color || DEFAULT_CORNERS.color || '#FFFFFF'}
-                onChange={(v) => updateCornersConfig({ color: v })} />
-              <div>
-                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
-                <ElementFontPicker value={corners.elementFont}
-                  defaultFontName={defaultBodyFontName}
-                  onChange={(v) => updateCornersConfig({ elementFont: v })} />
-              </div>
-            </div>
-          </>
-        )}
-      </>
+      <CornersPanel
+        show={!!corners.show}
+        onToggleShow={() => updateCornersConfig({ show: !corners.show })}
+        rows={(['topLeft', 'topRight'] as const).map((key) => ({
+          key,
+          label: key === 'topLeft' ? 'Canto esquerdo' : 'Canto direito',
+          value: corners[key].text,
+          onChange: (v) => updateCornersConfig({ [key]: { ...corners[key], text: v } } as never),
+          visible: corners[key].visible,
+          onToggleVisible: () =>
+            updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never),
+        }))}
+        fontSize={corners.fontSize}
+        onFontSize={(v) => updateCornersConfig({ fontSize: v })}
+        // "Distância bordas" e "Margem" sempre foram a mesma coisa: a distância
+        // do canto à borda do slide. O rótulo passa a ser um só.
+        margin={corners.borderDistance}
+        onMargin={(v) => updateCornersConfig({ borderDistance: v })}
+        opacity={corners.opacity}
+        onOpacity={(v) => updateCornersConfig({ opacity: v })}
+        color={corners.color || DEFAULT_CORNERS.color || '#FFFFFF'}
+        onColor={(v) => updateCornersConfig({ color: v })}
+        font={corners.elementFont}
+        defaultFontName={defaultBodyFontName}
+        onFont={(v) => updateCornersConfig({ elementFont: v })}
+        fontSizeMax={32}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
     ),
 
     /* TEXTO vale para o deck inteiro (ver `setDeckSlotText`); cor e visibilidade
-       são deste slide; tipografia e margem são globais. */
+       são deste slide; tipografia, margem e opacidade são globais. */
     cabecalho: (
-      <>
-        <Toggle
-          on={t02HeaderVisible}
-          onToggle={() => setHeaderStyles(t02HeaderSlotNames, { visible: !t02HeaderVisible })}
-          label="Exibir cantos"
-        />
-        {t02HeaderVisible && (
-          <>
-            {t02HeaderSlots.map((d) => {
-              const value = slide.templateSlots?.[d.slot] ?? TEMPLATE_02_DEFAULT_HEADER[d.slot];
-              const over = d.maxChars != null && value.length > d.maxChars;
-              return (
-                <div key={d.slot} className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={labelCls}>{d.label}</span>
-                    {d.maxChars != null && (
-                      <span className={cn(numericCls, over && 'text-red-500 font-semibold')}>
-                        {value.length}/{d.maxChars} car.
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    className={cn(inputCls, over && 'border-red-500/60')}
-                    value={value}
-                    onChange={(e) => setT02HeaderText(d.slot, e.target.value)}
-                  />
-                </div>
-              );
-            })}
-            <div className="space-y-3 border-t border-black/[0.05] pt-3 dark:border-white/[0.05]">
-              <Slider
-                label="Tamanho fonte"
-                value={Math.round(
-                  t02HeaderStyle.fontSize ??
-                    template02SlotDefaults(t02HeaderSlotNames[0])?.fontSizePx ??
-                    17
-                )}
-                min={8}
-                max={64}
-                unit="px"
-                onChange={(v) => setTemplateCornerStyle({ fontSize: v })}
-              />
-              <Slider
-                label="Margem"
-                value={t02HeaderStyle.margin ?? 0}
-                min={0}
-                max={150}
-                unit="px"
-                onChange={(v) => setTemplateCornerStyle({ margin: v })}
-              />
-              <ColorPicker
-                label="Cor"
-                value={
-                  t02HeaderStyle.color ||
-                  (t02Model != null
-                    ? template02SlotColor('header.category', t02Model)
-                    : '#767682')
-                }
-                onChange={(v) => setHeaderStyles(t02HeaderSlotNames, { color: v })}
-              />
-              <div>
-                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
-                <ElementFontPicker
-                  value={t02HeaderStyle.font}
-                  defaultFontName={
-                    template02SlotFontName(t02HeaderSlotNames[0]) ?? 'Inter Display Medium'
-                  }
-                  onChange={(v) => setTemplateCornerStyle({ font: v })}
-                />
-              </div>
-            </div>
-          </>
+      <CornersPanel
+        show={t02HeaderVisible}
+        onToggleShow={() => setHeaderStyles(t02HeaderSlotNames, { visible: !t02HeaderVisible })}
+        rows={t02HeaderSlots.map((d) => ({
+          key: d.slot,
+          label: d.label,
+          value: slide.templateSlots?.[d.slot] ?? TEMPLATE_02_DEFAULT_HEADER[d.slot],
+          onChange: (v) => setT02HeaderText(d.slot, v),
+          visible: slide.templateSlotStyles?.[d.slot]?.visible !== false,
+          onToggleVisible: () =>
+            setHeaderStyles([d.slot], {
+              visible: slide.templateSlotStyles?.[d.slot]?.visible === false,
+            }),
+          maxChars: d.maxChars,
+        }))}
+        fontSize={Math.round(
+          t02HeaderStyle.fontSize ??
+            template02SlotDefaults(t02HeaderSlotNames[0])?.fontSizePx ??
+            17
         )}
-      </>
+        onFontSize={(v) => setTemplateCornerStyle({ fontSize: v })}
+        margin={t02HeaderStyle.margin ?? 0}
+        onMargin={(v) => setTemplateCornerStyle({ margin: v })}
+        opacity={t02HeaderStyle.opacity ?? 100}
+        onOpacity={(v) => setTemplateCornerStyle({ opacity: v })}
+        color={
+          t02HeaderStyle.color ||
+          (t02Model != null ? template02SlotColor('header.category', t02Model) : '#767682')
+        }
+        onColor={(v) => setHeaderStyles(t02HeaderSlotNames, { color: v })}
+        font={t02HeaderStyle.font}
+        defaultFontName={template02SlotFontName(t02HeaderSlotNames[0]) ?? 'Inter Display Medium'}
+        onFont={(v) => setTemplateCornerStyle({ font: v })}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
     ),
 
     restaurarTemplate: (
       <>
         <button
           onClick={() => updateActiveSlide({ templateOverrides: undefined, templateSlotStyles: undefined })}
-          className="w-full py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-semibold hover:opacity-90 transition-opacity"
+          className="w-full py-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] text-[11px] font-semibold hover:opacity-90 transition-opacity"
         >
           Restaurar
         </button>
@@ -1132,13 +1177,20 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           label: 'Conteúdo',
           value: `SLIDE ${String(activeSlideIndex + 1).padStart(2, '0')}`,
         }
-      : g.scope === 'global'
-        ? { label: 'Estilo global' }
-        : {};
+      // 🔴 O escopo global NÃO tem mais rótulo: o "ESTILO GLOBAL" saiu da lista
+      // a pedido do Rafael, e o grupo passa a ser só mais linhas na sequência.
+      //
+      // Só ELE some. O "CONTEÚDO — SLIDE 01" é do mesmo componente e continua —
+      // e não é só a linha do topo: no Profile ele é o cabeçalho do SEGUNDO
+      // grupo, no corpo da lista. Tirar "cabeçalho do corpo" em bloco mataria
+      // o rótulo do Profile junto.
+      : {};
   };
 
-  // Painéis que já nascem abertos — o caminho principal de cada estilo.
-  const OPEN_BY_DEFAULT: PanelId[] = ['perfil', 'conteudoSlide', 'imagem', 'textoDoSlide'];
+  // Nenhum painel nasce aberto: a barra abre fechada, como no desenho, em TODOS
+  // os templates. Abrir/fechar no clique continua igual, e o estado segue local
+  // ao painel — não havia persistência entre sessões e continua não havendo.
+  const OPEN_BY_DEFAULT: PanelId[] = [];
 
   const renderPanel = (id: PanelId) => {
     const def = PANEL_REGISTRY[id];
@@ -1151,7 +1203,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         id={id}
         icon={def.icon}
         label={panelLabel(id, ctx)}
-        defaultOpen={OPEN_BY_DEFAULT.includes(id) || (id === 'fundoDoSlide' && isEditorialCover)}
+        defaultOpen={OPEN_BY_DEFAULT.includes(id)}
         badge={id === 'restaurarTemplate' && templateSlideChanges > 0 ? `${templateSlideChanges}` : undefined}
         disabled={disabled}
         disabledReason="Este slide ainda segue o template — não há estilo para restaurar."
@@ -1161,34 +1213,83 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     );
   };
 
+  // A pílula de voltar divide a linha com o cabeçalho do PRIMEIRO grupo: no
+  // desenho as duas coisas compartilham a baseline, pílula à esquerda e o
+  // rótulo alinhado à direita na borda interna do painel.
+  // A pílula do desenho (108,6 × 18,9, texto 10,5px) é pequena demais para
+  // clicar e para ler. Cresceu para ~30 de altura e 12px de corpo.
+  //
+  // 🔴 Medido antes de escolher: o rótulo do escopo ocupa 130 dos 259 úteis,
+  // sobrando 123 para a pílula. "Voltar para Dashboard" a 12px pede 153 — não
+  // cabe ao lado sem truncar, que é o aperto que já nos mordeu. Com o rótulo
+  // curto são 98, e a linha fecha em 234 dos 259. Por isso o texto visível é
+  // "Dashboard" e a frase inteira vive no title/aria-label.
+  const backPill = (
+    <Link
+      href="/dashboard"
+      title="Voltar para Dashboard"
+      aria-label="Voltar para Dashboard"
+      // Raio das linhas do acordeão (11), não mais pílula — o tamanho novo fica.
+      className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-[var(--studio-pill)] pl-2 pr-3 py-2 text-[12px] leading-none text-[var(--studio-pill-ink)] hover:bg-[var(--studio-line)] hover:text-[var(--ink)] transition-colors"
+    >
+      <ArrowLeft className="w-4 h-4 shrink-0" />
+      Dashboard
+    </Link>
+  );
+
   return (
-    <div className="w-[300px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
+    // Painel FLUTUANTE, não coluna colada na borda: 285 de largura, margem 15 à
+    // esquerda e 18 em cima/embaixo, raio 16. É um card sobre a página.
+    <aside className="w-[285px] shrink-0 ml-[15px] my-[18px] rounded-[16px] bg-[var(--studio-panel)] flex flex-col overflow-hidden">
       {fileInputs}
 
-      <div className="flex-1 overflow-y-auto pb-3">
-        {groups.map((g) => (
-          <SidebarGroup key={g.scope} {...headerFor(g)}>
+      <Link href="/dashboard" className="block shrink-0 pl-[23px] pt-[26px]" aria-label="Creatools">
+        <NextImage
+          src="/LOGO_SEMFUNDO.png"
+          alt="Creatools"
+          width={468}
+          height={132}
+          priority
+          className="w-[234px] h-[66px] object-contain object-left dark:invert"
+        />
+      </Link>
+
+      <div className="shrink-0 mx-[13px] mt-[37px] h-px bg-[var(--studio-divider)]" />
+
+      {/* `studio-scroll` reserva a canaleta da barra SEMPRE, para a largura da
+          linha não mudar entre rolando e não rolando (ver globals.css).
+          A máscara desbota os últimos 20px: sem ela o último card era cortado
+          ao meio pelo rodapé, sem nenhum sinal de que havia mais coisa. */}
+      <div className="studio-scroll flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,#000_calc(100%-20px),transparent_100%)]">
+        {groups.map((g, i) => (
+          <SidebarGroup key={g.scope} {...headerFor(g)} leading={i === 0 ? backPill : undefined}>
             {g.ids.map(renderPanel)}
           </SidebarGroup>
         ))}
       </div>
 
-      <div className="border-t border-black/[0.05] dark:border-white/[0.05] px-4 py-4 flex flex-col gap-2.5 bg-[var(--surface)]">
+      {/* Respiro inferior de 42 do desenho; os dois botões separados por 5. */}
+      <div className="shrink-0 px-[13px] pt-4 pb-[42px] flex flex-col gap-[5px]">
         <button
           onClick={onDownloadSlide}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[12px] font-bold hover:bg-gray-700 dark:hover:bg-white/90 active:scale-[0.98] transition-all shadow-sm"
+          className="h-[46px] w-full rounded-[10px] bg-[var(--studio-panel)] border border-[var(--studio-line)] text-[14px] text-[var(--ink)] flex items-center justify-center gap-3 hover:border-[var(--studio-line-strong)] transition-colors"
         >
-          <Download className="w-3.5 h-3.5" />
+          <Download className="w-[18px] h-[18px]" />
           Baixar Slide {activeSlideIndex + 1}
         </button>
+        {/* Ação principal. Borda e sombra CASADAS na cor do TEMA, não da tinta:
+            as duas saem de `--paper`, então no claro ficam brancas e no escuro
+            acompanham o tema — um token só, sem duas regras para dessincronizar.
+            Preto sobre preto (as duas em `--ink`) chapava o botão. O
+            preenchimento continua sendo a tinta. */}
         <button
           onClick={onDownloadAll}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[12px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
+          className="h-[46px] w-full rounded-[10px] bg-[var(--ink)] text-[var(--paper)] text-[14px] flex items-center justify-center gap-3 border border-[var(--paper)] shadow-[var(--sh-studio-paper)] hover:-translate-y-px active:translate-y-0 active:shadow-[var(--sh-press)] transition-all"
         >
-          <Archive className="w-3.5 h-3.5" />
-          Baixar todos os slides
+          <Archive className="w-[18px] h-[18px]" />
+          Exportar todos os slides
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

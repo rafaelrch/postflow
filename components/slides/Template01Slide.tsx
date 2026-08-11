@@ -4,6 +4,7 @@ import React from 'react';
 import { Slide, GlobalSettings, DEFAULT_CORNERS } from '@/types';
 import { getImageLayerStyle } from '@/lib/utils';
 import { getFormat } from '@/lib/formats';
+import { cornerGrowthTop, cornerTop } from '@/lib/utils';
 import {
   TEMPLATE_01_WIDTH,
   TEMPLATE_01_DEFAULT_CORNERS,
@@ -145,24 +146,47 @@ function nodeStyle(
     // Os cantos têm controle próprio (distância às bordas); o resto do texto
     // anda junto no deslocamento do bloco.
     const isCorner = kind === 'corner';
-    const slotMargin = isCorner && node.slot ? ov.slotStyles[node.slot]?.margin ?? 0 : 0;
-    const dx = isCorner ? cornerShift(ov) + slotMargin : ov.textOffset?.x ?? 0;
-    const dy = isCorner ? cornerShift(ov) + slotMargin : ov.textOffset?.y ?? 0;
+    // MARGEM por slot — a mesma da aba Cantos, agora em qualquer bloco de
+    // texto: empurra para DENTRO a partir da borda em que o spec ancorou.
+    const slotMargin = node.slot ? ov.slotStyles[node.slot]?.margin ?? 0 : 0;
+    const offX = isCorner ? cornerShift(ov) : ov.textOffset?.x ?? 0;
+    const offY = isCorner ? cornerShift(ov) : ov.textOffset?.y ?? 0;
+    // No eixo Y o CANTO cresce a partir do próprio centro. O bloco de corpo não
+    // ganha essa correção de propósito: ele reflui por medição
+    // (`template01Tops`), e recentrar ali brigaria com o reflow e mexeria em
+    // quem só mudou o tamanho do texto.
+    const dy = isCorner
+      ? offY + cornerGrowthTop(slotMargin, fontSizePx, t.fontSizePx)
+      : offY + slotMargin;
+
+    // O CANTO não usa a largura do spec. A caixa do Figma é justa para o texto
+    // de fábrica (233 px no esquerdo, 121 px no direito): crescer a fonte fazia
+    // o "LOREM IPSUM" quebrar em duas linhas e o "@LOREMIPSUM" vazar da caixa,
+    // que é o defeito que o Rafael viu no controle de tamanho. Com
+    // `max-content` a caixa acompanha o texto, como o canto do Editorial —
+    // e, no tamanho de fábrica, as âncoras (left/right + text-align) põem os
+    // glifos exatamente onde o gabarito põe, então a fidelidade não se mexe.
+    // No bloco de corpo a caixa encolhe pela margem: margem que não estreita o
+    // bloco só o faria vazar pelo outro lado.
+    const width = isCorner ? 'max-content' : Math.max(0, b.w - slotMargin);
 
     if (node.anchor.mode === 'center-x') {
+      // Bloco centrado não tem borda de referência: a margem só vale no Y.
       css.left = '50%';
-      css.transform = dx ? `translateX(calc(-50% + ${dx}px))` : 'translateX(-50%)';
-      css.width = b.w;
+      css.transform = offX ? `translateX(calc(-50% + ${offX}px))` : 'translateX(-50%)';
+      css.width = width;
     } else if (node.anchor.mode === 'right') {
-      // A distância é medida da borda direita. No canto, `dx` AFASTA da borda
-      // (soma); num deslocamento de bloco, empurrar para a direita aproxima.
-      css.right = b.right + (isCorner ? dx : -dx);
-      css.width = b.w;
+      // A distância é medida da borda direita. O deslocamento de bloco empurra
+      // para a direita (aproxima da borda); a MARGEM sempre afasta dela.
+      css.right = b.right + (isCorner ? offX : -offX) + slotMargin;
+      css.width = width;
     } else {
-      css.left = b.x + dx;
-      css.width = b.w;
+      css.left = b.x + offX + slotMargin;
+      css.width = width;
     }
-    css.top = (top ?? b.y) + dy;
+    // No canto o piso é a borda do slide; nos demais blocos o `top` do fluxo
+    // manda como sempre.
+    css.top = isCorner ? cornerTop(top ?? b.y, dy) : (top ?? b.y) + dy;
     css.fontFamily = o.font ? o.font.fontFamily : fontStack(t.fontFamily);
     css.fontWeight = o.font ? o.font.fontWeight : t.fontWeight || 400;
     css.fontStyle = o.font ? o.font.fontStyle : t.italic ? 'italic' : 'normal';
@@ -194,6 +218,9 @@ function nodeStyle(
   if (node.type === 'TEXT') {
     const o = template01TextOverrideFor(node, ov);
     if (o.opacity !== undefined) css.opacity = o.opacity;
+    // O controle da aba Cantos escreve por slot e vence o override legado.
+    const slotOpacity = node.slot ? ov.slotStyles[node.slot]?.opacity : undefined;
+    if (slotOpacity !== undefined) css.opacity = slotOpacity / 100;
   }
   return css;
 }

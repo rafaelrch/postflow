@@ -96,12 +96,14 @@ describe('TEMPLATE 2 — painéis na tela', () => {
 describe('TEMPLATE 2 — conteúdo do slide', () => {
   it('a capa mostra título, destaque e chamada; o interno, título e descrição', () => {
     montaDeck(0); // modelo 1 = capa
+    abre('Conteúdo do slide');
     expect(screen.getByText('Título')).toBeTruthy();
     expect(screen.getByText('Destaque')).toBeTruthy();
     expect(screen.getByText('Chamada')).toBeTruthy();
     cleanup();
 
     montaDeck(1); // modelo 2 = conteúdo
+    abre('Conteúdo do slide');
     expect(screen.getByText('Título')).toBeTruthy();
     expect(screen.getByText('Descrição')).toBeTruthy();
     expect(screen.queryByText('Chamada')).toBeNull();
@@ -109,7 +111,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
 
   it('editar um campo grava no slot do slide ativo, e só nele', () => {
     montaDeck(1);
-    const painel = screen.getByText('Título').closest('[data-panel]') as HTMLElement;
+    const painel = abre('Conteúdo do slide');
     const campo = within(painel).getAllByRole('textbox')[0];
     fireEvent.change(campo, { target: { value: 'Marca não é logo' } });
 
@@ -125,6 +127,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
         'cover.highlight': 'ERRAM A',
       },
     });
+    abre('Conteúdo do slide');
     const picker = screen.getByRole('group', { name: 'Palavras em destaque' });
     expect(within(picker).getAllByRole('button').map((button) => button.textContent)).toEqual([
       'STARTUPS',
@@ -144,6 +147,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
     montaDeck(0, {
       templateSlots: { 'cover.headline': 'STARTUPS ERRAM A\nIDENTIDADE', 'cover.highlight': 'ERRAM A' },
     });
+    abre('Conteúdo do slide');
     const picker = screen.getByRole('group', { name: 'Palavras em destaque' });
     fireEvent.click(within(picker).getByRole('button', { name: 'STARTUPS' }));
     expect(useEditorStore.getState().slides[0].templateSlots?.['cover.highlight']).toBe(
@@ -154,6 +158,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
   it('acusa o estouro do limite', () => {
     const limite = template02Limits('content.title').maxChar!;
     montaDeck(1, { templateSlots: { 'content.title': 'a'.repeat(limite + 1) } });
+    abre('Conteúdo do slide');
     expect(screen.getByText(`${limite + 1}/${limite} car.`)).toBeTruthy();
     expect(screen.getByText(/Estourou o limite do slot/i)).toBeTruthy();
   });
@@ -255,7 +260,7 @@ describe('TEMPLATE 2 — cantos', () => {
 describe('TEMPLATE 2 — imagem', () => {
   it('sem imagem, não há slider mexendo em nada', () => {
     montaDeck(1);
-    const painel = screen.getByText('Imagem').closest('[data-panel]') as HTMLElement;
+    const painel = abre('Imagem');
     expect(within(painel).queryByText('Opacidade')).toBeNull();
     expect(within(painel).queryByText('Zoom')).toBeNull();
     expect(within(painel).queryByText(/placeholder cinza/i)).toBeNull();
@@ -263,7 +268,7 @@ describe('TEMPLATE 2 — imagem', () => {
 
   it('com imagem, aparecem a miniatura e os ajustes', () => {
     montaDeck(1, { templateSlots: { 'content.image': 'https://x/foto.jpg' } });
-    const painel = screen.getByText('Imagem').closest('[data-panel]') as HTMLElement;
+    const painel = abre('Imagem');
     expect(within(painel).getByAltText('Imagem anexada')).toBeTruthy();
     expect(within(painel).getByText('Opacidade')).toBeTruthy();
     expect(within(painel).getByText('Zoom')).toBeTruthy();
@@ -274,6 +279,7 @@ describe('TEMPLATE 2 — imagem', () => {
       templateSlots: { 'content.image': 'https://x/foto.jpg' },
       contentImageUrl: 'https://x/generico.jpg',
     });
+    abre('Imagem');
     fireEvent.click(screen.getByTitle('Remover imagem'));
     const slide = useEditorStore.getState().slides[1];
     expect(slide.templateSlots?.['content.image']).toBe('');

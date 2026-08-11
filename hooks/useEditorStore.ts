@@ -65,6 +65,13 @@ interface EditorState {
     globalSettings: GlobalSettings;
     caption?: string;
     hashtags?: string[];
+    /**
+     * Quando o carrossel foi salvo pela última vez (`carousels.updated_at`).
+     * Sem isto a barra de status mostrava só "Salvo", sem horário, até o
+     * primeiro save DA SESSÃO — e o horário existia, só não tinha chegado até
+     * aqui. Não é chute: é o instante que o banco registrou.
+     */
+    lastSavedAt?: number | null;
   }) => void;
 }
 
@@ -223,7 +230,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       hashtags: [],
     }),
 
-  loadCarousel: ({ id, title, style, slides, globalSettings, caption = '', hashtags = [] }) =>
+  loadCarousel: ({ id, title, style, slides, globalSettings, caption = '', hashtags = [], lastSavedAt = null }) =>
     set({
       carouselId: id,
       carouselTitle: title,
@@ -232,7 +239,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       globalSettings,
       activeSlideIndex: 0,
       saveStatus: 'saved',
-      lastSavedAt: null,
+      lastSavedAt,
       history: [],
       historyIndex: -1,
       caption,

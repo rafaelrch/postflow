@@ -256,9 +256,13 @@ describe('TEMPLATE 1 — cabeçalho por slide', () => {
     const right = html.match(/data-slot="cantos\.right"[^>]*style="([^"]*)"/)?.[1] ?? '';
     expect(left).toContain('font-size:30px');
     expect(left).toContain('left:91px');
-    expect(left).toContain('top:64px');
+    // 44 (spec) + 20 (margem) + metade do que a fonte cresceu além da
+    // referência de ~16,8 px: o canto cresce a partir do próprio centro nos
+    // dois sentidos. Era `top:64px` enquanto o crescimento só valia para baixo
+    // — ver `tests/cantos-tamanho.test.tsx`.
+    expect(left).toContain('top:57.4025px');
     expect(right).toContain('right:83px');
-    expect(right).toContain('top:64px');
+    expect(right).toContain('top:57.4025px');
   });
 });
 

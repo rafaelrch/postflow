@@ -16,6 +16,7 @@ export default function SidebarGroup({
   hint,
   value,
   info,
+  leading,
   children,
 }: {
   /** Ausente = grupo sem cabeçalho (o bloco do topo, nível post). */
@@ -23,6 +24,13 @@ export default function SidebarGroup({
   hint?: string;
   value?: string;
   info?: string;
+  /**
+   * Conteúdo à esquerda na linha do cabeçalho — a pílula "Voltar para
+   * Dashboard", que no desenho divide a linha com o rótulo do primeiro grupo.
+   * Presente sozinho, ele basta para a linha existir: nem todo estilo tem
+   * rótulo no primeiro grupo (o grupo `post` do Perfil não tem).
+   */
+  leading?: ReactNode;
   children: ReactNode;
 }) {
   // `Children.toArray` já descarta null/false/undefined — que é como as
@@ -32,7 +40,9 @@ export default function SidebarGroup({
 
   return (
     <div className="pb-1">
-      {label && <SidebarScopeHeader label={label} hint={hint} value={value} info={info} />}
+      {(label || leading) && (
+        <SidebarScopeHeader label={label} hint={hint} value={value} info={info} leading={leading} />
+      )}
       {panels}
     </div>
   );

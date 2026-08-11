@@ -259,3 +259,33 @@ export function textPositionToStyle(position: string): React.CSSProperties {
   };
   return map[position] ?? map['bottom-left'];
 }
+
+/**
+ * Deslocamento vertical de um canto quando o TAMANHO da fonte muda.
+ *
+ * Sem isto o bloco é ancorado pelo topo: aumentar a fonte empurra o texto só
+ * para baixo, e ele parece "escorregar" para dentro do slide em vez de crescer.
+ * Aqui o bloco cresce a partir do PRÓPRIO CENTRO — o centro fica fixo na linha
+ * de referência do template — e o piso é a borda do slide.
+ *
+ * A primeira versão só fazia isso ENCOLHENDO (`margin + max(0, …)`), tratando a
+ * margem como limite duro para cima. Nos TEMPLATES 1 e 2 isso deixou o tamanho
+ * quebrado: a referência do spec é ~16,8 px e o slider vai a 64, então quase
+ * toda a faixa útil caía na parte travada e o canto só descia. O Editorial
+ * escondia o defeito porque a referência dele (27 px) fica no TOPO do slider
+ * (máx. 32) — daí "no Editorial funciona perfeitamente".
+ *
+ * Devolve quanto somar ao topo, já contando a margem. NÃO trava em zero: no
+ * Editorial `margin` é o topo absoluto (a distância às bordas), mas no T1/T2 é
+ * um DELTA somado ao `y` do spec e vale 0 por padrão — travar aqui devolveria a
+ * assimetria justamente nos dois templates quebrados. Quem tem o topo final na
+ * mão é que o prende à borda do slide (`cornerTop`).
+ */
+export function cornerGrowthTop(margin: number, fontSize: number, refFontSize: number): number {
+  return margin + (refFontSize - fontSize) / 2;
+}
+
+/** Topo final de um canto: o crescimento aplicado, sem sair do slide. */
+export function cornerTop(base: number, growth: number): number {
+  return Math.max(0, base + growth);
+}
