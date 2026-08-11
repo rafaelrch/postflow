@@ -127,9 +127,40 @@ export async function POST(req: NextRequest) {
  * Sem contexto, a string devolvida é exatamente a de antes.
  */
 function buildUserPrompt(body: GenerateCarouselInput, brandContext?: BrandContext): string {
-  const prompt = buildPromptBody(body);
+  const prompt = buildPromptBody(body) + buildContentDirectives(body);
   const contexto = formatBrandContextAsPrompt(brandContext);
   return contexto ? `${contexto}\n\n---\n\n${prompt}` : prompt;
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  'pt-BR': 'português do Brasil',
+  'en-US': 'inglês (EUA)',
+  'es-ES': 'espanhol',
+};
+
+/**
+ * Diretivas opcionais do wizard (idioma e conteúdo exato).
+ *
+ * Entram DEPOIS do addendum do template, para não competir com os limites de
+ * slot. Sem nenhuma das duas — o caso de qualquer chamador antigo — devolve
+ * string vazia e o prompt final fica idêntico ao de antes.
+ */
+function buildContentDirectives(body: GenerateCarouselInput): string {
+  const linhas: string[] = [];
+
+  // pt-BR é o padrão histórico e já está embutido no system prompt.
+  if (body.language && body.language !== 'pt-BR') {
+    linhas.push(`IDIOMA: escreva todo o conteúdo dos slides em ${LANGUAGE_LABELS[body.language] ?? body.language}.`);
+  }
+
+  if (body.exactContent) {
+    linhas.push(
+      'CONTEÚDO EXATO: use o texto acima literalmente, apenas distribuindo-o entre os slides. ' +
+      'Não reescreva, não resuma e não invente frases novas.'
+    );
+  }
+
+  return linhas.length ? `\n\n${linhas.join('\n')}` : '';
 }
 
 function buildPromptBody(body: GenerateCarouselInput): string {

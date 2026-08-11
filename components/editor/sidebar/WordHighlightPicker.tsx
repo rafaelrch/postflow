@@ -135,8 +135,8 @@ export default function WordHighlightPicker({
               className={cn(
                 'px-2 py-0.5 rounded-lg text-[11px] border transition-all font-medium',
                 isSelected
-                  ? 'border-blue-500/60 bg-blue-500/15 text-blue-500 dark:text-blue-400'
-                  : 'border-black/[0.07] dark:border-white/[0.07] text-gray-900/50 dark:text-white/40 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white bg-[var(--surface-elevated)]'
+                  ? 'border-[var(--accent)]/60 bg-[var(--accent)]/15 text-[var(--accent)] dark:text-[var(--accent)]'
+                  : 'border-[var(--line)] text-[var(--ink-dim)] hover:border-[var(--ink)] hover:text-[var(--ink)] bg-[var(--paper)]'
               )}
               style={
                 hl && !isSelected
@@ -151,8 +151,8 @@ export default function WordHighlightPicker({
       </div>
 
       {selected.size > 0 && (
-        <div className="rounded-xl border border-black/[0.07] dark:border-white/[0.07] p-3 flex flex-col gap-2.5 bg-[var(--surface-elevated)]">
-          <span className="text-[11px] font-semibold text-gray-900/45 dark:text-white/40">
+        <div className="rounded-xl border border-[var(--line)] p-3 flex flex-col gap-2.5 bg-[var(--paper)]">
+          <span className="text-[11px] font-semibold text-[var(--ink-dim)]">
             {selected.size} palavra{selected.size > 1 ? 's' : ''} selecionada
             {selected.size > 1 ? 's' : ''}
           </span>
@@ -178,7 +178,7 @@ export default function WordHighlightPicker({
               }}
               className={cn(
                 'w-8 h-4 rounded-full relative transition-colors shrink-0',
-                pendingUnderline ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10'
+                pendingUnderline ? 'bg-[var(--accent)]' : 'bg-black/10 dark:bg-white/10'
               )}
             >
               <div
@@ -188,12 +188,12 @@ export default function WordHighlightPicker({
                 )}
               />
             </div>
-            <span className="text-[11px] text-gray-900/50 dark:text-white/40">Sublinhado</span>
+            <span className="text-[11px] text-[var(--ink-dim)]">Sublinhado</span>
           </label>
           <div className="flex gap-2">
             <button
               onClick={() => setSelected(new Set())}
-              className="flex-1 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-bold transition-colors hover:bg-gray-700 dark:hover:bg-white/90"
+              className="flex-1 py-2 rounded-[var(--radius-sm)] bg-[var(--ink)] text-[var(--paper)] text-[11px] font-bold transition-colors hover:bg-[var(--ink-2)]"
             >
               Concluir
             </button>
@@ -218,7 +218,7 @@ export default function WordHighlightPicker({
               <span style={{ color: hl.color }}>{hl.text}</span>
               <button
                 onClick={() => onChange(highlights.filter((_, j) => j !== i))}
-                className="text-gray-900/30 dark:text-white/30 hover:text-red-400 transition-colors ml-0.5"
+                className="text-[var(--ink-muted)] hover:text-red-400 transition-colors ml-0.5"
               >
                 <X className="w-2.5 h-2.5" />
               </button>

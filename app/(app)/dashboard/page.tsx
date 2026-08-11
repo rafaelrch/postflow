@@ -1,4 +1,14 @@
+import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import {
+  DASHBOARD_PAGE_SIZE,
+  DASHBOARD_SELECT,
+  loadDashboardCarousels,
+  pageRedirectTarget,
+  parsePageParam,
+  rangeForPage,
+  totalPagesFor,
+} from '@/lib/dashboard-data';
 import DashboardClient from './DashboardClient';
 
 export type DashboardCarousel = {
@@ -17,44 +27,78 @@ export type DashboardCarousel = {
   coverSlide: Record<string, unknown> | null;
 };
 
-async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return new Promise<T>((resolve) => {
-    const timer = setTimeout(() => resolve(fallback), ms);
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch(() => {
-        clearTimeout(timer);
-        resolve(fallback);
-      });
-  });
-}
-
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  // Nesta versão do Next `searchParams` é uma PROMISE e precisa de await —
+  // conferido em node_modules/next/dist/docs/01-app/03-api-reference/
+  // 03-file-conventions/page.md, que é a fonte da verdade por AGENTS.md.
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const supabase = await createServerSupabaseClient();
+  const pedida = parsePageParam((await searchParams).page);
 
-  // Uma query só: o slide de capa (position 0) vem embutido via PostgREST,
-  // em vez da segunda round-trip que buscava as capas depois.
-  const carouselsQuery = Promise.resolve(
-    supabase
-      .from('carousels')
-      .select('id, title, style, status, accent_color, theme, font_pair, corners, profile_badge, global_settings, created_at, updated_at, slides(count), coverSlide:slides(*)')
-      .eq('coverSlide.position', 0)
-      .order('updated_at', { ascending: false })
+  // 🔴 Contagem ANTES do recorte, com `head: true` (traz só o cabeçalho, zero
+  // linha). Não é luxo: pedir um `.range()` além do fim faz o PostgREST
+  // responder ERRO, e sem isto uma URL como `?page=99` caía no desfecho
+  // "falhou ao carregar" — o QUARTO caso disfarçado de um dos três, que é
+  // justamente o que a carga desta tela existe para impedir.
+  const { count: totalBruto } = await supabase
+    .from('carousels')
+    .select('id', { count: 'exact', head: true });
+  const totalConhecido = typeof totalBruto === 'number' ? totalBruto : null;
+
+  // Passou do fim (URL chutada, ou o último item da última página foi apagado):
+  // manda para a última página REAL, para o endereço combinar com a tela.
+  const destino = pageRedirectTarget(pedida, totalConhecido, DASHBOARD_PAGE_SIZE);
+  if (destino !== null) redirect(destino <= 1 ? '/dashboard' : `/dashboard?page=${destino}`);
+
+  const pagina = pedida;
+  const { from, to } = rangeForPage(pagina);
+
+  // Uma query só: o slide de capa (position 0) vem embutido via PostgREST, e
+  // com as COLUNAS NOMEADAS — o `slides(*)` de antes trazia `carousel_id`,
+  // `metadata`, `created_at` e `updated_at` que o `mapDbSlideToSlide` nunca lê.
+  //
+  // 🔴 O recorte é do BANCO (`.range()`), não do cliente: são 10 linhas por
+  // página em vez de todas. `count: 'exact'` traz o total na MESMA query, sem
+  // uma segunda ida ao banco só para contar.
+  const carouselsQuery = supabase
+    .from('carousels')
+    .select(DASHBOARD_SELECT, { count: 'exact' })
+    .eq('coverSlide.position', 0)
+    .order('updated_at', { ascending: false })
+    .range(from, to);
+
+  type CarouselRow = Omit<DashboardCarousel, 'coverSlide'> & { coverSlide: Record<string, unknown>[] | null };
+
+  const { carousels, error, total } = await loadDashboardCarousels<CarouselRow>(
+    carouselsQuery as unknown as PromiseLike<{
+      data: CarouselRow[] | null; error: unknown; count?: number | null;
+    }>,
+    {
+      // Falha silenciosa é o que criou o bug; daqui em diante ela aparece no
+      // log do servidor.
+      onError: (kind, detail) => console.error(`[dashboard] carga falhou (${kind}):`, detail),
+    },
   );
 
-  const result = await withTimeout(carouselsQuery, 4000, { data: [] } as unknown as Awaited<typeof carouselsQuery>);
-  type CarouselRow = Omit<DashboardCarousel, 'coverSlide'> & { coverSlide: Record<string, unknown>[] | null };
-  const carousels = Array.isArray((result as { data?: unknown[] })?.data)
-    ? ((result as { data: unknown[] }).data as CarouselRow[])
-    : [];
+  // O total confiável é o da contagem; o da query recortada serve de reserva.
+  const totalFinal = totalConhecido ?? total;
+  const totalPaginas = totalPagesFor(totalFinal ?? 0, DASHBOARD_PAGE_SIZE);
 
   const carouselsWithCover: DashboardCarousel[] = carousels.map((c) => ({
     ...c,
     coverSlide: c.coverSlide?.[0] ?? null,
   }));
 
-  return <DashboardClient initialCarousels={carouselsWithCover} />;
+  return (
+    <DashboardClient
+      initialCarousels={carouselsWithCover}
+      loadError={error}
+      page={pagina}
+      totalPages={totalPaginas}
+      totalCarousels={totalFinal}
+    />
+  );
 }

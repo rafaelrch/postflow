@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Slide, GlobalSettings, TextPosition, TextHighlight, ElementFont } from '@/types';
-import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient, getImageLayerStyle } from '@/lib/utils';
+import { Slide, GlobalSettings, TextPosition, TextHighlight, DEFAULT_CORNERS } from '@/types';
+import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient, getImageLayerStyle, cornerGrowthTop, cornerTop as cornerTopOf } from '@/lib/utils';
 import { getFormat } from '@/lib/formats';
+import { renderTextWithHighlights } from '@/lib/text-highlights';
 
 export interface MinimalistSlideProps {
   slide: Slide;
@@ -13,17 +14,6 @@ export interface MinimalistSlideProps {
   forExport?: boolean;
 }
 
-// Sublinhado desenhado com border-bottom em vez de text-decoration: o
-// html2canvas desenha text-decoration com espessura/posição próprias, então o
-// export ficava diferente do preview. O inline-block é essencial — em elemento
-// inline o navegador pinta a borda na caixa de conteúdo do texto, mas o
-// html2canvas pinta no retângulo do elemento (altura da linha), deslocando a
-// linha. Com inline-block as duas caixas coincidem e o PNG sai igual ao preview.
-const UNDERLINE_STYLE: React.CSSProperties = {
-  display: 'inline-block',
-  lineHeight: 1.1,
-  borderBottom: '0.05em solid currentColor',
-};
 
 function getTextPositionStyle(pos: TextPosition): React.CSSProperties {
   const base: React.CSSProperties = { position: 'absolute', display: 'flex', flexDirection: 'column' };
@@ -76,84 +66,6 @@ function getTextBlockStyle(slide: Slide): React.CSSProperties {
 }
 
 // Each highlight may carry a wordIdx to distinguish occurrences of the same word
-interface IndexedHighlight extends TextHighlight { wordIdx?: number }
-
-function renderTextWithHighlights(
-  text: string,
-  highlights: TextHighlight[],
-  fallbackWord: string,
-  fallbackColor: string,
-  style: React.CSSProperties,
-): React.ReactNode {
-  const effective = (highlights.length > 0
-    ? highlights
-    : (fallbackWord ? [{ text: fallbackWord, color: fallbackColor }] : [])) as IndexedHighlight[];
-
-  // Sublinhado do bloco inteiro (título/descrição) vira border por palavra —
-  // text-decoration renderiza diferente no html2canvas.
-  const underlineAll = style.textDecoration === 'underline';
-  const { textDecoration: _td, ...outerStyle } = style;
-
-  if ((effective.length === 0 && !underlineAll) || !text) return <span style={outerStyle}>{text}</span>;
-
-  // Tokenise text into words+gaps preserving whitespace
-  // Each token = { raw: string, isWord: boolean }
-  interface Token { raw: string; isWord: boolean }
-  const tokens: Token[] = [];
-  let remaining = text;
-  while (remaining.length > 0) {
-    const wm = remaining.match(/^\S+/);
-    if (wm) { tokens.push({ raw: wm[0], isWord: true }); remaining = remaining.slice(wm[0].length); continue; }
-    const sm = remaining.match(/^\s+/);
-    if (sm) { tokens.push({ raw: sm[0], isWord: false }); remaining = remaining.slice(sm[0].length); continue; }
-    tokens.push({ raw: remaining[0], isWord: false }); remaining = remaining.slice(1);
-  }
-
-  // Count occurrence index per word (case-insensitive)
-  const seen: Record<string, number> = {};
-  const wordOccurrences: number[] = tokens.map((t) => {
-    if (!t.isWord) return -1;
-    const lc = t.raw.toLowerCase();
-    const occ = seen[lc] ?? 0;
-    seen[lc] = occ + 1;
-    return occ;
-  });
-
-  // Match each word token to a highlight
-  const getHl = (word: string, occIdx: number): IndexedHighlight | undefined => {
-    const lc = word.toLowerCase();
-    // Prefer occurrence-specific match, fall back to any highlight for this word (for legacy highlights without wordIdx)
-    return effective.find((h) => h.text.toLowerCase() === lc && h.wordIdx === occIdx)
-        ?? effective.find((h) => h.text.toLowerCase() === lc && h.wordIdx === undefined);
-  };
-
-  return (
-    <span style={outerStyle}>
-      {tokens.map((token, i) => {
-        if (!token.isWord) return token.raw;
-        const occ = wordOccurrences[i];
-        const hl = getHl(token.raw, occ);
-        const underlined = hl?.underline || underlineAll;
-        if (!hl && !underlined) return token.raw;
-        const hlFontCSS = hl?.font ? getElementFontCSS(hl.font as ElementFont) : null;
-        return (
-          <span
-            key={i}
-            style={{
-              ...(hl ? { color: hl.color } : {}),
-              ...(underlined ? UNDERLINE_STYLE : {}),
-              ...(hlFontCSS ? {
-                fontFamily: hlFontCSS.fontFamily,
-                fontWeight: hlFontCSS.fontWeight,
-                fontStyle: hlFontCSS.fontStyle,
-              } : {}),
-            }}
-          >{token.raw}</span>
-        );
-      })}
-    </span>
-  );
-}
 
 export default function MinimalistSlide({ slide, globalSettings, slideIndex, totalSlides, forExport }: MinimalistSlideProps) {
   const { corners, accentColor, fontPair, theme } = globalSettings;
@@ -236,9 +148,10 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
     (slide.description || '').toLowerCase().includes(h.text.toLowerCase())
   );
 
-  // Corner color: custom > auto-derived
-  const cornerTextColor = corners.color
-    || (isLightSlide ? `rgba(0,0,0,${corners.opacity / 100})` : `rgba(255,255,255,${corners.opacity / 100})`);
+  // A opacidade é propriedade à parte, não o alfa da cor — ver o comentário
+  // gêmeo no EditorialSlide: embutida no rgba() ela nunca era aplicada, porque
+  // o padrão do produto já traz uma cor definida.
+  const cornerTextColor = corners.color || (isLightSlide ? '#000000' : '#FFFFFF');
 
   const cornerStyle: React.CSSProperties = {
     fontSize: `${corners.fontSize}px`,
@@ -248,11 +161,14 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
     fontWeight: cornerFontCSS.fontWeight,
     fontStyle: cornerFontCSS.fontStyle,
     color: cornerTextColor,
+    opacity: corners.opacity / 100,
   };
 
   const dotInactive = isLightSlide ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.3)';
 
   const bd = corners.borderDistance;
+  // O canto cresce a partir do próprio centro, sem sair do slide.
+  const cornerTop = cornerTopOf(0, cornerGrowthTop(bd, corners.fontSize, DEFAULT_CORNERS.fontSize));
 
   return (
     <div
@@ -375,12 +291,12 @@ export default function MinimalistSlide({ slide, globalSettings, slideIndex, tot
       {corners.show && (
         <>
           {corners.topLeft.visible && (
-            <div style={{ position: 'absolute', top: bd, left: bd, ...cornerStyle }}>
+            <div style={{ position: 'absolute', top: cornerTop, left: bd, ...cornerStyle }}>
               {corners.topLeft.text}
             </div>
           )}
           {corners.topRight.visible && (
-            <div style={{ position: 'absolute', top: bd, right: bd, ...cornerStyle }}>
+            <div style={{ position: 'absolute', top: cornerTop, right: bd, ...cornerStyle }}>
               {corners.topRight.text}
             </div>
           )}

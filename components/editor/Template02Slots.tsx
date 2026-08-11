@@ -120,7 +120,7 @@ export default function Template02Slots() {
                         'rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors',
                         selected
                           ? 'border-[#C9D900] bg-[#EFFF00] text-black'
-                          : 'border-black/[0.08] bg-black/[0.025] text-gray-900/55 hover:border-black/20 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/55 dark:hover:border-white/20'
+                          : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-dim)] hover:border-[var(--ink)]'
                       )}
                     >
                       {word.display}

@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
-  X, ChevronRight, Sparkles, Image as ImageIcon,
-  Upload, Plus, Trash2, FileJson, Globe,
+  X, ArrowRight, ArrowLeft, Sparkles, Image as ImageIcon,
+  Upload, Plus, Trash2, FileJson, Globe, Check,
+  RectangleVertical, Square, Smartphone,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { cn, normalizeHandle } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
 import {
   SlideStyle,
+  SlideFormat,
   FontPair,
   TwitterFormat,
   DEFAULT_GLOBAL_SETTINGS,
@@ -20,11 +23,16 @@ import {
   ProfileData,
   TextPosition,
 } from '@/types';
+import { FORMAT_LIST, getFormat } from '@/lib/formats';
+import { freeFormSlideFields } from '@/lib/generated-slide-fields';
+import SlidePreview from '@/components/editor/SlidePreview';
+import type { Slide, GlobalSettings } from '@/types';
 import { createClient } from '@/lib/supabase';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import {
   TEMPLATE_01_DEFAULT_CORNERS,
   template01SlotsFromContent,
+  template01SlotsForSlide,
   TEMPLATE_01_SLIDE_COUNT,
 } from '@/lib/templates/template-01';
 import {
@@ -32,6 +40,7 @@ import {
   TEMPLATE_02_DEFAULT_HEADER,
   template02ModelAt,
   template02SlotsFromContent,
+  template02TextSlotsForModel,
 } from '@/lib/templates/template-02';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import { handlePlanRequired, handleProjectLimit } from '@/hooks/useUpgradeStore';
@@ -41,10 +50,129 @@ interface CreateWizardProps {
   onClose: () => void;
 }
 
-// Slide de copy manual
-interface ManualSlide {
-  title: string;
-  description: string;
+/**
+ * Slide de copy manual. As chaves são os campos do template escolhido:
+ * `title`/`description`/`highlightWord` nos estilos livres e nomes de slot
+ * (`s1.headline`, `content.title`) nos templates de spec.
+ */
+type ManualSlide = Record<string, string>;
+
+/** Um campo de texto do passo de conteúdo, derivado do template selecionado. */
+interface TemplateFieldDef {
+  key: string;
+  label: string;
+  multiline?: boolean;
+  placeholder?: string;
+  /** Limite vindo do spec, mostrado como dica. */
+  hint?: string;
+}
+
+/** Idioma em que a IA escreve. Ausente/pt-BR = comportamento de sempre. */
+type ContentLanguage = 'pt-BR' | 'en-US' | 'es-ES';
+
+const CONTENT_LANGUAGES: { value: ContentLanguage; label: string }[] = [
+  { value: 'pt-BR', label: 'Português (Brasil)' },
+  { value: 'en-US', label: 'Inglês (EUA)' },
+  { value: 'es-ES', label: 'Espanhol' },
+];
+
+const CONTENT_MODES: { value: 'ai' | 'manual' | 'json'; label: string }[] = [
+  { value: 'ai', label: 'Criar com IA' },
+  { value: 'manual', label: 'Manualmente' },
+  { value: 'json', label: 'Importar JSON' },
+];
+
+/** Grade de pills do número de slides. */
+const SLIDE_COUNT_OPTIONS = Array.from({ length: 20 }, (_, i) => i + 1);
+
+function limitHint(maxLines?: number, maxCharsPerLine?: number, maxChars?: number): string | undefined {
+  if (maxLines && maxCharsPerLine) {
+    return `${maxLines} ${maxLines === 1 ? 'linha' : 'linhas'} · ~${maxCharsPerLine} car./linha`;
+  }
+  if (maxCharsPerLine) return `~${maxCharsPerLine} caracteres`;
+  if (maxChars) return `~${maxChars} caracteres`;
+  return undefined;
+}
+
+/**
+ * Campos de texto de um slide, por template.
+ *
+ * Os templates de spec não têm "título e descrição": têm SLOTS, com nome,
+ * rótulo e limite próprios. Derivar daqui é o que faz o passo de conteúdo
+ * pedir a coisa certa em vez de um par genérico que o template ignora.
+ */
+function templateFieldsForSlide(style: SlideStyle, index: number): TemplateFieldDef[] {
+  if (style === 'template01') {
+    return template01SlotsForSlide(index + 1)
+      .filter((s) => s.kind === 'text' && !s.slot.startsWith('cantos.'))
+      .map((s) => ({
+        key: s.slot,
+        label: s.label || s.role || s.slot,
+        multiline: (s.maxLines ?? 1) > 1,
+        placeholder: s.defaultValue.replace(/\n/g, ' ').slice(0, 60),
+        hint: limitHint(s.maxLines, s.maxCharsPerLine),
+      }));
+  }
+
+  if (style === 'template02') {
+    return template02TextSlotsForModel(template02ModelAt(index)).map((s) => ({
+      key: s.slot,
+      label: s.label,
+      multiline: s.multiline,
+      placeholder: s.defaultValue.replace(/\n/g, ' ').slice(0, 60),
+      hint: limitHint(s.maxLines, s.maxCharsPerLine, s.maxChars),
+    }));
+  }
+
+  if (style === 'profile') {
+    return [
+      { key: 'title', label: 'Texto do post', multiline: true, placeholder: 'A frase que segura o leitor' },
+      { key: 'description', label: 'Complemento', multiline: true, placeholder: 'Opcional' },
+    ];
+  }
+
+  // Editorial: o highlightWord sai na cor de acento no slide.
+  return [
+    { key: 'title', label: index === 0 ? 'Título da capa' : 'Título', placeholder: 'Máx. 7 palavras' },
+    { key: 'description', label: 'Descrição', multiline: true, placeholder: 'Máx. 2 frases' },
+    { key: 'highlightWord', label: 'Palavra em destaque', placeholder: 'Opcional' },
+  ];
+}
+
+/** Templates cujo conteúdo entra por slot, não por título/descrição. */
+function isSpecTemplate(style: SlideStyle): boolean {
+  return style === 'template01' || style === 'template02';
+}
+
+/**
+ * Slots de um slide manual/JSON, com TODO slot de texto preenchido — vazio
+ * quando o usuário não escreveu. É a mesma regra dura de
+ * `template0XSlotsFromContent`: um deck criado aqui não pode exibir a copy
+ * ilustrativa do Figma.
+ */
+function slotsFromFields(style: SlideStyle, index: number, values: Record<string, string>) {
+  const slots: Record<string, string> = {};
+  for (const f of templateFieldsForSlide(style, index)) {
+    slots[f.key] = (values[f.key] ?? '').trim();
+  }
+  return slots;
+}
+
+/** Exemplo de JSON do template selecionado — vira o placeholder do textarea. */
+function templateJsonExample(style: SlideStyle): string {
+  if (isSpecTemplate(style)) {
+    const slides = [0, 1].map((i) =>
+      Object.fromEntries(
+        templateFieldsForSlide(style, i).map((f) => [f.key, f.placeholder || '...']),
+      ),
+    );
+    return JSON.stringify({ slides }, null, 2);
+  }
+
+  const slide: Record<string, string> = { title: 'Título do slide', description: 'Texto descritivo' };
+  if (style !== 'profile') slide.highlightWord = 'destaque';
+  slide.imageUrl = 'https://...';
+  return JSON.stringify({ slides: [slide] }, null, 2);
 }
 
 const FONT_PAIRS: { label: FontPair; preview: string; sub: string }[] = [
@@ -57,11 +185,232 @@ const FONT_PAIRS: { label: FontPair; preview: string; sub: string }[] = [
   { label: 'Syne + DM Sans', preview: 'Aa', sub: 'Syne · DM Sans' },
 ];
 
+/**
+ * Templates cuja forma vem inteira do spec do Figma. Neles não há nada de
+ * identidade visual para escolher antes de gerar, então o wizard TERMINA no
+ * conteúdo: 3 passos em vez de 4.
+ */
+const SKIP_VISUAL_STEP: SlideStyle[] = ['template01', 'template02'];
+
+function stepCountFor(style: SlideStyle): number {
+  return SKIP_VISUAL_STEP.includes(style) ? 3 : 4;
+}
+
+const STEP_TITLES = ['Formato do post', 'Template', 'Conteúdo', 'Identidade visual'];
+
+/** Ícone e descrição de cada formato. As dimensões saem de lib/formats.ts. */
+const FORMAT_META: Record<SlideFormat, {
+  name: string;
+  desc: string;
+  icon: LucideIcon;
+}> = {
+  '4:5':  { name: 'Carrossel', desc: 'Ideal para conteúdo educativo e listas',   icon: RectangleVertical },
+  '1:1':  { name: 'Quadrado',  desc: 'Ótimo para quotes e imagens simples',      icon: Square },
+  '9:16': { name: 'Stories',   desc: 'Perfeito para stories e reels verticais',  icon: Smartphone },
+};
+
+/**
+ * Os quatro templates do wizard, na ordem do grid 2×2.
+ *
+ * O estilo `minimalist` continua existindo no editor e em carrosséis antigos —
+ * ele só não é oferecido aqui, por decisão de produto.
+ */
+const TEMPLATES: {
+  value: SlideStyle;
+  label: string;
+  /** Uma linha, dentro do card. */
+  short: string;
+  /** Faixa de detalhe abaixo do grid, só do selecionado. */
+  detail: string;
+}[] = [
+  {
+    value: 'profile',
+    label: 'Profile',
+    short: 'Post social, focado em texto',
+    detail: 'Estética de post no Twitter/X, com o seu perfil.',
+  },
+  {
+    value: 'editorial',
+    label: 'Editorial',
+    short: 'Revista para creators',
+    detail: 'Revista: metadados no topo, imagem e texto. Fontes e cores são suas.',
+  },
+  {
+    value: 'template01',
+    label: 'Template 1',
+    short: 'Deck fechado de 6 slides',
+    detail: `Forma fixa do Figma, ${TEMPLATE_01_SLIDE_COUNT} slides. Você troca só texto e imagens.`,
+  },
+  {
+    value: 'template02',
+    label: 'Template 2',
+    short: 'Deck aberto: quantos slides você quiser',
+    detail: 'Forma fixa do Figma, deck aberto: os 3 modelos se alternam.',
+  },
+];
+
+/** Templates cuja forma vem do spec — o step de ID visual respeita isso. */
+const FIXED_VISUAL_STYLES: SlideStyle[] = ['profile', 'template01', 'template02'];
+
+/**
+ * Campos de estilo de um slide nos estilos de forma LIVRE (profile/editorial).
+ *
+ * Fonte única: o `handleGenerate` monta o carrossel com isto e a miniatura do
+ * passo 2 desenha com isto. É o que faz a capa do card ser fiel POR
+ * CONSTRUÇÃO — se a geração mudar, a miniatura muda junto e não desatualiza.
+ * Os templates de spec não passam por aqui: neles a forma é do Figma.
+ */
+
+// ─── Miniatura de template ──────────────────────────────────────
+// A capa é renderizada pelo SlidePreview de verdade — o mesmo componente do
+// editor — com os mesmos campos que a geração produz para o slide 0. Nada de
+// mock de divs nem de valores inventados.
+
+const THUMB_HEIGHT = 132;
+
+/** Perfil de exemplo da miniatura do Profile. */
+const THUMB_PROFILE = { name: 'Ana Ribeiro', handle: '@anaribeiro' };
+
+/**
+ * Capa de exemplo de cada template. Nos templates de spec vai SEM
+ * `templateSlots`: assim o slide cai no conteúdo original do Figma, que é
+ * literalmente a capa daquele template.
+ */
+function previewSlide(style: SlideStyle): Slide {
+  if (style === 'template01' || style === 'template02') {
+    return { ...DEFAULT_SLIDE, id: `thumb-${style}`, position: 0, templateModel: 1 };
+  }
+  return {
+    ...DEFAULT_SLIDE,
+    id: `thumb-${style}`,
+    position: 0,
+    title: style === 'profile'
+      ? 'A disciplina vence o talento quando o talento não se disciplina.'
+      : 'O hábito que muda tudo',
+    description: style === 'profile'
+      ? ''
+      : 'O que ninguém te conta sobre começar cedo.',
+    highlightWord: '',
+    backgroundImageUrl: '',
+    gridImageUrl: '',
+    backgroundColor: '#0A0A0A',
+    ...freeFormSlideFields(style, 0),
+  };
+}
+
+function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideFormat }) {
+  const fmt = getFormat(format);
+  const settings: GlobalSettings = {
+    ...DEFAULT_GLOBAL_SETTINGS,
+    format,
+    theme: 'dark',
+    profileBadge: {
+      ...DEFAULT_GLOBAL_SETTINGS.profileBadge,
+      show: true,
+      name: THUMB_PROFILE.name,
+      handle: THUMB_PROFILE.handle,
+    },
+  };
+  return (
+    <span
+      className="block overflow-hidden rounded-[6px]"
+      style={{ border: '1.5px solid var(--ink)', lineHeight: 0 }}
+      aria-hidden
+    >
+      <SlidePreview
+        slide={previewSlide(style)}
+        globalSettings={settings}
+        style={style}
+        slideIndex={0}
+        totalSlides={6}
+        scale={THUMB_HEIGHT / fmt.height}
+      />
+    </span>
+  );
+}
+
+/**
+ * Barra de progresso do wizard. O preenchimento e a bolinha animam por
+ * transição de CSS (.cw-progress-*), que o prefers-reduced-motion desliga.
+ */
+function ProgressBar({ step, total }: { step: number; total: number }) {
+  const pct = (step / total) * 100;
+  return (
+    <div className="flex items-center gap-3 px-6 pb-4">
+      {/* Trilho e bolinha são só preenchimento — sem contorno. */}
+      <div
+        className="relative flex-1 rounded-full"
+        style={{ height: 6, background: 'var(--paper-3)' }}
+      >
+        <div
+          className="cw-progress-fill absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${pct}%`, background: 'var(--ink)' }}
+        />
+        <span
+          className="cw-progress-knob absolute top-1/2 rounded-full"
+          style={{
+            left: `${pct}%`,
+            width: 12,
+            height: 12,
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--accent)',
+          }}
+        />
+      </div>
+      <span
+        className="font-mono text-[11px] font-semibold tabular-nums shrink-0"
+        style={{ color: 'var(--ink-dim)' }}
+        data-testid="wizard-progress"
+      >
+        {/*
+          O total muda de 4 para 3 ao escolher um template de forma fixa. A
+          largura da barra já anima por transição; o número, sendo texto,
+          trocaria a seco — a `key` refaz o nó e o faz entrar com fade.
+        */}
+        {step} / <span key={total} className="cw-total-swap">{total}</span>
+      </span>
+    </div>
+  );
+}
+
+/** Cartão de opção do wizard — visual e gesto vêm de `.cw-option`. */
+function OptionCard({
+  selected,
+  onClick,
+  disabled,
+  className,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cn('cw-option relative w-full text-left', className)}
+    >
+      {children}
+      {selected && (
+        <span
+          className="absolute top-2 right-2 grid place-items-center rounded-full"
+          style={{ width: 18, height: 18, background: 'var(--ink)', color: 'var(--paper)' }}
+        >
+          <Check className="w-3 h-3" strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Slides manuais nascem vazios: o exemplo vive no placeholder de cada campo. */
 function makeDefaultManualSlides(count: number): ManualSlide[] {
-  return Array.from({ length: count }, (_, i) => ({
-    title: i === 0 ? 'Título de abertura' : i === count - 1 ? 'Me segue pra mais!' : `Slide ${i + 1}`,
-    description: '',
-  }));
+  return Array.from({ length: count }, () => ({}));
 }
 
 interface ParsedJSONSlide {
@@ -70,6 +419,8 @@ interface ParsedJSONSlide {
   highlightWord: string;
   backgroundColor: string;
   imageUrl: string;
+  /** Só nos templates de spec: o conteúdo entra por slot. */
+  slots?: Record<string, string>;
 }
 
 interface ParsedCarouselJSON {
@@ -175,25 +526,111 @@ function parseCarouselJSON(raw: string): ParsedCarouselJSON {
   return { slides, carouselTitle, caption };
 }
 
+/**
+ * JSON dos templates de spec: cada slide é um objeto de slot → texto, com os
+ * nomes que o próprio spec define. Recusa slide sem nenhum slot conhecido — sem
+ * isso o deck sairia com a copy de fábrica e o usuário não entenderia por quê.
+ */
+function parseSpecTemplateJSON(arr: unknown[], style: SlideStyle): ParsedJSONSlide[] {
+  return arr.map((raw, i) => {
+    const item = (raw ?? {}) as Record<string, unknown>;
+    const campos = templateFieldsForSlide(style, i);
+    const conhecidos = new Set(campos.map((f) => f.key));
+
+    const valores: Record<string, string> = {};
+    const desconhecidos: string[] = [];
+    for (const [k, v] of Object.entries(item)) {
+      if (conhecidos.has(k)) {
+        if (typeof v === 'string') valores[k] = v;
+      } else if (k !== 'imageUrl' && k !== 'image_url' && k !== 'image') {
+        desconhecidos.push(k);
+      }
+    }
+
+    if (Object.keys(valores).length === 0) {
+      const nome = TEMPLATES.find((t) => t.value === style)?.label ?? style;
+      throw new Error(
+        `Slide ${i + 1}: nenhum campo do ${nome} reconhecido` +
+        `${desconhecidos.length ? ` (recebido: ${desconhecidos.slice(0, 3).join(', ')})` : ''}. ` +
+        `Esperado: ${campos.map((f) => f.key).join(', ')}.`
+      );
+    }
+
+    const imagem = item.imageUrl ?? item.image_url ?? item.image;
+    const primeiro = campos.find((f) => valores[f.key])?.key;
+
+    return {
+      title: primeiro ? valores[primeiro] : '',
+      description: '',
+      highlightWord: '',
+      backgroundColor: '#111111',
+      imageUrl: typeof imagem === 'string' ? imagem : '',
+      slots: slotsFromFields(style, i, valores),
+    };
+  });
+}
+
+/**
+ * Parser do passo de conteúdo. Os templates de spec têm estrutura própria; os
+ * demais caem no parser genérico de sempre, sem mudança de comportamento.
+ */
+function parseCarouselJSONForStyle(raw: string, style: SlideStyle): ParsedCarouselJSON {
+  if (!isSpecTemplate(style)) return parseCarouselJSON(raw);
+
+  let s = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
+  s = s.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (!s) throw new Error('JSON vazio');
+  const parsed = JSON.parse(s);
+
+  const top = (Array.isArray(parsed) ? {} : parsed ?? {}) as Record<string, unknown>;
+  const arr: unknown = Array.isArray(parsed) ? parsed : Array.isArray(top.slides) ? top.slides : null;
+  if (!Array.isArray(arr)) throw new Error('JSON deve ser um array de slides ou um objeto com "slides"');
+  if (arr.length === 0) throw new Error('Nenhum slide encontrado no JSON');
+
+  return {
+    slides: parseSpecTemplateJSON(arr, style),
+    carouselTitle: typeof top.title === 'string' ? top.title.trim() || undefined : undefined,
+    caption: typeof top.caption === 'string' ? top.caption : undefined,
+  };
+}
+
 export default function CreateWizard({ onClose }: CreateWizardProps) {
   const router = useRouter();
   const { loadCarousel } = useEditorStore();
 
   const [step, setStep] = useState(1);
+  // Direção da última navegação — só alimenta a animação de troca de etapa.
+  const [stepDir, setStepDir] = useState<'fwd' | 'back'>('fwd');
+  // Formato do canvas. Mesmo tipo do editor (lib/formats.ts): vai para
+  // globalSettings.format e é persistido em carousels.global_settings.
+  const [format, setFormat] = useState<SlideFormat>('4:5');
   const [style, setStyle] = useState<SlideStyle>('profile');
   const [contentMode, setContentMode] = useState<'ai' | 'manual' | 'json'>('ai');
   const [prompt, setPrompt] = useState('');
   const [webSearch, setWebSearch] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
-  const [slideCount, setSlideCount] = useState(6);
+  const [slideCount, setSlideCount] = useState(5);
+  const [language, setLanguage] = useState<ContentLanguage>('pt-BR');
   const [twitterFormat, setTwitterFormat] = useState<TwitterFormat>('B');
   const [fontPair, setFontPair] = useState<FontPair>('SF Pro Display + IvyOra Text');
   // Brand palette loaded from profile: [dark, paper/light, accent]
   const DEFAULT_BRAND_PALETTE = ['#0A0A0A', '#FAFAF7', '#00CFFF'];
   const [brandPalette, setBrandPalette] = useState<string[]>(DEFAULT_BRAND_PALETTE);
-  const accentColor = brandPalette[2] || '#00CFFF';
-  const brandDarkBg = brandPalette[0] || '#0A0A0A';
+  /** True só quando o onboarding trouxe uma paleta de verdade. */
+  const [hasBrandIdentity, setHasBrandIdentity] = useState(false);
+
+  // Passo 4 — identidade visual do post
+  const [visualMode, setVisualMode] = useState<'brand' | 'manual'>('brand');
+  const [customBg, setCustomBg] = useState('#0A0A0A');
+  const [customAccent, setCustomAccent] = useState('#00CFFF');
+  // O Profile não tem cor de fundo livre: o cartão é claro ou escuro.
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  // Sem paleta do onboarding não há identidade a usar: cai no manual sozinho.
+  const usingBrand = hasBrandIdentity && visualMode === 'brand';
+  const accentColor = usingBrand ? (brandPalette[2] || '#00CFFF') : customAccent;
+  const brandDarkBg = usingBrand ? (brandPalette[0] || '#0A0A0A') : customBg;
   const brandLightBg = brandPalette[1] || '#FFFFFF';
 
   useEffect(() => {
@@ -208,6 +645,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         .single();
       if (data?.brand_palette && Array.isArray(data.brand_palette) && data.brand_palette.length >= 3) {
         setBrandPalette(data.brand_palette);
+        setHasBrandIdentity(true);
+        setCustomBg(data.brand_palette[0] || '#0A0A0A');
+        setCustomAccent(data.brand_palette[2] || '#00CFFF');
       }
       // Pré-preenche o perfil do card Twitter/X com os dados do onboarding.
       if (data) {
@@ -226,7 +666,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     photoUrl: '',
   });
   // Manual slides
-  const [manualSlides, setManualSlides] = useState<ManualSlide[]>(makeDefaultManualSlides(6));
+  const [manualSlides, setManualSlides] = useState<ManualSlide[]>(makeDefaultManualSlides(5));
+  const [manualIndex, setManualIndex] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const profilePhotoRef = useRef<HTMLInputElement>(null);
@@ -243,12 +684,13 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     });
   };
 
-  const updateManualSlide = (i: number, field: 'title' | 'description', value: string) => {
+  const updateManualSlide = (i: number, field: string, value: string) => {
     setManualSlides((prev) => prev.map((sl, idx) => idx === i ? { ...sl, [field]: value } : sl));
   };
 
   const addManualSlide = () => {
-    setManualSlides((prev) => [...prev, { title: `Slide ${prev.length + 1}`, description: '' }]);
+    setManualSlides((prev) => [...prev, {}]);
+    setManualIndex(manualSlides.length);
   };
 
   const removeManualSlide = (i: number) => {
@@ -267,12 +709,69 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   // muda no slider como em qualquer outro estilo.
   const isT02 = style === 'template02';
 
-  // Twitter/X (profile) pula a etapa Visual: a tipografia do template é fixa
-  // e as cores vêm do tema claro/escuro do próprio Twitter.
-  const totalSteps = 3;
+  // Depende do template: o T1 e o T2 não têm passo de identidade visual.
+  const totalSteps = stepCountFor(style);
+  const manualFields = templateFieldsForSlide(style, manualIndex);
+
+  // Trocar para um template sem passo visual enquanto se está nele deixaria o
+  // wizard num passo que não existe mais. Só pode acontecer indo para trás.
+  useEffect(() => {
+    setStep((s) => Math.min(s, stepCountFor(style)));
+  }, [style]);
+
+  // O TEMPLATE 1 é deck fechado: a lista manual tem de ter exatamente os 6
+  // slides do spec, então trocar de template no passo 2 reajusta o passo 3.
+  useEffect(() => {
+    if (style !== 'template01') return;
+    setManualSlides((prev) =>
+      prev.length === TEMPLATE_01_SLIDE_COUNT
+        ? prev
+        : Array.from({ length: TEMPLATE_01_SLIDE_COUNT }, (_, i) => prev[i] ?? {})
+    );
+    setManualIndex((i) => Math.min(i, TEMPLATE_01_SLIDE_COUNT - 1));
+  }, [style]);
+
+  const goTo = (next: number) => {
+    setStepDir(next > step ? 'fwd' : 'back');
+    setStep(next);
+  };
+
+  /**
+   * Altura do modal, medida do conteúdo real. Fixá-la é o que permite ANIMAR a
+   * mudança de tamanho entre os passos; sem isso o modal saltaria de altura.
+   * O primeiro valor é aplicado sem transição (ver `.cw-box` + `cw-measured`).
+   */
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxHeight, setBoxHeight] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    // jsdom não implementa ResizeObserver: sem ele o modal fica com altura
+    // automática, que é exatamente o comportamento anterior.
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    // offsetHeight, não getBoundingClientRect: durante a animação de entrada o
+    // modal está sob um `scale()`, e o rect viria escalado (altura errada).
+    const medir = () => setBoxHeight(el.offsetHeight);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /**
+   * Habilita o botão primário. Só o step de conteúdo barra: a IA precisa de
+   * prompt e o JSON precisa de texto (a validação de forma roda no clique,
+   * pra não parsear o JSON a cada tecla).
+   */
+  const canAdvance = (() => {
+    if (step !== 3) return true;
+    if (contentMode === 'ai') return prompt.trim().length > 0;
+    if (contentMode === 'json') return jsonInput.trim().length > 0;
+    return true;
+  })();
 
   const handleNext = () => {
-    if (step === 2) {
+    if (step === 3) {
       if (contentMode === 'ai' && !prompt.trim()) {
         toast.error('Digite um prompt para a IA');
         return;
@@ -283,7 +782,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
       }
       if (contentMode === 'json') {
         try {
-          parseCarouselJSON(jsonInput);
+          parseCarouselJSONForStyle(jsonInput, style);
           setJsonError(null);
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'JSON inválido';
@@ -293,7 +792,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         }
       }
     }
-    if (step < totalSteps) setStep(step + 1);
+    if (step < totalSteps) goTo(step + 1);
     else handleGenerate();
   };
 
@@ -312,6 +811,8 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         imageUrl?: string;
         /** TEMPLATE 1: slots secundários que a IA escreveu (chapéu, remate…). */
         extras?: Record<string, string>;
+        /** Manual/JSON nos templates de spec: o conteúdo já vem por slot. */
+        slots?: Record<string, string>;
       }[];
       let jsonCarouselTitle: string | undefined;
       let jsonCaption: string | undefined;
@@ -327,6 +828,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             imageType: 'background',
             generateImages: false,
             webSearch,
+            language,
             fontPair: effectiveFontPair,
             accentColor,
             profileData: style === 'profile' ? effectiveProfile : undefined,
@@ -356,17 +858,31 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
               : undefined,
         }));
       } else if (contentMode === 'json') {
-        const parsed = parseCarouselJSON(jsonInput);
+        const parsed = parseCarouselJSONForStyle(jsonInput, style);
         slides = parsed.slides;
         jsonCarouselTitle = parsed.carouselTitle;
         jsonCaption = parsed.caption;
       } else {
-        slides = manualSlides.map((s) => ({
-          title: s.title,
-          description: s.description,
-          highlightWord: '',
-          backgroundColor: '#111111',
-        }));
+        // Manual: os campos são os do template escolhido. Nos templates de
+        // spec as chaves já são slots; nos demais, title/description/highlight.
+        slides = manualSlides.map((s, i) => {
+          if (isSpecTemplate(style)) {
+            const slots = slotsFromFields(style, i, s);
+            return {
+              title: Object.values(slots).find(Boolean) ?? '',
+              description: '',
+              highlightWord: '',
+              backgroundColor: '#111111',
+              slots,
+            };
+          }
+          return {
+            title: s.title ?? '',
+            description: s.description ?? '',
+            highlightWord: s.highlightWord ?? '',
+            backgroundColor: '#111111',
+          };
+        });
       }
 
       // O deck do TEMPLATE 1 é fechado em 6: conteúdo a mais é cortado, a menos
@@ -381,7 +897,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         ...DEFAULT_GLOBAL_SETTINGS,
         fontPair: effectiveFontPair,
         accentColor,
-        theme: 'dark' as const,
+        // Formato escolhido no step 1. É a mesma chave que o editor lê
+        // (mapDbCarouselToGlobalSettings) e que o FormatDropdown altera depois.
+        format,
+        theme,
         ...(style === 'profile' && profileData.name ? {
           profileBadge: {
             ...DEFAULT_GLOBAL_SETTINGS.profileBadge,
@@ -399,9 +918,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
         const aiWantsLight = aiBg === '#FFFFFF';
         const slideBg = aiWantsLight ? brandLightBg : brandDarkBg;
-        // Editorial (fora da capa): texto+imagem centralizados à esquerda,
-        // sem degradê — o shape de imagem já cria contraste sozinho.
-        const isEditorialContent = style === 'editorial' && i > 0;
 
         // TEMPLATE 1: a GERAÇÃO NÃO ESCREVE ESTILO. A forma inteira — fundo,
         // degradê, tamanho de fonte, entrelinha — é do spec, e o carrossel
@@ -416,12 +932,14 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             // certo se o usuário reordenar ou inserir um slide depois.
             templateModel: i + 1,
             templateSlots: {
-              ...template01SlotsFromContent(i, {
+              // Manual/JSON já entregam os slots prontos (e zerados onde o
+              // usuário não escreveu); a IA entrega título/descrição soltos.
+              ...(sl.slots ?? template01SlotsFromContent(i, {
                 title: sl.title,
                 description: sl.description,
                 imageUrl: sl.imageUrl,
                 extras: sl.extras,
-              }),
+              })),
               ...TEMPLATE_01_DEFAULT_CORNERS,
             },
             position: i,
@@ -456,12 +974,13 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             // slide no meio continua desenhando certo.
             templateModel: model,
             templateSlots: {
-              ...template02SlotsFromContent(model, {
+              // Ver o comentário do T1: manual/JSON já vêm por slot.
+              ...(sl.slots ?? template02SlotsFromContent(model, {
                 title: sl.title,
                 description: sl.description,
                 imageUrl: sl.imageUrl,
                 extras: sl.extras,
-              }),
+              })),
               ...TEMPLATE_02_DEFAULT_HEADER,
             },
             position: i,
@@ -493,18 +1012,9 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         highlights: [],
         backgroundImageUrl: sl.imageUrl || '',
         gridImageUrl: sl.imageUrl || '',
-        imageType: 'background' as const,
-        imagePosition: { ...DEFAULT_IMAGE_POSITION },
-        shadow: { style: isEditorialContent ? 'none' : 'base', opacity: 88 } as const,
         backgroundColor: slideBg,
-        textPosition: (isEditorialContent ? 'middle-left' : i === 0 ? 'bottom-center' : 'bottom-left') as TextPosition,
-        textAlignment: (i === 0 ? 'center' : 'left') as 'center' | 'left',
-        fontSize: style === 'profile'
-          ? { title: 47, description: 26 }
-          : { title: i === 0 ? 90 : 70, description: 36 },
-        lineHeight: style === 'profile' ? 1.1 : 1.2,
-        titleDescriptionGap: style === 'profile' ? 41 : undefined,
-        ctaButton: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid' as const, position: 'bottom-center' as const },
+        // Mesmos campos que a miniatura do passo 2 desenha.
+        ...freeFormSlideFields(style, i),
         });
       });
 
@@ -535,11 +1045,14 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             user_id:       user.id,
             title:         defaultTitle,
             style,
-            theme:         'dark',
+            theme,
             font_pair:     effectiveFontPair,
             accent_color:  accentColor,
             corners:       globalSettings.corners,
             profile_badge: globalSettings.profileBadge,
+            // O formato só sobrevive ao reload por aqui: mapDbCarouselToGlobalSettings
+            // lê `global_settings.format` e cai em '4:5' quando a chave falta.
+            global_settings: { format: globalSettings.format },
             ...(jsonCaption ? { caption: jsonCaption } : {}),
           })
           .select()
@@ -552,7 +1065,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         const slidesPayload = slides.map((sl, i) => {
           const aiBg = (sl.backgroundColor || '#111111').toUpperCase();
           const slideBg = aiBg === '#FFFFFF' ? brandLightBg : brandDarkBg;
-          const isEditorialContent = style === 'editorial' && i > 0;
 
           // Espelha o `editorSlides` acima: no TEMPLATE 1 o banco recebe os
           // padrões, nunca a paleta da marca. Ver o comentário de lá.
@@ -616,6 +1128,12 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             };
           }
 
+          // A linha do banco sai da MESMA função que monta o slide em memória.
+          // Antes as duas listas eram escritas à mão, uma ao lado da outra, e
+          // divergir era só questão de tempo: a variação de layout do Editorial
+          // teria ficado só na tela e sumido no primeiro reload, porque este
+          // payload nunca gravou `content_layout`.
+          const gerado = freeFormSlideFields(style, i);
           return ({
           carousel_id: carousel.id,
           position: i,
@@ -624,20 +1142,19 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           highlight_word: sl.highlightWord,
           background_image_url: sl.imageUrl || '',
           grid_image_url: sl.imageUrl || '',
-          image_type: 'background',
-          image_position: DEFAULT_IMAGE_POSITION,
-          shadow_style: isEditorialContent ? 'none' : 'base',
-          shadow_opacity: 88,
-          text_position: isEditorialContent ? 'middle-left' : i === 0 ? 'bottom-center' : 'bottom-left',
+          image_type: gerado.imageType,
+          image_position: gerado.imagePosition,
+          shadow_style: gerado.shadow.style,
+          shadow_opacity: gerado.shadow.opacity,
+          content_layout: gerado.contentLayout ?? null,
+          text_position: gerado.textPosition,
           text_offset: null,
-          text_alignment: i === 0 ? 'center' : 'left',
+          text_alignment: gerado.textAlignment,
           subtitle: '',
-          font_size: style === 'profile'
-            ? { title: 47, description: 26 }
-            : { title: i === 0 ? 90 : 70, description: 36 },
-          line_height: style === 'profile' ? 1.1 : 1.2,
-          title_description_gap: style === 'profile' ? 41 : null,
-          cta_button: { show: false, text: 'Comenta FLUXO', fontSize: 16, borderRadius: 12, style: 'solid', position: 'bottom-center' },
+          font_size: gerado.fontSize,
+          line_height: gerado.lineHeight,
+          title_description_gap: gerado.titleDescriptionGap ?? null,
+          cta_button: gerado.ctaButton,
           background_color: slideBg,
           });
         });
@@ -674,336 +1191,362 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
     }
   };
 
-  const stepLabel = ['Estilo', 'Conteúdo', style === 'profile' ? 'Perfil' : 'Visual'];
-
   const content = (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-[var(--surface)] border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+    <div
+      className="cw-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.55)' }}
+    >
+      {/*
+        A altura acompanha o conteúdo do passo atual, medida por ResizeObserver
+        e animada. Como o overlay centraliza por flex, crescer e encolher
+        acontece a partir do CENTRO — o modal não salta para o topo — e o
+        respiro de `p-4` continua uniforme em volta.
+      */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cw-title"
+        className={cn(
+          'cw-modal cw-box w-full overflow-hidden rounded-[18px]',
+          // O grid 2×2 de templates é o único passo que precisa de largura.
+          step === 2 ? 'max-w-[600px]' : 'max-w-[440px]',
+        )}
+        style={{
+          background: 'var(--paper)',
+          border: '1.5px solid var(--ink)',
+          boxShadow: 'var(--sh-2)',
+          ...(boxHeight ? { height: boxHeight } : {}),
+        }}
+      >
+      <div ref={boxRef} className="flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/8 dark:border-white/8">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Criar carrossel</h2>
-          <button onClick={onClose} className="text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors">
-            <X className="w-5 h-5" />
+        <div className="flex items-center gap-3.5 px-6 pt-6 pb-4">
+          <span
+            className="grid place-items-center rounded-[12px] shrink-0"
+            style={{ width: 40, height: 40, background: 'var(--ink)', color: 'var(--paper)' }}
+            aria-hidden
+          >
+            <Sparkles className="w-5 h-5" />
+          </span>
+          <h2 id="cw-title" className="font-display min-w-0 flex-1 text-[24px] leading-tight" style={{ color: 'var(--ink)' }}>
+            {STEP_TITLES[step - 1]}
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="cw-close grid place-items-center w-8 h-8 rounded-full shrink-0"
+            style={{ color: 'var(--ink-dim)' }}
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Step dots */}
-        <div className="flex items-center justify-center gap-2 py-4">
-          {stepLabel.map((label, i) => (
-            <div key={label} className="flex items-center gap-2">
-              <div className={cn('flex items-center gap-1.5', i + 1 === step ? 'text-gray-900 dark:text-white' : i + 1 < step ? 'text-gray-900/60 dark:text-white/60' : 'text-gray-900/20 dark:text-white/20')}>
-                <div className={cn('w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold', i + 1 === step ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : i + 1 < step ? 'bg-black/20 dark:bg-white/20 text-gray-900 dark:text-white' : 'bg-black/5 dark:bg-white/5 text-gray-900/30 dark:text-white/30')}>
-                  {i + 1 < step ? '✓' : i + 1}
-                </div>
-                <span className="text-xs font-medium hidden sm:block">{label}</span>
-              </div>
-              {i < stepLabel.length - 1 && <div className={cn('w-8 h-px', i + 1 < step ? 'bg-black/30 dark:bg-white/30' : 'bg-black/10 dark:bg-white/10')} />}
-            </div>
-          ))}
-        </div>
+        <ProgressBar step={step} total={totalSteps} />
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-7 pb-6">
+        {/* Body — sem scroll: cada step precisa caber inteiro no modal */}
+        <div
+          key={step}
+          className={cn('px-6 pb-5', stepDir === 'fwd' ? 'cw-step-fwd' : 'cw-step-back')}
+        >
 
-          {/* ── STEP 1: Estilo ── */}
+          {/* ── STEP 1: Formato do post ── */}
           {step === 1 && (
-            <div className="grid grid-cols-2 gap-4 mt-2">
-              {[
-                {
-                  value: 'profile' as SlideStyle,
-                  label: 'Twitter / X',
-                  desc: 'Estética de post no Twitter/X. Limpo, focado em texto e engajamento',
-                  icon: (
-                    <div className="w-full h-44 rounded-lg bg-white border border-white/10 flex items-start p-4 gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#1DA1F2] shrink-0 flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.623z"/></svg>
-                      </div>
-                      <div className="flex-1">
-                        <div className="w-20 h-2.5 bg-gray-300 rounded mb-2" />
-                        <div className="w-14 h-2 bg-gray-200 rounded" />
-                        <div className="w-full h-2 bg-gray-200 rounded mt-3" />
-                        <div className="w-3/4 h-2 bg-gray-200 rounded mt-1.5" />
-                        <div className="w-5/6 h-2 bg-gray-200 rounded mt-1.5" />
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: 'editorial' as SlideStyle,
-                  label: 'Editorial',
-                  desc: 'Layout magazine com imagem e texto combinados, barra de metadados',
-                  icon: (
-                    <div className="w-full h-44 rounded-lg bg-[#F5F0E8] border border-white/10 flex flex-col overflow-hidden">
-                      <div className="h-7 bg-[#1a1a1a] flex items-center px-3 gap-1.5">
-                        <div className="w-10 h-1.5 bg-white/40 rounded" />
-                        <div className="flex-1" />
-                        <div className="w-8 h-1.5 bg-white/40 rounded" />
-                      </div>
-                      <div className="flex flex-1 gap-2 p-2.5">
-                        <div className="w-1/2 bg-[#c8b89a] rounded" />
-                        <div className="flex-1 flex flex-col gap-1.5 justify-center">
-                          <div className="w-full h-2 bg-[#1a1a1a]/70 rounded" />
-                          <div className="w-3/4 h-2 bg-[#1a1a1a]/70 rounded" />
-                          <div className="w-full h-1.5 bg-[#1a1a1a]/30 rounded mt-1" />
-                          <div className="w-5/6 h-1.5 bg-[#1a1a1a]/30 rounded" />
-                        </div>
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: 'template01' as SlideStyle,
-                  label: 'Template 1',
-                  desc: 'Deck fechado de 6 slides com forma fixa do Figma. Você troca texto e imagem',
-                  icon: (
-                    <div className="w-full h-44 rounded-lg border border-white/10 flex flex-col overflow-hidden bg-black">
-                      <div className="flex-1 relative bg-gradient-to-b from-[#3a3a3a] to-black">
-                        <div className="absolute inset-x-0 bottom-0 p-3">
-                          <div className="w-1/2 h-1.5 bg-white/40 rounded mx-auto mb-2" />
-                          <div className="w-full h-2.5 bg-white/85 rounded mb-1" />
-                          <div className="w-4/5 h-2.5 bg-white/85 rounded mb-1 mx-auto" />
-                          <div className="w-2/3 h-2.5 bg-white/85 rounded mx-auto" />
-                        </div>
-                      </div>
-                      <div className="h-9 bg-[#0D39E4] flex items-center justify-center gap-1">
-                        <div className="w-16 h-1.5 bg-white/70 rounded" />
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: 'template02' as SlideStyle,
-                  label: 'Template 2',
-                  desc: 'Capa preta com marcador e slides creme com título serifado. Quantos slides você quiser',
-                  icon: (
-                    // Miniatura do modelo 2 (creme, texto à esquerda, bloco de
-                    // imagem à direita) com a faixa do cabeçalho no topo.
-                    <div className="w-full h-44 rounded-lg border border-white/10 flex flex-col overflow-hidden bg-[#EEE5D9]">
-                      <div className="flex items-center justify-between px-3 pt-2.5">
-                        <div className="w-12 h-1 bg-[#767682]/60 rounded" />
-                        <div className="w-8 h-1 bg-[#767682]/60 rounded" />
-                      </div>
-                      <div className="flex flex-1 gap-2.5 p-3">
-                        <div className="flex-1 flex flex-col justify-center gap-1.5">
-                          <div className="w-full h-2.5 bg-black/80 rounded" />
-                          <div className="w-2/3 h-2.5 bg-black/80 rounded mb-1" />
-                          <div className="w-full h-1.5 bg-[#727272]/50 rounded" />
-                          <div className="w-5/6 h-1.5 bg-[#727272]/50 rounded" />
-                          <div className="w-3/4 h-1.5 bg-[#727272]/50 rounded" />
-                        </div>
-                        <div className="w-[38%] bg-[#CBC9BF] rounded-md" />
-                      </div>
-                    </div>
-                  ),
-                },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => {
-                    setStyle(opt.value);
-                    // O deck padrão do TEMPLATE 2 é a `sequenciaPadrao` do spec
-                    // (5 slides). Continua ajustável no slider da etapa 2.
-                    if (opt.value === 'template02') updateSlideCount(TEMPLATE_02_DEFAULT_MODELS.length);
-                  }}
-                  className={cn('flex-1 rounded-xl p-5 border-2 transition-all text-left', style === opt.value ? 'border-gray-900 dark:border-white bg-black/5 dark:bg-white/5' : 'border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30')}
-                >
-                  {opt.icon}
-                  <p className="text-gray-900 dark:text-white font-bold text-sm mt-4">{opt.label}</p>
-                  <p className="text-gray-900/40 dark:text-white/40 text-xs mt-1.5 leading-relaxed">{opt.desc}</p>
-                  {style === opt.value && (
-                    <div className="mt-2 flex justify-end">
-                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">✓</div>
-                    </div>
-                  )}
-                </button>
-              ))}
+            <div className="flex flex-col gap-2.5">
+              {FORMAT_LIST.map((f) => {
+                const meta = FORMAT_META[f.id];
+                const Icon = meta.icon;
+                const selected = format === f.id;
+                return (
+                  <OptionCard
+                    key={f.id}
+                    selected={selected}
+                    onClick={() => setFormat(f.id)}
+                    className="flex items-center gap-3.5 px-4 py-3"
+                  >
+                    {/* Mini-retângulo na proporção real do formato. */}
+                    <span className="grid w-12 shrink-0 place-items-center">
+                      <span
+                        className="block rounded-[4px]"
+                        style={{
+                          width: Math.round(42 * f.aspectRatio),
+                          height: 42,
+                          background: selected ? 'var(--ink)' : 'var(--paper-3)',
+                          border: '1.5px solid var(--ink)',
+                          transition: 'background 160ms var(--ease)',
+                        }}
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+                          {meta.name}
+                        </span>
+                        <span className="font-mono text-[10px]" style={{ color: 'var(--ink-dim)' }}>
+                          {f.id} · {f.width} × {f.height}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-snug" style={{ color: 'var(--ink-dim)' }}>
+                        {meta.desc}
+                      </span>
+                    </span>
+                    <Icon className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-muted)' }} />
+                  </OptionCard>
+                );
+              })}
+              <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--ink-muted)' }}>
+                Dá pra trocar o formato depois, no editor.
+              </p>
             </div>
           )}
 
-          {/* ── STEP 2: Conteúdo ── */}
+          {/* ── STEP 2: Template ── */}
           {step === 2 && (
-            <div className="flex flex-col gap-4 mt-2">
-              {/* Toggle IA / Manual / JSON */}
-              <div className="flex rounded-xl border border-black/10 dark:border-white/10 overflow-hidden">
-                <button
-                  onClick={() => setContentMode('ai')}
-                  className={cn('flex-1 py-2.5 text-sm font-medium transition-colors', contentMode === 'ai' ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white')}
-                >
-                  <Sparkles className="w-4 h-4 inline mr-1.5" />
-                  Gerar com IA
-                </button>
-                <button
-                  onClick={() => setContentMode('manual')}
-                  className={cn('flex-1 py-2.5 text-sm font-medium transition-colors border-l border-black/10 dark:border-white/10', contentMode === 'manual' ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white')}
-                >
-                  Colar copy manual
-                </button>
-                <button
-                  onClick={() => setContentMode('json')}
-                  className={cn('flex-1 py-2.5 text-sm font-medium transition-colors border-l border-black/10 dark:border-white/10', contentMode === 'json' ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white')}
-                >
-                  <FileJson className="w-4 h-4 inline mr-1.5" />
-                  Importar JSON
-                </button>
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                {TEMPLATES.map((tpl) => (
+                  <OptionCard
+                    key={tpl.value}
+                    selected={style === tpl.value}
+                    onClick={() => {
+                      setStyle(tpl.value);
+                      // O deck padrão do TEMPLATE 2 é a `sequenciaPadrao` do
+                      // spec (5 slides). Continua ajustável no passo seguinte.
+                      if (tpl.value === 'template02') updateSlideCount(TEMPLATE_02_DEFAULT_MODELS.length);
+                    }}
+                    className="flex flex-col items-center gap-2 px-3 pt-3 pb-2.5"
+                  >
+                    <TemplateThumb style={tpl.value} format={format} />
+                    <span className="w-full text-center">
+                      <span className="block text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>
+                        {tpl.label}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: 'var(--ink-dim)' }}>
+                        {tpl.short}
+                      </span>
+                    </span>
+                  </OptionCard>
+                ))}
               </div>
+              <p
+                className="rounded-[10px] px-3.5 py-2.5 text-[11px] leading-relaxed"
+                style={{
+                  color: 'var(--ink-dim)',
+                  background: 'var(--paper-2)',
+                  border: '1.5px solid var(--line-strong)',
+                }}
+              >
+                {TEMPLATES.find((t) => t.value === style)?.detail}
+              </p>
+            </div>
+          )}
 
-              {/* IA */}
+          {/* ── STEP 3: Conteúdo ── */}
+          {step === 3 && (
+            <div className="flex flex-col gap-3">
+              {/* Como criar */}
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
+                  Como criar
+                </span>
+                <select
+                  className="brand-select"
+                  value={contentMode}
+                  onChange={(e) => setContentMode(e.target.value as 'ai' | 'manual' | 'json')}
+                >
+                  {CONTENT_MODES.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              {/* ─ Criar com IA ─ */}
               {contentMode === 'ai' && (
                 <>
-                  {/* Format A/B selector — only for Twitter style */}
+                  {/* Formato A/B — só o Profile tem essa bifurcação */}
                   {style === 'profile' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        { value: 'A' as TwitterFormat, label: 'Post único', sub: '1 slide, frase impactante' },
+                        { value: 'B' as TwitterFormat, label: 'Thread', sub: 'História em vários slides' },
+                      ]).map((fmt) => (
+                        <OptionCard
+                          key={fmt.value}
+                          selected={twitterFormat === fmt.value}
+                          onClick={() => {
+                            setTwitterFormat(fmt.value);
+                            if (fmt.value === 'A') updateSlideCount(1);
+                            else if (slideCount < 2) updateSlideCount(5);
+                          }}
+                          className="px-3 py-2"
+                        >
+                          <span className="block text-[12px] font-semibold" style={{ color: 'var(--ink)' }}>{fmt.label}</span>
+                          <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: 'var(--ink-dim)' }}>{fmt.sub}</span>
+                        </OptionCard>
+                      ))}
+                    </div>
+                  )}
+
+                  <textarea
+                    className="brand-textarea"
+                    style={{ minHeight: 76 }}
+                    placeholder="Sobre o que é o conteúdo?"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    autoFocus
+                  />
+
+                  {/* Busca de notícias recentes — o mesmo toggle de sempre */}
+                  <button
+                    type="button"
+                    onClick={() => setWebSearch((v) => !v)}
+                    title="A IA busca fatos e notícias atuais antes de escrever"
+                    aria-pressed={webSearch}
+                    className="chip cw-chip self-start"
+                    style={webSearch
+                      ? { background: 'var(--ink)', color: 'var(--paper)', borderColor: 'var(--ink)' }
+                      : undefined}
+                  >
+                    <Globe className="w-3.5 h-3.5 shrink-0" />
+                    Web search
+                  </button>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
+                      Idioma
+                    </span>
+                    <select
+                      className="brand-select"
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value as ContentLanguage)}
+                    >
+                      {CONTENT_LANGUAGES.map((l) => (
+                        <option key={l.value} value={l.value}>{l.label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {/* Nº de slides. O TEMPLATE 1 é deck fechado; o post único é 1. */}
+                  {isFixedDeck ? (
+                    <p className="text-[11px]" style={{ color: 'var(--ink-dim)' }}>
+                      Deck fixo de {TEMPLATE_01_SLIDE_COUNT} slides.
+                    </p>
+                  ) : style === 'profile' && twitterFormat === 'A' ? null : (
                     <div>
-                      <p className="text-xs text-gray-900/40 dark:text-white/40 mb-2 uppercase tracking-wider">Formato</p>
-                      <div className="flex gap-3">
-                        {([
-                          {
-                            value: 'A' as TwitterFormat,
-                            label: 'Formato A',
-                            sub: 'Tweet único',
-                            desc: 'Frase impactante. 1 slide.',
-                          },
-                          {
-                            value: 'B' as TwitterFormat,
-                            label: 'Formato B',
-                            sub: 'Thread completa',
-                            desc: 'História de empresa ou fundador. Múltiplos slides.',
-                          },
-                        ] as { value: TwitterFormat; label: string; sub: string; desc: string }[]).map((fmt) => (
+                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
+                        Slides · <span style={{ color: 'var(--ink)' }}>{slideCount}</span>
+                      </span>
+                      <div className="grid grid-cols-10 gap-1" role="group" aria-label="Número de slides">
+                        {SLIDE_COUNT_OPTIONS.map((n) => (
                           <button
-                            key={fmt.value}
-                            onClick={() => {
-                              setTwitterFormat(fmt.value);
-                              if (fmt.value === 'A') updateSlideCount(1);
-                              else if (slideCount < 2) updateSlideCount(2);
+                            key={n}
+                            type="button"
+                            onClick={() => updateSlideCount(n)}
+                            aria-pressed={slideCount === n}
+                            className="cw-pill rounded-[6px] text-[10px] font-semibold"
+                            style={{
+                              height: 24,
+                              border: '1.5px solid ' + (slideCount === n ? 'var(--ink)' : 'var(--line-strong)'),
+                              background: slideCount === n ? 'var(--ink)' : 'var(--paper)',
+                              color: slideCount === n ? 'var(--paper)' : 'var(--ink-dim)',
                             }}
-                            className={cn(
-                              'flex-1 rounded-xl p-3 border-2 text-left transition-all',
-                              twitterFormat === fmt.value ? 'border-[#1DA1F2] bg-[#1DA1F2]/8' : 'border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30',
-                            )}
                           >
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <div className={cn('w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors shrink-0', twitterFormat === fmt.value ? 'border-[#1DA1F2]' : 'border-black/30 dark:border-white/30')}>
-                                {twitterFormat === fmt.value && <div className="w-2 h-2 rounded-full bg-[#1DA1F2]" />}
-                              </div>
-                              <span className="text-xs font-bold text-gray-900 dark:text-white">{fmt.label}</span>
-                            </div>
-                            <p className="text-[11px] text-gray-900/60 dark:text-white/60 font-medium">{fmt.sub}</p>
-                            <p className="text-[10px] text-gray-900/30 dark:text-white/30 mt-0.5 leading-relaxed">{fmt.desc}</p>
+                            {n}
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  <textarea
-                    className="w-full h-24 px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30 resize-none"
-                    placeholder={
-                      style === 'profile' && twitterFormat === 'A'
-                        ? 'Digite o tema ou insight... Ex: disciplina, competição, mentalidade de longo prazo'
-                        : style === 'profile'
-                        ? 'Digite o tema ou empresa... Ex: A história da Nintendo, Como o Nubank chegou a 100M'
-                        : 'Descreva o conteúdo... Ex: 5 hábitos para acordar cedo e ser produtivo'
-                    }
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setWebSearch((v) => !v)}
-                    className={cn(
-                      'flex items-center gap-2 self-start px-3 py-2 rounded-lg border text-xs font-medium transition-colors',
-                      webSearch
-                        ? 'border-[#1DA1F2] bg-[#1DA1F2]/8 text-[#1DA1F2]'
-                        : 'border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:border-black/30 dark:hover:border-white/30',
-                    )}
-                  >
-                    <Globe className="w-3.5 h-3.5 shrink-0" />
-                    Web search
-                    <span className={cn('font-normal', webSearch ? 'text-[#1DA1F2]/70' : 'text-gray-900/30 dark:text-white/30')}>
-                      {webSearch ? 'a IA vai buscar fatos e notícias atuais' : 'ative para temas recentes'}
-                    </span>
-                  </button>
-                  {/* Nº de slides — oculto no Twitter Formato A e no TEMPLATE 1 (deck fixo) */}
-                  {!(style === 'profile' && twitterFormat === 'A') && !isFixedDeck && (
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs text-gray-900/40 dark:text-white/40 shrink-0">Slides</label>
-                      <input
-                        type="range"
-                        min={style === 'profile' ? 2 : 3}
-                        max={style === 'profile' ? 15 : 10}
-                        value={slideCount}
-                        onChange={(e) => updateSlideCount(+e.target.value)}
-                        className="flex-1"
-                      />
-                      <span className="text-sm text-gray-900 dark:text-white font-medium w-4 text-center">{slideCount}</span>
-                    </div>
-                  )}
-                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <ImageIcon className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-blue-300 leading-relaxed">
-                      As imagens serão adicionadas por você no editor após a criação.
-                    </p>
-                  </div>
                 </>
               )}
 
-              {/* MANUAL — colar copy slide a slide */}
+              {/* ─ Manualmente ─ (um slide por vez: o modal não rola) */}
               {contentMode === 'manual' && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs text-gray-900/50 dark:text-white/50">Cole o título e a descrição de cada slide. Você pode editar tudo no editor depois.</p>
-                  <div className="flex flex-col gap-3 max-h-[340px] overflow-y-auto pr-1">
-                    {manualSlides.map((sl, i) => (
-                      <div key={i} className="bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 rounded-xl p-3 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-gray-900/30 dark:text-white/30 uppercase tracking-wider">
-                            {i === 0 ? 'Capa' : i === manualSlides.length - 1 ? 'CTA final' : `Slide ${i + 1}`}
-                          </span>
-                          {manualSlides.length > 1 && (
-                            <button onClick={() => removeManualSlide(i)} className="text-gray-900/20 dark:text-white/20 hover:text-red-400 transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--surface)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:border-black/30 dark:focus:border-white/30"
-                          placeholder="Título (máx. 8 palavras)"
-                          value={sl.title}
-                          onChange={(e) => updateManualSlide(i, 'title', e.target.value)}
-                        />
-                        <textarea
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--surface)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:border-black/30 dark:focus:border-white/30 resize-none"
-                          placeholder="Descrição (opcional)"
-                          rows={2}
-                          value={sl.description}
-                          onChange={(e) => updateManualSlide(i, 'description', e.target.value)}
-                        />
-                      </div>
+                <>
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setManualIndex((i) => Math.max(0, i - 1))}
+                      disabled={manualIndex === 0}
+                      aria-label="Slide anterior"
+                      className="brand-btn outline icon sm"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--ink-dim)' }} data-testid="manual-pager">
+                      Slide {manualIndex + 1} de {manualSlides.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setManualIndex((i) => Math.min(manualSlides.length - 1, i + 1))}
+                      disabled={manualIndex >= manualSlides.length - 1}
+                      aria-label="Próximo slide"
+                      className="brand-btn outline icon sm"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {manualFields.map((f) => (
+                      <label key={f.key} className="block">
+                        <span className="mb-1 flex items-baseline justify-between gap-2">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>{f.label}</span>
+                          {f.hint && <span className="font-mono text-[9px]" style={{ color: 'var(--ink-muted)' }}>{f.hint}</span>}
+                        </span>
+                        {f.multiline ? (
+                          <textarea
+                            className="brand-textarea"
+                            style={{ minHeight: 52, fontSize: 12, padding: '7px 10px' }}
+                            placeholder={f.placeholder}
+                            value={manualSlides[manualIndex]?.[f.key] ?? ''}
+                            onChange={(e) => updateManualSlide(manualIndex, f.key, e.target.value)}
+                          />
+                        ) : (
+                          <input
+                            className="brand-input"
+                            style={{ fontSize: 12, padding: '7px 10px' }}
+                            placeholder={f.placeholder}
+                            value={manualSlides[manualIndex]?.[f.key] ?? ''}
+                            onChange={(e) => updateManualSlide(manualIndex, f.key, e.target.value)}
+                          />
+                        )}
+                      </label>
                     ))}
                   </div>
-                  <button
-                    onClick={addManualSlide}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-black/10 dark:border-white/10 text-gray-900/30 dark:text-white/30 hover:text-gray-900/60 dark:hover:text-white/60 hover:border-black/30 dark:hover:border-white/30 transition-colors text-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Adicionar slide
-                  </button>
-                </div>
+
+                  {/* Deck fechado: o paginador já mostra "de 6", sem precisar de nota. */}
+                  {!isFixedDeck && (
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={addManualSlide} className="brand-btn outline sm flex-1">
+                        <Plus className="w-3.5 h-3.5" /> Adicionar slide
+                      </button>
+                      {manualSlides.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeManualSlide(manualIndex)}
+                          aria-label="Remover este slide"
+                          className="brand-btn outline icon sm"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* JSON — importar */}
+              {/* ─ Importar JSON ─ */}
               {contentMode === 'json' && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs text-gray-900/50 dark:text-white/50">
-                    Cole ou importe um array JSON com os slides. Campos aceitos: <code className="text-gray-900/70 dark:text-white/70">title</code>, <code className="text-gray-900/70 dark:text-white/70">description</code>, <code className="text-gray-900/70 dark:text-white/70">imageUrl</code>, <code className="text-gray-900/70 dark:text-white/70">highlightWord</code>, <code className="text-gray-900/70 dark:text-white/70">backgroundColor</code>.
-                  </p>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => jsonFileRef.current?.click()}
-                      className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 text-xs transition-colors"
-                    >
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px]" style={{ color: 'var(--ink-dim)' }}>
+                      Estrutura do{' '}
+                      <strong style={{ color: 'var(--ink)' }}>
+                        {TEMPLATES.find((t) => t.value === style)?.label}
+                      </strong>
+                    </span>
+                    <button onClick={() => jsonFileRef.current?.click()} className="brand-btn outline sm">
                       <Upload className="w-3.5 h-3.5" /> Upload .json
                     </button>
                     <input
@@ -1025,133 +1568,237 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                   </div>
 
                   <textarea
-                    className="w-full h-56 px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-xs font-mono placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30 resize-none"
-                    placeholder={`[\n  {\n    "title": "Título do slide",\n    "description": "Texto descritivo",\n    "imageUrl": "https://..."\n  }\n]`}
+                    className="brand-textarea font-mono"
+                    style={{ minHeight: 168, fontSize: 10.5, lineHeight: 1.55 }}
+                    placeholder={templateJsonExample(style)}
                     value={jsonInput}
                     onChange={(e) => { setJsonInput(e.target.value); setJsonError(null); }}
                     spellCheck={false}
                   />
 
                   {jsonError && (
-                    <p className="text-xs text-red-400">{jsonError}</p>
+                    <p className="text-[11px] leading-snug" role="alert" style={{ color: 'var(--danger)' }}>
+                      {jsonError}
+                    </p>
                   )}
-                </div>
+                </>
               )}
             </div>
           )}
 
-          {/* ── STEP 3: Visual (não se aplica ao Twitter — tipografia fixa) ── */}
-          {step === 3 && style !== 'profile' && (
-            <div className="flex flex-col gap-5 mt-2">
+          {/* ── STEP 4: Identidade visual ──
+              Só existe nos estilos de forma livre. O TEMPLATE 1 e o TEMPLATE 2
+              não chegam aqui: `stepCountFor` encerra o wizard no conteúdo. */}
+          {step === 4 && style === 'profile' && (
+            <div className="flex flex-col gap-3">
+              {/* O Profile não usa a paleta do onboarding: o cartão é claro ou
+                  escuro, como na própria rede (ProfileSlide lê globalSettings.theme). */}
               <div>
-                <p className="text-xs text-gray-900/40 dark:text-white/40 mb-3 uppercase tracking-wider">Cores da marca</p>
-                <div className="flex items-center gap-3 p-3 rounded-xl border border-black/10 dark:border-white/10">
-                  <div className="flex gap-1.5 shrink-0">
-                    {brandPalette.slice(0, 3).map((c, i) => (
-                      <span
-                        key={i}
-                        className="w-7 h-7 rounded-md border border-black/10 dark:border-white/10"
-                        style={{ background: c }}
-                        title={['Fundo escuro', 'Fundo claro', 'Destaque'][i] + ': ' + c}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] text-gray-900/50 dark:text-white/50 leading-tight">
-                      O carrossel será criado usando estas cores. Edite no <a href="/onboarding" className="underline">onboarding</a> pra alterar.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-gray-900/40 dark:text-white/40 mb-3 uppercase tracking-wider">Combinação de fontes</p>
+                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
+                  Tema
+                </span>
                 <div className="grid grid-cols-2 gap-2">
-                  {FONT_PAIRS.map((fp) => (
+                  {([
+                    { value: 'dark' as const, label: 'Escuro' },
+                    { value: 'light' as const, label: 'Claro' },
+                  ]).map((t) => (
                     <button
-                      key={fp.label}
-                      onClick={() => setFontPair(fp.label)}
-                      className={cn('p-3 rounded-xl border-2 text-left transition-all', fontPair === fp.label ? 'border-gray-900 dark:border-white bg-black/5 dark:bg-white/5' : 'border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30')}
+                      key={t.value}
+                      type="button"
+                      onClick={() => setTheme(t.value)}
+                      aria-pressed={theme === t.value}
+                      className="cw-pill rounded-[6px] py-2 text-[12px] font-semibold"
                       style={{
-                        fontFamily: fp.label === 'SF Pro Display + IvyOra Text'
-                          ? "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif"
-                          : undefined,
+                        border: '1.5px solid ' + (theme === t.value ? 'var(--ink)' : 'var(--line-strong)'),
+                        background: theme === t.value ? 'var(--ink)' : 'var(--paper)',
+                        color: theme === t.value ? 'var(--paper)' : 'var(--ink-dim)',
                       }}
                     >
-                      <div className="text-lg font-bold text-gray-900 dark:text-white mb-0.5">{fp.preview}</div>
-                      <div className="text-[10px] text-gray-900/50 dark:text-white/50 leading-tight">{fp.sub}</div>
-                      {fp.label === 'SF Pro Display + IvyOra Text' && (
-                        <div className="text-[9px] text-blue-400/70 mt-0.5">padrão</div>
-                      )}
+                      {t.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-            </div>
-          )}
-
-          {/* ── STEP 3: Perfil (Twitter) ── */}
-          {step === 3 && style === 'profile' && (
-            <div className="flex flex-col gap-4 mt-2">
-              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-1">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-[#1DA1F2] mt-0.5 shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.623z"/></svg>
-                <p className="text-xs text-blue-300 leading-relaxed">
-                  Os slides vão imitar a estética do Twitter/X com o seu perfil.
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-14 h-14 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center overflow-hidden border-2 border-[#1DA1F2]/40 cursor-pointer shrink-0"
-                  onClick={() => profilePhotoRef.current?.click()}
-                >
-                  {profileData.photoUrl
-                    ? <img src={profileData.photoUrl} alt="Profile" className="w-full h-full object-cover" />
-                    : <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white/20"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-                  }
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => profilePhotoRef.current?.click()}
+                    aria-label="Upload foto"
+                    className="cw-pill grid shrink-0 place-items-center overflow-hidden rounded-full"
+                    style={{ width: 38, height: 38, border: '1.5px solid var(--ink)', background: 'var(--paper-3)' }}
+                  >
+                    {profileData.photoUrl
+                      ? <img src={profileData.photoUrl} alt="" className="h-full w-full object-cover" />
+                      : <span className="text-[9px]" style={{ color: 'var(--ink-muted)' }}>foto</span>}
+                  </button>
+                  <input
+                    className="brand-input"
+                    style={{ fontSize: 12, padding: '7px 10px' }}
+                    placeholder="Nome de exibição"
+                    value={profileData.name}
+                    onChange={(e) => setProfileData((p) => ({ ...p, name: e.target.value }))}
+                  />
                 </div>
-                <button onClick={() => profilePhotoRef.current?.click()} className="px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white text-xs transition-colors">
-                  Upload foto
-                </button>
+                <input
+                  className="brand-input"
+                  style={{ fontSize: 12, padding: '7px 10px' }}
+                  placeholder="@handle"
+                  value={profileData.handle}
+                  onChange={(e) => setProfileData((p) => ({ ...p, handle: e.target.value }))}
+                />
                 <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
                   const toastId = toast.loading('Enviando foto…');
                   try {
                     const url = await uploadImageFile(f, 'profile-photos');
-                    setProfileData(p => ({ ...p, photoUrl: url }));
+                    setProfileData((p) => ({ ...p, photoUrl: url }));
                     toast.success('Foto adicionada', { id: toastId });
                   } catch (err) {
                     toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
                   }
                 }} />
               </div>
-              <input className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30" placeholder="Nome de exibição" value={profileData.name} onChange={(e) => setProfileData(p => ({ ...p, name: e.target.value }))} />
-              <input className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-black/30 dark:focus:border-white/30" placeholder="@handle" value={profileData.handle} onChange={(e) => setProfileData(p => ({ ...p, handle: e.target.value }))} />
+            </div>
+          )}
+
+          {step === 4 && style !== 'profile' && (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <OptionCard
+                  selected={usingBrand}
+                  onClick={() => setVisualMode('brand')}
+                  disabled={!hasBrandIdentity}
+                  className="flex items-center gap-3 px-3.5 py-2.5"
+                >
+                  <span className="flex shrink-0 gap-1">
+                    {brandPalette.slice(0, 3).map((c, i) => (
+                      <span
+                        key={i}
+                        className="block rounded-[4px]"
+                        style={{ width: 22, height: 22, background: c, border: '1.5px solid var(--ink)' }}
+                      />
+                    ))}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+                      Minha identidade visual
+                    </span>
+                    {!hasBrandIdentity && (
+                      <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: 'var(--ink-dim)' }}>
+                        Você ainda não preencheu a marca no onboarding
+                      </span>
+                    )}
+                  </span>
+                </OptionCard>
+
+                <OptionCard
+                  selected={!usingBrand}
+                  onClick={() => setVisualMode('manual')}
+                  className="px-3.5 py-2.5"
+                >
+                  <span className="block text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+                    Definir manualmente
+                  </span>
+                </OptionCard>
+              </div>
+
+              {!usingBrand && (
+                <div
+                  className="flex flex-col gap-3 rounded-[10px] p-3.5"
+                  style={{ background: 'var(--paper-2)', border: '1.5px solid var(--line-strong)' }}
+                >
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      aria-label="Cor de fundo"
+                      value={customBg}
+                      onChange={(e) => setCustomBg(e.target.value)}
+                      className="cw-pill shrink-0 rounded-[6px]"
+                      style={{ width: 40, height: 30, border: '1.5px solid var(--ink)', background: 'transparent' }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>Fundo</span>
+                      <span className="block font-mono text-[9px] uppercase" style={{ color: 'var(--ink-muted)' }}>{customBg}</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      aria-label="Cor de destaque"
+                      value={customAccent}
+                      onChange={(e) => setCustomAccent(e.target.value)}
+                      className="cw-pill shrink-0 rounded-[6px]"
+                      style={{ width: 40, height: 30, border: '1.5px solid var(--ink)', background: 'transparent' }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>Destaque</span>
+                      <span className="block font-mono text-[9px] uppercase" style={{ color: 'var(--ink-muted)' }}>{customAccent}</span>
+                    </span>
+                  </label>
+
+                  <div>
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
+                      Tipografia
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {FONT_PAIRS.map((fp) => (
+                        <button
+                          key={fp.label}
+                          type="button"
+                          onClick={() => setFontPair(fp.label)}
+                          aria-pressed={fontPair === fp.label}
+                          className="cw-pill rounded-[6px] px-2 py-1.5 text-left"
+                          style={{
+                            border: '1.5px solid ' + (fontPair === fp.label ? 'var(--ink)' : 'var(--line-strong)'),
+                            background: fontPair === fp.label ? 'var(--paper-3)' : 'var(--paper)',
+                          }}
+                        >
+                          <span className="block text-[9.5px] leading-tight" style={{ color: 'var(--ink)' }}>{fp.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-black/8 dark:border-white/8">
-          <button onClick={() => step > 1 ? setStep(step - 1) : onClose()} className="text-sm text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors">
-            {step > 1 ? '← Voltar' : 'Cancelar'}
-          </button>
-          <Button onClick={handleNext} loading={loading} className="gap-2">
+        <div className="flex items-center gap-3 px-6 pb-6">
+          {step > 1 && (
+            <button onClick={() => goTo(step - 1)} className="brand-btn outline pill sm">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Voltar
+            </button>
+          )}
+          <Button
+            onClick={handleNext}
+            loading={loading}
+            disabled={!canAdvance}
+            pill
+            className="ml-auto gap-2"
+          >
             {step === totalSteps ? (
               loading ? 'Criando...' : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  {contentMode === 'ai' ? 'Gerar com IA' : contentMode === 'json' ? 'Importar e criar' : 'Criar carrossel'}
+                  Gerar
                 </>
               )
             ) : (
               <>
                 Continuar
-                <ChevronRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

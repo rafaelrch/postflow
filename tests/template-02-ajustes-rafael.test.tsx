@@ -89,9 +89,12 @@ describe('FATIA 6 — cabeçalho por slide', () => {
     const category = html.match(/data-slot="header\.category" style="([^"]*)"/)?.[1] ?? '';
     const handle = html.match(/data-slot="header\.handle" style="([^"]*)"/)?.[1] ?? '';
     expect(category).toContain('font-size:30px');
-    expect(category).toContain('top:64px');
+    // 44 (spec) + 20 (margem) menos metade do crescimento além da referência:
+    // o canto cresce a partir do próprio centro. Era `top:64px` quando o
+    // crescimento só ia para baixo — ver `tests/cantos-tamanho.test.tsx`.
+    expect(category).toContain('top:57.4023px');
     expect(category).toContain('left:91px');
-    expect(handle).toContain('top:64px');
+    expect(handle).toContain('top:57.4023px');
     expect(handle).toContain('right:91px');
     expect(html).toContain('data-slot="cover.headline"');
   });

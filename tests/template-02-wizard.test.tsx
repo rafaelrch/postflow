@@ -24,11 +24,17 @@ vi.mock('@/lib/upload-image', () => ({ uploadImageFile: vi.fn() }));
 
 import CreateWizard from '@/components/editor/CreateWizard';
 
+/**
+ * Abre o wizard já no passo de TEMPLATE (2 de 4). O passo 1 é o formato do
+ * post (4:5 / 1:1 / 9:16) e não interessa a estes testes.
+ */
 function abreWizard() {
-  return render(<CreateWizard onClose={vi.fn()} />);
+  const r = render(<CreateWizard onClose={vi.fn()} />);
+  fireEvent.click(screen.getByText('Continuar'));
+  return r;
 }
 
-/** Vai do passo 1 (estilo) para o 2 (conteúdo). */
+/** Vai do passo de template para o de conteúdo. */
 function avanca() {
   fireEvent.click(screen.getByText('Continuar'));
 }
@@ -48,31 +54,45 @@ describe('TEMPLATE 2 no wizard', () => {
     expect(screen.getByText(/Quantos slides você quiser/i)).toBeTruthy();
   });
 
+  /** O controle de quantidade virou uma grade de pills de 1 a 20. */
+  function pillsDeQuantidade() {
+    return screen.queryByRole('group', { name: 'Número de slides' });
+  }
+
   it('escolher o Template 2 MANTÉM o controle de quantidade', () => {
     abreWizard();
     fireEvent.click(screen.getByText('Template 2'));
     avanca();
-    // O slider existe (o T1 esconde o dele) e abre no padrão do spec.
-    const slider = screen.getByRole('slider');
-    expect(slider).toBeTruthy();
-    expect((slider as HTMLInputElement).value).toBe(String(TEMPLATE_02_DEFAULT_MODELS.length));
-    expect(screen.getByText(String(TEMPLATE_02_DEFAULT_MODELS.length))).toBeTruthy();
+    // O controle existe (o T1 esconde o dele) e abre no padrão do spec.
+    const grade = pillsDeQuantidade();
+    expect(grade).toBeTruthy();
+    const ativa = grade!.querySelector('[aria-pressed="true"]');
+    expect(ativa?.textContent).toBe(String(TEMPLATE_02_DEFAULT_MODELS.length));
   });
 
-  it('o Template 1 continua sem slider — o deck dele é fechado', () => {
+  it('o Template 1 continua sem controle de quantidade — o deck dele é fechado', () => {
     // A generalização não pode ter afrouxado a regra do T1.
     abreWizard();
     fireEvent.click(screen.getByText('Template 1'));
     avanca();
-    expect(screen.queryByRole('slider')).toBeNull();
+    expect(pillsDeQuantidade()).toBeNull();
+    expect(screen.getByText(/Deck fixo de 6 slides/)).toBeTruthy();
   });
 
-  it('"Colar copy manual" está disponível — é o caminho SEM crédito de IA', () => {
+  it('o modo manual é o caminho SEM crédito: não chama a API de geração', () => {
+    // O rótulo do botão final virou "Gerar" para todos os modos, então o que
+    // vale provar é o comportamento: no manual nada vai para a OpenAI.
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
     abreWizard();
     fireEvent.click(screen.getByText('Template 2'));
     avanca();
-    fireEvent.click(screen.getByText('Colar copy manual'));
-    // O botão final deixa de falar em gerar: nada vai para a OpenAI.
-    expect(screen.getByText('Criar carrossel')).toBeTruthy();
+    fireEvent.change(screen.getByDisplayValue('Criar com IA'), { target: { value: 'manual' } });
+    // O T2 não tem passo de identidade visual: o conteúdo já é o último.
+    fireEvent.click(screen.getByText('Gerar'));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

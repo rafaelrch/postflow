@@ -1,19 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Slide, GlobalSettings, ContentLayout, TextHighlight, ElementFont } from '@/types';
-import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient, getImageLayerStyle } from '@/lib/utils';
+import { Slide, GlobalSettings, ContentLayout, TextHighlight, DEFAULT_CORNERS } from '@/types';
+import { getFontFamilies, getElementFontCSS, getShadowOverlayGradient, getImageLayerStyle, cornerGrowthTop, cornerTop } from '@/lib/utils';
 import { getFormat } from '@/lib/formats';
+import { renderTextWithHighlights } from '@/lib/text-highlights';
 
-// Sublinhado via border-bottom — text-decoration sai diferente no html2canvas
-// (export). O inline-block é essencial: em elemento inline o navegador pinta a
-// borda na caixa de conteúdo do texto, mas o html2canvas pinta no retângulo do
-// elemento (altura da linha). Com inline-block as caixas coincidem nos dois.
-const UNDERLINE_STYLE: React.CSSProperties = {
-  display: 'inline-block',
-  lineHeight: 1.1,
-  borderBottom: '0.05em solid currentColor',
-};
 
 export interface EditorialSlideProps {
   slide: Slide;
@@ -46,6 +38,27 @@ const TTI_IMG_HEIGHT = 500;
 // image-text-text
 const ITT_IMG_HEIGHT = 490;
 
+/**
+ * Base da faixa dos CANTOS (@handle / título do carrossel), em px do slide.
+ *
+ * Os cantos são a única coisa desenhada acima do conteúdo, e o usuário mexe na
+ * distância às bordas e no tamanho deles — então a faixa não é um número fixo.
+ * Devolve 0 quando não há canto visível.
+ *
+ * Mesma conta do componente `Corners` logo abaixo, de propósito num lugar só:
+ * se as duas divergirem, o conteúdo volta a encostar nos cantos.
+ */
+function cornersBandBottom(corners: GlobalSettings['corners']): number {
+  const algumVisivel = corners.topLeft.visible || corners.topRight.visible;
+  if (!corners.show || !algumVisivel) return 0;
+  const top = cornerTop(
+    0,
+    cornerGrowthTop(corners.borderDistance, corners.fontSize, DEFAULT_CORNERS.fontSize),
+  );
+  // `lineHeight: 1` no `cornerStyle` — a caixa tem a altura do próprio corpo.
+  return top + corners.fontSize;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,67 +75,6 @@ function isLightColor(hex: string): boolean {
   try { return hexLuminance(hex) > 0.4; } catch { return false; }
 }
 
-interface IndexedHighlight extends TextHighlight { wordIdx?: number }
-
-function renderTextWithHighlights(
-  text: string,
-  highlights: TextHighlight[],
-  fallbackWord: string,
-  fallbackColor: string,
-  style: React.CSSProperties,
-): React.ReactNode {
-  const effective = (highlights.length > 0
-    ? highlights
-    : (fallbackWord ? [{ text: fallbackWord, color: fallbackColor }] : [])) as IndexedHighlight[];
-
-  const underlineAll = style.textDecoration === 'underline';
-  const { textDecoration: _td, ...outerStyle } = style;
-
-  if ((effective.length === 0 && !underlineAll) || !text) return <span style={outerStyle}>{text}</span>;
-
-  interface Token { raw: string; isWord: boolean }
-  const tokens: Token[] = [];
-  let remaining = text;
-  while (remaining.length > 0) {
-    const wm = remaining.match(/^\S+/);
-    if (wm) { tokens.push({ raw: wm[0], isWord: true }); remaining = remaining.slice(wm[0].length); continue; }
-    const sm = remaining.match(/^\s+/);
-    if (sm) { tokens.push({ raw: sm[0], isWord: false }); remaining = remaining.slice(sm[0].length); continue; }
-    tokens.push({ raw: remaining[0], isWord: false }); remaining = remaining.slice(1);
-  }
-
-  const seen: Record<string, number> = {};
-  const wordOccurrences: number[] = tokens.map((t) => {
-    if (!t.isWord) return -1;
-    const lc = t.raw.toLowerCase();
-    const occ = seen[lc] ?? 0;
-    seen[lc] = occ + 1;
-    return occ;
-  });
-
-  const getHl = (word: string, occIdx: number): IndexedHighlight | undefined =>
-    effective.find((h) => h.text.toLowerCase() === word.toLowerCase() && h.wordIdx === occIdx)
-    ?? effective.find((h) => h.text.toLowerCase() === word.toLowerCase() && h.wordIdx === undefined);
-
-  return (
-    <span style={outerStyle}>
-      {tokens.map((token, i) => {
-        if (!token.isWord) return token.raw;
-        const hl = getHl(token.raw, wordOccurrences[i]);
-        const underlined = hl?.underline || underlineAll;
-        if (!hl && !underlined) return token.raw;
-        const hlFontCSS = hl?.font ? getElementFontCSS(hl.font as ElementFont) : null;
-        return (
-          <span key={i} style={{
-            ...(hl ? { color: hl.color } : {}),
-            ...(underlined ? UNDERLINE_STYLE : {}),
-            ...(hlFontCSS ? { fontFamily: hlFontCSS.fontFamily, fontWeight: hlFontCSS.fontWeight, fontStyle: hlFontCSS.fontStyle } : {}),
-          }}>{token.raw}</span>
-        );
-      })}
-    </span>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MetaBar sub-component
@@ -179,8 +131,11 @@ function Corners({
     ? getElementFontCSS(corners.elementFont)
     : { fontFamily: fontBody, fontWeight: 400, fontStyle: 'normal' as const };
 
-  const cornerTextColor = corners.color
-    || (bgIsLight ? `rgba(0,0,0,${corners.opacity / 100})` : `rgba(255,255,255,${corners.opacity / 100})`);
+  // A opacidade é uma propriedade à parte, NÃO o alfa da cor. Ela vinha
+  // embutida no rgba() do fallback, que só era usado quando `corners.color`
+  // estava vazio — e o padrão do produto já traz '#FFFFFF'. Resultado: o
+  // slider de opacidade nunca fazia efeito nenhum.
+  const cornerTextColor = corners.color || (bgIsLight ? '#000000' : '#FFFFFF');
 
   const cornerStyle = (): React.CSSProperties => ({
     fontSize: `${corners.fontSize}px`,
@@ -190,20 +145,25 @@ function Corners({
     fontWeight: cornerFontCSS.fontWeight,
     fontStyle: cornerFontCSS.fontStyle,
     color: cornerTextColor,
+    opacity: corners.opacity / 100,
     zIndex: 20,
   });
 
   const bd = corners.borderDistance;
+  // O canto cresce a partir do próprio centro, sem sair do slide. A base desta
+  // faixa é o que `cornersBandBottom` devolve — é ela que o conteúdo respeita
+  // na âncora de topo.
+  const top = cornerTop(0, cornerGrowthTop(bd, corners.fontSize, DEFAULT_CORNERS.fontSize));
 
   return (
     <>
       {corners.topLeft.visible && (
-        <div style={{ position: 'absolute', top: bd, left: bd, ...cornerStyle() }}>
+        <div style={{ position: 'absolute', top, left: bd, ...cornerStyle() }}>
           {corners.topLeft.text}
         </div>
       )}
       {corners.topRight.visible && (
-        <div style={{ position: 'absolute', top: bd, right: bd, ...cornerStyle() }}>
+        <div style={{ position: 'absolute', top, right: bd, ...cornerStyle() }}>
           {corners.topRight.text}
         </div>
       )}
@@ -223,8 +183,6 @@ export default function EditorialSlide({
   // Dimensões do formato ativo — largura sempre 1080; só a altura muda. As zonas
   // verticais dos layouts são derivadas de SLIDE_H, então refluem sem esticar.
   const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
-  // Cover layout — text group default top (~58% down)
-  const COVER_TEXT_DEFAULT_TOP = Math.round(SLIDE_H * 0.58);
 
   const layout: ContentLayout = slide.contentLayout ?? (slideIndex === 0 ? 'cover' : 'text-image-text');
 
@@ -320,9 +278,14 @@ export default function EditorialSlide({
     }} />
   ) : null;
 
-  // "Fundo do Slide" — cor sólida OU imagem full-bleed atrás de tudo (texto,
-  // shape de imagem, etc). Usa os mesmos campos que o layout "cover" já usava.
-  const bgImageUrl = slide.backgroundImageUrl || slide.gridImageUrl || '';
+  // "Fundo do Slide" — cor sólida OU imagem full-bleed atrás de tudo.
+  //
+  // Só a CAPA usa a imagem: nos demais layouts a imagem vai no CARD (o shape de
+  // conteúdo), nunca no fundo — pedido do Rafael. A capa é a exceção porque não
+  // tem card nenhum: a imagem dela É o slide, e é por isso que o painel
+  // "Imagem" nem aparece nela (ver `TEMPLATE_SIDEBAR_CONFIG`). O `text-only`
+  // também fica sem imagem: sem card, não há onde ela entrar.
+  const bgImageUrl = layout === 'cover' ? slide.backgroundImageUrl || slide.gridImageUrl || '' : '';
   const backgroundImageLayer = bgImageUrl ? (
     <div style={{
       position: 'absolute', inset: 0,
@@ -348,11 +311,19 @@ export default function EditorialSlide({
     const coverGap = slide.titleDescriptionGap ?? 36;
     // Bloco de texto (título + descrição) posicionado pela faixa vertical do
     // seletor "Posição do texto"; os sliders de offset seguem funcionando.
+    //
+    // Na faixa de BAIXO a capa é ancorada pelo RODAPÉ, com o mesmo respiro dos
+    // slides internos (`CONTENT_TOP`). Antes era `top: 58% da altura`, um ponto
+    // fixo que não acompanhava o tamanho do bloco: título de duas linhas descia
+    // o conjunto inteiro e a descrição chegava mais perto do rodapé do que a de
+    // um título de uma linha. Ancorando por baixo, a distância ao rodapé é
+    // sempre a mesma e o bloco cresce para cima — que é o "mais para baixo" que
+    // o Rafael pediu, sem número novo.
     const coverBlockPos: React.CSSProperties = vBand === 'top'
       ? { top: CONTENT_TOP + 40 }
       : vBand === 'middle'
         ? { top: '50%', transform: 'translateY(-50%)' }
-        : { top: COVER_TEXT_DEFAULT_TOP };
+        : { bottom: CONTENT_TOP };
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: panelBg }}>
@@ -373,8 +344,12 @@ export default function EditorialSlide({
           </div>
         )}
 
-        {/* Text block — título e descrição fluem juntos com gap ajustável */}
-        <div style={{
+        {/* Text block — título e descrição fluem juntos com gap ajustável.
+            A CAPA tem posicionamento PRÓPRIO: ela não passa pela coluna flex
+            das sequências, então o respiro delas não a alcança. Na faixa de
+            baixo ela é ancorada pelo rodapé — ver `coverBlockPos` acima e
+            `tests/editorial-respiro-vertical.test.tsx`. */}
+        <div data-block="cover-text" style={{
           position: 'absolute',
           ...coverBlockPos,
           left: PAD_X, right: PAD_X,
@@ -437,13 +412,68 @@ export default function EditorialSlide({
 
   const gap = slide.titleDescriptionGap ?? 36;
 
-  // ── text-image-text ────────────────────────────────────────────────────────
-  if (layout === 'text-image-text') {
+  // ── SEQUÊNCIAS (text-image-text / text-text-image / image-text-text) ──────
+  //
+  // As três são a MESMA coluna flex; o que muda é só a ORDEM dos blocos. Antes
+  // só o `text-image-text` era assim: as outras duas posicionavam cada bloco
+  // por `top` absoluto, com uma faixa fixa reservada para o título (28% da
+  // altura ≈ 378 px). Com título curto sobrava um vazio antes da descrição —
+  // "como se algo fosse ser inserido ali" (o Rafael), que era exatamente o slot
+  // da imagem sendo reservado onde não há imagem. Em coluna flex o vão entre os
+  // blocos é sempre o `gap`, e os textos se aproximam sozinhos.
+  if (layout === 'text-image-text' || layout === 'text-text-image' || layout === 'image-text-text') {
     const titleOffsetY = slide.editorialTitleOffsetY ?? 0;
     const imageOffsetY = slide.editorialImageOffsetY ?? 0;
     const descOffsetY = slide.editorialDescOffsetY ?? 0;
 
-    const imgH = IMG_HEIGHT;
+    // A altura da imagem continua sendo a de cada sequência — o que se unificou
+    // é o empilhamento, não o desenho.
+    const imgH = layout === 'text-image-text' ? IMG_HEIGHT
+      : layout === 'text-text-image' ? TTI_IMG_HEIGHT
+      : ITT_IMG_HEIGHT;
+
+    const titleItem = (
+      <div key="title" data-block="title" style={{ transform: `translateY(${titleOffsetY}px)` }}>
+        {titleBlock}
+      </div>
+    );
+    const imageItem = showImageBox ? (
+      <div key="image" data-block="image" style={{
+        height: imgH,
+        width: '100%',
+        flex: 'none',
+        transform: `translateY(${imageOffsetY}px)`,
+        ...imageStyle(imgH),
+      }}>
+        {contentImageLayer}
+      </div>
+    ) : null;
+    const descItem = descBlock ? (
+      <div key="description" data-block="description" style={{ transform: `translateY(${descOffsetY}px)` }}>
+        {descBlock}
+      </div>
+    ) : null;
+
+    const ordem = layout === 'text-image-text' ? [titleItem, imageItem, descItem]
+      : layout === 'text-text-image' ? [titleItem, descItem, imageItem]
+      : [imageItem, titleItem, descItem];
+
+    // RESPIRO das âncoras extremas. Medido antes: colado no topo o conteúdo
+    // começava a 20 px da base dos cantos, e colado no rodapé parava a 56 px da
+    // borda — nas três sequências e nos três formatos.
+    //
+    // Entra como PADDING da banda extrema, não como novo limite do container:
+    // mexer em `top`/`bottom` arrastaria junto a âncora do MEIO, que já está
+    // certa. Com `justifyContent` em `flex-start`/`flex-end` o padding empurra
+    // exatamente o lado que encosta, e em `center` os dois são zero.
+    //
+    // Os números vêm do próprio renderer: a folga abaixo dos cantos é o `PAD_X`
+    // (o respiro que o template já usa na horizontal) e o recuo do rodapé é o
+    // `CONTENT_TOP` (o inset vertical que ele já usava em cima), o que deixa o
+    // quadro simétrico em vez de 96 em cima e 56 embaixo.
+    const topoSeguro = Math.max(CONTENT_TOP, cornersBandBottom(corners) + PAD_X);
+    const padTop = vBand === 'top' ? Math.max(0, topoSeguro - CONTENT_TOP) : 0;
+    const padBottom = vBand === 'bottom' ? Math.max(0, CONTENT_TOP - 56) : 0;
 
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
@@ -461,137 +491,12 @@ export default function EditorialSlide({
           flexDirection: 'column',
           // Faixa vertical do seletor "Posição do texto" move o grupo inteiro
           justifyContent: vBand === 'top' ? 'flex-start' : vBand === 'bottom' ? 'flex-end' : 'center',
+          paddingTop: padTop,
+          paddingBottom: padBottom,
           gap,
         }}>
-          <div style={{ transform: `translateY(${titleOffsetY}px)` }}>
-            {titleBlock}
-          </div>
-
-          {showImageBox && (
-            <div style={{
-              height: imgH,
-              width: '100%',
-              transform: `translateY(${imageOffsetY}px)`,
-              ...imageStyle(imgH),
-            }}>
-              {contentImageLayer}
-            </div>
-          )}
-
-          {descBlock && (
-            <div style={{ transform: `translateY(${descOffsetY}px)` }}>
-              {descBlock}
-            </div>
-          )}
+          {ordem.filter(Boolean)}
         </div>
-
-        <Corners corners={corners} bgIsLight={bgIsLight} fontBody={fonts.body} />
-      </div>
-    );
-  }
-
-  // ── text-text-image ────────────────────────────────────────────────────────
-  if (layout === 'text-text-image') {
-    const titleOffsetY = slide.editorialTitleOffsetY ?? 0;
-    const descOffsetY = slide.editorialDescOffsetY ?? 0;
-    const imageOffsetY = slide.editorialImageOffsetY ?? 0;
-
-    const titleH = Math.round(SLIDE_H * 0.28); // ~378
-    const titleTop = CONTENT_TOP + titleOffsetY;
-    const baseDescTop = CONTENT_TOP + titleH + 40;
-    const descH = Math.round(SLIDE_H * 0.16);  // ~216
-    const descTopTTI = baseDescTop + descOffsetY;
-    const baseImgTop = baseDescTop + descH + 40;
-    const imgTopTTI = baseImgTop + imageOffsetY;
-    const imgH = SLIDE_H - baseImgTop - 56;
-
-    return (
-      <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
-        {backgroundImageLayer}
-        {shadowOverlayLayer}
-        <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
-
-        {/* Top title */}
-        <div style={{
-          position: 'absolute', top: titleTop, left: PAD_X, right: PAD_X,
-          overflow: 'hidden',
-        }}>
-          {titleBlock}
-        </div>
-
-        {/* Secondary description text */}
-        {descBlock && (
-          <div style={{
-            position: 'absolute', top: descTopTTI, left: PAD_X, right: PAD_X,
-            overflow: 'hidden',
-          }}>
-            {descBlock}
-          </div>
-        )}
-
-        {/* Image at bottom */}
-        {showImageBox && imgH > 0 && (
-          <div style={{
-            position: 'absolute', top: imgTopTTI, left: PAD_X, right: PAD_X, height: imgH,
-            ...imageStyle(imgH),
-            width: SLIDE_W - PAD_X * 2,
-          }}>
-            {contentImageLayer}
-          </div>
-        )}
-
-        <Corners corners={corners} bgIsLight={bgIsLight} fontBody={fonts.body} />
-      </div>
-    );
-  }
-
-  // ── image-text-text ────────────────────────────────────────────────────────
-  if (layout === 'image-text-text') {
-    const imageOffsetY = slide.editorialImageOffsetY ?? 0;
-    const titleOffsetY = slide.editorialTitleOffsetY ?? 0;
-    const descOffsetY = slide.editorialDescOffsetY ?? 0;
-
-    const imgTop = CONTENT_TOP + imageOffsetY;
-    const imgH = ITT_IMG_HEIGHT;
-    const baseTitleTop = CONTENT_TOP + imgH + 44;
-    const titleTopITT = baseTitleTop + titleOffsetY;
-    const baseDescTop = baseTitleTop + Math.round(SLIDE_H * 0.28);
-    const descTopITT = baseDescTop + descOffsetY;
-
-    return (
-      <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: bgColor }}>
-        {backgroundImageLayer}
-        {shadowOverlayLayer}
-        <MetaBar metaBar={metaBar} textColor={metaTextColor} fontFamily={fonts.body} />
-
-        {/* Image at top */}
-        {showImageBox && (
-          <div style={{
-            position: 'absolute', top: imgTop, left: PAD_X, right: PAD_X, height: imgH,
-            ...imageStyle(imgH),
-            width: SLIDE_W - PAD_X * 2,
-          }}>
-            {contentImageLayer}
-          </div>
-        )}
-
-        {/* Title */}
-        <div style={{
-          position: 'absolute', top: titleTopITT, left: PAD_X, right: PAD_X,
-          overflow: 'hidden',
-        }}>
-          {titleBlock}
-        </div>
-
-        {/* Description */}
-        {descBlock && (
-          <div style={{
-            position: 'absolute', top: descTopITT, left: PAD_X, right: PAD_X,
-            overflow: 'hidden',
-          }}>
-            {descBlock}
-          </div>
-        )}
 
         <Corners corners={corners} bgIsLight={bgIsLight} fontBody={fonts.body} />
       </div>

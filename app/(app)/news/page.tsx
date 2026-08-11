@@ -6,8 +6,6 @@ import {
   Newspaper,
   Upload,
   X,
-  ChevronLeft,
-  ChevronRight,
   FileJson,
   Package,
   ExternalLink,
@@ -17,9 +15,12 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NewsCard, { NewsCardItem, DEFAULT_STYLE, parseNewsJSON } from '@/components/news/NewsCard';
+import NewsCardStrip from '@/components/news/NewsCardStrip';
+import NewsCardStage from '@/components/news/NewsCardStage';
 import { createClient } from '@/lib/supabase';
 import { handleNewsDailyLimit } from '@/hooks/useUpgradeStore';
 import { fetchNewsUsage, newsCreateAllowance, FREE_NEWS_DAILY_LIMIT } from '@/lib/news-quota';
+import Pagination from '@/components/ui/Pagination';
 
 // ── Canvas export helpers ─────────────────────────────────────────────────────
 
@@ -291,8 +292,12 @@ const DEFAULT_TEMPLATE: NewsTemplateStyle = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const THUMB_SCALE = 0.18;
+// A escala das miniaturas saiu daqui: quem decide é o `NewsCardStrip`, a partir
+// da largura da miniatura, para a proporção nunca depender de dois números.
 const PREVIEW_SCALE = 0.38;
+
+/** Lotes salvos por página. Mesmo número do dashboard, de propósito. */
+const NEWS_PAGE_SIZE = 10;
 
 const NEWS_TITLE_FONTS: { label: string; value: string }[] = [
   { label: 'SF Pro Display', value: "'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif" },
@@ -497,7 +502,6 @@ export default function NewsPage() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [localImages, setLocalImages] = useState<Record<number, string>>({});
 
-  const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
   const insetFileRef = useRef<HTMLInputElement>(null);
@@ -712,6 +716,12 @@ export default function NewsPage() {
   const saveTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const currentBatchIdRef = useRef<string | null>(null);
   const [savedBatches, setSavedBatches] = useState<SavedNewsBatch[]>([]);
+  // Mesma regra do dashboard: 10 por página. O produto não precisa de dois
+  // comportamentos, e o usuário não precisa aprender dois.
+  const [batchPage, setBatchPage] = useState(1);
+  const [batchTotalPages, setBatchTotalPages] = useState(1);
+  // Total de LOTES (não de cards): é o "de N" do rótulo de intervalo.
+  const [batchTotalItems, setBatchTotalItems] = useState(0);
 
   // blob: URLs morrem no reload — não vão para o banco.
   const sanitizeForPayload = (item: NewsCardItem): Record<string, unknown> => {
@@ -761,15 +771,60 @@ export default function NewsPage() {
     }
   }, []);
 
-  /** Carrega todos os lotes de cards salvos, agrupados por batch_id. */
-  const loadBatches = useCallback(async () => {
+  /**
+   * Carrega uma PÁGINA de lotes salvos.
+   *
+   * 🔴 A linha do banco é um CARD; a unidade da lista é o LOTE, que só existe
+   * depois de agrupar por `batch_id`. Um `.range()` direto sobre as linhas
+   * cortaria lotes no meio — a página 1 terminaria com metade de um lote e a
+   * 2 começaria com a outra metade. Por isso são duas queries:
+   *
+   *   1. as CHAVES (id, created_at, batch_id) — três colunas minúsculas, sem
+   *      payload nem imagem, só para saber quais lotes existem e em que ordem;
+   *   2. as linhas dos 10 lotes DESTA página, por `.in('id', …)`.
+   *
+   * O que pesa (raw_payload, legenda, url de imagem) vem do banco já recortado:
+   * nunca se busca o conteúdo de todos os lotes para mostrar dez.
+   */
+  const loadBatches = useCallback(async (pagina: number = 1) => {
     const supabase = createClient();
+
+    type ChaveRow = { id: string; created_at: string; batch_id: string | null };
+    const { data: chaves, error: erroChaves } = await supabase
+      .from('news_entries')
+      .select('id, created_at, batch_id:raw_payload->>batch_id')
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false });
+    if (erroChaves || !chaves) return;
+
+    // Agrupa preservando a ordem de chegada (created_at desc).
+    const ordem: string[] = [];
+    const idsPorLote = new Map<string, string[]>();
+    for (const r of chaves as ChaveRow[]) {
+      const key = r.batch_id || `single_${r.id}`;
+      const atual = idsPorLote.get(key);
+      if (atual) atual.push(r.id);
+      else { idsPorLote.set(key, [r.id]); ordem.push(key); }
+    }
+
+    const paginas = Math.max(1, Math.ceil(ordem.length / NEWS_PAGE_SIZE));
+    // Página fora do intervalo (apagou o último lote da última página) volta
+    // para a última que existe, em vez de mostrar lista vazia.
+    const pag = Math.min(Math.max(1, pagina), paginas);
+    const inicio = (pag - 1) * NEWS_PAGE_SIZE;
+    const chavesDaPagina = ordem.slice(inicio, inicio + NEWS_PAGE_SIZE);
+    const idsDaPagina = chavesDaPagina.flatMap((k) => idsPorLote.get(k) ?? []);
+
+    setBatchTotalPages(paginas);
+    setBatchTotalItems(ordem.length);
+    setBatchPage(pag);
+
+    if (idsDaPagina.length === 0) { setSavedBatches([]); return; }
+
     const { data, error } = await supabase
       .from('news_entries')
       .select('id, title, topic, image_url, caption, raw_payload, created_at')
-      .eq('status', 'draft')
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .in('id', idsDaPagina);
     if (error || !data) return;
 
     type EntryRow = { id: string; title: string; topic: string; image_url: string; caption: string; raw_payload: Record<string, unknown> | null; created_at: string };
@@ -782,7 +837,12 @@ export default function NewsPage() {
       if (g) g.push(r); else groups.set(key, [r]);
     }
 
-    const batches: SavedNewsBatch[] = Array.from(groups.entries()).map(([key, groupRows]) => ({
+    // `.in()` não garante ordem; a ordem certa é a das CHAVES.
+    const ordenados = chavesDaPagina
+      .map((k) => [k, groups.get(k)] as const)
+      .filter((par): par is readonly [string, EntryRow[]] => Array.isArray(par[1]) && par[1].length > 0);
+
+    const batches: SavedNewsBatch[] = ordenados.map(([key, groupRows]) => ({
       batchId: key.startsWith('single_') ? null : key,
       createdAt: groupRows[groupRows.length - 1].created_at,
       items: groupRows
@@ -1326,6 +1386,15 @@ export default function NewsPage() {
                   </div>
                 ))}
               </div>
+
+              <Pagination
+                page={batchPage}
+                totalPages={batchTotalPages}
+                totalItems={batchTotalItems}
+                pageSize={NEWS_PAGE_SIZE}
+                onChange={(p) => loadBatches(p)}
+                label="Paginação das notícias salvas"
+              />
             </div>
           )}
         </div>
@@ -1892,60 +1961,37 @@ export default function NewsPage() {
   const selected = items[selectedIdx];
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[var(--background)]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--background)]">
 
-      {/* Left: Card grid */}
-      <div className="w-56 shrink-0 border-r border-black/[0.06] dark:border-white/[0.06] flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-900/50 dark:text-white/50 uppercase tracking-wider">
-            {items.length} cards
-          </span>
+      {/* Barra de topo — o que restou da antiga coluna da esquerda.
+          A lista de miniaturas desceu para o rodapé do card (`NewsCardStrip`);
+          sem ela a coluna ficaria só com a contagem e o "Voltar", uma faixa de
+          224 px praticamente vazia. Então os quatro controles vieram para cá e
+          a coluna deixou de existir. */}
+      <div className="shrink-0 flex items-center justify-between gap-4 px-6 py-3 border-b border-black/[0.06] dark:border-white/[0.06]">
+        <div className="flex items-center gap-4">
           <button
             onClick={() => setStep('choose')}
             className="text-xs text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
             ← Voltar
           </button>
+          <span className="text-xs font-semibold text-gray-900/50 dark:text-white/50 uppercase tracking-wider">
+            {items.length} cards
+          </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-3 px-3 flex flex-col gap-2">
-          {items.map((item, idx) => (
-            <button
-              key={item.numero}
-              onClick={() => setSelectedIdx(idx)}
-              className={`relative rounded-lg overflow-hidden border-2 transition-all text-left ${
-                idx === selectedIdx
-                  ? 'border-gray-900 dark:border-white shadow-md'
-                  : 'border-transparent hover:border-black/20 dark:hover:border-white/20'
-              }`}
-              style={{
-                width: 1080 * THUMB_SCALE,
-                height: 1350 * THUMB_SCALE,
-              }}
-            >
-              <div style={{ transform: `scale(${THUMB_SCALE})`, transformOrigin: 'top left', pointerEvents: 'none' }}>
-                <NewsCard item={item} scale={1} />
-              </div>
-              {/* Number badge */}
-              <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                {item.numero}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Save + Download all */}
-        <div className="p-3 border-t border-black/[0.06] dark:border-white/[0.06] flex flex-col gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={saveAllCards}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-black/10 dark:border-white/10 text-xs font-bold text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:border-black/25 dark:hover:border-white/25 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-black/10 dark:border-white/10 text-xs font-bold text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:border-black/25 dark:hover:border-white/25 transition-colors"
           >
             <Save className="w-3.5 h-3.5" />
             Salvar cards
           </button>
           <button
             onClick={downloadAll}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors"
           >
             <Package className="w-3.5 h-3.5" />
             Baixar todos
@@ -1953,47 +1999,24 @@ export default function NewsPage() {
         </div>
       </div>
 
+      {/* Linha: card + painel de edição */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+
       {/* Center: Preview */}
-      <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto bg-[var(--background-subtle,var(--background))] py-8 px-6 gap-4">
-        {/* Nav */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSelectedIdx(i => Math.max(0, i - 1))}
-            disabled={selectedIdx === 0}
-            className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4 text-gray-900 dark:text-white" />
-          </button>
-          <span className="text-xs font-medium text-gray-900/50 dark:text-white/50">
-            Card {selectedIdx + 1} de {items.length}
-          </span>
-          <button
-            onClick={() => setSelectedIdx(i => Math.min(items.length - 1, i + 1))}
-            disabled={selectedIdx === items.length - 1}
-            className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 transition-colors"
-          >
-            <ChevronRight className="w-4 h-4 text-gray-900 dark:text-white" />
-          </button>
-        </div>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[var(--background-subtle,var(--background))]">
+      {/* Palco do card: setas nas laterais e o card escalado para CABER na
+          altura útil. A escala fixa de antes (0,38 => 513 px de altura) não
+          cabia em janela baixa e a coluna do meio ganhava barra de rolagem. */}
+      <NewsCardStage
+        item={selected}
+        selectedIdx={selectedIdx}
+        total={items.length}
+        onPrev={() => setSelectedIdx(i => Math.max(0, i - 1))}
+        onNext={() => setSelectedIdx(i => Math.min(items.length - 1, i + 1))}
+      />
 
-        {/* Card preview */}
-        <div
-          style={{
-            width: 1080 * PREVIEW_SCALE,
-            height: 1350 * PREVIEW_SCALE,
-            overflow: 'hidden',
-            borderRadius: 12,
-            border: '1px solid rgba(128,128,128,0.15)',
-            flexShrink: 0,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-          }}
-        >
-          <div ref={previewRef} style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <NewsCard item={selected} scale={1} />
-          </div>
-        </div>
-
-        {/* Download this card */}
+      {/* Download this card */}
+      <div className="shrink-0 flex justify-center pb-4">
         <button
           onClick={() => downloadCard(selectedIdx)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors"
@@ -2001,6 +2024,15 @@ export default function NewsPage() {
           <Download className="w-3.5 h-3.5" />
           Baixar este card
         </button>
+      </div>
+
+        {/* Tira de miniaturas no RODAPÉ do card. Era uma coluna à esquerda, e
+            saía achatada: item de flex nasce com `flex-shrink: 1`, então dez
+            miniaturas de 243 px numa coluna de ~600 px eram comprimidas na
+            vertical e esticadas até a largura do container, enquanto o
+            `NewsCard` (um `transform: scale`) não encolhia junto. Em
+            `NewsCardStrip` a proporção é estrutural. */}
+        <NewsCardStrip items={items} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
       </div>
 
       {/* Right: Editor */}
@@ -2479,6 +2511,8 @@ export default function NewsPage() {
           )}
 
         </div>
+      </div>
+
       </div>
     </div>
   );

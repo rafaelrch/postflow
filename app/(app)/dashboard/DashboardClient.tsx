@@ -16,10 +16,26 @@ import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
 import Template02Slide from '@/components/slides/Template02Slide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
+import Pagination from '@/components/ui/Pagination';
 import type { DashboardCarousel } from './page';
+import { DASHBOARD_PAGE_SIZE, type DashboardLoadError } from '@/lib/dashboard-data';
 
 interface DashboardClientProps {
   initialCarousels: DashboardCarousel[];
+  /**
+   * `null` quando a query respondeu — inclusive respondendo que não há nada.
+   * Só com isto a tela consegue separar "você não tem carrossel" de "a carga
+   * falhou", que antes eram a mesma lista vazia.
+   */
+  loadError?: DashboardLoadError | null;
+  /** Página atual (1-based), vinda do `?page` do URL. */
+  page?: number;
+  totalPages?: number;
+  /**
+   * Total de carrosséis do usuário — o `count` do banco, NÃO o tamanho desta
+   * página. `null` quando a carga falhou: aí não se sabe quantos existem.
+   */
+  totalCarousels?: number | null;
 }
 
 function formatDate(dateStr: string) {
@@ -85,9 +101,23 @@ function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
   );
 }
 
-export default function DashboardClient({ initialCarousels }: DashboardClientProps) {
+export default function DashboardClient({
+  initialCarousels,
+  loadError = null,
+  page = 1,
+  totalPages = 1,
+  totalCarousels = null,
+}: DashboardClientProps) {
   const router = useRouter();
   const [carousels, setCarousels] = useState(initialCarousels);
+
+  // A página vem do servidor: ao trocar de `?page` o React reaproveita este
+  // componente, e sem isto a lista continuaria mostrando a página anterior.
+  useEffect(() => { setCarousels(initialCarousels); }, [initialCarousels]);
+
+  const irParaPagina = (p: number) => {
+    router.push(p <= 1 ? '/dashboard' : `/dashboard?page=${p}`);
+  };
   const [showWizard, setShowWizard] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
@@ -112,8 +142,14 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
     if (!res.ok) {
       toast.error('Erro ao deletar');
     } else {
-      setCarousels((prev) => prev.filter((c) => c.id !== id));
+      const restantes = carousels.filter((c) => c.id !== id);
+      setCarousels(restantes);
       toast.success('Carrossel deletado');
+      // Apagar o último item da página não pode deixar o usuário olhando para
+      // uma página vazia: volta uma página se esvaziou, senão recarrega os
+      // dados do servidor para puxar o item que subiu da página seguinte.
+      if (restantes.length === 0 && page > 1) irParaPagina(page - 1);
+      else router.refresh();
     }
     setDeleting(null);
   };
@@ -189,7 +225,15 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
     router.push(`/generator?id=${id}`);
   };
 
-  const total = carousels.length;
+  // O "Total" é o do BANCO, não o desta página — com 12 carrosséis a página 1
+  // mostra 10 e o contador tem de continuar dizendo 12. Cai para o tamanho da
+  // página só quando o total não veio (carga falhada).
+  const total = totalCarousels ?? carousels.length;
+
+  // ⚠️ A busca filtra apenas os carrosséis DESTA página, porque só eles estão
+  // carregados. Antes da paginação ela varria todos. Está anotado no LOG para
+  // o Orquestrador decidir se vira busca no banco.
+  const buscando = query.trim().length > 0;
 
   return (
     <div
@@ -245,15 +289,53 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
             </div>
           </div>
 
-          {/* Stats row */}
+          {/* Stats row — contagem de um lado, paginação do OUTRO, na mesma
+              linha. O controle saiu de baixo dos cards: encostado à direita
+              aqui em cima, ele não compete com o título nem obriga a rolar a
+              lista inteira para trocar de página. */}
           <div className="flex items-center gap-8 mt-2">
             <Stat label="Total" value={total} />
             <span className="hairline soft flex-1" />
+            {!buscando && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={total}
+                pageSize={DASHBOARD_PAGE_SIZE}
+                onChange={irParaPagina}
+                label="Paginação dos carrosséis"
+              />
+            )}
           </div>
         </header>
 
+        {/* Falha de carga NUNCA vira "você não tem carrossel": o usuário precisa
+            saber que foi erro, e ter como repetir. O `router.refresh()` aqui é
+            gesto explícito dele, não revalidação cega. */}
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[14px] px-5 py-4"
+            style={{ border: '1.5px solid var(--ink)', background: 'var(--paper-2)' }}
+          >
+            <div>
+              <p className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+                Não foi possível carregar seus carrosséis
+              </p>
+              <p className="text-[11.5px]" style={{ color: 'var(--ink-dim)' }}>
+                {loadError === 'timeout'
+                  ? 'A busca demorou demais. Seus carrosséis continuam salvos.'
+                  : 'Houve uma falha ao buscar. Seus carrosséis continuam salvos.'}
+              </p>
+            </div>
+            <Button variant="primary" size="md" onClick={() => router.refresh()}>
+              Tentar de novo
+            </Button>
+          </div>
+        )}
+
         {total === 0 ? (
-          <EmptyState onCreate={() => setShowWizard(true)} />
+          loadError ? null : <EmptyState onCreate={() => setShowWizard(true)} />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -382,6 +464,7 @@ export default function DashboardClient({ initialCarousels }: DashboardClientPro
                 </div>
               ))}
             </div>
+
           </>
         )}
       </main>

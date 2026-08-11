@@ -58,8 +58,8 @@ export default function AiGenPanel({
         className={cn(
           'w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold transition-opacity',
           open
-            ? 'border border-black/[0.1] dark:border-white/[0.1] text-gray-900/70 dark:text-white/70'
-            : 'bg-gray-900 dark:bg-white text-white dark:text-black hover:opacity-90'
+            ? 'border border-[var(--line-strong)] text-[var(--ink-2)]'
+            : 'bg-[var(--ink)] text-[var(--paper)] hover:opacity-90'
         )}
       >
         <Sparkles className="w-3.5 h-3.5" />
@@ -67,7 +67,7 @@ export default function AiGenPanel({
       </button>
 
       {open && (
-        <div className="flex flex-col gap-2 p-2.5 rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
+        <div className="flex flex-col gap-2 p-2.5 rounded-xl border border-[var(--line)] bg-black/[0.02] dark:bg-white/[0.02]">
           <input
             ref={fileRef}
             type="file"
@@ -82,10 +82,10 @@ export default function AiGenPanel({
           ) : (
             <div
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-lg p-3 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition-all"
+              className="border-2 border-dashed border-[var(--line-strong)] rounded-lg p-3 text-center cursor-pointer hover:border-[var(--ink)] transition-all"
             >
-              <Upload className="w-3.5 h-3.5 mx-auto mb-1 text-gray-900/25 dark:text-white/25" />
-              <span className="text-[11px] text-gray-900/35 dark:text-white/35 font-medium">
+              <Upload className="w-3.5 h-3.5 mx-auto mb-1 text-[var(--ink-muted)]" />
+              <span className="text-[11px] text-[var(--ink-muted)] font-medium">
                 {uploading ? 'Enviando…' : 'Clique para anexar referência'}
               </span>
             </div>
@@ -116,7 +116,7 @@ export default function AiGenPanel({
               })
             }
             disabled={generating || uploading}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Sparkles className="w-3.5 h-3.5" />
             {generating ? 'Gerando…' : 'Gerar'}

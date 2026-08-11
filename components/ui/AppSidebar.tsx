@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { REELS_ENABLED } from '@/lib/feature-flags';
 import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
+import NavPending from '@/components/ui/NavPending';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
 
 interface NavItem {
@@ -145,6 +146,13 @@ export default function AppSidebar() {
 
   const initial = (userName || userEmail || '?').trim().charAt(0).toUpperCase();
 
+  // No ESTÚDIO a navegação global sai de cena: o editor é tela cheia de duas
+  // colunas, e o que este trilho carregava migrou para dentro dele — logo e
+  // "Voltar para Dashboard" no painel do editor, créditos e toggle de tema na
+  // barra superior. Depois de TODOS os hooks, nunca antes: o retorno é
+  // condicional, a ordem dos hooks não pode ser.
+  if (isGenerator) return null;
+
   return (
     <aside
       className={cn(
@@ -235,6 +243,9 @@ export default function AppSidebar() {
             >
               <Icon className="w-4 h-4 shrink-0" />
               {!collapsed && <span className="flex-1">{label}</span>}
+              {/* Sinal de navegação pendente — precisa ficar DENTRO do `Link`,
+                  que é a única forma de o `useLinkStatus` enxergar o estado. */}
+              <NavPending />
             </Link>
           );
         })}

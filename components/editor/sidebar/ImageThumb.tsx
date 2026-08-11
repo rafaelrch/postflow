@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 /** Miniatura da imagem anexada, com X para remover. */
 export default function ImageThumb({ url, onRemove }: { url: string; onRemove: () => void }) {
   return (
-    <div className="relative w-full h-24 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
+    <div className="relative w-full h-24 rounded-lg overflow-hidden border border-[var(--line-strong)] bg-black/5 dark:bg-white/5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="Imagem anexada" className="w-full h-full object-cover" />
       <button

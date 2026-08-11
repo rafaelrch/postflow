@@ -233,6 +233,8 @@ export interface Template01SlotStyle {
   visible?: boolean;
   /** Margem adicional para dentro, em px do canvas; usada nos cabeçalhos. */
   margin?: number;
+  /** Opacidade do bloco, 0–100. Usada pelos cantos/cabeçalho. */
+  opacity?: number;
   /**
    * Fundo do bloco. Hoje só o marcador da capa do TEMPLATE 2 usa (a tarja atrás
    * do destaque), e o Rafael pediu poder trocar a cor dele.
@@ -364,7 +366,7 @@ export interface GlobalSettings {
    * Texto, cor e visibilidade continuam em `slides.template_*`, pois podem
    * variar de card para card.
    */
-  templateCornerStyle?: Pick<Template01SlotStyle, 'font' | 'fontSize' | 'margin'>;
+  templateCornerStyle?: Pick<Template01SlotStyle, 'font' | 'fontSize' | 'margin' | 'opacity'>;
 }
 
 export interface Carousel {
@@ -395,7 +397,17 @@ export interface GenerateCarouselInput {
   referenceImageBase64?: string;
   profileData?: ProfileData;
   twitterFormat?: TwitterFormat;
+  /**
+   * Opcionais do wizard. Omitidos — o caso de qualquer chamador antigo — o
+   * prompt final sai byte a byte igual ao de antes.
+   */
+  language?: ContentLanguage;
+  /** Usa o texto do prompt como está, sem a IA reescrever. */
+  exactContent?: boolean;
 }
+
+/** Idioma em que a IA escreve o conteúdo. Ausente = português, como sempre foi. */
+export type ContentLanguage = 'pt-BR' | 'en-US' | 'es-ES';
 
 export interface SlideAIData {
   id: number;

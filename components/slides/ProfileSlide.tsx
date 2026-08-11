@@ -3,7 +3,7 @@
 import React, { useRef } from 'react';
 import { Slide, GlobalSettings } from '@/types';
 import { getFormat } from '@/lib/formats';
-import { getImageLayerStyle } from '@/lib/utils';
+import { renderTextWithHighlights } from '@/lib/text-highlights';
 
 export interface ProfileSlideProps {
   slide: Slide;
@@ -73,6 +73,8 @@ export default function ProfileSlide({
   const imageUrl = slide.gridImageUrl || slide.backgroundImageUrl;
   const hasMedia = Boolean(imageUrl);
   const descText = slide.description?.trim() || '';
+  const highlights = slide.highlights ?? [];
+  const accentColor = globalSettings.accentColor;
   const titleDescGap = slide.titleDescriptionGap ?? 16;
   const avatarFallback = (profileData.name || 'P').trim().charAt(0).toUpperCase();
   const bodyFontSize = Math.min(slide.fontSize.title, MAX_BODY_FONT);
@@ -272,36 +274,43 @@ export default function ProfileSlide({
             cursor: isEditable && onUpdateText ? 'text' : 'default',
           }}
         >
-          {slide.title}
+          {/* Destaques por palavra — é o que permite deixar ALGUMAS palavras em
+              negrito (o destaque carrega a face escolhida), e não o bloco todo.
+              Com o texto em edição inline os destaques continuam valendo: o
+              `onBlur` só lê o `innerText`, que ignora os spans. */}
+          {renderTextWithHighlights(slide.title, highlights, '', accentColor, {})}
           {descText && (
-            <span style={{ display: 'block', marginTop: titleDescGap }}>{descText}</span>
+            <span style={{ display: 'block', marginTop: titleDescGap }}>
+              {renderTextWithHighlights(descText, highlights, '', accentColor, {})}
+            </span>
           )}
         </div>
 
-        {/* Media: video or image */}
+        {/* Mídia — a imagem entra INTEIRA, na proporção original.
+            Antes era uma caixa de 510 px de altura com `background-size:
+            cover`: qualquer foto que não fosse 864x510 perdia as bordas, que é
+            o corte que o Rafael viu. Agora quem manda na altura é a imagem, e o
+            `MEDIA_HEIGHT` vira só o teto para retrato muito alto não empurrar o
+            resto do post para fora do slide. Sem `object-fit` de propósito —
+            é ele que recortaria, e sem ele o html2canvas desenha o <img>
+            simples sem divergir do preview. */}
         {hasMedia && <div style={{ height: 54 }} />}
-        {hasMedia && (
-          <div
+        {hasMedia && imageUrl && (
+          <img
+            src={imageUrl}
+            alt=""
+            crossOrigin="anonymous"
             style={{
-              width: '100%',
-              height: MEDIA_HEIGHT,
+              display: 'block',
+              maxWidth: '100%',
+              width: 'auto',
+              height: 'auto',
+              maxHeight: MEDIA_HEIGHT,
+              margin: '0 auto',
               borderRadius: 34,
-              overflow: 'hidden',
               backgroundColor: C.mediaBg,
             }}
-          >
-            {imageUrl ? (
-              /* background-image approach — html2canvas handles this correctly unlike objectFit on <img> */
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundImage: `url(${imageUrl})`,
-                  ...getImageLayerStyle(slide.imagePosition),
-                }}
-              />
-            ) : null}
-          </div>
+          />
         )}
       </div>
     </div>
