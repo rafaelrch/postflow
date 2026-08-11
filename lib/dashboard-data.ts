@@ -105,6 +105,87 @@ export function pageRedirectTarget(
   return pedida > paginas ? paginas : null;
 }
 
+/* ── Busca ──────────────────────────────────────────────────────────────────
+   🔴 A busca consulta o BANCO, não a página já carregada.
+
+   A primeira versão filtrava `carousels` no cliente — e como o cliente só tem
+   os 10 da página aberta, digitar o título de um carrossel da página 2 dava
+   "não achei" sobre um item que EXISTE. Filtro de cliente sobre lista paginada
+   não é busca: é busca dentro da janela.
+
+   O recorte por `.range()` e a contagem continuam iguais; a busca só acrescenta
+   um `ilike` às DUAS queries (a de contagem e a de linhas), para que o total, o
+   número de páginas e o intervalo falem do resultado da busca, não do acervo. */
+
+/** Termo do `?q` → texto limpo. Só espaço em branco é o mesmo que não buscar. */
+export function parseSearchParam(raw: string | string[] | undefined): string {
+  const bruto = Array.isArray(raw) ? raw[0] : raw;
+  return typeof bruto === 'string' ? bruto.trim() : '';
+}
+
+/**
+ * Termo do usuário → padrão do `ilike`.
+ *
+ * `%` e `_` são coringas do LIKE: sem escapar, quem digita "50%" pediria "50
+ * seguido de qualquer coisa" e receberia carrossel que nada tem a ver. `\` vem
+ * primeiro no grupo porque escapar o escape depois desfaria os outros dois.
+ */
+export function ilikePatternFor(termo: string): string {
+  return `%${termo.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/**
+ * Endereço da lista. Página e busca vivem no URL — as duas juntas, senão
+ * paginar um resultado de busca perderia o termo, e limpar a busca deixaria o
+ * usuário na página 7 de uma lista que agora tem 2.
+ */
+export function dashboardHref(page: number, termo: string = ''): string {
+  const params = new URLSearchParams();
+  if (termo) params.set('q', termo);
+  if (page > 1) params.set('page', String(page));
+  const qs = params.toString();
+  return qs ? `/dashboard?${qs}` : '/dashboard';
+}
+
+/* Tipos estruturais: o mínimo do builder do PostgREST que estas duas queries
+   usam. Existem para o teste poder passar um banco de mentira e provar que a
+   busca de fato consulta o banco — com um client real embutido não haveria como
+   afirmar isso sem rede. */
+export type DashboardBuilder = {
+  eq(column: string, value: unknown): DashboardBuilder;
+  ilike(column: string, pattern: string): DashboardBuilder;
+  order(column: string, opts: { ascending: boolean }): DashboardBuilder;
+  range(from: number, to: number): DashboardBuilder;
+};
+
+export type DashboardSupabase = {
+  from(table: string): {
+    select(sel: string, opts?: { count?: 'exact'; head?: boolean }): DashboardBuilder;
+  };
+};
+
+/**
+ * Contagem — só o cabeçalho (`head: true`), zero linha. Com termo, conta o
+ * RESULTADO da busca: é ele que decide quantas páginas existem.
+ */
+export function dashboardCountQuery(supabase: DashboardSupabase, termo: string = ''): DashboardBuilder {
+  const q = supabase.from('carousels').select('id', { count: 'exact', head: true });
+  return termo ? q.ilike('title', ilikePatternFor(termo)) : q;
+}
+
+/** As linhas desta página — mesma query de sempre, mais o `ilike` da busca. */
+export function dashboardCarouselsQuery(
+  supabase: DashboardSupabase,
+  { from, to, termo = '' }: { from: number; to: number; termo?: string },
+): DashboardBuilder {
+  const base = supabase
+    .from('carousels')
+    .select(DASHBOARD_SELECT, { count: 'exact' })
+    .eq('coverSlide.position', 0);
+  const comBusca = termo ? base.ilike('title', ilikePatternFor(termo)) : base;
+  return comBusca.order('updated_at', { ascending: false }).range(from, to);
+}
+
 /** O mínimo que este módulo precisa saber de um client Supabase. */
 export interface DashboardQuery<T> {
   then: Promise<{ data: T[] | null; error: unknown }>['then'];

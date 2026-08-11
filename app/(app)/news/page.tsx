@@ -20,6 +20,14 @@ import NewsCardStage from '@/components/news/NewsCardStage';
 import { createClient } from '@/lib/supabase';
 import { handleNewsDailyLimit } from '@/hooks/useUpgradeStore';
 import { fetchNewsUsage, newsCreateAllowance, FREE_NEWS_DAILY_LIMIT } from '@/lib/news-quota';
+import {
+  NEWS_PAGE_SIZE,
+  agruparChaves,
+  apagarLoteDeNoticias,
+  chaveDoLote,
+  paginarLotes,
+  type ChaveDeLote,
+} from '@/lib/news-batches';
 import Pagination from '@/components/ui/Pagination';
 
 // ── Canvas export helpers ─────────────────────────────────────────────────────
@@ -295,9 +303,6 @@ const DEFAULT_TEMPLATE: NewsTemplateStyle = {
 // A escala das miniaturas saiu daqui: quem decide é o `NewsCardStrip`, a partir
 // da largura da miniatura, para a proporção nunca depender de dois números.
 const PREVIEW_SCALE = 0.38;
-
-/** Lotes salvos por página. Mesmo número do dashboard, de propósito. */
-const NEWS_PAGE_SIZE = 10;
 
 const NEWS_TITLE_FONTS: { label: string; value: string }[] = [
   { label: 'SF Pro Display', value: "'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif" },
@@ -722,6 +727,9 @@ export default function NewsPage() {
   const [batchTotalPages, setBatchTotalPages] = useState(1);
   // Total de LOTES (não de cards): é o "de N" do rótulo de intervalo.
   const [batchTotalItems, setBatchTotalItems] = useState(0);
+  // Lote sendo apagado — trava o botão para o clique duplo não mandar dois
+  // DELETE, e some junto com o card quando a lista recarrega.
+  const [deletandoLote, setDeletandoLote] = useState<string | null>(null);
 
   // blob: URLs morrem no reload — não vão para o banco.
   const sanitizeForPayload = (item: NewsCardItem): Record<string, unknown> => {
@@ -789,7 +797,6 @@ export default function NewsPage() {
   const loadBatches = useCallback(async (pagina: number = 1) => {
     const supabase = createClient();
 
-    type ChaveRow = { id: string; created_at: string; batch_id: string | null };
     const { data: chaves, error: erroChaves } = await supabase
       .from('news_entries')
       .select('id, created_at, batch_id:raw_payload->>batch_id')
@@ -797,22 +804,10 @@ export default function NewsPage() {
       .order('created_at', { ascending: false });
     if (erroChaves || !chaves) return;
 
-    // Agrupa preservando a ordem de chegada (created_at desc).
-    const ordem: string[] = [];
-    const idsPorLote = new Map<string, string[]>();
-    for (const r of chaves as ChaveRow[]) {
-      const key = r.batch_id || `single_${r.id}`;
-      const atual = idsPorLote.get(key);
-      if (atual) atual.push(r.id);
-      else { idsPorLote.set(key, [r.id]); ordem.push(key); }
-    }
-
-    const paginas = Math.max(1, Math.ceil(ordem.length / NEWS_PAGE_SIZE));
-    // Página fora do intervalo (apagou o último lote da última página) volta
-    // para a última que existe, em vez de mostrar lista vazia.
-    const pag = Math.min(Math.max(1, pagina), paginas);
-    const inicio = (pag - 1) * NEWS_PAGE_SIZE;
-    const chavesDaPagina = ordem.slice(inicio, inicio + NEWS_PAGE_SIZE);
+    // Agrupar e recortar vivem em `lib/news-batches` — o caminho de duas etapas
+    // só executa acima de 10 lotes, e lá ele tem teste.
+    const { ordem, idsPorLote } = agruparChaves(chaves as ChaveDeLote[]);
+    const { pagina: pag, paginas, chavesDaPagina } = paginarLotes(ordem, pagina, NEWS_PAGE_SIZE);
     const idsDaPagina = chavesDaPagina.flatMap((k) => idsPorLote.get(k) ?? []);
 
     setBatchTotalPages(paginas);
@@ -832,7 +827,7 @@ export default function NewsPage() {
 
     const groups = new Map<string, EntryRow[]>();
     for (const r of rows) {
-      const key = (r.raw_payload?.batch_id as string | undefined) || `single_${r.id}`;
+      const key = chaveDoLote(r.raw_payload?.batch_id as string | undefined, r.id);
       const g = groups.get(key);
       if (g) g.push(r); else groups.set(key, [r]);
     }
@@ -1175,6 +1170,51 @@ export default function NewsPage() {
     const formatBatchDate = (iso: string) =>
       new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
+    /** Chave estável do lote na tela — a mesma do agrupamento. */
+    const keyDoLote = (batch: SavedNewsBatch) =>
+      chaveDoLote(batch.batchId, batch.items[0]?.dbId ?? '');
+
+    /**
+     * Apagar o lote inteiro. DESTRUTIVO e IRREVERSÍVEL, então:
+     * confirma nomeando data e quantidade → apaga TODAS as linhas → recarrega
+     * a página (que se corrige sozinha se o lote apagado era o último dela).
+     * Falha aparece em toast; sumir no console seria o usuário achar que
+     * apagou.
+     */
+    const handleDeleteBatch = async (batch: SavedNewsBatch, ev: React.MouseEvent) => {
+      ev.stopPropagation(); // o card inteiro abre o editor — apagar não abre nada
+      if (deletandoLote) return;
+
+      const key = keyDoLote(batch);
+      setDeletandoLote(key);
+      try {
+        const r = await apagarLoteDeNoticias({
+          lote: batch,
+          supabase: createClient(),
+          confirmar: (msg) => window.confirm(msg),
+          formatarData: formatBatchDate,
+        });
+
+        if (r.desfecho === 'cancelado') return;
+        if (r.desfecho === 'sem-ids') {
+          toast.error('Estes cards não estão salvos no banco — nada a apagar.');
+          return;
+        }
+        if (r.desfecho === 'falhou') {
+          console.error('[news] erro ao apagar lote:', r.detalhe);
+          toast.error('Não foi possível apagar. Tente de novo.');
+          return;
+        }
+
+        toast.success(r.apagadas === 1 ? 'Notícia apagada' : `${r.apagadas} cards apagados`);
+        // Recarrega a MESMA página: o `paginarLotes` volta para a última que
+        // existe se esta esvaziou, e a contagem e o intervalo vêm junto.
+        await loadBatches(batchPage);
+      } finally {
+        setDeletandoLote(null);
+      }
+    };
+
     return (
       <div className="flex-1 overflow-y-auto" style={{ background: 'var(--paper)' }}>
         <div className="max-w-3xl mx-auto px-8 py-14">
@@ -1345,14 +1385,29 @@ export default function NewsPage() {
           {savedBatches.length > 0 && (
             <div className="mt-2">
               <div className="h-px mb-8" style={{ background: 'var(--line)' }} />
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--ink-dim)' }}>
-                Notícias salvas
-              </p>
+
+              {/* Título e paginação na MESMA linha, o controle à direita —
+                  igual ao dashboard. No rodapé ele ficava colado nos cards e
+                  obrigava a rolar a lista inteira para trocar de página. */}
+              <div className="flex items-center justify-between gap-4 mb-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--ink-dim)' }}>
+                  Notícias salvas
+                </p>
+                <Pagination
+                  page={batchPage}
+                  totalPages={batchTotalPages}
+                  totalItems={batchTotalItems}
+                  pageSize={NEWS_PAGE_SIZE}
+                  onChange={(p) => loadBatches(p)}
+                  label="Paginação das notícias salvas"
+                />
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {savedBatches.map((batch) => (
                   <div
-                    key={batch.batchId ?? batch.items[0]?.dbId}
-                    className="brand-card interactive p-3 flex flex-col gap-3"
+                    key={keyDoLote(batch)}
+                    className="group relative brand-card interactive p-3 flex flex-col gap-3"
                     onClick={() => handleOpenBatch(batch)}
                     role="button"
                     tabIndex={0}
@@ -1374,6 +1429,27 @@ export default function NewsPage() {
                           <NewsCard item={batch.items[0]} scale={1} />
                         </div>
                       </div>
+
+                      {/* Mesma linguagem do dashboard: lixeira no canto do
+                          card, aparecendo no hover. */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteBatch(batch, e)}
+                        disabled={deletandoLote === keyDoLote(batch)}
+                        title="Apagar este grupo"
+                        aria-label={`Apagar as notícias de ${formatBatchDate(batch.createdAt)}`}
+                        className="absolute top-2 right-2 w-8 h-8 grid place-items-center rounded-[6px]
+                                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity
+                                   disabled:opacity-60 disabled:cursor-not-allowed"
+                        style={{
+                          background: 'var(--paper)',
+                          color: 'var(--danger)',
+                          border: '1.5px solid var(--ink)',
+                          boxShadow: 'var(--sh-1)',
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     <div>
                       <p className="text-[13px] font-medium truncate" style={{ color: 'var(--ink)' }}>
@@ -1386,15 +1462,6 @@ export default function NewsPage() {
                   </div>
                 ))}
               </div>
-
-              <Pagination
-                page={batchPage}
-                totalPages={batchTotalPages}
-                totalItems={batchTotalItems}
-                pageSize={NEWS_PAGE_SIZE}
-                onChange={(p) => loadBatches(p)}
-                label="Paginação das notícias salvas"
-              />
             </div>
           )}
         </div>
