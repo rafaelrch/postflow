@@ -37,6 +37,15 @@ export type AsaasBillingType =
   | 'PIX';
 
 /** Formas aceitas em POST /v3/checkouts (subconjunto do acima). */
+/**
+ * Formas de pagamento aceitas em POST /v3/checkouts.
+ *
+ * PIX consta na doc, mas o Asaas o RECUSA quando chargeTypes inclui RECURRENT
+ * ("CREDIT_CARD é o único método permitido para operações RECURRENT" —
+ * verificado no sandbox em 12/08). Como o Creatools só vende assinatura, na
+ * prática é sempre cartão. PIX fica no tipo porque é válido em checkout
+ * DETACHED, que não usamos hoje.
+ */
 export type AsaasCheckoutBillingType = 'CREDIT_CARD' | 'PIX';
 
 export type AsaasChargeType = 'DETACHED' | 'RECURRENT' | 'INSTALLMENT';
@@ -329,13 +338,14 @@ export interface AsaasCheckoutCallback {
 
 export interface AsaasCheckoutItem {
   /**
-   * A referência lista imageBase64 como OBRIGATÓRIO, o que é estranho para um
-   * plano de SaaS. Mantido obrigatório aqui porque é o que a doc diz — se o
-   * sandbox provar o contrário, é só afrouxar para opcional.
-   * TODO(fase-3): confirmar no sandbox e, se for mesmo exigido, embutir a
-   * imagem do plano em lib/asaas/plan-image.ts.
+   * OPCIONAL, apesar de a referência do Asaas listar como obrigatório.
+   *
+   * Testado contra o sandbox em 12/08, com e sem o campo: os dois casos
+   * devolveram 200. A doc está errada aqui. Deixamos de fora — mandar um PNG
+   * 1x1 transparente só para satisfazer o schema publicado deixaria um
+   * quadrado vazio na página de pagamento.
    */
-  imageBase64: string;
+  imageBase64?: string;
   /** Máx. 30 caracteres. */
   name: string;
   quantity: number;

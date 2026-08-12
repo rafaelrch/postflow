@@ -98,12 +98,30 @@ describe('POST /api/asaas/checkout — corpo enviado ao Asaas', () => {
     expect(body.callback.expiredUrl).toContain('/assinatura/expirado');
   });
 
-  it('NÃO pede CPF: customerData leva só o que o popup coletou', async () => {
+  it('OMITE customerData por completo — mandar parcial faz o Asaas exigir CPF e endereço', async () => {
     await POST(jsonRequest({ interval: 'month', leadId: LEAD_ID }));
 
     const [body] = mockCreateCheckout.mock.calls[0];
-    expect(body.customerData.email).toBe('rafael@test.com');
-    expect(body.customerData).not.toHaveProperty('cpfCnpj');
+    // Verificado contra o sandbox: com name/email/phone parcial o Asaas
+    // responde 400 pedindo cpfCnpj, address, addressNumber, province e
+    // postalCode. Omitir o objeto inteiro passa, e o checkout hospedado
+    // coleta tudo do comprador.
+    expect(body).not.toHaveProperty('customerData');
+  });
+
+  it('só CREDIT_CARD: o Asaas recusa PIX quando chargeTypes inclui RECURRENT', async () => {
+    await POST(jsonRequest({ interval: 'month', leadId: LEAD_ID }));
+
+    const [body] = mockCreateCheckout.mock.calls[0];
+    expect(body.billingTypes).toEqual(['CREDIT_CARD']);
+    expect(body.billingTypes).not.toContain('PIX');
+  });
+
+  it('não manda imageBase64: a doc diz obrigatório, o sandbox aceita sem', async () => {
+    await POST(jsonRequest({ interval: 'month', leadId: LEAD_ID }));
+
+    const [body] = mockCreateCheckout.mock.calls[0];
+    expect(body.items[0]).not.toHaveProperty('imageBase64');
   });
 
   it('desliga o retry: um 502 do Asaas não pode virar dois checkouts', async () => {

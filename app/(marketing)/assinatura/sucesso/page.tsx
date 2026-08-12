@@ -14,11 +14,11 @@ export const dynamic = 'force-dynamic';
  * Volta do checkout hospedado do Asaas (callback.successUrl).
  *
  * ⚠️ ESTA PÁGINA NÃO LIBERA NADA. Chegar aqui significa apenas "o Asaas
- * redirecionou de volta" — e isso acontece antes de a cobrança ser confirmada,
- * inclusive num PIX que o comprador ainda não pagou. Quem cria a assinatura é
- * o webhook (PAYMENT_CONFIRMED), e o cadastro exige essa linha no banco. Se um
- * dia alguém for tentado a "adiantar" o acesso a partir daqui: é exatamente
- * assim que se dá acesso de graça a quem fechou o checkout sem pagar.
+ * redirecionou de volta" — e o redirect acontece antes de a cobrança ser
+ * confirmada. Quem cria a assinatura é o webhook (PAYMENT_CONFIRMED), e o
+ * cadastro exige essa linha no banco. Se um dia alguém for tentado a
+ * "adiantar" o acesso a partir daqui: é exatamente assim que se dá acesso de
+ * graça a quem fechou o checkout sem pagar.
  *
  * O token só responde "de qual lead é esta volta" (ver lib/signup-token.ts).
  * Token ausente ou adulterado não é erro do comprador — provavelmente ele
@@ -55,8 +55,8 @@ export default async function CheckoutSucessoPage({
       }
     >
       <p>
-        Recebemos o retorno da operadora e estamos confirmando o pagamento. Isso costuma levar
-        alguns segundos no cartão de crédito, e pode levar alguns minutos no PIX.
+        Recebemos o retorno da operadora e estamos confirmando o pagamento. Costuma levar
+        alguns segundos.
       </p>
       <p>
         {leadId

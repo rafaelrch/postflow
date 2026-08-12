@@ -911,7 +911,7 @@ function Pricing() {
             <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
-            Checkout seguro (Pix ou cartão). Sem fidelidade. Cancele quando quiser.
+            Checkout seguro no cartão de crédito. Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 

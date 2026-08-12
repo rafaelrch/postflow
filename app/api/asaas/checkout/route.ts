@@ -7,7 +7,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 import { createCheckout } from '../../../../lib/asaas/checkouts';
 import { hasBillableSubscription } from '../../../../lib/subscription';
 import { rateLimit, clientIp } from '../../../../lib/rate-limit';
-import { isPlanInterval, planFor, planItemImageBase64 } from '../../../../lib/plans';
+import { isPlanInterval, planFor } from '../../../../lib/plans';
 import { createSignupToken } from '../../../../lib/signup-token';
 
 export const runtime = 'nodejs';
@@ -19,7 +19,7 @@ const RATE_WINDOW_MS = 60_000;
 /**
  * Validade do link de checkout. A doc aceita 10 a 1440 minutos.
  *
- * 60 é folgado para quem vai buscar o cartão ou pagar um PIX, e curto o
+ * 60 é folgado para quem vai buscar o cartão, e curto o
  * bastante para que um link abandonado não continue pagável no dia seguinte —
  * uma cobrança que cai 20 horas depois cria assinatura para alguém que já
  * desistiu (ou que já assinou por outro link), e o webhook não tem como saber
@@ -89,7 +89,10 @@ export async function POST(req: NextRequest) {
     const admin = createAdminSupabaseClient();
     const { data: lead, error: leadError } = await admin
       .from('leads')
-      .select('id, name, email, phone')
+      // Só o id: o resto do lead não vai para o Asaas (ver o comentário sobre
+      // customerData abaixo). A linha precisa existir porque é ela que vira o
+      // externalReference — a única amarra entre o pagamento e o comprador.
+      .select('id')
       .eq('id', leadId)
       .maybeSingle();
 
@@ -116,18 +119,30 @@ export async function POST(req: NextRequest) {
 
     const checkout = await createCheckout(
       {
-        billingTypes: ['CREDIT_CARD', 'PIX'],
+        // SÓ CARTÃO. Não é escolha nossa: o Asaas recusa o checkout com
+        // "O método de pagamento CREDIT_CARD é o único método de pagamento
+        // permitido para operações RECURRENT". PIX só existe em chargeTypes
+        // DETACHED (cobrança avulsa), o que exigiria renovação manual a cada
+        // ciclo — outro produto. Verificado contra o sandbox em 12/08.
+        billingTypes: ['CREDIT_CARD'],
         chargeTypes: ['RECURRENT'],
         minutesToExpire: CHECKOUT_MINUTES_TO_EXPIRE,
         externalReference: lead.id as string,
+        // ⚠️ Estas URLs precisam ser HTTPS PÚBLICAS. O Asaas rejeita localhost
+        // com "O campo successUrl é inválido" — em dev, aponte
+        // NEXT_PUBLIC_APP_URL para o túnel (ngrok/cloudflared), não para
+        // localhost:3000.
         callback: {
           successUrl: appUrl(`/assinatura/sucesso?t=${encodeURIComponent(token)}`),
           cancelUrl: appUrl('/assinatura/cancelado'),
           expiredUrl: appUrl('/assinatura/expirado'),
         },
+        // Sem imageBase64: a referência do Asaas lista o campo como
+        // obrigatório, mas o sandbox aceita o checkout sem ele (testado nos
+        // dois modos em 12/08). Mandar um PNG 1x1 só para satisfazer a doc
+        // deixaria um quadrado vazio na página de pagamento.
         items: [
           {
-            imageBase64: planItemImageBase64(),
             name: plan.itemName,
             description: plan.itemDescription,
             quantity: 1,
@@ -138,14 +153,18 @@ export async function POST(req: NextRequest) {
           cycle: plan.cycle,
           nextDueDate: today,
         },
-        // Tudo opcional no Asaas. Mandamos o que o popup já coletou para o
-        // comprador não redigitar. CPF NÃO vai: o checkout hospedado pede
-        // sozinho, e não queremos coletar documento na nossa superfície.
-        customerData: {
-          name: (lead.name as string) || undefined,
-          email: (lead.email as string) || undefined,
-          phone: (lead.phone as string) || undefined,
-        },
+        // customerData é OMITIDO de propósito, e isso é tudo-ou-nada.
+        //
+        // A doc diz que todos os campos dele são opcionais. É verdade só se o
+        // objeto inteiro for omitido: mandar name/email/phone parcial faz o
+        // Asaas exigir TAMBÉM cpfCnpj, address, addressNumber, province e
+        // postalCode, e devolver 400 sem eles. Como não coletamos documento
+        // nem endereço no popup (e não queremos coletar), o objeto não vai —
+        // o checkout hospedado pede tudo isso ao comprador.
+        //
+        // Consequência que o webhook resolve: o e-mail do pagador só é
+        // conhecido depois, via GET /v3/customers/{id}. Quem liga o pagamento
+        // a esta pessoa é o externalReference acima.
       },
       {
         // SEM RETRY. O client repete 5xx/429 por padrão, o que é certo para

@@ -71,25 +71,3 @@ export function isPlanInterval(value: unknown): value is PlanInterval {
 export function planFor(interval: PlanInterval): Plan {
   return PLANS[interval];
 }
-
-/**
- * Imagem do item no checkout hospedado.
- *
- * A referência do Asaas lista items[].imageBase64 como OBRIGATÓRIO. Não
- * conseguimos confirmar no sandbox (sem chave na fase de escrita), e um plano
- * de SaaS não tem imagem natural — então mandamos sempre algo, para não
- * arriscar um 400 na criação do checkout.
- *
- * O valor real deve vir de ASAAS_ITEM_IMAGE_BASE64 (o logo do Creatools). O
- * fallback abaixo é um PNG 1x1 transparente: satisfaz o campo sem inventar uma
- * arte. Configure a env antes de ir para produção — um item sem imagem de
- * verdade fica pobre na página de pagamento.
- *
- * TODO(rafael): gerar o base64 do logo e setar ASAAS_ITEM_IMAGE_BASE64.
- */
-const TRANSPARENT_PNG_1X1 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
-export function planItemImageBase64(): string {
-  return process.env.ASAAS_ITEM_IMAGE_BASE64?.trim() || TRANSPARENT_PNG_1X1;
-}

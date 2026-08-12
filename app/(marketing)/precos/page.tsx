@@ -129,7 +129,7 @@ export default function PrecosPage() {
         </div>
 
         <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
-          Pagamento via Pix ou cartão, processado com segurança. Para cancelar ou trocar de plano,
+          Pagamento via cartão de crédito, processado com segurança. Para cancelar ou trocar de plano,
           entre em contato com nosso suporte. Ao assinar, você concorda com os{' '}
           <Link href="/termos" className="underline underline-offset-4">
             Termos de Uso

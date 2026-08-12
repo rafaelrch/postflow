@@ -20,7 +20,12 @@ ASAAS_API_KEY=$aact_hmlg_...        # do dashboard SANDBOX, não do de produçã
 ASAAS_ENV=sandbox
 ASAAS_WEBHOOK_TOKEN=                # você inventa: 32+ caracteres, sem espaços
 SIGNUP_TOKEN_SECRET=                # openssl rand -base64 48
+NEXT_PUBLIC_APP_URL=https://SEU-TUNEL   # ⚠️ NÃO pode ser localhost
 ```
+
+> ⚠️ **`NEXT_PUBLIC_APP_URL` precisa ser a URL do túnel, não `localhost:3000`.**
+> O Asaas recusa o checkout com "O campo successUrl é inválido" se os callbacks
+> apontarem para localhost. Verificado contra o sandbox em 12/08.
 
 O cliente recusa a combinação errada de chave e ambiente **antes** de qualquer
 requisição sair — se você colar a chave de produção com `ASAAS_ENV=sandbox`,
@@ -48,6 +53,7 @@ ngrok http 3000
       reconhecido depois — é a peça que amarra tudo.
 - [ ] Ser redirecionado para o checkout hospedado do Asaas
 - [ ] Pagar com um cartão de teste do sandbox
+      (só cartão: o Asaas não aceita PIX em assinatura recorrente)
 - [ ] Voltar em `/assinatura/sucesso` e ver "estamos confirmando seu pagamento"
 - [ ] **Conferir que a linha em `subscriptions` nasceu com `user_id` NULL**,
       `status='active'`, `payment_provider='asaas'` e `external_reference`
@@ -101,6 +107,14 @@ Confirme os paths atuais na referência antes de usar.
       ele chega ~32 dias depois do CONFIRMED, e usá-lo como gatilho deixaria
       todo assinante um mês sem acesso
 
+## 5b. O que NÃO dá para testar (e por quê)
+
+- **PIX**: o Asaas recusa `billingTypes: ["PIX"]` quando `chargeTypes` inclui
+  `RECURRENT` — "CREDIT_CARD é o único método permitido para operações
+  RECURRENT". PIX só existe em cobrança avulsa (`DETACHED`), que exigiria
+  renovação manual a cada ciclo. Se você quiser vender por PIX, é outro
+  produto, não um ajuste de configuração.
+
 ## 6. Cartão recusado
 
 - [ ] Usar um cartão de teste que falha na captura
@@ -128,8 +142,6 @@ Confirme os paths atuais na referência antes de usar.
 - [ ] `SIGNUP_TOKEN_SECRET` de produção, diferente do de sandbox
 - [ ] `NEXT_PUBLIC_APP_URL` apontando para o domínio público (o `appUrl()`
       recusa localhost em produção e falha alto — de propósito)
-- [ ] `ASAAS_ITEM_IMAGE_BASE64` com o logo, senão o item do checkout aparece
-      com um PNG transparente
 - [ ] **Tokenização de cartão**: peça a liberação ao gerente de contas. Sem
       ela, trocar de plano não pode alterar a assinatura existente — o código
       cai no fallback de cancelar e criar outra (ver

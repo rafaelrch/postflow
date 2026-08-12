@@ -39,8 +39,8 @@ export default function CheckoutCanceladoPage() {
         de um minuto.
       </p>
       <p className="text-sm">
-        Se algo no pagamento não funcionou, tente outro método: o checkout aceita cartão de
-        crédito e PIX.
+        Se o pagamento não passou, vale tentar outro cartão — o checkout aceita cartão de
+        crédito.
       </p>
     </Shell>
   );
