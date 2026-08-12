@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT, WEB_SEARCH_PROMPT_ADDENDUM } from '@/lib/openai';
-import { requireCredits, refundCredits } from '@/lib/subscription';
-import { requireEntitlement } from '@/lib/entitlements';
+import { requireActiveSubscription, requireCredits, refundCredits } from '@/lib/subscription';
 import { CREDIT_COSTS } from '@/lib/credits';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { BrandContext, formatBrandContextAsPrompt, getBrandContext } from '@/lib/brand-context';
@@ -34,11 +33,12 @@ export async function POST(req: NextRequest) {
   try {
     const body: GenerateCarouselInput & { manual?: boolean } = await req.json();
 
-    // Superfície MANUAL (esqueleto vazio): sem IA e sem crédito. Aceita free e
-    // pro — só exige estar autenticado. NÃO passa por requireCredits.
+    // Superfície MANUAL (esqueleto vazio): sem IA e sem crédito, então NÃO
+    // passa por requireCredits. Exige assinatura ativa como o resto do produto
+    // — o plano gratuito saiu e voltou a valer o pagamento-primeiro.
     if (body.manual) {
-      const ent = await requireEntitlement();
-      if (!ent.ok) return ent.response;
+      const manualGuard = await requireActiveSubscription();
+      if (!manualGuard.ok) return manualGuard.response;
 
       const slides = Array.from({ length: body.slideCount }, (_, i) => ({
         id: i + 1,
@@ -50,11 +50,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ slides, caption: '', hashtags: [] });
     }
 
-    // Superfície de IA: exige plano PAGO e nega o free CEDO, com code
-    // 'plan_required', ANTES de qualquer débito ou chamada à OpenAI.
-    const ent = await requireEntitlement({ requirePlan: 'pro' });
-    if (!ent.ok) return ent.response;
-
+    // Superfície de IA. Não há mais um gate de plano separado: requireCredits
+    // já exige assinatura ativa (402 subscription_required) ANTES de debitar
+    // crédito ou chamar a OpenAI. Com o free removido, "plano pago" e
+    // "assinatura ativa" viraram a mesma pergunta — perguntar duas vezes só
+    // criaria dois lugares para errar.
     const cost = CREDIT_COSTS.carousel;
     const guard = await requireCredits(cost);
     if (!guard.ok) return guard.response;

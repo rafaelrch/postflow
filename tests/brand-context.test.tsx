@@ -14,15 +14,16 @@ vi.mock('@/lib/openai', () => ({
   WEB_SEARCH_PROMPT_ADDENDUM: 'ADDENDUM',
 }));
 
+// Assinante ativo: o foco destes testes é a injeção do BrandContext, não o
+// gating de assinatura (coberto em tests/subscription-credits.test.ts).
 vi.mock('@/lib/subscription', () => ({
   requireCredits: mockRequireCredits,
   refundCredits: mockRefundCredits,
-}));
-
-// Usuário autorizado (pro): o foco destes testes é a injeção do BrandContext,
-// não o split de plano (coberto em tests/generate-carousel-entitlement.test.ts).
-vi.mock('@/lib/entitlements', () => ({
-  requireEntitlement: async () => ({ ok: true, userId: 'user-brand', plan: 'pro' }),
+  requireActiveSubscription: async () => ({
+    ok: true,
+    userId: 'user-brand',
+    subscription: { subscription_id: 'sub_1', status: 'active', plan_interval: 'month' },
+  }),
 }));
 
 vi.mock('@/lib/supabase-server', () => ({

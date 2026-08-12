@@ -36,10 +36,10 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '3. Prazos de estorno',
     body: (
       <p>
-        O reembolso é processado pela Stripe em poucos dias úteis após a aprovação do pedido. Como
-        a assinatura é paga por cartão de crédito, o prazo para o valor aparecer na sua fatura
-        depende da operadora do cartão e do banco emissor, podendo levar até 1 ou 2 ciclos de
-        faturamento.
+        O reembolso é processado pelo Asaas em poucos dias úteis após a aprovação do pedido. No
+        cartão de crédito, o prazo para o valor aparecer na sua fatura depende da operadora e do
+        banco emissor, podendo levar até 1 ou 2 ciclos de faturamento. No Pix, o estorno cai na
+        conta de origem.
       </p>
     ),
   },
@@ -48,9 +48,9 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         Passado o prazo de arrependimento, não há mais reembolso incondicional. Você pode cancelar
-        a renovação automática a qualquer momento pelo portal de assinatura — o cancelamento evita
-        cobranças futuras, mas o acesso permanece ativo até o fim do ciclo já pago, sem reembolso
-        proporcional do período em curso, salvo exigência legal em contrário.
+        a renovação automática a qualquer momento — o cancelamento evita cobranças futuras, mas o
+        acesso permanece ativo até o fim do ciclo já pago, sem reembolso proporcional do período em
+        curso, salvo exigência legal em contrário.
       </p>
     ),
   },
@@ -58,9 +58,9 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '5. Cancelamento da renovação automática',
     body: (
       <p>
-        Para cancelar a renovação, acesse sua conta e abra o portal de assinatura (gerenciamento de
-        plano). O cancelamento é imediato para fins de renovação futura: você não será cobrado no
-        próximo ciclo, mesmo mantendo acesso até o fim do período vigente.
+        Para cancelar a renovação, solicite pelo nosso suporte. O cancelamento é imediato para
+        fins de renovação futura: você não será cobrado no próximo ciclo, mesmo mantendo acesso até
+        o fim do período vigente.
       </p>
     ),
   },

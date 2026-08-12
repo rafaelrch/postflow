@@ -4,9 +4,9 @@
 --
 -- PROPÓSITO: capturar nome/e-mail/telefone de TODO mundo que clica em "assinar"
 -- um plano, ANTES e INDEPENDENTE de completar a compra. Dois motivos:
---   1. A AbacatePay não devolve e-mail no checkout (diferente da Stripe), então
---      coletar o e-mail aqui é o que permite provar depois quem demonstrou
---      interesse / iniciou a compra (equivalente ao fix B2).
+--   1. O id desta linha é o `externalReference` do checkout do Asaas — a chave
+--      pela qual o webhook liga o pagamento de volta a quem comprou. Sem lead
+--      gravado não há como reconhecer quem pagou.
 --   2. Remarketing: quem não converte ainda fica registrado para contato.
 --
 -- Por isso a linha é gravada no submit do popup, antes do redirect pro checkout,
@@ -56,6 +56,6 @@ create trigger set_leads_updated before update on public.leads
 
 -- RLS ligado e NENHUMA policy ⇒ deny por padrão para o usuário final. A
 -- inserção acontece só via service role na rota /api/leads (mesmo padrão de
--- abacatepay_webhook_events). Leads são dados de contato de terceiros: nunca
+-- payment_webhook_events). Leads são dados de contato de terceiros: nunca
 -- devem ser legíveis pelo client anônimo.
 alter table public.leads enable row level security;

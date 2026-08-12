@@ -7,8 +7,8 @@ const { mockGetUser, mockUserRpc, mockAdminRpc, mockSubscriptionRow } = vi.hoist
   mockSubscriptionRow: vi.fn(),
 }));
 
-vi.mock('@/lib/stripe', () => ({
-  stripe: { customers: { create: vi.fn() } },
+vi.mock('@/lib/asaas/customers', () => ({
+  createCustomer: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase-server', () => ({

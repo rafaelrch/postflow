@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
-import { getEntitlement } from '@/lib/entitlements';
 import { getUserCredits } from '@/lib/credits';
 
 function fmtDate(iso: string | null): string {
@@ -20,15 +19,12 @@ export default async function ContaPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [sub, credits, plan] = user
+  const [sub, credits] = user
     ? await Promise.all([
         getActiveSubscription(supabase, user.id),
         getUserCredits(supabase, user.id),
-        getEntitlement(supabase, user.id),
       ])
-    : [null, null, 'free' as const];
-
-  const isPro = plan === 'pro';
+    : [null, null];
 
   return (
     <div className="p-8 max-w-2xl mx-auto w-full overflow-y-auto">
@@ -38,7 +34,7 @@ export default async function ContaPage() {
         className="chip filled mt-3 inline-flex text-[11px]"
         data-testid="plan-badge"
       >
-        {isPro ? 'Plano Pago' : 'Plano Grátis'}
+        {sub ? `Plano ${sub.plan_interval === 'year' ? 'Anual' : 'Mensal'}` : 'Sem assinatura'}
       </span>
 
       <section className="mt-8 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6">
@@ -67,15 +63,14 @@ export default async function ContaPage() {
         ) : (
           <div className="mt-4">
             <p className="text-sm text-[var(--ink-dim)]">
-              Você está no <strong className="text-[var(--foreground)]">plano Grátis</strong>: editor e
-              templates manuais completos, export sem marca d’água e até 5 carrosséis salvos. Os recursos
-              de IA (carrosséis e imagens geradas por IA) são exclusivos dos planos pagos.
+              Não encontramos uma assinatura ativa nesta conta. O acesso ao Creatools
+              começa pela assinatura.
             </p>
             <Link
               href="/precos"
               className="brand-btn accent mt-4 inline-flex"
             >
-              Fazer upgrade
+              Ver planos
             </Link>
           </div>
         )}
@@ -98,7 +93,7 @@ export default async function ContaPage() {
             </div>
             <p className="text-xs text-[var(--ink-dim)]">
               Carrossel custa 5 · Notícias e Threads custam 3 · Imagem com IA custa 5. Refinar slide é grátis.
-              Os créditos recarregam todo mês; para mais, faça upgrade do plano.
+              Os créditos recarregam todo mês.
             </p>
           </div>
         </section>

@@ -35,10 +35,10 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '3. Planos, pagamento e renovação automática',
     body: (
       <p>
-        O Creatools é vendido por assinatura recorrente, processada pela Stripe: plano mensal
+        O Creatools é vendido por assinatura recorrente, processada pelo Asaas: plano mensal
         (R$ 59,50/mês) ou plano anual (R$ 499,00/ano). A assinatura renova automaticamente ao fim de cada ciclo até que seja
-        cancelada. Você pode cancelar a renovação a qualquer momento pelo portal de assinatura,
-        com efeito ao término do período já pago — sem cobranças futuras. Consulte também a nossa{' '}
+        cancelada. Você pode cancelar a renovação a qualquer momento solicitando pelo nosso
+        suporte, com efeito ao término do período já pago — sem cobranças futuras. Consulte também a nossa{' '}
         <Link href="/reembolso" className="underline underline-offset-4">
           Política de Reembolso
         </Link>
@@ -86,8 +86,8 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '7. Rescisão',
     body: (
       <p>
-        Você pode encerrar sua conta e cancelar a assinatura a qualquer momento pelo portal de
-        assinatura. O Creatools pode suspender ou encerrar contas que violem estes termos,
+        Você pode encerrar sua conta e cancelar a assinatura a qualquer momento solicitando pelo
+        nosso suporte. O Creatools pode suspender ou encerrar contas que violem estes termos,
         mediante aviso quando possível, sem prejuízo dos valores já devidos até a data do
         encerramento.
       </p>

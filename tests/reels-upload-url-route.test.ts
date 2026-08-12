@@ -16,10 +16,6 @@ vi.mock('@/lib/supabase-server', () => ({
 // Estes testes cobrem sessão/mídia/derivação de path — usuário pro passa direto
 // pela trava de custo (fatia 4b) sem tocar o banco. A trava tem teste próprio
 // em tests/reels-upload-cost-gate.test.ts.
-vi.mock('@/lib/entitlements', () => ({
-  getEntitlement: async () => 'pro',
-}));
-
 let POST: typeof import('../app/api/reels/upload-url/route').POST;
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';

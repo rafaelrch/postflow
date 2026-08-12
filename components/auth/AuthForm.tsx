@@ -15,7 +15,7 @@ export default function AuthForm({
   mode,
   lockedEmail,
   planLabel,
-  checkoutRef,
+  signupToken,
 }: {
   mode: AuthMode;
   /** E-mail pago no checkout — quando presente, fica travado no form. */
@@ -23,7 +23,8 @@ export default function AuthForm({
   /** Rótulo do plano assinado (Mensal/Anual) exibido acima do form. */
   planLabel?: string;
   /** Prova one-shot validada no servidor e consumida atomicamente pelo trigger. */
-  checkoutRef?: string;
+  /** Token assinado da volta do checkout (ver lib/signup-token.ts). */
+  signupToken?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -46,21 +47,28 @@ export default function AuthForm({
       const supabase = createClient();
 
       if (isSignup) {
-        // B2: sem prova de pagamento (ref da AbacatePay — UUID gerado por nós,
-        // presente só na URL de retorno de quem completou o checkout) não deixa
-        // cadastrar. Não confia no e-mail travado no form, que é client-side.
-        const ref = checkoutRef;
-        if (!ref) {
+        // Sem prova de pagamento não deixa cadastrar. A prova é o token
+        // assinado que veio na successUrl do checkout do Asaas (HMAC do id do
+        // lead, ver lib/signup-token.ts) — quem valida é o servidor. Não
+        // confia no e-mail travado no form, que é client-side.
+        const token = signupToken;
+        if (!token) {
           toast.error('Não encontramos o pagamento desta assinatura. Assine um plano antes de criar a conta.');
           return;
         }
 
         if (confirmationSent) return;
-        const verifyRes = await fetch('/api/abacatepay/passwordless/start', {
+        const verifyRes = await fetch('/api/asaas/signup-intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ checkout_ref: ref }),
+          body: JSON.stringify({ token }),
         });
+        if (verifyRes.status === 202) {
+          // O webhook ainda não confirmou o pagamento. Não é erro de quem pagou
+          // — é corrida com o Asaas; pedir para tentar de novo é honesto.
+          toast('Ainda estamos confirmando seu pagamento. Tente de novo em instantes.');
+          return;
+        }
         if (!verifyRes.ok) {
           const verifyData = await verifyRes.json().catch(() => ({}));
           toast.error(verifyData.error || 'Não foi possível confirmar o pagamento para este e-mail.');

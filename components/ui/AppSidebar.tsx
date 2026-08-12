@@ -45,11 +45,10 @@ export default function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  // Rótulo do plano (Anual/Mensal) derivado da assinatura ativa. Com o plano
+  // gratuito removido, a assinatura é a única fonte: não há mais a tabela
+  // user_entitlements nem o estado 'free'.
   const [planLabel, setPlanLabel] = useState<string | null>(null);
-  // Plano real do usuário, lido da MESMA fonte da verdade do guard de API
-  // (tabela user_entitlements). 'free' mostra o selo Grátis; 'pro' usa o
-  // rótulo Anual/Mensal derivado da assinatura.
-  const [plan, setPlan] = useState<'free' | 'pro' | null>(null);
   const credits = useCreditsStore((s) => s.balance);
   const fetchCredits = useCreditsStore((s) => s.fetch);
   const [collapsed, setCollapsed] = useState(false);
@@ -111,16 +110,6 @@ export default function AppSidebar() {
         .maybeSingle()
         .then(({ data }: { data: { plan_interval: string | null } | null }) => {
           if (active && data?.plan_interval) setPlanLabel(data.plan_interval === 'year' ? 'Anual' : 'Mensal');
-        });
-
-      supabase
-        .from('user_entitlements')
-        .select('plan')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .then(({ data }: { data: { plan: string | null } | null }) => {
-          // Falha fechada como no guard: ausência/erro nunca vira 'pro'.
-          if (active) setPlan(data?.plan === 'pro' ? 'pro' : 'free');
         });
 
       fetchCredits();
@@ -275,11 +264,7 @@ export default function AppSidebar() {
               >
                 {userEmail || '—'}
               </span>
-              {plan === 'free' ? (
-                <span className="mt-1.5 flex items-center gap-1.5">
-                  <span className="chip filled text-[9px] py-[1px] px-[6px]">Grátis</span>
-                </span>
-              ) : planLabel ? (
+              {planLabel ? (
                 <span className="mt-1.5 flex items-center gap-1.5">
                   <span className="chip filled text-[9px] py-[1px] px-[6px]">{planLabel}</span>
                   {credits !== null && (

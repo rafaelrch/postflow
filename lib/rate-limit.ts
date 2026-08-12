@@ -1,7 +1,7 @@
 /**
  * Rate limiter em memória, janela fixa por chave (tipicamente IP). Simples de
  * propósito: o projeto não usa Redis/Upstash e o pedido é "N requisições por
- * minuto por IP" em rotas públicas de escrita (/api/leads, /api/abacatepay/checkout).
+ * minuto por IP" em rotas públicas de escrita (/api/leads, /api/asaas/checkout).
  *
  * CAVEAT serverless: o contador vive no processo. Com várias instâncias
  * (ex.: Vercel) cada uma tem o seu, então o teto efetivo é N × instâncias.

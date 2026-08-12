@@ -896,8 +896,8 @@ const PLAN_FEATURES = [
 function Pricing() {
   // Escolher um plano abre o popup de captura de lead (nome/e-mail/telefone) —
   // o MESMO fluxo do /precos (CheckoutButton → LeadCaptureModal). O e-mail
-  // coletado segue para a AbacatePay; a landing não vai mais direto ao checkout
-  // AbacatePay nem pula a captura de lead.
+  // coletado vira um lead e o id dele segue para o checkout do Asaas; a landing
+  // não vai direto ao checkout nem pula a captura de lead.
   const [modalInterval, setModalInterval] = useState<'month' | 'year' | null>(null);
 
   return (

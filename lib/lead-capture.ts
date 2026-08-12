@@ -5,8 +5,9 @@
  *
  * A regra central vive em `submitLeadThenCheckout`: o lead é SALVO antes do
  * checkout e é condição para prosseguir. O lead é o ativo que não pode se
- * perder (remarketing + prova de quem iniciou a compra, já que a AbacatePay não
- * devolve e-mail no checkout), então nunca depende de o pagamento dar certo.
+ * perder: é ele que gera o id usado como `externalReference` do checkout, a
+ * chave que liga o pagamento de volta ao comprador — além do remarketing. Por
+ * isso nunca depende de o pagamento dar certo.
  */
 
 export type LeadInterval = 'month' | 'year';
@@ -19,7 +20,7 @@ export type LeadForm = {
 
 export type LeadFormErrors = Partial<Record<keyof LeadForm, string>>;
 
-// Mesma regra da rota /api/abacatepay/checkout: um @, um ponto no domínio, sem
+// Mesma regra da rota /api/leads no servidor: um @, um ponto no domínio, sem
 // espaços. Não tenta validar RFC completa — só barrar erro grosseiro no client.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -76,10 +77,13 @@ export class LeadValidationError extends Error {
 export type SavedLead = LeadForm & { interval: LeadInterval };
 
 export type SubmitLeadDeps = {
-  /** Persiste o lead. Deve resolver só quando a gravação estiver confirmada. */
-  saveLead: (lead: SavedLead) => Promise<void>;
-  /** Segue para o checkout com o e-mail já coletado. */
-  startCheckout: (interval: LeadInterval, email: string) => Promise<void>;
+  /**
+   * Persiste o lead e devolve o ID da linha gravada. Deve resolver só quando a
+   * gravação estiver confirmada — o ID é o que amarra o pagamento ao comprador.
+   */
+  saveLead: (lead: SavedLead) => Promise<string>;
+  /** Segue para o checkout com o lead já gravado. */
+  startCheckout: (interval: LeadInterval, leadId: string) => Promise<void>;
 };
 
 /**
@@ -90,8 +94,10 @@ export type SubmitLeadDeps = {
  *    nenhum checkout é iniciado);
  *  - se `saveLead` rejeitar, `startCheckout` NÃO é chamado — não redireciona a
  *    pessoa para pagar sem ter registrado o interesse dela;
- *  - o e-mail é normalizado uma vez e o MESMO valor vai para o lead e para o
- *    checkout, garantindo que o customer da AbacatePay nasça com o e-mail certo.
+ *  - o ID devolvido por `saveLead` é o que segue para o checkout. Ele vira o
+ *    externalReference do Asaas, ou seja, a chave pela qual o webhook liga o
+ *    pagamento de volta a esta pessoa. Sem lead gravado não há como reconhecer
+ *    quem pagou — por isso a ordem é obrigatória, não uma conveniência.
  */
 export async function submitLeadThenCheckout(
   form: LeadForm,
@@ -105,6 +111,8 @@ export async function submitLeadThenCheckout(
   const name = form.name.trim();
   const phone = form.phone.trim();
 
-  await deps.saveLead({ name, email, phone, interval });
-  await deps.startCheckout(interval, email);
+  const leadId = await deps.saveLead({ name, email, phone, interval });
+  if (!leadId) throw new Error('Não foi possível registrar seus dados.');
+
+  await deps.startCheckout(interval, leadId);
 }

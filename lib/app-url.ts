@@ -4,8 +4,8 @@
  * pode apontar para localhost — falha ruidosamente em vez de gerar redirects
  * quebrados. Em dev, cai em http://localhost:3000.
  *
- * Vivia em lib/stripe.ts (fix B4); foi extraída pra cá antes de o Stripe ser
- * removido. Hoje é a única casa dela — usada pela migração AbacatePay.
+ * Nasceu dentro do cliente de pagamento (fix B4) e foi extraída para cá antes
+ * da troca de provedor. Hoje é a única casa dela — agnóstica de gateway.
  */
 export function appUrl(path = ''): string {
   const envUrl = process.env.NEXT_PUBLIC_APP_URL;

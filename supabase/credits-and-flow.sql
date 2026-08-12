@@ -1,3 +1,18 @@
+-- ⚠️⚠️ NÃO EXECUTE ESTE ARQUIVO. HISTÓRICO, SUPERADO. ⚠️⚠️
+--
+-- Este é o script canônico da era AbacatePay. Todas as funções aqui foram
+-- REESCRITAS por supabase/migrations/20260812_asaas_migration.sql (bloco 4), e
+-- as tabelas que ele referencia (abacatepay_customers, a subscriptions híbrida
+-- com provider/price_id) NÃO EXISTEM MAIS no banco.
+--
+-- Rodá-lo hoje REGREDIRIA a produção: reinstalaria funções que falam
+-- provider='abacatepay' e leem colunas que sumiram, quebrando o cadastro pago.
+--
+-- Mantido no repositório só como referência do que existia antes e porque
+-- tests/paid-signup-precondition.test.ts faz asserções estáticas sobre ele.
+-- Para o estado ATUAL do banco, leia a migration 20260812.
+-- ============================================================
+
 -- ============================================================
 -- Creatools — signup pago + créditos (AbacatePay)
 -- Idempotente. Rodar após schema.sql, subscriptions-schema.sql e

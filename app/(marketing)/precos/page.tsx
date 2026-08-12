@@ -1,14 +1,18 @@
 import Link from 'next/link';
 import { Check, ArrowLeft } from 'lucide-react';
 import CheckoutButton from '@/components/billing/CheckoutButton';
+import { PLANS } from '@/lib/plans';
 
 export const metadata = {
   title: 'Planos e preços — Creatools',
   description: 'Assine o Creatools: plano mensal ou anual.',
 };
 
-const MONTHLY_PRICE = 'R$ 59,50';
-const YEARLY_PRICE = 'R$ 499';
+// Preço vem de lib/plans.ts, a MESMA fonte que a rota de checkout usa para
+// montar items[].value. Escrever o número aqui de novo é como se anuncia um
+// valor e se cobra outro.
+const MONTHLY_PRICE = PLANS.month.priceLabel;
+const YEARLY_PRICE = PLANS.year.priceLabel;
 const YEARLY_MONTHLY_EQUIV = 'R$ 41,58/mês';
 
 // Plano gratuito: editor e templates manuais completos, sem IA.
