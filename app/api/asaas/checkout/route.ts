@@ -9,6 +9,7 @@ import { hasBillableSubscription } from '../../../../lib/subscription';
 import { rateLimit, clientIp } from '../../../../lib/rate-limit';
 import { isPlanInterval, planFor } from '../../../../lib/plans';
 import { createSignupToken } from '../../../../lib/signup-token';
+import { AsaasError } from '../../../../lib/asaas/client';
 
 export const runtime = 'nodejs';
 
@@ -182,9 +183,27 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ url: checkout.link });
-  } catch {
-    // Nada do erro é logado: a mensagem pode carregar payload do comprador.
-    console.error('[asaas/checkout] checkout_failed');
+  } catch (err) {
+    // O objeto de erro NÃO é logado inteiro: ele carrega o corpo da requisição,
+    // e ali vai dado do comprador. Mas logar só "falhou" deixa a rota
+    // indiagnosticável — foi o que aconteceu na primeira integração com o
+    // sandbox, onde a causa era um campo do payload recusado e não dava para
+    // saber qual.
+    //
+    // O meio-termo: `code` e `description` do AsaasError são texto do PROVEDOR
+    // sobre o que ele recusou ("O campo successUrl é inválido"), não conteúdo
+    // do comprador. Isso é seguro e é exatamente o que se precisa ler às 3h da
+    // manhã.
+    if (err instanceof AsaasError) {
+      console.error(
+        `[asaas/checkout] asaas_rejected status=${err.status} code=${err.code ?? '?'} description=${err.description ?? '?'}`,
+      );
+    } else {
+      // Só o NOME da classe do erro, nunca a mensagem: mensagem de exceção
+      // pode incorporar o payload. O nome (AsaasConfigError, TypeError...) já
+      // separa 'env faltando' de 'bug no código' sem vazar nada.
+      console.error(`[asaas/checkout] checkout_failed ${(err as Error)?.name ?? 'Error'}`);
+    }
     return NextResponse.json(
       { error: 'Não foi possível criar o checkout.' },
       { status: 500 },

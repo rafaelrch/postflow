@@ -16,13 +16,19 @@ Nada aqui toca produção. A conta sandbox é separada, tem chave própria
 **Variáveis no `.env.local`:**
 
 ```bash
-ASAAS_API_KEY=$aact_hmlg_...        # do dashboard SANDBOX, não do de produção
+ASAAS_API_KEY=\$aact_hmlg_...       # do dashboard SANDBOX. NOTE A BARRA antes do $
 ASAAS_ENV=sandbox
 ASAAS_WEBHOOK_TOKEN=                # você inventa: 32+ caracteres, sem espaços
 SIGNUP_TOKEN_SECRET=                # openssl rand -base64 48
 NEXT_PUBLIC_APP_URL=https://SEU-TUNEL   # ⚠️ NÃO pode ser localhost
 ```
 
+> ⚠️ **Escape o `$` da chave com barra invertida.** O dotenv do Next expande
+> `$aact_hmlg_` como variável de ambiente e o valor chega VAZIO — o app falha
+> com "Missing ASAAS_API_KEY env var" e nada aponta para o cifrão. Aspas
+> simples não resolvem. No painel da Vercel, cole a chave crua (lá não há
+> expansão).
+>
 > ⚠️ **`NEXT_PUBLIC_APP_URL` precisa ser a URL do túnel, não `localhost:3000`.**
 > O Asaas recusa o checkout com "O campo successUrl é inválido" se os callbacks
 > apontarem para localhost. Verificado contra o sandbox em 12/08.
