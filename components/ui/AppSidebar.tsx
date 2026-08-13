@@ -51,6 +51,11 @@ export default function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  // Terceiro caso de fallback: a URL existe mas a imagem não carrega (link
+  // quebrado, bucket sem permissão). Sem isto o círculo ficaria vazio ou com o
+  // ícone de imagem quebrada — pior que a inicial.
+  const [photoFailed, setPhotoFailed] = useState(false);
   // Rótulo do plano (Anual/Mensal) derivado da assinatura ativa. Com o plano
   // gratuito removido, a assinatura é a única fonte: não há mais a tabela
   // user_entitlements nem o estado 'free'.
@@ -100,13 +105,17 @@ export default function AppSidebar() {
 
       supabase
         .from('profiles')
-        .select('name, brand_name')
+        .select('name, brand_name, photo_url')
         .eq('id', user.id)
         .single()
-        .then(({ data: profile }: { data: { name: string | null; brand_name: string | null } | null }) => {
+        .then(({ data: profile }: { data: { name: string | null; brand_name: string | null; photo_url: string | null } | null }) => {
           if (!active) return;
           const resolved = profile?.name?.trim() || metaName || profile?.brand_name?.trim() || '';
           if (resolved) setUserName(resolved);
+          // A coluna tem default '' — string vazia cai na inicial igual a null.
+          const photo = profile?.photo_url?.trim() || '';
+          setPhotoUrl(photo);
+          setPhotoFailed(false);
         });
 
       supabase
@@ -134,6 +143,8 @@ export default function AppSidebar() {
   };
 
   const initial = (userName || userEmail || '?').trim().charAt(0).toUpperCase();
+  /** Foto só aparece com URL preenchida E carregada; caso contrário, inicial. */
+  const showPhoto = photoUrl !== '' && !photoFailed;
 
   // No ESTÚDIO a navegação global sai de cena: o editor é tela cheia de duas
   // colunas, e o que este trilho carregava migrou para dentro dele — logo e
@@ -255,14 +266,25 @@ export default function AppSidebar() {
           title={collapsed ? `Conta — ${userName || 'Usuário'}` : 'Ver conta e assinatura'}
         >
           <span
-            className="grid place-items-center w-8 h-8 rounded-full shrink-0 font-semibold text-[13px]"
+            className="grid place-items-center w-8 h-8 rounded-full shrink-0 overflow-hidden font-semibold text-[13px]"
             style={{
               background: 'var(--ink)',
               color: 'var(--paper)',
             }}
             aria-hidden
           >
-            {initial}
+            {showPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={photoUrl}
+                alt=""
+                data-testid="sidebar-avatar-photo"
+                className="h-full w-full object-cover"
+                onError={() => setPhotoFailed(true)}
+              />
+            ) : (
+              initial
+            )}
           </span>
           {!collapsed && (
             <div className="flex flex-col min-w-0 leading-tight">
