@@ -58,6 +58,12 @@ export function mapDbSlideToSlide(sl: DbRow): Slide {
     titleDescriptionGap: (sl.title_description_gap as number) ?? undefined,
     textPadding: (sl.text_padding as Slide['textPadding']) || undefined,
     contentLayout: (sl.content_layout as Slide['contentLayout']) || undefined,
+    templateSlots: (sl.template_slots as Slide['templateSlots']) || undefined,
+    // Deck salvo antes da coluna existir vem sem isto — e tem de continuar
+    // vindo: é a ausência que faz o modelo voltar a sair da posição.
+    templateModel: (sl.template_model as number) ?? undefined,
+    templateOverrides: (sl.template_overrides as Slide['templateOverrides']) || undefined,
+    templateSlotStyles: (sl.template_slot_styles as Slide['templateSlotStyles']) || undefined,
     editorialTitleOffsetY: (sl.editorial_title_offset_y as number) ?? undefined,
     editorialDescOffsetY: (sl.editorial_desc_offset_y as number) ?? undefined,
     editorialImageOffsetY: (sl.editorial_image_offset_y as number) ?? undefined,
@@ -105,6 +111,13 @@ export function mapSlideToDbRow(slide: Slide, carouselId: string, position: numb
     title_description_gap: slide.titleDescriptionGap ?? null,
     text_padding: slide.textPadding ?? null,
     content_layout: slide.contentLayout ?? null,
+    // Só o TEMPLATE 1 preenche isto. Escrever a chave apenas quando há conteúdo
+    // mantém o autosave dos outros estilos funcionando mesmo antes da migração
+    // do template rodar (a coluna não existe → o insert falharia).
+    ...(slide.templateSlots ? { template_slots: slide.templateSlots } : {}),
+    ...(slide.templateModel != null ? { template_model: slide.templateModel } : {}),
+    ...(slide.templateOverrides ? { template_overrides: slide.templateOverrides } : {}),
+    ...(slide.templateSlotStyles ? { template_slot_styles: slide.templateSlotStyles } : {}),
     editorial_title_offset_y: slide.editorialTitleOffsetY ?? null,
     editorial_desc_offset_y: slide.editorialDescOffsetY ?? null,
     editorial_image_offset_y: slide.editorialImageOffsetY ?? null,
@@ -122,5 +135,7 @@ export function mapDbCarouselToGlobalSettings(carousel: DbRow): GlobalSettings {
     metaBar: stored.metaBar || DEFAULT_GLOBAL_SETTINGS.metaBar,
     // Projetos antigos sem formato salvo assumem '4:5' (legado).
     format: stored.format || '4:5',
+    templateOverrides: stored.templateOverrides || undefined,
+    templateCornerStyle: stored.templateCornerStyle || undefined,
   };
 }

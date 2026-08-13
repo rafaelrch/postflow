@@ -8,6 +8,41 @@ export const metadata = {
   description: 'Assine o Creatools: plano mensal ou anual.',
 };
 
+/**
+ * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
+ * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
+ * não existe portal de autoatendimento. Estes valores se repetem nas 5 páginas
+ * públicas: mudou aqui, muda nas cinco.
+ */
+const SUPORTE_URL = 'https://instagram.com/creatools';
+const SUPORTE_HANDLE = '@creatools';
+const SUPORTE_EMAIL = 'contato@creatools.com';
+
+/**
+ * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
+ * texto manda cancelar ou pedir reembolso, ele deixa registro escrito dos dois
+ * lados e não exige conta no Instagram. O DM continua oferecido — é mais
+ * rápido —, nunca como via única.
+ */
+function Canais() {
+  return (
+    <>
+      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
+        {SUPORTE_EMAIL}
+      </a>{' '}
+      ou no Instagram{' '}
+      <a
+        href={SUPORTE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_HANDLE}
+      </a>
+    </>
+  );
+}
+
 // Preço vem de lib/plans.ts, a MESMA fonte que a rota de checkout usa para
 // montar items[].value. Escrever o número aqui de novo é como se anuncia um
 // valor e se cobra outro.
@@ -98,8 +133,8 @@ export default function PrecosPage() {
         </div>
 
         <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
-          Pagamento via cartão de crédito, processado com segurança. Para cancelar ou trocar de plano,
-          entre em contato com nosso suporte. Ao assinar, você concorda com os{' '}
+          Pagamento em cartão de crédito, processado com segurança. Para cancelar ou trocar de plano,
+          fale com a gente pelo e-mail <Canais />. Ao assinar, você concorda com os{' '}
           <Link href="/termos" className="underline underline-offset-4">
             Termos de Uso
           </Link>

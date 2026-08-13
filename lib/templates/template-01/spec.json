@@ -1,0 +1,2278 @@
+{
+  "$schema": "creatools/template-spec@1",
+  "template": {
+    "id": "template-01",
+    "figmaFileKey": "pYVZ11PzZRDwZtPPUhG89w",
+    "figmaFileName": "TEMPLATE 1",
+    "figmaLastModified": "2026-07-30T12:35:48Z",
+    "figmaVersion": "2381993616915261199",
+    "slideCount": 6,
+    "canvas": {
+      "w": 1080,
+      "h": 1350,
+      "aspectRatio": "4:5",
+      "exportScales": [
+        1,
+        2
+      ]
+    }
+  },
+  "slides": [
+    {
+      "index": 1,
+      "figmaId": "1:2",
+      "figmaName": "TEMPLATE 1 - SLIDE 1",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "angleDeg": 180.0,
+          "handles": [
+            {
+              "x": 0.4999999660695012,
+              "y": 0.3025925954829677
+            },
+            {
+              "x": 0.49999996606950114,
+              "y": 0.8718519028732679
+            },
+            {
+              "x": 0.2153703123743511,
+              "y": 0.30259259548296813
+            }
+          ],
+          "stops": [
+            {
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "position": 0.0
+            },
+            {
+              "color": "#000000",
+              "alpha": 1.0,
+              "position": 1.0
+            }
+          ],
+          "axisLengthNormalized": 0.569259,
+          "cssStopsPercent": [
+            30.2593,
+            87.1852
+          ],
+          "css": "linear-gradient(180.0deg, #FFFFFF 30.2593%, #000000 87.1852%)"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "1:21",
+          "name": "Barcelona lança tipografia que carrega a identidade de uma cidade inteira",
+          "type": "TEXT",
+          "box": {
+            "x": 84.0,
+            "y": 801.3,
+            "w": 911.0,
+            "h": 264.0,
+            "right": 85.0,
+            "bottom": 284.7
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Barcelona lança tipografia\nque carrega a identidade\nde uma cidade inteira",
+            "lines": [
+              "Barcelona lança tipografia",
+              "que carrega a identidade",
+              "de uma cidade inteira"
+            ],
+            "lineCount": 3,
+            "maxLineChars": 26,
+            "totalChars": 73
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 80.865,
+            "lineHeightPx": 88.255,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -4.8519,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 539.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s1.headline",
+          "role": "titulo-capa",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 28
+        },
+        {
+          "id": "2:23",
+          "name": "*Barcelona FC cria fonte inspirada na arquiterua catalã",
+          "type": "TEXT",
+          "box": {
+            "x": 174.42,
+            "y": 738.16,
+            "w": 730.0,
+            "h": 35.0,
+            "right": 175.58,
+            "bottom": 576.84
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "*Barcelona FC cria fonte inspirada na arquiterua catalã",
+            "lines": [
+              "*Barcelona FC cria fonte inspirada na arquiterua catalã"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 55,
+            "totalChars": 55,
+            "styledRuns": [
+              {
+                "styleKey": "0",
+                "start": 0,
+                "end": 25,
+                "text": "*Barcelona FC cria fonte ",
+                "override": {}
+              },
+              {
+                "styleKey": "30",
+                "start": 25,
+                "end": 55,
+                "text": "inspirada na arquiterua catalã",
+                "override": {
+                  "fontFamily": "Inter",
+                  "fontPostScriptName": "Inter-Light",
+                  "fontStyle": "Light",
+                  "fontWeight": 300,
+                  "fills": [
+                    {
+                      "type": "SOLID",
+                      "blendMode": "NORMAL",
+                      "opacity": 1.0,
+                      "visible": true,
+                      "color": "#FFFFFF",
+                      "alpha": 1.0,
+                      "css": "#FFFFFF"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 32.173,
+            "lineHeightPx": 35.113,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.9304,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 539.42,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s1.eyebrow",
+          "role": "chapeu",
+          "editable": true,
+          "maxLines": 1,
+          "maxCharsPerLine": 51,
+          "note": "estilo misto: trecho inicial Bold, resto Light. O ponto de virada e definido por caractere."
+        },
+        {
+          "id": "1:22",
+          "name": "Cada número virou fragmento da arquitetura catalã. A camisa deixou de vestir o jogador. Passou a vestir uma cidade.",
+          "type": "TEXT",
+          "box": {
+            "x": 135.24,
+            "y": 1090.15,
+            "w": 808.0,
+            "h": 153.0,
+            "right": 136.76,
+            "bottom": 106.85
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Cada número virou fragmento da arquitetura\ncatalã. A camisa deixou de vestir o jogador.\nPassou a vestir uma cidade.",
+            "lines": [
+              "Cada número virou fragmento da arquitetura",
+              "catalã. A camisa deixou de vestir o jogador.",
+              "Passou a vestir uma cidade."
+            ],
+            "lineCount": 3,
+            "maxLineChars": 44,
+            "totalChars": 115
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 46.321,
+            "lineHeightPx": 50.554,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -2.7793,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 539.24,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s1.subline",
+          "role": "sintese",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 46
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "z": 0,
+          "type": "IMAGE_SLOT",
+          "slot": "s1.image",
+          "fit": "cover",
+          "position": "center",
+          "size": "1080x1350",
+          "note": "imagem de fundo full-bleed; entra ATRAS do scrim"
+        },
+        {
+          "z": 1,
+          "type": "GRADIENT_SCRIM",
+          "css": "linear-gradient(180.0deg, rgba(0,0,0,0) 30.2593%, #000000 87.1852%)",
+          "originalFigmaCss": "linear-gradient(180.0deg, #FFFFFF 30.2593%, #000000 87.1852%)",
+          "angleDeg": 180.0,
+          "note": "degrade do Figma e branco->preto opaco. Convertido para transparente->preto: identico visualmente, mas revela a imagem."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "figmaId": "1:16",
+      "figmaName": "TEMPLATE 1 - SLIDE 2",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "angleDeg": 180.0,
+          "handles": [
+            {
+              "x": 0.5000000000000038,
+              "y": 0.3685185136101661
+            },
+            {
+              "x": 0.5000000000000058,
+              "y": 0.5670370310067764
+            },
+            {
+              "x": 0.40074074130169857,
+              "y": 0.36851851361016685
+            }
+          ],
+          "stops": [
+            {
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "position": 0.0
+            },
+            {
+              "color": "#000000",
+              "alpha": 1.0,
+              "position": 1.0
+            }
+          ],
+          "axisLengthNormalized": 0.198519,
+          "cssStopsPercent": [
+            36.8519,
+            56.7037
+          ],
+          "css": "linear-gradient(180.0deg, #FFFFFF 36.8519%, #000000 56.7037%)"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "2:24",
+          "name": "Design que rompeu sete temporadas de repetição",
+          "type": "TEXT",
+          "box": {
+            "x": 93.0,
+            "y": 784.0,
+            "w": 765.0,
+            "h": 152.0,
+            "right": 222.0,
+            "bottom": 414.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Design que rompeu sete\ntemporadas de repetição",
+            "lines": [
+              "Design que rompeu sete",
+              "temporadas de repetição"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 23,
+            "totalChars": 46
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 70.058,
+            "lineHeightPx": 76.46,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -4.2035,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 93.0
+          },
+          "slot": "s2.title",
+          "role": "titulo",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 26
+        },
+        {
+          "id": "2:25",
+          "name": "Depois de sete anos seguidos usando a mesma fonte unificada para números e letras, o clube decidiu reescrever essa história. Para profissionais de marca, é a prova de que até o que parece definitivo pode e deve ser questionado",
+          "type": "TEXT",
+          "box": {
+            "x": 93.24,
+            "y": 975.21,
+            "w": 813.0,
+            "h": 270.0,
+            "right": 173.76,
+            "bottom": 104.79
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#727272",
+              "alpha": 1.0,
+              "css": "#727272"
+            }
+          ],
+          "text": {
+            "characters": "Depois de sete anos seguidos usando a mesma \nfonte unificada para números e letras, o clube\ndecidiu reescrever essa história.\n\nPara profissionais de marca, é a prova de que até o \nque parece definitivo pode e deve ser questionado",
+            "lines": [
+              "Depois de sete anos seguidos usando a mesma ",
+              "fonte unificada para números e letras, o clube",
+              "decidiu reescrever essa história.",
+              "",
+              "Para profissionais de marca, é a prova de que até o ",
+              "que parece definitivo pode e deve ser questionado"
+            ],
+            "lineCount": 6,
+            "maxLineChars": 52,
+            "totalChars": 229
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 41.281,
+            "lineHeightPx": 45.053,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -2.064,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 93.24
+          },
+          "slot": "s2.body",
+          "role": "corpo",
+          "editable": true,
+          "maxLines": 6,
+          "maxCharsPerLine": 48,
+          "note": "aceita linha em branco como separador de paragrafo"
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "z": 0,
+          "type": "IMAGE_SLOT",
+          "slot": "s2.image",
+          "fit": "cover",
+          "position": "center",
+          "size": "1080x1350",
+          "note": "imagem de fundo full-bleed; entra ATRAS do scrim"
+        },
+        {
+          "z": 1,
+          "type": "GRADIENT_SCRIM",
+          "css": "linear-gradient(180.0deg, rgba(0,0,0,0) 36.8519%, #000000 56.7037%)",
+          "originalFigmaCss": "linear-gradient(180.0deg, #FFFFFF 36.8519%, #000000 56.7037%)",
+          "angleDeg": 180.0,
+          "note": "degrade do Figma e branco->preto opaco. Convertido para transparente->preto: identico visualmente, mas revela a imagem."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "figmaId": "1:17",
+      "figmaName": "TEMPLATE 1 - SLIDE 3",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "SOLID",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "color": "#050416",
+          "alpha": 1.0,
+          "css": "#050416"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "2:36",
+          "name": "Group 1",
+          "type": "GROUP",
+          "box": {
+            "x": 58.0,
+            "y": 169.0,
+            "w": 964.0,
+            "h": 1013.0,
+            "right": 58.0,
+            "bottom": 168.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "CENTER",
+            "horizontal": "LEFT"
+          },
+          "cornerRadius": 13.0
+        },
+        {
+          "id": "2:31",
+          "name": "O problema era a padronização",
+          "type": "TEXT",
+          "box": {
+            "x": 153.0,
+            "y": 169.0,
+            "w": 774.0,
+            "h": 69.0,
+            "right": 153.0,
+            "bottom": 1112.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "O problema era a padronização",
+            "lines": [
+              "O problema era a padronização"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 29,
+            "totalChars": 29
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 63.495,
+            "lineHeightPx": 69.298,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -3.8097,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.0,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s3.title",
+          "role": "titulo",
+          "editable": true,
+          "maxLines": 1,
+          "maxCharsPerLine": 33
+        },
+        {
+          "id": "2:32",
+          "name": "A maioria dos clubes trata o número apenas como número: uma fonte genérica, geométrica, sem nenhuma relação com quem a veste.",
+          "type": "TEXT",
+          "box": {
+            "x": 157.0,
+            "y": 892.0,
+            "w": 766.0,
+            "h": 135.0,
+            "right": 157.0,
+            "bottom": 323.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "A maioria dos clubes trata o número apenas\ncomo número: uma fonte genérica, geométrica, \nsem nenhuma relação com quem a veste.",
+            "lines": [
+              "A maioria dos clubes trata o número apenas",
+              "como número: uma fonte genérica, geométrica, ",
+              "sem nenhuma relação com quem a veste."
+            ],
+            "lineCount": 3,
+            "maxLineChars": 45,
+            "totalChars": 126
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 41.281,
+            "lineHeightPx": 45.053,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -2.064,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.0,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s3.body",
+          "role": "corpo",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 46
+        },
+        {
+          "id": "2:34",
+          "name": "Criando camisas tecnicamente perfeitas, mas culturalmente vazias",
+          "type": "TEXT",
+          "box": {
+            "x": 248.0,
+            "y": 1080.0,
+            "w": 585.0,
+            "h": 102.0,
+            "right": 247.0,
+            "bottom": 168.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#727272",
+              "alpha": 1.0,
+              "css": "#727272"
+            }
+          ],
+          "text": {
+            "characters": "Criando camisas tecnicamente\nperfeitas, mas culturalmente vazias",
+            "lines": [
+              "Criando camisas tecnicamente",
+              "perfeitas, mas culturalmente vazias"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 35,
+            "totalChars": 64
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Italic",
+            "fontStyle": "Italic",
+            "fontWeight": 400,
+            "italic": true,
+            "fontSizePx": 46.864,
+            "lineHeightPx": 51.146,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.4059,
+            "letterSpacingEm": -0.03,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s3.kicker",
+          "role": "remate-italico",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 33
+        },
+        {
+          "id": "2:35",
+          "name": "Rectangle 1",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 58.0,
+            "y": 300.0,
+            "w": 964.0,
+            "h": 530.0,
+            "right": 58.0,
+            "bottom": 520.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "cornerRadius": 13.0,
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#2F2F2F",
+              "alpha": 1.0,
+              "css": "#2F2F2F"
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "strokeWeight": 1.0,
+          "strokeAlign": "INSIDE",
+          "slot": "s3.image",
+          "role": "imagem",
+          "editable": true
+        },
+        {
+          "id": "2:40",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          }
+        },
+        {
+          "id": "2:37",
+          "name": "BRANDING & DESIGN DE MARCA",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 233.0,
+            "h": 18.0,
+            "right": 776.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "BRANDING & DESIGN DE MARCA",
+            "lines": [
+              "BRANDING & DESIGN DE MARCA"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 26,
+            "totalChars": 26
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "role": "assinatura",
+          "editable": true
+        },
+        {
+          "id": "2:39",
+          "name": "@OANDRELONA",
+          "type": "TEXT",
+          "box": {
+            "x": 896.0,
+            "y": 44.0,
+            "w": 121.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "@OANDRELONA",
+            "lines": [
+              "@OANDRELONA"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "role": "arroba",
+          "editable": true
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "figmaId": "1:18",
+      "figmaName": "TEMPLATE 1 - SLIDE 4",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "SOLID",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "color": "#FFFFFF",
+          "alpha": 1.0,
+          "css": "#FFFFFF"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "2:42",
+          "name": "Rectangle 2",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 0.0,
+            "y": 0.0,
+            "w": 1080.0,
+            "h": 850.0,
+            "right": 0.0,
+            "bottom": 500.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#D9D9D9",
+              "alpha": 1.0,
+              "css": "#D9D9D9"
+            }
+          ],
+          "slot": "s4.image",
+          "role": "imagem",
+          "editable": true,
+          "note": "full-bleed no topo"
+        },
+        {
+          "id": "2:43",
+          "name": "O número como vitral",
+          "type": "TEXT",
+          "box": {
+            "x": 229.45,
+            "y": 952.28,
+            "w": 622.0,
+            "h": 73.0,
+            "right": 228.55,
+            "bottom": 324.72
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#000000",
+              "alpha": 1.0,
+              "css": "#000000"
+            }
+          ],
+          "text": {
+            "characters": "O número como vitral",
+            "lines": [
+              "O número como vitral"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 20,
+            "totalChars": 20
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 66.744,
+            "lineHeightPx": 72.843,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -4.0046,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.45,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s4.title",
+          "role": "titulo",
+          "editable": true,
+          "maxLines": 1,
+          "maxCharsPerLine": 23
+        },
+        {
+          "id": "2:44",
+          "name": "Linhas artísticas, contornos fluidos e detalhes internos intricados transformam cada dígito em um fragmento de fachada catalã. A camisa vira parede; o número, mosaico",
+          "type": "TEXT",
+          "box": {
+            "x": 178.0,
+            "y": 1043.98,
+            "w": 725.0,
+            "h": 172.0,
+            "right": 177.0,
+            "bottom": 134.02
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#000000",
+              "alpha": 1.0,
+              "css": "#000000"
+            }
+          ],
+          "text": {
+            "characters": "Linhas artísticas, contornos fluidos e detalhes\ninternos intricados transformam cada dígito\nem um fragmento de fachada catalã. A camisa \nvira parede; o número, mosaico",
+            "lines": [
+              "Linhas artísticas, contornos fluidos e detalhes",
+              "internos intricados transformam cada dígito",
+              "em um fragmento de fachada catalã. A camisa ",
+              "vira parede; o número, mosaico"
+            ],
+            "lineCount": 4,
+            "maxLineChars": 47,
+            "totalChars": 167
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 39.746,
+            "lineHeightPx": 43.378,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.9873,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s4.body",
+          "role": "corpo",
+          "editable": true,
+          "maxLines": 4,
+          "maxCharsPerLine": 44
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "figmaId": "1:19",
+      "figmaName": "TEMPLATE 1 - SLIDE 5",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "SOLID",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "color": "#FFFFFF",
+          "alpha": 1.0,
+          "css": "#FFFFFF"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "2:46",
+          "name": "Rectangle 3",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 0.0,
+            "y": 350.0,
+            "w": 1080.0,
+            "h": 650.0,
+            "right": 0.0,
+            "bottom": 350.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "CENTER",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#D9D9D9",
+              "alpha": 1.0,
+              "css": "#D9D9D9"
+            }
+          ],
+          "slot": "s5.image",
+          "role": "imagem",
+          "editable": true,
+          "note": "faixa central; x=1 no original (provavel imprecisao de 1px)",
+          "corrigido": {
+            "motivo": "Faixa de imagem central deve ser full-bleed. No Figma estava 1px deslocada, deixando uma coluna de 1px de fundo branco na esquerda.",
+            "original": {
+              "x": 1.0,
+              "w": 1079.0
+            }
+          }
+        },
+        {
+          "id": "2:47",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          }
+        },
+        {
+          "id": "2:48",
+          "name": "BRANDING & DESIGN DE MARCA",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 233.0,
+            "h": 18.0,
+            "right": 776.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#AAAAAA",
+              "alpha": 1.0,
+              "css": "#AAAAAA"
+            }
+          ],
+          "text": {
+            "characters": "BRANDING & DESIGN DE MARCA",
+            "lines": [
+              "BRANDING & DESIGN DE MARCA"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 26,
+            "totalChars": 26
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "role": "assinatura",
+          "editable": true
+        },
+        {
+          "id": "2:49",
+          "name": "@OANDRELONA",
+          "type": "TEXT",
+          "box": {
+            "x": 896.0,
+            "y": 44.0,
+            "w": 121.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#AAAAAA",
+              "alpha": 1.0,
+              "css": "#AAAAAA"
+            }
+          ],
+          "text": {
+            "characters": "@OANDRELONA",
+            "lines": [
+              "@OANDRELONA"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "role": "arroba",
+          "editable": true
+        },
+        {
+          "id": "2:52",
+          "name": "A nova fonte troca o quadrado pela curva, o traço rígido pelo ornamento, buscando no Modernime Catalã, o movimento de Gaudi, uma linguagem visual só sua.",
+          "type": "TEXT",
+          "box": {
+            "x": 502.0,
+            "y": 1070.0,
+            "w": 468.0,
+            "h": 195.0,
+            "right": 110.0,
+            "bottom": 85.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#000000",
+              "alpha": 1.0,
+              "css": "#000000"
+            }
+          ],
+          "text": {
+            "characters": "A nova fonte troca o quadrado pela \ncurva, o traço rígido pelo ornamento,\nbuscando no Modernime Catalã, o\nmovimento de Gaudi, uma linguagem\nvisual só sua.",
+            "lines": [
+              "A nova fonte troca o quadrado pela ",
+              "curva, o traço rígido pelo ornamento,",
+              "buscando no Modernime Catalã, o",
+              "movimento de Gaudi, uma linguagem",
+              "visual só sua."
+            ],
+            "lineCount": 5,
+            "maxLineChars": 37,
+            "totalChars": 154
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 32.091,
+            "lineHeightPx": 39.151,
+            "lineHeightRatio": 1.22,
+            "letterSpacingPx": -1.6045,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 502.0
+          },
+          "slot": "s5.bot.body",
+          "role": "corpo-coluna",
+          "editable": true,
+          "maxLines": 5,
+          "maxCharsPerLine": 36
+        },
+        {
+          "id": "2:54",
+          "name": "A nova fonte troca o quadrado pela curva, o traço rígido pelo ornamento, buscando no Modernime Catalã, o movimento de Gaudi, uma linguagem",
+          "type": "TEXT",
+          "box": {
+            "x": 502.0,
+            "y": 128.0,
+            "w": 468.0,
+            "h": 156.0,
+            "right": 110.0,
+            "bottom": 1066.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#000000",
+              "alpha": 1.0,
+              "css": "#000000"
+            }
+          ],
+          "text": {
+            "characters": "A nova fonte troca o quadrado pela \ncurva, o traço rígido pelo ornamento,\nbuscando no Modernime Catalã, o\nmovimento de Gaudi, uma linguagem",
+            "lines": [
+              "A nova fonte troca o quadrado pela ",
+              "curva, o traço rígido pelo ornamento,",
+              "buscando no Modernime Catalã, o",
+              "movimento de Gaudi, uma linguagem"
+            ],
+            "lineCount": 4,
+            "maxLineChars": 37,
+            "totalChars": 139
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 32.091,
+            "lineHeightPx": 39.151,
+            "lineHeightRatio": 1.22,
+            "letterSpacingPx": -1.6045,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 502.0
+          },
+          "slot": "s5.top.body",
+          "role": "corpo-coluna",
+          "editable": true,
+          "maxLines": 4,
+          "maxCharsPerLine": 36
+        },
+        {
+          "id": "2:51",
+          "name": "O design alterou a visão",
+          "type": "TEXT",
+          "box": {
+            "x": 72.0,
+            "y": 1062.0,
+            "w": 217.0,
+            "h": 177.0,
+            "right": 791.0,
+            "bottom": 111.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#000000",
+              "alpha": 1.0,
+              "css": "#000000"
+            }
+          ],
+          "text": {
+            "characters": "O design\nalterou a\nvisão",
+            "lines": [
+              "O design",
+              "alterou a",
+              "visão"
+            ],
+            "lineCount": 3,
+            "maxLineChars": 9,
+            "totalChars": 24
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 55.163,
+            "lineHeightPx": 58.512,
+            "lineHeightRatio": 1.0607,
+            "letterSpacingPx": -3.3098,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 72.0
+          },
+          "slot": "s5.bot.title",
+          "role": "titulo-coluna",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 11
+        },
+        {
+          "id": "2:55",
+          "name": "Falta de território",
+          "type": "TEXT",
+          "box": {
+            "x": 72.0,
+            "y": 147.0,
+            "w": 211.0,
+            "h": 118.0,
+            "right": 797.0,
+            "bottom": 1085.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#000000",
+              "alpha": 1.0,
+              "css": "#000000"
+            }
+          ],
+          "text": {
+            "characters": "Falta de\nterritório",
+            "lines": [
+              "Falta de",
+              "território"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 10,
+            "totalChars": 19
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 55.163,
+            "lineHeightPx": 58.512,
+            "lineHeightRatio": 1.0607,
+            "letterSpacingPx": -3.3098,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 72.0
+          },
+          "slot": "s5.top.title",
+          "role": "titulo-coluna",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 10,
+          "note": "coluna estreita (211px) - use palavras curtas"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "figmaId": "1:20",
+      "figmaName": "TEMPLATE 1 - SLIDE 6",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "SOLID",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "color": "#0D39E4",
+          "alpha": 1.0,
+          "css": "#0D39E4"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "4:2",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          }
+        },
+        {
+          "id": "4:3",
+          "name": "BRANDING & DESIGN DE MARCA",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 233.0,
+            "h": 18.0,
+            "right": 776.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#AAAAAA",
+              "alpha": 1.0,
+              "css": "#AAAAAA"
+            }
+          ],
+          "text": {
+            "characters": "BRANDING & DESIGN DE MARCA",
+            "lines": [
+              "BRANDING & DESIGN DE MARCA"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 26,
+            "totalChars": 26
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "role": "assinatura",
+          "editable": true
+        },
+        {
+          "id": "4:4",
+          "name": "@OANDRELONA",
+          "type": "TEXT",
+          "box": {
+            "x": 896.0,
+            "y": 44.0,
+            "w": 121.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#AAAAAA",
+              "alpha": 1.0,
+              "css": "#AAAAAA"
+            }
+          ],
+          "text": {
+            "characters": "@OANDRELONA",
+            "lines": [
+              "@OANDRELONA"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "role": "arroba",
+          "editable": true
+        },
+        {
+          "id": "4:10",
+          "name": "Group 2",
+          "type": "GROUP",
+          "box": {
+            "x": 161.0,
+            "y": 366.0,
+            "w": 756.0,
+            "h": 696.0,
+            "right": 163.0,
+            "bottom": 288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "CENTER",
+            "horizontal": "LEFT"
+          }
+        },
+        {
+          "id": "4:6",
+          "name": "A modernidade não escolheu o caminho fácil",
+          "type": "TEXT",
+          "box": {
+            "x": 243.0,
+            "y": 366.0,
+            "w": 592.0,
+            "h": 106.0,
+            "right": 245.0,
+            "bottom": 878.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "A modernidade não\nescolheu o caminho fácil",
+            "lines": [
+              "A modernidade não",
+              "escolheu o caminho fácil"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 24,
+            "totalChars": 42
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 48.565,
+            "lineHeightPx": 53.003,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -2.9139,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 539.0,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s6.title",
+          "role": "titulo",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 33
+        },
+        {
+          "id": "4:7",
+          "name": "Em vez do minimalismo limpo e sem alma, o clube escolheu um futuro mais artesanal, mais irregular, mais humano, que ainda reconhece a mão do artista, o ornamento, a arquitetura e a rua.",
+          "type": "TEXT",
+          "box": {
+            "x": 161.0,
+            "y": 807.0,
+            "w": 756.0,
+            "h": 255.0,
+            "right": 163.0,
+            "bottom": 288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Em vez do minimalismo limpo e sem alma, o clube escolheu um futuro mais artesanal, mais irregular, mais humano, que ainda reconhece a mão do artista, o ornamento, a arquitetura e a rua.",
+            "lines": [
+              "Em vez do minimalismo limpo e sem alma, o clube escolheu um futuro mais artesanal, mais irregular, mais humano, que ainda reconhece a mão do artista, o ornamento, a arquitetura e a rua."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 185,
+            "totalChars": 185
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 46.303,
+            "lineHeightPx": 50.534,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -2.3152,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 539.0,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s6.body",
+          "role": "corpo-fecho",
+          "editable": true,
+          "maxLines": 5,
+          "maxCharsPerLine": 39
+        },
+        {
+          "id": "4:9",
+          "name": "Arrow 1",
+          "type": "VECTOR",
+          "box": {
+            "x": 539.0,
+            "y": 578.0,
+            "w": 0.0,
+            "h": 127.0,
+            "right": 541.0,
+            "bottom": 645.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "rotationDeg": 90.0,
+          "strokes": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "strokeWeight": 2.0,
+          "strokeAlign": "INSIDE",
+          "slot": "s6.arrow",
+          "role": "ornamento",
+          "editable": false,
+          "note": "seta vertical 127px apontando para baixo, stroke 2px #FFF"
+        }
+      ]
+    }
+  ],
+  "slotIndex": {
+    "s1.headline": {
+      "figmaId": "1:21",
+      "role": "titulo-capa",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 28,
+      "font": "Inter Bold 80.87"
+    },
+    "s1.eyebrow": {
+      "figmaId": "2:23",
+      "role": "chapeu",
+      "editable": true,
+      "maxLines": 1,
+      "maxCharsPerLine": 51,
+      "font": "Inter Bold+Light 32.17",
+      "note": "estilo misto: trecho inicial Bold, resto Light. O ponto de virada e definido por caractere."
+    },
+    "s1.subline": {
+      "figmaId": "1:22",
+      "role": "sintese",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 46,
+      "font": "IvyOra Medium 46.32"
+    },
+    "s2.title": {
+      "figmaId": "2:24",
+      "role": "titulo",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 26,
+      "font": "Inter Bold 70.06"
+    },
+    "s2.body": {
+      "figmaId": "2:25",
+      "role": "corpo",
+      "editable": true,
+      "maxLines": 6,
+      "maxCharsPerLine": 48,
+      "font": "InterDisplay Regular 41.28",
+      "note": "aceita linha em branco como separador de paragrafo"
+    },
+    "s3.title": {
+      "figmaId": "2:31",
+      "role": "titulo",
+      "editable": true,
+      "maxLines": 1,
+      "maxCharsPerLine": 33,
+      "font": "IvyOra Medium 63.50"
+    },
+    "s3.image": {
+      "figmaId": "2:35",
+      "role": "imagem",
+      "editable": true,
+      "type": "image",
+      "size": "964x530",
+      "radius": 13,
+      "border": "1px #FFFFFF"
+    },
+    "s3.body": {
+      "figmaId": "2:32",
+      "role": "corpo",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 46,
+      "font": "InterDisplay Regular 41.28"
+    },
+    "s3.kicker": {
+      "figmaId": "2:34",
+      "role": "remate-italico",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 33,
+      "font": "IvyOra Italic 46.86"
+    },
+    "cantos.left": {
+      "figmaId": "4:3",
+      "role": "assinatura",
+      "editable": true
+    },
+    "cantos.right": {
+      "figmaId": "4:4",
+      "role": "arroba",
+      "editable": true
+    },
+    "s4.image": {
+      "figmaId": "2:42",
+      "role": "imagem",
+      "editable": true,
+      "type": "image",
+      "size": "1080x850",
+      "note": "full-bleed no topo"
+    },
+    "s4.title": {
+      "figmaId": "2:43",
+      "role": "titulo",
+      "editable": true,
+      "maxLines": 1,
+      "maxCharsPerLine": 23,
+      "font": "Inter Bold 66.74"
+    },
+    "s4.body": {
+      "figmaId": "2:44",
+      "role": "corpo",
+      "editable": true,
+      "maxLines": 4,
+      "maxCharsPerLine": 44,
+      "font": "InterDisplay Regular 39.75"
+    },
+    "s5.image": {
+      "figmaId": "2:46",
+      "role": "imagem",
+      "editable": true,
+      "type": "image",
+      "size": "1080x650",
+      "note": "faixa central full-bleed (corrigido de x=1/1079px do Figma)"
+    },
+    "s5.top.title": {
+      "figmaId": "2:55",
+      "role": "titulo-coluna",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 10,
+      "font": "Inter Bold 55.16",
+      "note": "coluna estreita (211px) - use palavras curtas"
+    },
+    "s5.top.body": {
+      "figmaId": "2:54",
+      "role": "corpo-coluna",
+      "editable": true,
+      "maxLines": 4,
+      "maxCharsPerLine": 36,
+      "font": "InterDisplay Regular 32.09"
+    },
+    "s5.bot.title": {
+      "figmaId": "2:51",
+      "role": "titulo-coluna",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 11,
+      "font": "Inter Bold 55.16"
+    },
+    "s5.bot.body": {
+      "figmaId": "2:52",
+      "role": "corpo-coluna",
+      "editable": true,
+      "maxLines": 5,
+      "maxCharsPerLine": 36,
+      "font": "InterDisplay Regular 32.09"
+    },
+    "s6.title": {
+      "figmaId": "4:6",
+      "role": "titulo",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 33,
+      "font": "IvyOra Medium 48.56"
+    },
+    "s6.arrow": {
+      "figmaId": "4:9",
+      "role": "ornamento",
+      "editable": false,
+      "note": "seta vertical 127px apontando para baixo, stroke 2px #FFF"
+    },
+    "s6.body": {
+      "figmaId": "4:7",
+      "role": "corpo-fecho",
+      "editable": true,
+      "maxLines": 5,
+      "maxCharsPerLine": 39,
+      "font": "InterDisplay Regular 46.30"
+    },
+    "s1.image": {
+      "figmaId": null,
+      "role": "imagem-fundo",
+      "editable": true,
+      "type": "image",
+      "size": "1080x1350",
+      "note": "fundo full-bleed sob o scrim"
+    },
+    "s2.image": {
+      "figmaId": null,
+      "role": "imagem-fundo",
+      "editable": true,
+      "type": "image",
+      "size": "1080x1350",
+      "note": "fundo full-bleed sob o scrim"
+    }
+  },
+  "fontSubstitutions": {
+    "_doc": "IvyOra Text e comercial (Ivy Foundry) e nao pode ser embutida. Trocar a substituta = alterar 'use' abaixo. Ranking medido contra o render do Figma (menor diferenca de forma = mais parecida).",
+    "IvyOra Text": {
+      "use": "Cormorant Garamond",
+      "weightShift": {
+        "500": 600,
+        "note": "Cormorant e mais leve; sobe um grau para compensar"
+      },
+      "ranking": [
+        {
+          "font": "Cormorant Garamond",
+          "shapeRoman": 0.2394,
+          "shapeItalic": 0.1199,
+          "widthRel": 0.962
+        },
+        {
+          "font": "Bodoni Moda",
+          "shapeRoman": 0.2589,
+          "shapeItalic": 0.1461,
+          "widthRel": 1.008
+        },
+        {
+          "font": "EB Garamond",
+          "shapeRoman": 0.2501,
+          "shapeItalic": 0.1856,
+          "widthRel": 0.922
+        },
+        {
+          "font": "Newsreader",
+          "shapeRoman": 0.2727,
+          "shapeItalic": 0.1824,
+          "widthRel": 1.03
+        },
+        {
+          "font": "Playfair Display",
+          "shapeRoman": 0.2799,
+          "shapeItalic": 0.2074,
+          "widthRel": 1.078
+        }
+      ]
+    }
+  },
+  "designSystem": {
+    "canvas": {
+      "w": 1080,
+      "h": 1350,
+      "aspect": "4:5",
+      "safeMarginPx": 72
+    },
+    "lineHeightRatio": {
+      "padrao": 1.0914,
+      "excecoes": {
+        "s5.*.body": 1.22,
+        "s5.*.title": 1.0607
+      },
+      "note": "18 de 22 slots usam 109,14%. E a regra real do template."
+    },
+    "letterSpacingEm": {
+      "titulos_inter_bold": -0.06,
+      "titulos_ivyora": -0.06,
+      "corpo_inter_display": -0.05,
+      "italico_ivyora": -0.03
+    },
+    "palette": {
+      "branco": "#FFFFFF",
+      "preto": "#000000",
+      "azul_fecho": "#0D39E4",
+      "navy_card": "#050416",
+      "cinza_texto": "#727282",
+      "cinza_texto_claro": "#AAAAAA",
+      "cinza_cantos": "#767682",
+      "placeholder_img": "#D9D9D9",
+      "card_interno": "#2F2F2F"
+    },
+    "fonts": {
+      "titulo_sans": "Inter Bold",
+      "corpo_sans": "Inter Display Regular",
+      "cantos": "Inter Display Medium",
+      "titulo_serif": "IvyOra Text Medium (substituida)",
+      "remate_serif": "IvyOra Text Italic (substituida)"
+    },
+    "note": "Tamanhos em px sao dizimas (80,8654 etc) porque o arquivo foi redimensionado manualmente. Nenhum fator unico de escala explica (melhor ajuste erra 0,30px). Mantidos fieis ao Figma de proposito."
+  },
+  "correctionsApplied": [
+    {
+      "figmaId": "2:46",
+      "slot": "s5.image",
+      "reason": "Faixa de imagem central deve ser full-bleed. No Figma estava 1px deslocada, deixando uma coluna de 1px de fundo branco na esquerda.",
+      "aprovadoPor": "Rafael",
+      "box": {
+        "de": {
+          "x": 1.0,
+          "w": 1079.0
+        },
+        "para": {
+          "x": 0.0,
+          "w": 1080.0
+        }
+      }
+    }
+  ]
+}

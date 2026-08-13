@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
-import { getUserCredits } from '@/lib/credits';
+import { CREDIT_COSTS, getUserCredits } from '@/lib/credits';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -91,9 +91,20 @@ export default async function ContaPage() {
               <span className="text-[var(--ink-dim)]">Próxima recarga</span>
               <span className="font-medium">{fmtDate(credits?.period_end ?? null)}</span>
             </div>
+            {/*
+              Custos vêm de CREDIT_COSTS (lib/credits.ts) interpolados, não
+              digitados: só o carrossel e a imagem consomem crédito, e a copy não
+              pode divergir do objeto numa próxima edição de texto.
+              Notícia não tem custo nem teto: o plano gratuito, único que tinha
+              limite diário, saiu do produto. "Thread do X" é estilo
+              de carrossel (FORMATO B em lib/openai.ts), não um item à parte.
+              Não há CTA de upgrade aqui: quem tem assinatura ativa leva 409
+              `alreadySubscribed` no checkout (app/api/asaas/checkout/route.ts).
+            */}
             <p className="text-xs text-[var(--ink-dim)]">
-              Carrossel custa 5 · Notícias e Threads custam 3 · Imagem com IA custa 5. Refinar slide é grátis.
-              Os créditos recarregam todo mês.
+              Carrossel com IA custa {CREDIT_COSTS.carousel} créditos — o mesmo nos 3 estilos,
+              incluindo Thread do X. Imagem com IA custa {CREDIT_COSTS.image}. Notícias e o editor
+              manual não consomem créditos. Os créditos recarregam todo mês.
             </p>
           </div>
         </section>

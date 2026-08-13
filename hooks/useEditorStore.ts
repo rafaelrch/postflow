@@ -38,7 +38,8 @@ interface EditorState {
   setCaption: (caption: string) => void;
   setHashtags: (hashtags: string[]) => void;
 
-  addSlide: () => void;
+  /** `patch` existe para o TEMPLATE 1: o popup escolhe o modelo e o lorem dele. */
+  addSlide: (patch?: Partial<Slide>) => void;
   removeSlide: (index: number) => void;
   duplicateSlide: (index: number) => void;
   reorderSlides: (fromIndex: number, toIndex: number) => void;
@@ -64,6 +65,13 @@ interface EditorState {
     globalSettings: GlobalSettings;
     caption?: string;
     hashtags?: string[];
+    /**
+     * Quando o carrossel foi salvo pela última vez (`carousels.updated_at`).
+     * Sem isto a barra de status mostrava só "Salvo", sem horário, até o
+     * primeiro save DA SESSÃO — e o horário existia, só não tinha chegado até
+     * aqui. Não é chute: é o instante que o banco registrou.
+     */
+    lastSavedAt?: number | null;
   }) => void;
 }
 
@@ -92,9 +100,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCaption: (caption) => set({ caption }),
   setHashtags: (hashtags) => set({ hashtags }),
 
-  addSlide: () =>
+  addSlide: (patch) =>
     set((s) => {
-      const newSlide = createEmptySlide(s.slides.length);
+      const newSlide = { ...createEmptySlide(s.slides.length), ...patch };
       return {
         slides: [...s.slides, newSlide],
         activeSlideIndex: s.slides.length,
@@ -222,7 +230,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       hashtags: [],
     }),
 
-  loadCarousel: ({ id, title, style, slides, globalSettings, caption = '', hashtags = [] }) =>
+  loadCarousel: ({ id, title, style, slides, globalSettings, caption = '', hashtags = [], lastSavedAt = null }) =>
     set({
       carouselId: id,
       carouselTitle: title,
@@ -231,7 +239,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       globalSettings,
       activeSlideIndex: 0,
       saveStatus: 'saved',
-      lastSavedAt: null,
+      lastSavedAt,
       history: [],
       historyIndex: -1,
       caption,

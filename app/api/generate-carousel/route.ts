@@ -6,6 +6,7 @@ import { CREDIT_COSTS } from '@/lib/credits';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { BrandContext, formatBrandContextAsPrompt, getBrandContext } from '@/lib/brand-context';
 import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
+import { template02Addendum } from '@/lib/templates/template-02';
 
 export const maxDuration = 60;
 
@@ -126,9 +127,40 @@ export async function POST(req: NextRequest) {
  * Sem contexto, a string devolvida é exatamente a de antes.
  */
 function buildUserPrompt(body: GenerateCarouselInput, brandContext?: BrandContext): string {
-  const prompt = buildPromptBody(body);
+  const prompt = buildPromptBody(body) + buildContentDirectives(body);
   const contexto = formatBrandContextAsPrompt(brandContext);
   return contexto ? `${contexto}\n\n---\n\n${prompt}` : prompt;
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  'pt-BR': 'português do Brasil',
+  'en-US': 'inglês (EUA)',
+  'es-ES': 'espanhol',
+};
+
+/**
+ * Diretivas opcionais do wizard (idioma e conteúdo exato).
+ *
+ * Entram DEPOIS do addendum do template, para não competir com os limites de
+ * slot. Sem nenhuma das duas — o caso de qualquer chamador antigo — devolve
+ * string vazia e o prompt final fica idêntico ao de antes.
+ */
+function buildContentDirectives(body: GenerateCarouselInput): string {
+  const linhas: string[] = [];
+
+  // pt-BR é o padrão histórico e já está embutido no system prompt.
+  if (body.language && body.language !== 'pt-BR') {
+    linhas.push(`IDIOMA: escreva todo o conteúdo dos slides em ${LANGUAGE_LABELS[body.language] ?? body.language}.`);
+  }
+
+  if (body.exactContent) {
+    linhas.push(
+      'CONTEÚDO EXATO: use o texto acima literalmente, apenas distribuindo-o entre os slides. ' +
+      'Não reescreva, não resuma e não invente frases novas.'
+    );
+  }
+
+  return linhas.length ? `\n\n${linhas.join('\n')}` : '';
 }
 
 function buildPromptBody(body: GenerateCarouselInput): string {
@@ -167,5 +199,36 @@ ${body.imageDirection ? `Direcionamento visual: ${body.imageDirection}` : ''}
 Estrutura: hook irresistível na capa → desenvolvimento progressivo (1 ponto por slide) → CTA no final.
 OBRIGATÓRIO: description de cada slide = máximo 2 frases. Curto, direto, sem enchimento.
 title de cada slide = máximo 7 palavras.
-O leitor deve querer ir para o próximo slide em cada etapa.`;
+O leitor deve querer ir para o próximo slide em cada etapa.${
+    body.style === 'template01' ? TEMPLATE_01_ADDENDUM : ''
+  }${body.style === 'template02' ? template02Addendum() : ''}`;
 }
+
+/**
+ * TEMPLATE 1 — o desenho tem blocos de texto ALÉM do par título/descrição: o
+ * chapéu da capa, o remate do slide 3 e a coluna de baixo do slide 5. Sem estes
+ * campos eles ficavam com a copy ilustrativa do Figma ("*Barcelona FC cria
+ * fonte…") em todo carrossel gerado.
+ *
+ * Os limites são os de `slots.json` (o mesmo que a barra lateral audita); o que
+ * estourar não deixa "apertado", empurra o bloco de baixo.
+ */
+const TEMPLATE_01_ADDENDUM = `
+
+TEMPLATE 1 — campos extras OBRIGATÓRIOS.
+São exatamente 6 slides. Além de "title" e "description", devolva em cada slide
+um objeto "extras" com os campos abaixo (só nos slides listados; nos outros
+omita "extras"). Respeite os limites — eles são a caixa do desenho:
+
+- slide 1: { "eyebrow": "..." }   1 linha, até 51 caracteres. É o chapéu da
+  capa: uma manchete curta do assunto, começando com "*".
+- slide 3: { "kicker": "..." }    até 2 linhas de 33 caracteres (use \\n para
+  quebrar). É um remate em itálico que fecha o raciocínio do slide.
+- slide 5: { "botTitle": "...", "botBody": "..." }
+  botTitle: até 3 linhas de 11 caracteres (coluna estreita — palavras curtas,
+  quebre com \\n). botBody: até 5 linhas de 36 caracteres.
+  O slide 5 tem DUAS faixas: title/description são a de cima, botTitle/botBody
+  são a de baixo, e as duas tratam de eixos DIFERENTES do tema.
+
+Nunca devolva texto de exemplo, nome de marca ou assunto que não sejam os do
+tema pedido.`;

@@ -67,6 +67,48 @@ let httpsResponse: {
   chunks: Buffer[];
 };
 
+// Options exatas que o Node passa ao lookup customizado ao abrir a conexão
+// (verificado em Node v22: `{ hints: 1024, all: true }`).
+const NODE_LOOKUP_OPTIONS = { hints: 1024, all: true } as const;
+
+// Emula a leitura que o Node faz do resultado do lookup. Com `all: true` ele
+// espera um ARRAY e lê `addresses[0].address`; se vier string, o endereço sai
+// `undefined` e o socket estoura com ERR_INVALID_IP_ADDRESS.
+function nodeConsumesLookup(
+  options: { all?: boolean },
+  args: [unknown, unknown, unknown?]
+): { address: unknown; family: unknown } {
+  const [error, addressesOrAddress, family] = args;
+  if (error) throw error;
+  if (options.all) {
+    if (!Array.isArray(addressesOrAddress)) {
+      throw new TypeError(
+        `Invalid IP address: ${(addressesOrAddress as { address?: unknown })?.address}`
+      );
+    }
+    const first = addressesOrAddress[0] as { address?: unknown; family?: unknown } | undefined;
+    if (typeof first?.address !== 'string') {
+      throw new TypeError(`Invalid IP address: ${first?.address}`);
+    }
+    return { address: first.address, family: first.family };
+  }
+  if (typeof addressesOrAddress !== 'string') {
+    throw new TypeError(`Invalid IP address: ${addressesOrAddress}`);
+  }
+  return { address: addressesOrAddress, family };
+}
+
+/** Captura a função `lookup` que downloadReferenceImage passou ao https.request. */
+async function capturePinnedLookup(): Promise<
+  (host: string, options: object, cb: (...args: unknown[]) => void) => void
+> {
+  await downloadReferenceImage(validUrl, userId);
+  const options = mockHttpsRequest.mock.calls.at(-1)?.[1] as {
+    lookup: (host: string, options: object, cb: (...args: unknown[]) => void) => void;
+  };
+  return options.lookup;
+}
+
 function request(referenceImageUrl?: string) {
   return new NextRequest('http://localhost/api/generate-image', {
     method: 'POST',
@@ -92,7 +134,9 @@ beforeEach(() => {
   };
   mockLookup.mockResolvedValue([{ address: '2606:4700::1', family: 6 }]);
   mockHttpsRequest.mockImplementation((_url, options, callback) => {
-    options.lookup('project.supabase.co', {}, mockPinnedLookup);
+    // O Node chama o lookup pinado com `all: true` (net.connect -> lookupAndConnect).
+    // Reproduzir o options real é o que expõe o ERR_INVALID_IP_ADDRESS.
+    options.lookup('project.supabase.co', NODE_LOOKUP_OPTIONS, mockPinnedLookup);
     const response = Readable.from(httpsResponse.chunks) as Readable & {
       statusCode: number;
       headers: Record<string, string>;
@@ -200,7 +244,8 @@ describe('download seguro da imagem de referência', () => {
 
     await expect(downloadReferenceImage(validUrl, userId)).resolves.toMatchObject({ mime: 'image/png' });
     expect(mockLookup).toHaveBeenCalledTimes(1);
-    expect(mockPinnedLookup).toHaveBeenCalledWith(null, '203.0.114.10', 4);
+    // `all: true` (o que o Node realmente pede): resultado em forma de array.
+    expect(mockPinnedLookup).toHaveBeenCalledWith(null, [{ address: '203.0.114.10', family: 4 }]);
     expect(mockHttpsRequest).toHaveBeenCalledWith(
       expect.any(URL),
       expect.objectContaining({
@@ -209,6 +254,55 @@ describe('download seguro da imagem de referência', () => {
       }),
       expect.any(Function)
     );
+  });
+
+  it('honra options.all no lookup pinado, nas duas formas do contrato do Node', async () => {
+    mockLookup.mockResolvedValue([
+      { address: '203.0.114.10', family: 4 },
+      { address: '2606:4700::1', family: 6 },
+    ]);
+    const pinnedLookup = await capturePinnedLookup();
+
+    // all: true -> array de { address, family }. Era aqui que estourava
+    // TypeError [ERR_INVALID_IP_ADDRESS]: Invalid IP address: undefined.
+    const allArgs: [unknown, unknown, unknown?] = [null, null, null];
+    pinnedLookup('project.supabase.co', { hints: 1024, all: true }, (...args) => {
+      allArgs[0] = args[0];
+      allArgs[1] = args[1];
+      allArgs[2] = args[2];
+    });
+    expect(nodeConsumesLookup({ all: true }, allArgs)).toEqual({ address: '203.0.114.10', family: 4 });
+
+    // all ausente/false -> forma clássica (err, address, family).
+    const singleArgs: [unknown, unknown, unknown?] = [null, null, null];
+    pinnedLookup('project.supabase.co', { hints: 1024 }, (...args) => {
+      singleArgs[0] = args[0];
+      singleArgs[1] = args[1];
+      singleArgs[2] = args[2];
+    });
+    expect(nodeConsumesLookup({ all: false }, singleArgs)).toEqual({
+      address: '203.0.114.10',
+      family: 4,
+    });
+  });
+
+  it('o lookup pinado entrega sempre o IP público validado, sem novo DNS', async () => {
+    mockLookup.mockResolvedValue([{ address: '203.0.114.10', family: 4 }]);
+    const pinnedLookup = await capturePinnedLookup();
+    mockLookup.mockClear();
+
+    // Mesmo se o atacante trocar o DNS depois da validação (rebinding), o
+    // endereço entregue continua sendo o `selected` já checado como público.
+    for (const options of [{ hints: 1024, all: true }, { hints: 1024 }]) {
+      const args: [unknown, unknown, unknown?] = [null, null, null];
+      pinnedLookup('evil.example', options, (...received) => {
+        args[0] = received[0];
+        args[1] = received[1];
+        args[2] = received[2];
+      });
+      expect(nodeConsumesLookup(options, args).address).toBe('203.0.114.10');
+    }
+    expect(mockLookup).not.toHaveBeenCalled();
   });
 
   it('aplica o limite também a resposta chunked sem Content-Length', async () => {

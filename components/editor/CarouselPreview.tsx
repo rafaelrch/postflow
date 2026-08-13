@@ -108,6 +108,9 @@ export default function CarouselPreview({ carouselId }: CarouselPreviewProps) {
         format:
           ((data.global_settings as { format?: GlobalSettings['format'] } | null)?.format) ||
           '4:5',
+        templateCornerStyle:
+          ((data.global_settings as Partial<GlobalSettings> | null)?.templateCornerStyle) ||
+          undefined,
       };
 
       setCarousel({

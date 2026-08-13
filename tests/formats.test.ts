@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, FORMAT_LIST, DEFAULT_FORMAT, getFormat } from '../lib/formats';
 import { getImageLayerStyle } from '../lib/utils';
+import { DEFAULT_IMAGE_POSITION } from '../types';
 
 describe('lib/formats', () => {
   it('todos os formatos compartilham a largura 1080 (só a altura muda)', () => {
@@ -44,6 +45,15 @@ describe('lib/formats', () => {
 });
 
 describe('zoom das imagens', () => {
+  it('uma imagem nova preenche a moldura, centralizada e sem deformar', () => {
+    expect(DEFAULT_IMAGE_POSITION).toEqual({ x: 50, y: 50, zoom: 100, objectFit: 'cover' });
+    expect(getImageLayerStyle(DEFAULT_IMAGE_POSITION)).toMatchObject({
+      backgroundSize: 'cover',
+      backgroundPosition: '50% 50%',
+      transform: 'scale(1)',
+    });
+  });
+
   it('parte de cover em 100% e aplica o zoom como escala relativa', () => {
     expect(getImageLayerStyle({ x: 25, y: 75, zoom: 100 })).toMatchObject({
       backgroundSize: 'cover',

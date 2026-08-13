@@ -1,538 +1,76 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
-import { Download, Archive, Upload, Image, X, Underline, Sparkles } from 'lucide-react';
+import { ReactNode, useRef } from 'react';
+import { Download, Archive, Upload, Image, Underline, Sparkles, RotateCcw, ArrowLeft } from 'lucide-react';
+// `Image` já é o ícone do lucide neste arquivo — o componente do Next entra
+// com outro nome em vez de renomear as ~10 chamadas do ícone.
+import NextImage from 'next/image';
+import Link from 'next/link';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
-import Section from './Section';
+import Template01Slots from './Template01Slots';
+import Template02Slots from './Template02Slots';
+import SidebarGroup from './sidebar/SidebarGroup';
+import SidebarPanel from './sidebar/SidebarPanel';
+import ColorPicker from './sidebar/ColorPicker';
+import ElementFontPicker from './sidebar/ElementFontPicker';
+import CornersPanel from './sidebar/CornersPanel';
+import WordHighlightPicker from './sidebar/WordHighlightPicker';
+import AiGenPanel from './sidebar/AiGenPanel';
+import ImageThumb from './sidebar/ImageThumb';
+import { inputCls, labelCls, numericCls } from './sidebar/tokens';
+import {
+  PANEL_REGISTRY,
+  PanelContext,
+  PanelId,
+  PanelScope,
+  panelLabel,
+  visiblePanels,
+} from './sidebar/panels';
 import { cn } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
-import { TextPosition, TextHighlight, ElementFont } from '@/types';
-
-// ── ImageThumb: miniatura da imagem anexada com X para remover ───────────────
-function ImageThumb({ url, onRemove }: { url: string; onRemove: () => void }) {
-  return (
-    <div className="relative w-full h-24 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="Imagem anexada" className="w-full h-full object-cover" />
-      <button
-        onClick={onRemove}
-        title="Remover imagem"
-        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center transition-colors"
-      >
-        <X className="w-3 h-3" />
-      </button>
-    </div>
-  );
-}
-
-// ── AiGenPanel: painel expansível de geração de imagem por IA ─────────────────
-// Ao abrir: referência (upload + preview + X), prompt livre, conteúdo do slide
-// (somente leitura) e o botão Gerar. Estado local; reseta ao trocar de slide
-// via key={activeSlideIndex} no uso.
-function AiGenPanel({
-  buttonLabel,
-  generating,
-  slideTitle,
-  slideDescription,
-  onGenerate,
-}: {
-  buttonLabel: string;
-  generating: boolean;
-  slideTitle: string;
-  slideDescription: string;
-  onGenerate: (opts: { userPrompt?: string; referenceImageUrl?: string }) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [prompt, setPrompt] = useState('');
-  const [refUrl, setRefUrl] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = async (file: File) => {
-    setUploading(true);
-    const toastId = toast.loading('Enviando referência…');
-    try {
-      const url = await uploadImageFile(file, 'reference-images');
-      setRefUrl(url);
-      toast.success('Referência adicionada', { id: toastId });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const slideContent = [slideTitle, slideDescription].filter(Boolean).join('\n\n');
-  const panelLabelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
-  const fieldCls = 'w-full px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:border-black/20 dark:focus:border-white/20 transition-all resize-none';
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-semibold transition-opacity',
-          open
-            ? 'border border-black/[0.1] dark:border-white/[0.1] text-gray-900/70 dark:text-white/70'
-            : 'bg-gray-900 dark:bg-white text-white dark:text-black hover:opacity-90'
-        )}
-      >
-        <Sparkles className="w-3 h-3" />
-        {buttonLabel}
-      </button>
-
-      {open && (
-        <div className="flex flex-col gap-2 p-2.5 rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          />
-
-          {/* Imagem de referência */}
-          <span className={panelLabelCls}>Imagem de referência (opcional)</span>
-          {refUrl ? (
-            <ImageThumb url={refUrl} onRemove={() => setRefUrl('')} />
-          ) : (
-            <div
-              onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-lg p-3 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition-all"
-            >
-              <Upload className="w-3.5 h-3.5 mx-auto mb-1 text-gray-900/25 dark:text-white/25" />
-              <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">
-                {uploading ? 'Enviando…' : 'Clique para anexar referência'}
-              </span>
-            </div>
-          )}
-
-          {/* Prompt livre */}
-          <span className={panelLabelCls}>Prompt</span>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Descreva a imagem que você quer gerar…"
-            className={fieldCls}
-            style={{ minHeight: 64 }}
-          />
-
-          {/* Conteúdo do slide — somente leitura */}
-          <span className={panelLabelCls}>Conteúdo do slide</span>
-          <textarea
-            readOnly
-            value={slideContent}
-            className={cn(fieldCls, 'opacity-60 cursor-default')}
-            style={{ minHeight: 48 }}
-          />
-
-          {/* Gerar */}
-          <button
-            onClick={() =>
-              onGenerate({
-                userPrompt: prompt.trim() || undefined,
-                referenceImageUrl: refUrl || undefined,
-              })
-            }
-            disabled={generating || uploading}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Sparkles className="w-3 h-3" />
-            {generating ? 'Gerando…' : 'Gerar'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── ColorPicker: swatch + hex input ─────────────────────────────────────────
-
-interface ColorPickerProps {
-  label?: string;
-  value: string;
-  onChange: (v: string) => void;
-  className?: string;
-}
-
-// ── ElementFontPicker ────────────────────────────────────────────────────────
-
-type FontFamily = 'SF Pro Display' | 'IvyOra Text' | 'Bebas Neue' | 'Montserrat';
-
-interface FontVariant { value: ElementFont; label: string; weight: number; style: 'normal' | 'italic' }
-
-const FONT_FAMILIES: { value: FontFamily; label: string; family: string; variants: FontVariant[] }[] = [
-  {
-    value: 'SF Pro Display',
-    label: 'SF Display',
-    family: "'SF Pro Display', -apple-system, 'Helvetica Neue', sans-serif",
-    variants: [
-      { value: 'SF Pro Display Light',    label: 'Light',    weight: 300, style: 'normal' },
-      { value: 'SF Pro Display Regular',  label: 'Regular',  weight: 400, style: 'normal' },
-      { value: 'SF Pro Display Medium',   label: 'Medium',   weight: 500, style: 'normal' },
-      { value: 'SF Pro Display SemiBold', label: 'SemiBold', weight: 600, style: 'normal' },
-      { value: 'SF Pro Display Bold',     label: 'Bold',     weight: 700, style: 'normal' },
-    ],
-  },
-  {
-    value: 'IvyOra Text',
-    label: 'IvyOra Text',
-    family: "'IvyOra Text', Georgia, serif",
-    variants: [
-      { value: 'IvyOra Text Medium',        label: 'Medium',        weight: 500, style: 'normal' },
-      { value: 'IvyOra Text Medium Italic', label: 'Medium Italic', weight: 500, style: 'italic' },
-    ],
-  },
-  {
-    value: 'Bebas Neue',
-    label: 'Bebas Neue',
-    family: "'Bebas Neue', sans-serif",
-    variants: [
-      { value: 'Bebas Neue', label: 'Regular', weight: 400, style: 'normal' },
-    ],
-  },
-  {
-    value: 'Montserrat',
-    label: 'Montserrat',
-    family: "'Montserrat', sans-serif",
-    variants: [
-      { value: 'Montserrat', label: 'SemiBold', weight: 600, style: 'normal' },
-    ],
-  },
-];
-
-// Derive family + variant from an ElementFont value
-function splitElementFont(font: ElementFont | undefined): { family: FontFamily | null; variant: ElementFont | null } {
-  if (!font) return { family: null, variant: null };
-  for (const fam of FONT_FAMILIES) {
-    if (fam.variants.some((v) => v.value === font)) {
-      return { family: fam.value, variant: font };
-    }
-  }
-  return { family: null, variant: null };
-}
-
-interface ElementFontPickerProps {
-  value: ElementFont | undefined;
-  onChange: (v: ElementFont | undefined) => void;
-}
-
-function ElementFontPicker({ value, onChange }: ElementFontPickerProps) {
-  const { family: currentFamily, variant: currentVariant } = splitElementFont(value);
-  const selectedFam = FONT_FAMILIES.find((f) => f.value === currentFamily) ?? null;
-
-  const handleFamilyChange = (raw: string) => {
-    if (!raw) { onChange(undefined); return; }
-    const fam = FONT_FAMILIES.find((f) => f.value === raw);
-    if (!fam) return;
-    // Auto-select first variant (or keep current if same family)
-    const keep = fam.variants.find((v) => v.value === currentVariant);
-    onChange((keep ?? fam.variants[0]).value);
-  };
-
-  const handleVariantChange = (raw: string) => {
-    onChange(raw as ElementFont || undefined);
-  };
-
-  const selectCls = 'w-full px-2 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-xs focus:outline-none focus:border-black/30 dark:focus:border-white/30 cursor-pointer';
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      {/* Família */}
-      <select value={currentFamily ?? ''} onChange={(e) => handleFamilyChange(e.target.value)} className={selectCls}
-        style={{ fontFamily: selectedFam?.family }}>
-        <option value="">Herdar global</option>
-        {FONT_FAMILIES.map((f) => (
-          <option key={f.value} value={f.value} style={{ fontFamily: f.family }}>{f.label}</option>
-        ))}
-      </select>
-
-      {/* Variante — só mostra se há família selecionada com mais de 1 opção */}
-      {selectedFam && selectedFam.variants.length > 1 && (
-        <select value={currentVariant ?? ''} onChange={(e) => handleVariantChange(e.target.value)} className={selectCls}
-          style={{ fontFamily: selectedFam.family, fontWeight: selectedFam.variants.find((v) => v.value === currentVariant)?.weight, fontStyle: selectedFam.variants.find((v) => v.value === currentVariant)?.style }}>
-          {selectedFam.variants.map((v) => (
-            <option key={v.value} value={v.value} style={{ fontWeight: v.weight, fontStyle: v.style }}>{v.label}</option>
-          ))}
-        </select>
-      )}
-    </div>
-  );
-}
-
-// ── WordHighlightPicker ──────────────────────────────────────────────────────
-
-// Each token = one word occurrence with its position index in the original text
-interface Token { word: string; idx: number }
-
-function tokenizeAll(text: string): Token[] {
-  const tokens: Token[] = [];
-  let idx = 0;
-  for (const match of (text || '').matchAll(/\S+/g)) {
-    tokens.push({ word: match[0], idx });
-    idx++;
-  }
-  return tokens;
-}
-
-// A highlight keyed by word index so each occurrence is independent
-interface IndexedHighlight extends TextHighlight {
-  wordIdx: number; // which occurrence (0-based) of this word in the text
-}
-
-// Convert flat TextHighlight[] (stored in slide) to IndexedHighlight[]
-function toIndexed(text: string, highlights: TextHighlight[]): IndexedHighlight[] {
-  const tokens = tokenizeAll(text);
-  const result: IndexedHighlight[] = [];
-  // Count occurrences seen per normalised word
-  const seen: Record<string, number> = {};
-  for (const token of tokens) {
-    const lc = token.word.toLowerCase();
-    const occurrenceIdx = seen[lc] ?? 0;
-    seen[lc] = occurrenceIdx + 1;
-    const hl = highlights.find(
-      (h) => h.text.toLowerCase() === lc && (h as IndexedHighlight).wordIdx === occurrenceIdx
-    );
-    if (hl) result.push({ ...hl, wordIdx: occurrenceIdx });
-  }
-  return result;
-}
-
-// The stored highlights use wordIdx to distinguish occurrences of the same word
-function getHighlightForToken(highlights: TextHighlight[], word: string, wordIdx: number): TextHighlight | undefined {
-  return highlights.find(
-    (h) => h.text.toLowerCase() === word.toLowerCase() && (h as IndexedHighlight).wordIdx === wordIdx
-  );
-}
-
-interface WordHighlightPickerProps {
-  label: string;
-  text: string;
-  highlights: TextHighlight[];
-  onChange: (highlights: TextHighlight[]) => void;
-  accentColor: string;
-}
-
-function WordHighlightPicker({ label, text, highlights, onChange, accentColor }: WordHighlightPickerProps) {
-  // Selection = set of "word::idx" strings
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [pendingColor, setPendingColor] = useState(accentColor);
-  const [pendingFont, setPendingFont] = useState<ElementFont | undefined>(undefined);
-  const [pendingUnderline, setPendingUnderline] = useState(false);
-
-  const tokens = tokenizeAll(text);
-
-  // Track occurrence index per word
-  const tokensWithIdx: Array<{ word: string; wordIdx: number; tokenIdx: number }> = (() => {
-    const seen: Record<string, number> = {};
-    return tokens.map((t, i) => {
-      const lc = t.word.toLowerCase();
-      const wordIdx = seen[lc] ?? 0;
-      seen[lc] = wordIdx + 1;
-      return { word: t.word, wordIdx, tokenIdx: i };
-    });
-  })();
-
-  const selKey = (word: string, wordIdx: number) => `${word.toLowerCase()}::${wordIdx}`;
-
-  // Aplica o estilo às palavras do conjunto imediatamente — o preview do slide
-  // atualiza ao vivo conforme o usuário mexe em cor/fonte/sublinhado.
-  const applyLive = (sel: Set<string>, color: string, font: ElementFont | undefined, underline: boolean) => {
-    if (sel.size === 0) return;
-    const next = highlights.filter((h) => {
-      const ih = h as IndexedHighlight;
-      return !sel.has(selKey(h.text, ih.wordIdx ?? 0));
-    });
-    sel.forEach((key) => {
-      const [word, idxStr] = key.split('::');
-      next.push({
-        text: word,
-        color,
-        underline,
-        font,
-        wordIdx: parseInt(idxStr, 10),
-      } as IndexedHighlight);
-    });
-    onChange(next);
-  };
-
-  const toggleToken = (word: string, wordIdx: number) => {
-    const key = selKey(word, wordIdx);
-    const next = new Set(selected);
-    if (next.has(key)) {
-      next.delete(key);
-      setSelected(next);
-      return;
-    }
-    next.add(key);
-    const existing = getHighlightForToken(highlights, word, wordIdx);
-    let color = pendingColor;
-    let font = pendingFont;
-    let underline = pendingUnderline;
-    if (existing) {
-      color = existing.color;
-      font = existing.font;
-      underline = existing.underline ?? false;
-      setPendingColor(color);
-      setPendingFont(font);
-      setPendingUnderline(underline);
-    }
-    setSelected(next);
-    // Palavra recém-selecionada já ganha o destaque na hora
-    applyLive(new Set([key]), color, font, underline);
-  };
-
-  const changeColor = (c: string) => {
-    setPendingColor(c);
-    applyLive(selected, c, pendingFont, pendingUnderline);
-  };
-
-  const changeFont = (f: ElementFont | undefined) => {
-    setPendingFont(f);
-    applyLive(selected, pendingColor, f, pendingUnderline);
-  };
-
-  const toggleUnderline = () => {
-    const v = !pendingUnderline;
-    setPendingUnderline(v);
-    applyLive(selected, pendingColor, pendingFont, v);
-  };
-
-  const removeSelected = () => {
-    if (selected.size === 0) return;
-    onChange(highlights.filter((h) => {
-      const ih = h as IndexedHighlight;
-      return !selected.has(selKey(h.text, ih.wordIdx ?? 0));
-    }));
-    setSelected(new Set());
-  };
-
-  if (tokensWithIdx.length === 0) return null;
-
-  const hasSelection = selected.size > 0;
-
-  return (
-    <div>
-      <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] block mb-2">{label}</span>
-
-      {/* Word chips */}
-      <div className="flex flex-wrap gap-1 mb-2">
-        {tokensWithIdx.map(({ word, wordIdx, tokenIdx }) => {
-          const hl = getHighlightForToken(highlights, word, wordIdx);
-          const key = selKey(word, wordIdx);
-          const isSelected = selected.has(key);
-          return (
-            <button
-              key={tokenIdx}
-              onClick={() => toggleToken(word, wordIdx)}
-              className={cn(
-                'px-2 py-0.5 rounded-lg text-[10px] border transition-all font-medium',
-                isSelected
-                  ? 'border-blue-500/60 bg-blue-500/15 text-blue-500 dark:text-blue-400'
-                  : 'border-black/[0.07] dark:border-white/[0.07] text-gray-900/50 dark:text-white/40 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white bg-[var(--surface-elevated)]'
-              )}
-              style={hl && !isSelected ? { borderColor: hl.color + '80', backgroundColor: hl.color + '15', color: hl.color } : {}}
-            >
-              {word}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Options panel */}
-      {hasSelection && (
-        <div className="rounded-xl border border-black/[0.07] dark:border-white/[0.07] p-3 flex flex-col gap-2.5 bg-[var(--surface-elevated)]">
-          <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35">
-            {selected.size} palavra{selected.size > 1 ? 's' : ''} selecionada{selected.size > 1 ? 's' : ''}
-          </span>
-          <ColorPicker label="Cor" value={pendingColor} onChange={changeColor} />
-          <div>
-            <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] block mb-1.5">Fonte</span>
-            <ElementFontPicker value={pendingFont} onChange={changeFont} />
-          </div>
-          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-            <div onClick={toggleUnderline}
-              className={cn('w-8 h-4 rounded-full relative transition-colors shrink-0', pendingUnderline ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-              <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all', pendingUnderline ? 'left-[18px]' : 'left-0.5')} />
-            </div>
-            <span className="text-[10px] text-gray-900/50 dark:text-white/40">Sublinhado</span>
-          </label>
-          <div className="flex gap-2">
-            <button onClick={() => setSelected(new Set())}
-              className="flex-1 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-bold transition-colors hover:bg-gray-700 dark:hover:bg-white/90">
-              Concluir
-            </button>
-            <button onClick={removeSelected}
-              className="px-3 py-2 rounded-xl border border-red-400/30 text-red-400/60 hover:text-red-400 hover:border-red-400/60 text-[10px] font-medium transition-colors">
-              Remover
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Active highlights list */}
-      {highlights.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {highlights.map((hl, i) => (
-            <div key={i} className="flex items-center gap-1 px-1.5 py-1 rounded-lg border text-[9px] font-medium"
-              style={{ borderColor: hl.color + '50', background: hl.color + '12' }}>
-              <span style={{ color: hl.color }}>{hl.text}</span>
-              <button onClick={() => onChange(highlights.filter((_, j) => j !== i))}
-                className="text-gray-900/30 dark:text-white/30 hover:text-red-400 transition-colors ml-0.5">
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ColorPicker({ label, value, onChange, className }: ColorPickerProps) {
-  const [hex, setHex] = useState(value);
-  useEffect(() => { setHex(value); }, [value]);
-
-  const handleHex = (raw: string) => {
-    setHex(raw);
-    if (/^#[0-9A-Fa-f]{6}$/.test(raw)) onChange(raw);
-  };
-
-  const validHex = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : value;
-
-  return (
-    <div className={cn('flex items-center gap-2', className)}>
-      {label && (
-        <span className="text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em] shrink-0">
-          {label}
-        </span>
-      )}
-      <label className="relative shrink-0 cursor-pointer group">
-        <span
-          className="block w-7 h-7 rounded-lg border border-black/10 dark:border-white/10 shadow-sm group-hover:scale-105 transition-transform"
-          style={{ background: validHex }}
-        />
-        <input
-          type="color"
-          value={validHex}
-          onChange={(e) => { onChange(e.target.value); setHex(e.target.value); }}
-          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-        />
-      </label>
-      <input
-        type="text"
-        value={hex}
-        onChange={(e) => handleHex(e.target.value)}
-        className="w-[76px] px-2 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[10px] font-mono focus:outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
-        placeholder="#000000"
-        maxLength={7}
-      />
-    </div>
-  );
-}
+import {
+  DEFAULT_CORNERS,
+  DEFAULT_IMAGE_POSITION,
+  Slide,
+  Template01SlideControl,
+  Template01SlotStyle,
+  TextPosition,
+} from '@/types';
+import {
+  TEMPLATE_01_DEFAULT_CORNERS,
+  template01ImageSlot,
+  template01SlideImageUrl,
+  template01ModelOf,
+  template01SlideMedia,
+  template01SpecBackground,
+  template01SlotDefaults,
+  template01SlotFontName,
+  template01SlotColor,
+  template01SlotsForSlide,
+} from '@/lib/templates/template-01';
+import { template01ClearImage, template01SetImage } from '@/lib/templates/template-01/image';
+import { markTemplate01Override } from '@/lib/templates/template-01/overrides';
+import {
+  TEMPLATE_02_DEFAULT_HEADER,
+  template02HeaderSlotsForModel,
+  template02ImageSlot,
+  template02ModelOf,
+  template02SlotColor,
+  template02SlotDefaults,
+  template02SlotFontName,
+  template02TextSlotsForModel,
+  template02Background,
+  TEMPLATE_02_HIGHLIGHT_COLOR,
+} from '@/lib/templates/template-02';
+import { template02ClearImage, template02SetImage, template02SlideImageUrl } from '@/lib/templates/template-02/image';
+import {
+  Template02SlideControl,
+  markTemplate02Override,
+  template02SlideChanges,
+} from '@/lib/templates/template-02/overrides';
 
 interface EditorSidebarProps {
   onOpenWizard: () => void;
@@ -546,627 +84,1212 @@ const TEXT_POSITIONS: TextPosition[] = [
   'bottom-left', 'bottom-center', 'bottom-right',
 ];
 
+/** Toggle reaproveitado pelos painéis — era copiado em quatro lugares. */
+function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className="flex items-center gap-2 cursor-pointer select-none"
+    >
+      <div
+        className={cn(
+          'w-8 h-4 rounded-full relative transition-colors shrink-0',
+          on ? 'bg-[var(--accent)]' : 'bg-black/10 dark:bg-white/10'
+        )}
+      >
+        <div
+          className={cn(
+            'absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all',
+            on ? 'left-[18px]' : 'left-0.5'
+          )}
+        />
+      </div>
+      <span className="text-[12px] text-[var(--ink-dim)]">{label}</span>
+    </button>
+  );
+}
+
+/** Botão quadrado de sublinhado — idem. */
+function UnderlineToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      title="Sublinhado"
+      className={cn(
+        'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
+        on
+          ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+          : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-dim)] hover:border-[var(--ink)] hover:text-[var(--ink)]'
+      )}
+    >
+      <Underline className="w-3 h-3" />
+    </button>
+  );
+}
+
+function DropZone({ label, onClick, onFile }: { label: string; onClick: () => void; onFile: (f: File) => void }) {
+  return (
+    <div
+      className="border-2 border-dashed border-[var(--line-strong)] rounded-xl p-4 text-center cursor-pointer hover:border-[var(--ink)] hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
+      onClick={onClick}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files[0];
+        if (f?.type.startsWith('image/')) onFile(f);
+      }}
+    >
+      <Upload className="w-4 h-4 mx-auto mb-1.5 text-[var(--ink-muted)] group-hover:text-[var(--ink-dim)] transition-colors" />
+      <span className="text-[11px] text-[var(--ink-muted)] font-medium">{label}</span>
+    </div>
+  );
+}
+
 export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: EditorSidebarProps) {
   const {
     slides, activeSlideIndex, style, globalSettings,
-    updateActiveSlide, updateGlobalSettings, updateCornersConfig,
+    updateActiveSlide, updateSlide, updateGlobalSettings, updateCornersConfig,
   } = useEditorStore();
 
   const slide = slides[activeSlideIndex];
   const { corners, profileBadge, accentColor, theme } = globalSettings;
+  const [pairTitleFontName = 'SF Pro Display', pairBodyFontName = 'IvyOra Text'] =
+    globalSettings.fontPair.split(' + ');
+  // O template de perfil desenha em SF Pro independentemente do par global.
+  const defaultTitleFontName = style === 'profile' ? 'SF Pro Display' : pairTitleFontName;
+  const defaultBodyFontName = style === 'profile' ? 'SF Pro Display' : pairBodyFontName;
 
   const bgImageRef = useRef<HTMLInputElement>(null);
-  const gridImageRef = useRef<HTMLInputElement>(null);
   const contentImageRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
+  const t01ImageRef = useRef<HTMLInputElement>(null);
+  const t02ImageRef = useRef<HTMLInputElement>(null);
 
   const { generateAll, generateOne, generating, progress } = useGenerateCarouselImages();
 
   if (!slide) return null;
 
-  // Capa do Editorial (layout 'cover'): não tem shape de imagem de conteúdo —
-  // a imagem da capa vai no fundo do slide.
   const isEditorialCover = isEditorialCoverSlide(style, slide, activeSlideIndex);
-  // Quantos slides recebem imagem de conteúdo no "gerar para todos" (capa fora)
+  /**
+   * A imagem de fundo deste slide de fato PINTA alguma coisa?
+   *
+   * No Editorial só a capa usa fundo de imagem desde a F4 — nos internos a
+   * imagem mora no card. Nos demais estilos que têm a aba (o Minimalista) o
+   * fundo continua valendo em qualquer slide.
+   */
+  const bgImageIsLive = style !== 'editorial' || isEditorialCover;
   const contentSlidesCount = slides.filter((s, i) => !isEditorialCoverSlide(style, s, i)).length;
 
-  const handleImageFile = async (file: File) => {
+  // ── TEMPLATE 1 ────────────────────────────────────────────────────────────
+  // Tudo do template segue o MODELO do slide, nunca a posição: com modelo
+  // repetido ou deck maior que 6, a posição mostraria os campos de outro slide.
+  const isT01 = style === 'template01';
+  const t01Model = isT01 ? template01ModelOf(slide, activeSlideIndex) : null;
+  const t01Media = t01Model != null ? template01SlideMedia(t01Model) : { background: false, content: false };
+  const t01ImageSlot = t01Model != null ? template01ImageSlot(t01Model) : undefined;
+  const t01ImageUrl = t01Model != null ? template01SlideImageUrl(slide, t01Model) : '';
+
+  // Fundo: sem a MARCA o slide segue o spec, então o seletor tem de abrir na cor
+  // de fábrica daquele modelo (o 6 em `#0D39E4`) — nunca num padrão do editor,
+  // que mostraria uma cor que não é a que está na tela.
+  const t01SpecBg = t01Model != null ? template01SpecBackground(t01Model) : undefined;
+  const t01BgValue =
+    slide.templateOverrides?.background && slide.backgroundColor
+      ? slide.backgroundColor
+      : t01SpecBg?.swatch ?? '#111111';
+
+  // ── TEMPLATE 2 ────────────────────────────────────────────────────────────
+  // Mesma regra do T1: tudo segue o MODELO do slide, nunca a posição. Aqui isso
+  // pesa ainda mais — o deck do T2 não tem tamanho fixo.
+  const isT02 = style === 'template02';
+  const t02Model = isT02 ? template02ModelOf(slide, activeSlideIndex) : null;
+  const t02ImageUrl = t02Model != null ? template02SlideImageUrl(slide, t02Model) : '';
+  // A capa tem imagem de FUNDO full-bleed; os internos, o bloco de 380x1089.
+  const t02IsCover = t02Model === 1;
+  const t02TextSlots = t02Model != null ? template02TextSlotsForModel(t02Model) : [];
+  const t02HeaderSlots = t02Model != null ? template02HeaderSlotsForModel(t02Model) : [];
+
+  const ctx: PanelContext = {
+    style,
+    slide,
+    activeSlideIndex,
+    globalSettings,
+    template01Model: t01Model,
+    template02Model: t02Model,
+    isEditorialCover,
+  };
+
+  /* ── Uploads ─────────────────────────────────────────────────────────── */
+  const upload = async (file: File, apply: (url: string) => void, bucket = 'slide-images') => {
     const toastId = toast.loading('Enviando imagem…');
     try {
-      const url = await uploadImageFile(file, 'slide-images');
-      // Sync both fields so templates that read either one (editorial prefers
-      // gridImageUrl, minimalist switches on imageType) stay consistent.
-      updateActiveSlide({ backgroundImageUrl: url, gridImageUrl: url });
+      apply(await uploadImageFile(file, bucket));
       toast.success('Imagem adicionada', { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
     }
   };
 
-  // Imagem de conteúdo (entre os textos) — distinta do fundo do slide.
-  const handleContentImageFile = async (file: File) => {
-    const toastId = toast.loading('Enviando imagem…');
-    try {
-      const url = await uploadImageFile(file, 'slide-images');
-      updateActiveSlide({ contentImageUrl: url });
-      toast.success('Imagem adicionada', { id: toastId });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
-    }
-  };
+  // Fundo do slide: mantém os dois campos em sincronia porque cada template lê
+  // um deles (editorial prefere gridImageUrl, minimalist decide por imageType).
+  const handleBackgroundFile = (f: File) =>
+    upload(f, (url) =>
+      updateActiveSlide({
+        backgroundImageUrl: url,
+        gridImageUrl: url,
+        imagePosition: { ...DEFAULT_IMAGE_POSITION },
+      })
+    );
+  const handleContentFile = (f: File) =>
+    upload(f, (url) =>
+      updateActiveSlide({
+        contentImageUrl: url,
+        contentImagePosition: { ...DEFAULT_IMAGE_POSITION },
+      })
+    );
+  const handleT01File = (f: File) =>
+    upload(f, (url) => t01Model != null && updateActiveSlide(template01SetImage(slide, t01Model, url)));
+  // Upload, IA e remoção escrevem no MESMO lugar (o slot) — ver
+  // `lib/templates/template-02/image.ts`.
+  const handleT02File = (f: File) =>
+    upload(f, (url) => t02Model != null && updateActiveSlide(template02SetImage(slide, t02Model, url)));
 
-  const labelCls = 'text-[9px] font-semibold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.08em]';
-  const inputCls = 'w-full px-3 py-2 rounded-xl bg-[var(--surface-elevated)] border border-black/[0.07] dark:border-white/[0.07] text-gray-900 dark:text-white text-[11px] placeholder-black/20 dark:placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-black/[0.06] dark:focus:ring-white/[0.06] focus:border-black/20 dark:focus:border-white/20 transition-all';
-
-  /* ─────────────────────────────────────────────────────────────────────────
-     Hidden file inputs (used by both modes)
-  ───────────────────────────────────────────────────────────────────────── */
   const fileInputs = (
     <>
       <input ref={bgImageRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
-      <input ref={gridImageRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
+        onChange={(e) => e.target.files?.[0] && handleBackgroundFile(e.target.files[0])} />
       <input ref={contentImageRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleContentImageFile(e.target.files[0])} />
+        onChange={(e) => e.target.files?.[0] && handleContentFile(e.target.files[0])} />
+      <input ref={t01ImageRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT01File(f); e.target.value = ''; }} />
+      <input ref={t02ImageRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT02File(f); e.target.value = ''; }} />
       <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
-          const toastId = toast.loading('Enviando foto…');
-          try {
-            const url = await uploadImageFile(f, 'profile-photos');
-            updateGlobalSettings({ profileBadge: { ...profileBadge, photo: url } });
-            toast.success('Foto atualizada', { id: toastId });
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });
-          }
-        }} />
+        onChange={(e) => e.target.files?.[0] && upload(
+          e.target.files[0],
+          (url) => updateGlobalSettings({ profileBadge: { ...profileBadge, photo: url } }),
+          'profile-photos'
+        )} />
     </>
   );
 
-  return (
-    <div className="w-[272px] shrink-0 bg-[var(--surface)] border-r border-black/[0.05] dark:border-white/[0.05] flex flex-col h-full overflow-hidden">
-      {fileInputs}
+  /* ── Escritas do TEMPLATE 1 ──────────────────────────────────────────────
+     Cada handler MARCA o controle em `templateOverrides`. É a marca — nunca o
+     valor — que faz o override existir: o carrossel gerado não tem nenhuma, e
+     por isso nasce idêntico ao spec.
+  ─────────────────────────────────────────────────────────────────────────── */
+  const setT01 = (patch: Partial<Slide>, ...keys: Template01SlideControl[]) =>
+    updateActiveSlide({ ...patch, templateOverrides: markTemplate01Override(slide.templateOverrides, ...keys) });
 
-      {/* Theme toggle — only for profile (Twitter) style */}
-      {style === 'profile' && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.05] dark:border-white/[0.05]">
-          <span className={labelCls}>Tema do slide</span>
-          <div className="flex rounded-lg overflow-hidden bg-black/[0.05] dark:bg-white/[0.05] p-0.5 gap-0.5">
-            <button
-              onClick={() => updateGlobalSettings({ theme: 'dark' })}
-              className={cn('px-3 py-1 text-[9px] font-semibold rounded-md transition-all', theme === 'dark' ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900/70 dark:hover:text-white/70')}
-            >
-              Escuro
-            </button>
-            <button
-              onClick={() => updateGlobalSettings({ theme: 'light' })}
-              className={cn('px-3 py-1 text-[9px] font-semibold rounded-md transition-all', theme === 'light' ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'text-gray-900/40 dark:text-white/40 hover:text-gray-900/70 dark:hover:text-white/70')}
-            >
-              Claro
-            </button>
+  /** Estilo de UM slot. A chave existir já é o gesto do usuário — sem marca. */
+  const setT01Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
+    updateActiveSlide({
+      templateSlotStyles: {
+        ...(slide.templateSlotStyles ?? {}),
+        [slot]: { ...(slide.templateSlotStyles?.[slot] ?? {}), ...patch },
+      },
+    });
+
+  /**
+   * Texto de canto/cabeçalho — grava em TODOS os slides do deck.
+   *
+   * O canto é a assinatura do carrossel (marca e @), não conteúdo do slide: ele
+   * aparece igual nos seis, e editar num slide só produzia um deck com
+   * assinaturas diferentes por página — que ninguém quer e ninguém percebe
+   * enquanto não exporta.
+   *
+   * Pedido do Rafael, com estas palavras: "o texto do canto tem que ser editado
+   * em todos os slides".
+   *
+   * 🔸 Só o TEXTO é do deck. Cor e visibilidade continuam por slide de
+   * propósito: o mesmo canto precisa de cor diferente sobre um slide claro e um
+   * escuro, e há slide em que ele atrapalha a composição.
+   */
+  const setDeckSlotText = (slot: string, value: string) =>
+    slides.forEach((s, i) =>
+      updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [slot]: value } })
+    );
+
+  const setT01CornerText = (slot: string, value: string) => setDeckSlotText(slot, value);
+
+  /* ── Escritas do TEMPLATE 2 ─────────────────────────────────────────────
+     Mesma disciplina do T1: o handler MARCA o controle em `templateOverrides`,
+     e é a marca — nunca o valor — que faz o override existir. Deck gerado não
+     tem nenhuma, e por isso nasce idêntico ao spec.
+  ────────────────────────────────────────────────────────────────────────── */
+  const setT02 = (patch: Partial<Slide>, ...keys: Template02SlideControl[]) =>
+    updateActiveSlide({ ...patch, templateOverrides: markTemplate02Override(slide.templateOverrides, ...keys) });
+
+  /** Estilo de UM slot. A chave existir já é o gesto do usuário — sem marca. */
+  const setT02Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
+    updateActiveSlide({
+      templateSlotStyles: {
+        ...(slide.templateSlotStyles ?? {}),
+        [slot]: { ...(slide.templateSlotStyles?.[slot] ?? {}), ...patch },
+      },
+    });
+
+  /** Mesma regra do T1: a categoria e o @ valem para o deck inteiro. */
+  const setT02HeaderText = (slot: string, value: string) => setDeckSlotText(slot, value);
+
+  const setHeaderStyles = (slots: string[], patch: Partial<Template01SlotStyle>) => {
+    const next = { ...(slide.templateSlotStyles ?? {}) };
+    for (const slot of slots) next[slot] = { ...(next[slot] ?? {}), ...patch };
+    updateActiveSlide({ templateSlotStyles: next });
+  };
+
+  const setTemplateCornerStyle = (
+    patch: Partial<NonNullable<typeof globalSettings.templateCornerStyle>>
+  ) =>
+    updateGlobalSettings({
+      templateCornerStyle: { ...(globalSettings.templateCornerStyle ?? {}), ...patch },
+    });
+
+  const withContentImagePosition = (patch: Partial<typeof DEFAULT_IMAGE_POSITION>) => ({
+    ...DEFAULT_IMAGE_POSITION,
+    ...(slide.contentImagePosition ?? {}),
+    ...patch,
+  });
+
+  const t01TextSlots = t01Model != null
+    ? template01SlotsForSlide(t01Model).filter((d) => d.kind === 'text' && !d.slot.startsWith('cantos.'))
+    : [];
+  const t01CornerSlots = t01Model != null
+    ? template01SlotsForSlide(t01Model).filter((d) => d.slot.startsWith('cantos.'))
+    : [];
+
+  // Vale para os DOIS templates: os campos são os mesmos (`templateOverrides` +
+  // `templateSlotStyles`), então o botão "Restaurar" conta igual nos dois.
+  const templateSlideChanges = template02SlideChanges(slide);
+  const t01CornerSlotNames = t01CornerSlots.map((d) => d.slot);
+  const t02HeaderSlotNames = t02HeaderSlots.map((d) => d.slot);
+  const t01HasVisibility = t01CornerSlotNames.some(
+    (slot) => slide.templateSlotStyles?.[slot]?.visible != null
+  );
+  const t01HeaderVisible = t01HasVisibility
+    ? t01CornerSlotNames.every((slot) => slide.templateSlotStyles?.[slot]?.visible !== false)
+    : corners.show !== false;
+  const t02HeaderVisible = t02HeaderSlotNames.every(
+    (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
+  );
+  const t01HeaderStyle = {
+    ...(slide.templateSlotStyles?.[t01CornerSlotNames[0]] ?? {}),
+    ...(globalSettings.templateCornerStyle ?? {}),
+  };
+  const t02HeaderStyle = {
+    ...(slide.templateSlotStyles?.[t02HeaderSlotNames[0]] ?? {}),
+    ...(globalSettings.templateCornerStyle ?? {}),
+  };
+
+  /* ── Conteúdo de cada painel ─────────────────────────────────────────── */
+  const content: Record<PanelId, ReactNode> = {
+    perfil: (
+      <>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-10 h-10 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden cursor-pointer border border-[var(--line-strong)] shrink-0"
+            onClick={() => profilePhotoRef.current?.click()}
+            title="Clique para trocar a foto"
+          >
+            {profileBadge.photo
+              ? <img src={profileBadge.photo} alt="" className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center text-[var(--ink-muted)] text-[9px]">foto</div>}
+          </div>
+          <div className="flex-1 flex flex-col gap-1">
+            <input className={inputCls} placeholder="Nome" value={profileBadge.name}
+              onChange={(e) => updateGlobalSettings({ profileBadge: { ...profileBadge, name: e.target.value } })} />
+            <input className={inputCls} placeholder="@handle" value={profileBadge.handle}
+              onChange={(e) => updateGlobalSettings({ profileBadge: { ...profileBadge, handle: e.target.value } })} />
           </div>
         </div>
-      )}
+        <Slider label="Tamanho nome/handle" value={profileBadge.headerFontSize ?? 26} min={14} max={60} unit="px"
+          onChange={(v) => updateGlobalSettings({ profileBadge: { ...profileBadge, headerFontSize: v } })} />
+      </>
+    ),
 
-      {/* ── SCROLLABLE CONTENT ── */}
-      <div className="flex-1 overflow-y-auto">
+    tema: (
+      <div className="flex rounded-lg overflow-hidden bg-black/[0.05] dark:bg-white/[0.05] p-0.5 gap-0.5">
+        {(['dark', 'light'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => updateGlobalSettings({ theme: t })}
+            className={cn(
+              'flex-1 px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all',
+              theme === t
+                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                : 'text-[var(--ink-dim)] hover:text-[var(--ink-2)]'
+            )}
+          >
+            {t === 'dark' ? 'Escuro' : 'Claro'}
+          </button>
+        ))}
+      </div>
+    ),
 
-        {style === 'profile' ? (
-          /* ══════════════════════════════════
-             PROFILE SIDEBAR — focused & clean
-             ══════════════════════════════════ */
+    conteudoSlide: isT01 ? (
+      <Template01Slots />
+    ) : isT02 ? (
+      <Template02Slots />
+    ) : (
+      // profile: título + corpo, sem os controles de forma dos outros estilos.
+      <>
+        <div>
+          <span className={labelCls}>Conteúdo</span>
+          <input className={cn(inputCls, 'mt-1')} value={slide.title}
+            onChange={(e) => updateActiveSlide({ title: e.target.value })}
+            placeholder="Título / primeiro parágrafo" />
+        </div>
+        <textarea
+          className={cn(inputCls, 'resize-none overflow-hidden')}
+          style={{ minHeight: 80 }}
+          value={slide.description || ''}
+          onChange={(e) => {
+            updateActiveSlide({ description: e.target.value });
+            e.target.style.height = 'auto';
+            e.target.style.height = `${e.target.scrollHeight}px`;
+          }}
+          placeholder="Continua o raciocínio..."
+        />
+        <Slider label="Tamanho do texto" value={slide.fontSize.title} min={16} max={80} unit="px"
+          onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })} />
+        <Slider label="Espaçamento de linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
+          onChange={(v) => updateActiveSlide({ lineHeight: v })} />
+        <Slider label="Espaço título → descrição" value={slide.titleDescriptionGap ?? 16} min={0} max={80} unit="px"
+          onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })} />
+      </>
+    ),
+
+    /* Um painel de imagem por slide, com upload, IA e ajustes juntos. Antes o
+       upload e a geração viviam em painéis diferentes, gravando em campos
+       diferentes, e um vencia o outro no render sem avisar ninguém. */
+    imagem: isT02 ? (
+      <>
+        <DropZone
+          label={t02ImageUrl ? 'Trocar imagem' : 'Clique ou arraste'}
+          onClick={() => t02ImageRef.current?.click()}
+          onFile={handleT02File}
+        />
+        <AiGenPanel
+          // A key precisa do índice: prompt e referência são estado local, e
+          // sem remontar ao trocar de slide o texto do slide 1 gera o slide 2.
+          key={`t02-img-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          onGenerate={(opts) => generateOne(activeSlideIndex, t02IsCover ? 'background' : 'content', opts)}
+        />
+        {t02ImageUrl && (
           <>
-            {/* 1. Perfil */}
-            <Section title="Perfil" defaultOpen>
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-10 h-10 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden cursor-pointer border border-black/10 dark:border-white/10 shrink-0"
-                  onClick={() => profilePhotoRef.current?.click()}
-                  title="Clique para trocar a foto"
-                >
-                  {profileBadge.photo
-                    ? <img src={profileBadge.photo} alt="" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-gray-900/20 dark:text-white/20 text-[8px]">foto</div>}
-                </div>
-                <div className="flex-1 flex flex-col gap-1">
-                  <input
-                    className={inputCls}
-                    placeholder="Nome"
-                    value={profileBadge.name}
-                    onChange={(e) => updateGlobalSettings({ profileBadge: { ...profileBadge, name: e.target.value } })}
-                  />
-                  <input
-                    className={inputCls}
-                    placeholder="@handle"
-                    value={profileBadge.handle}
-                    onChange={(e) => updateGlobalSettings({ profileBadge: { ...profileBadge, handle: e.target.value } })}
-                  />
-                </div>
-              </div>
-              <Slider
-                label="Tamanho nome/handle"
-                value={profileBadge.headerFontSize ?? 26}
-                min={14}
-                max={60}
-                onChange={(v) => updateGlobalSettings({ profileBadge: { ...profileBadge, headerFontSize: v } })}
-                unit="px"
-              />
-            </Section>
-
-            {/* 2. Texto */}
-            <Section title={`Texto — Slide ${activeSlideIndex + 1}`} defaultOpen>
-              <div>
-                <span className={labelCls}>Conteúdo</span>
-                <input
-                  className={cn(inputCls, 'mt-1')}
-                  value={slide.title}
-                  onChange={(e) => updateActiveSlide({ title: e.target.value })}
-                  placeholder="Título / primeiro parágrafo"
-                />
-              </div>
-              <div className="mt-1">
-                <textarea
-                  className={cn(inputCls, 'resize-none overflow-hidden')}
-                  style={{ minHeight: 80 }}
-                  value={slide.description || ''}
-                  onChange={(e) => {
-                    updateActiveSlide({ description: e.target.value });
-                    const el = e.target;
-                    el.style.height = 'auto';
-                    el.style.height = `${el.scrollHeight}px`;
-                  }}
-                  ref={(el) => {
-                    if (el) {
-                      el.style.height = 'auto';
-                      el.style.height = `${el.scrollHeight}px`;
-                    }
-                  }}
-                  placeholder="Continua o raciocínio..."
-                />
-              </div>
-              <Slider
-                label="Tamanho do texto"
-                value={slide.fontSize.title}
-                min={16}
-                max={80}
-                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })}
-                unit="px"
-              />
-              <Slider
-                label="Espaçamento de linhas"
-                value={slide.lineHeight}
-                min={1.0}
-                max={2.5}
-                step={0.1}
-                onChange={(v) => updateActiveSlide({ lineHeight: v })}
-              />
-              <Slider
-                label="Espaço título → descrição"
-                value={slide.titleDescriptionGap ?? 16}
-                min={0}
-                max={80}
-                step={1}
-                onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
-                unit="px"
-              />
-            </Section>
-
-            {/* 3. Mídia */}
-            <Section title="Imagem / Vídeo">
-              {/* Image upload */}
-              <div
-                className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
-                onClick={() => bgImageRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const f = e.dataTransfer.files[0];
-                  if (f?.type.startsWith('image/')) handleImageFile(f);
-                }}
-              >
-                <Image className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
-                <span className="text-[10px] font-medium text-gray-900/35 dark:text-white/35">Arraste ou clique para adicionar</span>
-              </div>
-
-              {/* AI image generation — painel expansível */}
-              <div className="flex flex-col gap-1.5 pt-1">
-                <AiGenPanel
-                  key={`profile-bg-${activeSlideIndex}`}
-                  buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
-                  generating={generating}
-                  slideTitle={slide.title}
-                  slideDescription={slide.description || ''}
-                  onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
-                />
-                <button
-                  onClick={() => generateAll()}
-                  disabled={generating}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  {generating && progress.total > 1
-                    ? `Gerando ${progress.done}/${progress.total}…`
-                    : `Gerar para todos os ${slides.length} slides`}
-                </button>
-              </div>
-
-              {/* Miniatura da imagem anexada */}
-              {(slide.backgroundImageUrl || slide.gridImageUrl) && (
-                <ImageThumb
-                  url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
-                  onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })}
-                />
-              )}
-              {/* Position controls — only when media exists */}
-              {(slide.backgroundImageUrl || slide.gridImageUrl) && (
-                <>
-                  <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100}
-                    onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
-                  <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100}
-                    onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
-                  <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300}
-                    onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
-                </>
-              )}
-            </Section>
-
-          </>
-        ) : (
-          /* ════════════════════════════════
-             MINIMALIST SIDEBAR — full editor
-             ════════════════════════════════ */
-          <>
-            {/* IMAGEM — a capa do Editorial não tem shape de conteúdo */}
-            <Section title={`Conteúdo — Slide ${activeSlideIndex + 1}`} defaultOpen>
-              {!isEditorialCover && (
-              <Section title="Imagem" defaultOpen>
-                <div
-                  className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
-                  onClick={() => contentImageRef.current?.click()}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const f = e.dataTransfer.files[0];
-                    if (f) handleContentImageFile(f);
-                  }}
-                >
-                  <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
-                  <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste</span>
-                </div>
-                {/* AI image generation — painel expansível */}
-                <div className="flex flex-col gap-1.5">
-                  <AiGenPanel
-                    key={`content-${activeSlideIndex}`}
-                    buttonLabel={`Gerar imagem com IA (slide ${activeSlideIndex + 1})`}
-                    generating={generating}
-                    slideTitle={slide.title}
-                    slideDescription={slide.description || ''}
-                    onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
-                  />
-                  <button
-                    onClick={() => generateAll('content')}
-                    disabled={generating}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[10px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    {generating && progress.total > 1
-                      ? `Gerando ${progress.done}/${progress.total}…`
-                      : `Gerar para os ${contentSlidesCount} slides`}
-                  </button>
-                </div>
-
-                {slide.contentImageUrl && (
-                  <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
-                )}
-                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: v, y: slide.contentImagePosition?.y ?? 50, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
-                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: v, zoom: slide.contentImagePosition?.zoom ?? 100 } })} unit="%" />
-                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} onChange={(v) => updateActiveSlide({ contentImagePosition: { x: slide.contentImagePosition?.x ?? 50, y: slide.contentImagePosition?.y ?? 50, zoom: v, objectFit: slide.contentImagePosition?.objectFit } })} unit="%" />
-              </Section>
-              )}
-
-              <Section title="Sombra / Overlay">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <div
-                    onClick={() => updateActiveSlide({ shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } })}
-                    className={cn('w-8 h-4 rounded-full relative transition-colors', slide.shadow.style !== 'none' ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}
-                  >
-                    <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', slide.shadow.style !== 'none' ? 'left-[18px]' : 'left-0.5')} />
-                  </div>
-                  <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir sombra</span>
-                </label>
-                {slide.shadow.style !== 'none' && (
-                  <>
-                    <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} unit="%" />
-                    <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} unit="%" />
-                    <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} unit="%" />
-                    <ColorPicker
-                      label="Cor"
-                      value={slide.shadow.color || '#000000'}
-                      onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })}
-                    />
-                  </>
-                )}
-              </Section>
-
-              <Section title="Fundo do Slide" defaultOpen={isEditorialCover}>
-                <ColorPicker
-                  label="Cor"
-                  value={slide.backgroundColor || '#111111'}
-                  onChange={(v) => updateActiveSlide({ backgroundColor: v })}
-                />
-                <div
-                  className="border-2 border-dashed border-black/[0.1] dark:border-white/[0.1] rounded-xl p-4 text-center cursor-pointer hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all group"
-                  onClick={() => bgImageRef.current?.click()}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const f = e.dataTransfer.files[0];
-                    if (f) handleImageFile(f);
-                  }}
-                >
-                  <Upload className="w-4 h-4 mx-auto mb-1.5 text-gray-900/25 dark:text-white/25 group-hover:text-gray-900/40 dark:group-hover:text-white/40 transition-colors" />
-                  <span className="text-[10px] text-gray-900/35 dark:text-white/35 font-medium">Clique ou arraste uma imagem de fundo</span>
-                </div>
-                {isEditorialCover && (
-                  <AiGenPanel
-                    key={`cover-bg-${activeSlideIndex}`}
-                    buttonLabel="Gerar imagem com IA (capa)"
-                    generating={generating}
-                    slideTitle={slide.title}
-                    slideDescription={slide.description || ''}
-                    onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
-                  />
-                )}
-                {(slide.backgroundImageUrl || slide.gridImageUrl) && (
-                  <>
-                    <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''} onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
-                    <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} unit="%" />
-                    <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} unit="%" />
-                    <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} unit="%" />
-                    <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} unit="%" />
-                  </>
-                )}
-              </Section>
-            </Section>
-
-            {/* TEXTO */}
-            <Section title="Texto do Slide" defaultOpen>
-
-              {/* ── Título ── */}
-              <div>
-                <span className={labelCls}>Título</span>
-                <textarea
-                  className={cn(inputCls, 'mt-1 resize-none')}
-                  rows={3}
-                  value={slide.title}
-                  onChange={(e) => updateActiveSlide({ title: e.target.value })}
-                  placeholder="Título do slide"
-                />
-              </div>
-              <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160}
-                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })} unit="px" />
-              <div className="flex items-center gap-2 flex-wrap">
-                <ColorPicker value={slide.titleColor || '#FFFFFF'} onChange={(v) => updateActiveSlide({ titleColor: v })} label="Cor" />
-                <button
-                  onClick={() => updateActiveSlide({ titleUnderline: !slide.titleUnderline })}
-                  title="Sublinhado"
-                  className={cn(
-                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-                    slide.titleUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
-                  )}
-                >
-                  <Underline className="w-3 h-3" />
-                </button>
-              </div>
-              <div>
-                <span className={labelCls + ' block mb-1'}>Fonte título</span>
-                <ElementFontPicker
-                  value={slide.titleFont}
-                  onChange={(v) => updateActiveSlide({ titleFont: v })}
-                />
-              </div>
-
-              {/* ── Descrição ── */}
-              <div className="mt-2">
-                <span className={labelCls}>Descrição</span>
-                <textarea className={cn(inputCls, 'mt-1 resize-none h-16')} value={slide.description || ''}
-                  onChange={(e) => updateActiveSlide({ description: e.target.value })} placeholder="Descrição do slide" />
-              </div>
-              <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80}
-                onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, description: v } })} unit="px" />
-              <div className="flex items-center gap-2 flex-wrap">
-                <ColorPicker value={slide.descriptionColor || 'rgba(255,255,255,0.7)'} onChange={(v) => updateActiveSlide({ descriptionColor: v })} label="Cor" />
-                <button
-                  onClick={() => updateActiveSlide({ descriptionUnderline: !slide.descriptionUnderline })}
-                  title="Sublinhado"
-                  className={cn(
-                    'w-7 h-7 rounded border flex items-center justify-center transition-colors shrink-0',
-                    slide.descriptionUnderline
-                      ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
-                      : 'border-black/[0.07] dark:border-white/[0.07] bg-[var(--surface-elevated)] text-gray-900/40 dark:text-white/35 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
-                  )}
-                >
-                  <Underline className="w-3 h-3" />
-                </button>
-              </div>
-              <div>
-                <span className={labelCls + ' block mb-1'}>Fonte descrição</span>
-                <ElementFontPicker
-                  value={slide.descriptionFont}
-                  onChange={(v) => updateActiveSlide({ descriptionFont: v })}
-                />
-              </div>
-
-              {/* ── Espaçamento entre título e descrição ── */}
-              <Slider
-                label="Espaço título → descrição"
-                value={slide.titleDescriptionGap ?? 16}
-                min={0}
-                max={80}
-                step={1}
-                onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })}
-                unit="px"
-              />
-
-              {/* ── Espaçamento de letras (título) ── */}
-              <Slider
-                label="Espaçamento de letras (título)"
-                value={slide.titleLetterSpacing ?? -0.02}
-                min={-0.1}
-                max={0.3}
-                step={0.01}
-                onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })}
-                unit="em"
-              />
-
-              {/* ── Destaques título ── */}
-              <WordHighlightPicker
-                label="Destaques no título"
-                text={slide.title}
-                highlights={(slide.highlights || []).filter(h => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
-                onChange={(titleHls) => {
-                  const otherHls = (slide.highlights || []).filter(h => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
-                  updateActiveSlide({ highlights: [...otherHls, ...titleHls] });
-                }}
-                accentColor={accentColor}
-              />
-
-              {/* ── Destaques descrição ── */}
-              {slide.description && (
-                <WordHighlightPicker
-                  label="Destaques na descrição"
-                  text={slide.description}
-                  highlights={(slide.highlights || []).filter(h => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
-                  onChange={(descHls) => {
-                    const otherHls = (slide.highlights || []).filter(h => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
-                    updateActiveSlide({ highlights: [...otherHls, ...descHls] });
-                  }}
-                  accentColor={accentColor}
-                />
-              )}
-
-              <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
-                onChange={(v) => updateActiveSlide({ lineHeight: v })} />
-
-              {/* ── Posição do texto ── */}
-              <div>
-                <span className={labelCls + ' block mb-1.5'}>Posição do texto</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {TEXT_POSITIONS.map((pos) => (
-                    <button key={pos} onClick={() => {
-                      const autoAlign = (pos === 'top-center' || pos === 'center' || pos === 'bottom-center') ? 'center'
-                        : (pos === 'top-right' || pos === 'middle-right' || pos === 'bottom-right') ? 'right'
-                        : 'left';
-                      updateActiveSlide({ textPosition: pos, textOffset: undefined, textAlignment: autoAlign });
-                    }} title={pos}
-                      className={cn('h-7 rounded text-[8px] transition-colors border',
-                        slide.textPosition === pos ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
-                      )}
-                    >
-                      {pos === 'top-left' ? '↖' : pos === 'top-center' ? '↑' : pos === 'top-right' ? '↗'
-                        : pos === 'middle-left' ? '←' : pos === 'center' ? '·' : pos === 'middle-right' ? '→'
-                        : pos === 'bottom-left' ? '↙' : pos === 'bottom-center' ? '↓' : '↘'}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-1.5 grid grid-cols-3 gap-1">
-                  {(['left', 'center', 'right'] as const).map((align) => (
-                    <button
-                      key={align}
-                      onClick={() => updateActiveSlide({ textAlignment: align })}
-                      className={cn('h-7 rounded text-[8px] transition-colors border',
-                        slide.textAlignment === align ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white shadow-sm' : 'bg-[var(--surface-elevated)] text-gray-900/30 dark:text-white/25 border-black/[0.07] dark:border-white/[0.07] hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900/60 dark:hover:text-white/60'
-                      )}
-                    >
-                      {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
-                    </button>
-                  ))}
-                </div>
-                {style === 'editorial' && (
-                  <div className="mt-3 space-y-2">
-                    <Slider
-                      label="Mover título ↕"
-                      value={slide.editorialTitleOffsetY ?? 0}
-                      min={-500} max={500} step={1}
-                      onChange={(v) => updateActiveSlide({ editorialTitleOffsetY: v })}
-                      unit="px"
-                    />
-                    <Slider
-                      label="Mover descrição ↕"
-                      value={slide.editorialDescOffsetY ?? 0}
-                      min={-500} max={500} step={1}
-                      onChange={(v) => updateActiveSlide({ editorialDescOffsetY: v })}
-                      unit="px"
-                    />
-                  </div>
-                )}
-              </div>
-            </Section>
-
-            {/* CANTOS */}
-            <Section title="Cantos">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div onClick={() => updateCornersConfig({ show: !corners.show })} className={cn('w-8 h-4 rounded-full relative transition-colors', corners.show ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10')}>
-                  <div className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', corners.show ? 'left-[18px]' : 'left-0.5')} />
-                </div>
-                <span className="text-[10px] text-gray-900/50 dark:text-white/50">Exibir cantos</span>
-              </label>
-              {corners.show && (
-                <>
-                  {(['topLeft', 'topRight'] as const).map((key) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <div onClick={() => updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never)}
-                        className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer shrink-0', corners[key].visible ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white' : 'border-black/30 dark:border-white/30')}>
-                        {corners[key].visible && <span className="text-black text-[8px] font-bold">✓</span>}
-                      </div>
-                      <input className={cn(inputCls, 'flex-1 text-[10px]')} value={corners[key].text}
-                        onChange={(e) => updateCornersConfig({ [key]: { ...corners[key], text: e.target.value } } as never)} placeholder={key} />
-                    </div>
-                  ))}
-                  <Slider label="Tamanho fonte" value={corners.fontSize} min={8} max={32} onChange={(v) => updateCornersConfig({ fontSize: v })} unit="px" />
-                  <Slider label="Distância bordas" value={corners.borderDistance} min={0} max={150} onChange={(v) => updateCornersConfig({ borderDistance: v })} unit="px" />
-                  <Slider label="Opacidade" value={corners.opacity} min={0} max={100} onChange={(v) => updateCornersConfig({ opacity: v })} unit="%" />
-                  <ColorPicker
-                    label="Cor"
-                    value={corners.color || '#FFFFFF'}
-                    onChange={(v) => updateCornersConfig({ color: v })}
-                  />
-                  <div>
-                    <span className={labelCls + ' block mb-1'}>Fonte</span>
-                    <ElementFontPicker
-                      value={corners.elementFont}
-                      onChange={(v) => updateCornersConfig({ elementFont: v })}
-                    />
-                  </div>
-                </>
-              )}
-            </Section>
-
+            <ImageThumb
+              url={t02ImageUrl}
+              onRemove={() => t02Model != null && updateActiveSlide(template02ClearImage(slide, t02Model))}
+            />
+            <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} unit="%"
+              onChange={(v) => setT02({ backgroundImageOpacity: v }, 'backgroundImageOpacity')} />
+            {t02IsCover ? (
+              <>
+                <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
+                <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
+                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                  onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
+              </>
+            ) : (
+              <>
+                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ x: v }) }, 'contentImagePosition')} />
+                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ y: v }) }, 'contentImagePosition')} />
+                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                  onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ zoom: v }) }, 'contentImagePosition')} />
+              </>
+            )}
           </>
         )}
+      </>
+    ) : isT01 ? (
+      <>
+        <DropZone
+          label={t01ImageUrl ? 'Trocar imagem' : 'Clique ou arraste'}
+          onClick={() => t01ImageRef.current?.click()}
+          onFile={handleT01File}
+        />
+        <AiGenPanel
+          // A key precisa do índice: prompt e referência são estado local, e
+          // sem remontar ao trocar de slide o texto do slide 1 gera o slide 2.
+          key={`t01-img-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          onGenerate={(opts) =>
+            generateOne(activeSlideIndex, t01Media.background ? 'background' : 'content', opts)
+          }
+        />
+        {t01ImageUrl && (
+          <>
+            <ImageThumb
+              url={t01ImageUrl}
+              onRemove={() => t01Model != null && updateActiveSlide(template01ClearImage(slide, t01Model))}
+            />
+            <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} unit="%"
+              onChange={(v) => setT01({ backgroundImageOpacity: v }, 'backgroundImageOpacity')} />
+            {t01Media.background ? (
+              <>
+                <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
+                <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
+                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                  onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
+              </>
+            ) : (
+              <>
+                <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ x: v }) }, 'contentImagePosition')} />
+                <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
+                  onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ y: v }) }, 'contentImagePosition')} />
+                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                  onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ zoom: v }) }, 'contentImagePosition')} />
+              </>
+            )}
+          </>
+        )}
+      </>
+    ) : style === 'profile' ? (
+      <>
+        <DropZone label="Arraste ou clique para adicionar" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
+        <AiGenPanel
+          key={`profile-bg-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+        />
+        <button onClick={() => generateAll()} disabled={generating}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--line)] text-[11px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+          <Sparkles className="w-3.5 h-3.5" />
+          {generating && progress.total > 1
+            ? `Gerando ${progress.done}/${progress.total}…`
+            : `Gerar para todos os ${slides.length} slides`}
+        </button>
+        {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+          <>
+            <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+              onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
+            <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} />
+            <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} />
+            <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} />
+          </>
+        )}
+      </>
+    ) : (
+      <>
+        <DropZone label="Clique ou arraste" onClick={() => contentImageRef.current?.click()} onFile={handleContentFile} />
+        <AiGenPanel
+          key={`content-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
+        />
+        <button onClick={() => generateAll('content')} disabled={generating}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--line)] text-[11px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+          <Sparkles className="w-3.5 h-3.5" />
+          {generating && progress.total > 1
+            ? `Gerando ${progress.done}/${progress.total}…`
+            : `Gerar para os ${contentSlidesCount} slides`}
+        </button>
+        {slide.contentImageUrl && (
+          <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
+        )}
+        <Slider label="Posição X" value={slide.contentImagePosition?.x ?? 50} min={0} max={100} unit="%"
+          onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ x: v }) })} />
+        <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
+          onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ y: v }) })} />
+        <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+          onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ zoom: v }) })} />
+      </>
+    ),
+
+    /* Um controle por BLOCO de texto. Antes era por papel (título/descrição) e
+       uma mexida pegava blocos diferentes de uma vez — no slide 5, as duas
+       colunas juntas. Entrelinha e alinhamento ficam fora da repetição de
+       propósito: são um controle só para o slide. */
+    estiloDoTexto: isT02 ? (
+      <>
+        {t02TextSlots.map((d) => {
+          const st = slide.templateSlotStyles?.[d.slot] ?? {};
+          const base = template02SlotDefaults(d.slot);
+          // O seletor abre mostrando o que ESTÁ na tela: o número do spec
+          // daquele bloco, nunca um padrão do editor.
+          const specColor = t02Model != null ? template02SlotColor(d.slot, t02Model) : '#000000';
+          const isHighlight = d.slot === 'cover.highlight';
+          return (
+            <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
+              <span className={labelCls}>{d.label}</span>
+              {isHighlight ? (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ColorPicker
+                      label="Cor do marcador"
+                      value={st.background || TEMPLATE_02_HIGHLIGHT_COLOR}
+                      onChange={(v) => setT02Slot(d.slot, { background: v })}
+                    />
+                  </div>
+                  <div>
+                    <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                    <ElementFontPicker
+                      value={st.font}
+                      defaultFontName={template02SlotFontName(d.slot) ?? 'Inter Bold'}
+                      onChange={(v) => setT02Slot(d.slot, { font: v })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
+                    min={10} max={160} unit="px" onChange={(v) => setT02Slot(d.slot, { fontSize: v })} />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ColorPicker label="Cor" value={st.color || specColor} onChange={(v) => setT02Slot(d.slot, { color: v })} />
+                    <UnderlineToggle on={!!st.underline} onToggle={() => setT02Slot(d.slot, { underline: !st.underline })} />
+                  </div>
+                  <div>
+                    <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                    <ElementFontPicker
+                      value={st.font}
+                      defaultFontName={template02SlotFontName(d.slot) ?? 'Inter Display Regular'}
+                      onChange={(v) => setT02Slot(d.slot, { font: v })}
+                    />
+                  </div>
+                  <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
+                    min={-0.1} max={0.3} step={0.01} unit="em"
+                    onChange={(v) => setT02Slot(d.slot, { letterSpacing: v })} />
+                  {/* Mesma faixa e mesmo campo do slider "Margem" da aba
+                      Cantos: empurra o bloco para dentro. */}
+                  <Slider label="Margem" value={st.margin ?? 0} min={0} max={150} unit="px"
+                    onChange={(v) => setT02Slot(d.slot, { margin: v })} />
+                </>
+              )}
+            </div>
+          );
+        })}
+      </>
+    ) : (
+      <>
+        {t01TextSlots.map((d) => {
+          const st = slide.templateSlotStyles?.[d.slot] ?? {};
+          const base = template01SlotDefaults(d.slot);
+          return (
+            <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
+              <span className={labelCls}>{d.label}</span>
+              <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
+                min={10} max={160} unit="px" onChange={(v) => setT01Slot(d.slot, { fontSize: v })} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker label="Cor" value={st.color || '#FFFFFF'} onChange={(v) => setT01Slot(d.slot, { color: v })} />
+                <UnderlineToggle on={!!st.underline} onToggle={() => setT01Slot(d.slot, { underline: !st.underline })} />
+              </div>
+              <div>
+                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                <ElementFontPicker
+                  value={st.font}
+                  defaultFontName={template01SlotFontName(d.slot) ?? 'Inter Regular'}
+                  onChange={(v) => setT01Slot(d.slot, { font: v })}
+                />
+              </div>
+              <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
+                min={-0.1} max={0.3} step={0.01} unit="em"
+                onChange={(v) => setT01Slot(d.slot, { letterSpacing: v })} />
+              {/* Mesma faixa e mesmo campo do slider "Margem" da aba Cantos:
+                  empurra o bloco para dentro a partir da borda do spec. */}
+              <Slider label="Margem" value={st.margin ?? 0} min={0} max={150} unit="px"
+                onChange={(v) => setT01Slot(d.slot, { margin: v })} />
+            </div>
+          );
+        })}
+
+        <div className="pt-3 border-t border-[var(--line)] space-y-2">
+          <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
+            onChange={(v) => setT01({ lineHeight: v }, 'lineHeight')} />
+          {/* No template os blocos são ancorados pelo spec (a capa centraliza, o
+              slide 5 tem duas colunas), então a grade de 9 posições dos outros
+              estilos destruiria a composição. O que resta é o alinhamento. */}
+          <div>
+            <span className={cn(labelCls, 'block mb-1.5')}>Alinhamento</span>
+            <div className="grid grid-cols-3 gap-1">
+              {(['left', 'center', 'right'] as const).map((align) => (
+                <button key={align} onClick={() => setT01({ textAlignment: align }, 'textAlignment')}
+                  className={cn('h-7 rounded text-[10px] transition-colors border',
+                    slide.templateOverrides?.textAlignment && slide.textAlignment === align
+                      ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                      : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}>
+                  {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </>
+    ),
+
+    textoDoSlide: (
+      <>
+        <div>
+          <span className={labelCls}>Título</span>
+          <textarea className={cn(inputCls, 'mt-1 resize-none')} rows={3} value={slide.title}
+            onChange={(e) => updateActiveSlide({ title: e.target.value })} placeholder="Título do slide" />
+        </div>
+        <Slider label="Tamanho título" value={slide.fontSize.title} min={16} max={160} unit="px"
+          onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, title: v } })} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ColorPicker label="Cor" value={slide.titleColor || '#FFFFFF'} onChange={(v) => updateActiveSlide({ titleColor: v })} />
+          <UnderlineToggle on={!!slide.titleUnderline} onToggle={() => updateActiveSlide({ titleUnderline: !slide.titleUnderline })} />
+        </div>
+        <div>
+          <span className={cn(labelCls, 'block mb-1')}>Fonte título</span>
+          <ElementFontPicker
+            value={slide.titleFont}
+            defaultFontName={defaultTitleFontName}
+            onChange={(v) => updateActiveSlide({ titleFont: v })}
+          />
+        </div>
+
+        <div className="pt-1">
+          <span className={labelCls}>Descrição</span>
+          <textarea className={cn(inputCls, 'mt-1 resize-none h-16')} value={slide.description || ''}
+            onChange={(e) => updateActiveSlide({ description: e.target.value })} placeholder="Descrição do slide" />
+        </div>
+        <Slider label="Tamanho descrição" value={slide.fontSize.description} min={10} max={80} unit="px"
+          onChange={(v) => updateActiveSlide({ fontSize: { ...slide.fontSize, description: v } })} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ColorPicker label="Cor" value={slide.descriptionColor || 'rgba(255,255,255,0.7)'}
+            onChange={(v) => updateActiveSlide({ descriptionColor: v })} />
+          <UnderlineToggle on={!!slide.descriptionUnderline}
+            onToggle={() => updateActiveSlide({ descriptionUnderline: !slide.descriptionUnderline })} />
+        </div>
+        <div>
+          <span className={cn(labelCls, 'block mb-1')}>Fonte descrição</span>
+          <ElementFontPicker
+            value={slide.descriptionFont}
+            defaultFontName={defaultBodyFontName}
+            onChange={(v) => updateActiveSlide({ descriptionFont: v })}
+          />
+        </div>
+
+        <Slider label="Espaço título → descrição" value={slide.titleDescriptionGap ?? 16} min={0} max={80} unit="px"
+          onChange={(v) => updateActiveSlide({ titleDescriptionGap: v })} />
+        <Slider label="Espaçamento de letras (título)" value={slide.titleLetterSpacing ?? -0.02}
+          min={-0.1} max={0.3} step={0.01} unit="em"
+          onChange={(v) => updateActiveSlide({ titleLetterSpacing: v })} />
+        <Slider label="Espaçamento entre linhas" value={slide.lineHeight} min={1.0} max={2.5} step={0.1}
+          onChange={(v) => updateActiveSlide({ lineHeight: v })} />
+
+        <WordHighlightPicker
+          label="Destaques no título"
+          text={slide.title}
+          highlights={(slide.highlights || []).filter((h) => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
+          onChange={(titleHls) => {
+            const other = (slide.highlights || []).filter((h) => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
+            updateActiveSlide({ highlights: [...other, ...titleHls] });
+          }}
+          accentColor={accentColor}
+          defaultFontName={slide.titleFont ?? defaultTitleFontName}
+        />
+        {slide.description && (
+          <WordHighlightPicker
+            label="Destaques na descrição"
+            text={slide.description}
+            highlights={(slide.highlights || []).filter((h) => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
+            onChange={(descHls) => {
+              const other = (slide.highlights || []).filter((h) => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
+              updateActiveSlide({ highlights: [...other, ...descHls] });
+            }}
+            accentColor={accentColor}
+            defaultFontName={slide.descriptionFont ?? defaultBodyFontName}
+          />
+        )}
+      </>
+    ),
+
+    /* PERFIL — negrito parcial e cor por palavra. É o mesmo picker do Editorial
+       e do Minimalista; o que faltava era o estilo `profile` oferecê-lo e o
+       `ProfileSlide` ler `slide.highlights` (ver `lib/text-highlights.tsx`).
+       A fonte padrão é a do template, que é fixa. */
+    destaquesDoTexto: (
+      <>
+        <WordHighlightPicker
+          label="Destaques no título"
+          text={slide.title}
+          highlights={(slide.highlights || []).filter((h) => slide.title.toLowerCase().includes(h.text.toLowerCase()))}
+          onChange={(titleHls) => {
+            const other = (slide.highlights || []).filter((h) => !slide.title.toLowerCase().includes(h.text.toLowerCase()));
+            updateActiveSlide({ highlights: [...other, ...titleHls] });
+          }}
+          accentColor={accentColor}
+          defaultFontName={defaultTitleFontName}
+        />
+        {slide.description && (
+          <WordHighlightPicker
+            label="Destaques na descrição"
+            text={slide.description}
+            highlights={(slide.highlights || []).filter((h) => (slide.description || '').toLowerCase().includes(h.text.toLowerCase()))}
+            onChange={(descHls) => {
+              const other = (slide.highlights || []).filter((h) => !(slide.description || '').toLowerCase().includes(h.text.toLowerCase()));
+              updateActiveSlide({ highlights: [...other, ...descHls] });
+            }}
+            accentColor={accentColor}
+            defaultFontName={defaultBodyFontName}
+          />
+        )}
+      </>
+    ),
+
+    layoutDoSlide: (
+      <>
+        {/* SEQUÊNCIA do slide — onde a imagem entra em relação aos dois blocos
+            de texto. Os três valores já existiam em `ContentLayout` e o
+            `EditorialSlide` já desenhava cada um; faltava poder escolher.
+            A capa fica de fora: ela não é uma sequência, é a capa. */}
+        {!isEditorialCover && (
+          <div>
+            <span className={cn(labelCls, 'block mb-1.5')}>Posição da imagem</span>
+            <div className="grid grid-cols-3 gap-1">
+              {([
+                ['image-text-text', 'Imagem em cima', '▣ ≡ ≡'],
+                ['text-image-text', 'Imagem no meio', '≡ ▣ ≡'],
+                ['text-text-image', 'Imagem embaixo', '≡ ≡ ▣'],
+              ] as const).map(([value, label, glyph]) => {
+                const active = (slide.contentLayout ?? 'text-image-text') === value;
+                return (
+                  <button
+                    key={value}
+                    aria-label={label}
+                    aria-pressed={active}
+                    title={label}
+                    onClick={() => updateActiveSlide({ contentLayout: value })}
+                    className={cn('h-7 rounded text-[10px] transition-colors border',
+                      active
+                        ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                        : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}
+                  >
+                    {glyph}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div>
+          <span className={cn(labelCls, 'block mb-1.5')}>Posição do texto</span>
+          <div className="grid grid-cols-3 gap-1">
+            {TEXT_POSITIONS.map((pos) => (
+              <button key={pos} title={pos}
+                onClick={() => {
+                  const autoAlign = pos.endsWith('center') || pos === 'center' ? 'center'
+                    : pos.endsWith('right') ? 'right' : 'left';
+                  updateActiveSlide({ textPosition: pos, textOffset: undefined, textAlignment: autoAlign });
+                }}
+                className={cn('h-7 rounded text-[10px] transition-colors border',
+                  slide.textPosition === pos
+                    ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                    : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}>
+                {pos === 'top-left' ? '↖' : pos === 'top-center' ? '↑' : pos === 'top-right' ? '↗'
+                  : pos === 'middle-left' ? '←' : pos === 'center' ? '·' : pos === 'middle-right' ? '→'
+                  : pos === 'bottom-left' ? '↙' : pos === 'bottom-center' ? '↓' : '↘'}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1.5 grid grid-cols-3 gap-1">
+            {(['left', 'center', 'right'] as const).map((align) => (
+              <button key={align} onClick={() => updateActiveSlide({ textAlignment: align })}
+                className={cn('h-7 rounded text-[10px] transition-colors border',
+                  slide.textAlignment === align
+                    ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)] shadow-sm'
+                    : 'bg-[var(--paper)] text-[var(--ink-muted)] border-[var(--line)] hover:border-[var(--ink)]')}>
+                {align === 'left' ? '⬅ esq' : align === 'center' ? '↔ centro' : '➡ dir'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider label="Mover título ↕" value={slide.editorialTitleOffsetY ?? 0} min={-500} max={500} unit="px"
+          onChange={(v) => updateActiveSlide({ editorialTitleOffsetY: v })} />
+        <Slider label="Mover descrição ↕" value={slide.editorialDescOffsetY ?? 0} min={-500} max={500} unit="px"
+          onChange={(v) => updateActiveSlide({ editorialDescOffsetY: v })} />
+      </>
+    ),
+
+    sombraOverlay: (
+      <>
+        <Toggle
+          on={slide.shadow.style !== 'none'}
+          onToggle={() => updateActiveSlide({ shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } })}
+          label="Exibir sombra"
+        />
+        {slide.shadow.style !== 'none' && (
+          <>
+            <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} />
+            <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} />
+            <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} />
+            <ColorPicker label="Cor" value={slide.shadow.color || '#000000'}
+              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })} />
+          </>
+        )}
+      </>
+    ),
+
+    /* No template é SÓ A COR. Upload e IA ficam de fora de propósito: a imagem
+       do template tem painel próprio ("Imagem"), e repeti-la aqui recriaria a
+       duplicata que essa refatoração acabou de eliminar. */
+    fundoDoSlide: isT02 ? (
+      <>
+        <ColorPicker
+          label="Cor"
+          value={
+            slide.templateOverrides?.background && slide.backgroundColor
+              ? slide.backgroundColor
+              : t02Model != null ? template02Background(t02Model) : '#EEE5D9'
+          }
+          onChange={(v) => setT02({ backgroundColor: v }, 'background')}
+        />
+      </>
+    ) : isT01 ? (
+      <>
+        <ColorPicker
+          label="Cor"
+          value={t01BgValue}
+          onChange={(v) => setT01({ backgroundColor: v }, 'background')}
+        />
+      </>
+    ) : (
+      <>
+        <ColorPicker label="Cor" value={slide.backgroundColor || '#111111'}
+          onChange={(v) => updateActiveSlide({ backgroundColor: v })} />
+        {/* No EDITORIAL a imagem de fundo só existe na CAPA: nos internos ela
+            vai no card (F4), e o upload aqui virou controle órfão — aceitava
+            arquivo que não entrava em slide nenhum. O Minimalista continua
+            usando fundo de imagem em qualquer slide, então mantém tudo. */}
+        {bgImageIsLive && (
+          <DropZone label="Clique ou arraste uma imagem de fundo" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
+        )}
+        {isEditorialCover && (
+          <AiGenPanel
+            key={`cover-bg-${activeSlideIndex}`}
+            buttonLabel="Gerar imagem com IA (capa)"
+            generating={generating}
+            slideTitle={slide.title}
+            slideDescription={slide.description || ''}
+            onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+          />
+        )}
+        {/* Carrossel editorial antigo pode ter fundo gravado num slide interno.
+            O dado NÃO é apagado sozinho — mas sem nenhum controle viraria lixo
+            invisível e sem como limpar, então sobra o botão de remover. */}
+        {!bgImageIsLive && (slide.backgroundImageUrl || slide.gridImageUrl) && (
+          <div className="space-y-2 rounded-xl border border-[var(--line)] p-2">
+            <p className="text-[10px] leading-snug text-[var(--ink-muted)]">
+              Este slide tem uma imagem de fundo salva que não é mais usada — no
+              Editorial a imagem entra no card.
+            </p>
+            <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+              onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
+            <button
+              onClick={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })}
+              className="w-full py-1.5 rounded-lg border border-[var(--line)] text-[10px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all"
+            >
+              Remover imagem de fundo
+            </button>
+          </div>
+        )}
+        {bgImageIsLive && (slide.backgroundImageUrl || slide.gridImageUrl) && (
+          <>
+            <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+              onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
+            <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} />
+            <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} />
+            <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} />
+            <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} />
+          </>
+        )}
+      </>
+    ),
+
+    /* Aba CANTOS — o MESMO componente nos três templates que a têm. Cada um só
+       traduz o seu modelo de persistência (config global de cantos no legado,
+       slots do spec no T1/T2) para as props do painel. */
+    cantos: isT01 ? (
+      <CornersPanel
+        show={t01HeaderVisible}
+        onToggleShow={() => setHeaderStyles(t01CornerSlotNames, { visible: !t01HeaderVisible })}
+        rows={t01CornerSlots.map((d) => ({
+          key: d.slot,
+          label: d.label,
+          value: slide.templateSlots?.[d.slot] ?? TEMPLATE_01_DEFAULT_CORNERS[d.slot],
+          onChange: (v) => setT01CornerText(d.slot, v),
+          visible: slide.templateSlotStyles?.[d.slot]?.visible !== false,
+          onToggleVisible: () =>
+            setHeaderStyles([d.slot], {
+              visible: slide.templateSlotStyles?.[d.slot]?.visible === false,
+            }),
+        }))}
+        fontSize={Math.round(
+          t01HeaderStyle.fontSize ??
+            template01SlotDefaults(t01CornerSlotNames[0])?.fontSizePx ??
+            17
+        )}
+        onFontSize={(v) => setTemplateCornerStyle({ fontSize: v })}
+        margin={t01HeaderStyle.margin ?? 0}
+        onMargin={(v) => setTemplateCornerStyle({ margin: v })}
+        opacity={t01HeaderStyle.opacity ?? 100}
+        onOpacity={(v) => setTemplateCornerStyle({ opacity: v })}
+        color={
+          t01HeaderStyle.color ||
+          (t01Model != null ? template01SlotColor(t01CornerSlotNames[0], t01Model) : '#FFFFFF')
+        }
+        onColor={(v) => setHeaderStyles(t01CornerSlotNames, { color: v })}
+        font={t01HeaderStyle.font}
+        defaultFontName={template01SlotFontName(t01CornerSlotNames[0]) ?? 'Inter Display Medium'}
+        onFont={(v) => setTemplateCornerStyle({ font: v })}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
+    ) : (
+      <CornersPanel
+        show={!!corners.show}
+        onToggleShow={() => updateCornersConfig({ show: !corners.show })}
+        rows={(['topLeft', 'topRight'] as const).map((key) => ({
+          key,
+          label: key === 'topLeft' ? 'Canto esquerdo' : 'Canto direito',
+          value: corners[key].text,
+          onChange: (v) => updateCornersConfig({ [key]: { ...corners[key], text: v } } as never),
+          visible: corners[key].visible,
+          onToggleVisible: () =>
+            updateCornersConfig({ [key]: { ...corners[key], visible: !corners[key].visible } } as never),
+        }))}
+        fontSize={corners.fontSize}
+        onFontSize={(v) => updateCornersConfig({ fontSize: v })}
+        // "Distância bordas" e "Margem" sempre foram a mesma coisa: a distância
+        // do canto à borda do slide. O rótulo passa a ser um só.
+        margin={corners.borderDistance}
+        onMargin={(v) => updateCornersConfig({ borderDistance: v })}
+        opacity={corners.opacity}
+        onOpacity={(v) => updateCornersConfig({ opacity: v })}
+        color={corners.color || DEFAULT_CORNERS.color || '#FFFFFF'}
+        onColor={(v) => updateCornersConfig({ color: v })}
+        font={corners.elementFont}
+        defaultFontName={defaultBodyFontName}
+        onFont={(v) => updateCornersConfig({ elementFont: v })}
+        fontSizeMax={32}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
+    ),
+
+    /* TEXTO vale para o deck inteiro (ver `setDeckSlotText`); cor e visibilidade
+       são deste slide; tipografia, margem e opacidade são globais. */
+    cabecalho: (
+      <CornersPanel
+        show={t02HeaderVisible}
+        onToggleShow={() => setHeaderStyles(t02HeaderSlotNames, { visible: !t02HeaderVisible })}
+        rows={t02HeaderSlots.map((d) => ({
+          key: d.slot,
+          label: d.label,
+          value: slide.templateSlots?.[d.slot] ?? TEMPLATE_02_DEFAULT_HEADER[d.slot],
+          onChange: (v) => setT02HeaderText(d.slot, v),
+          visible: slide.templateSlotStyles?.[d.slot]?.visible !== false,
+          onToggleVisible: () =>
+            setHeaderStyles([d.slot], {
+              visible: slide.templateSlotStyles?.[d.slot]?.visible === false,
+            }),
+          maxChars: d.maxChars,
+        }))}
+        fontSize={Math.round(
+          t02HeaderStyle.fontSize ??
+            template02SlotDefaults(t02HeaderSlotNames[0])?.fontSizePx ??
+            17
+        )}
+        onFontSize={(v) => setTemplateCornerStyle({ fontSize: v })}
+        margin={t02HeaderStyle.margin ?? 0}
+        onMargin={(v) => setTemplateCornerStyle({ margin: v })}
+        opacity={t02HeaderStyle.opacity ?? 100}
+        onOpacity={(v) => setTemplateCornerStyle({ opacity: v })}
+        color={
+          t02HeaderStyle.color ||
+          (t02Model != null ? template02SlotColor('header.category', t02Model) : '#767682')
+        }
+        onColor={(v) => setHeaderStyles(t02HeaderSlotNames, { color: v })}
+        font={t02HeaderStyle.font}
+        defaultFontName={template02SlotFontName(t02HeaderSlotNames[0]) ?? 'Inter Display Medium'}
+        onFont={(v) => setTemplateCornerStyle({ font: v })}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
+    ),
+
+    restaurarTemplate: (
+      <>
+        <button
+          onClick={() => updateActiveSlide({ templateOverrides: undefined, templateSlotStyles: undefined })}
+          className="w-full py-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] text-[11px] font-semibold hover:opacity-90 transition-opacity"
+        >
+          Restaurar
+        </button>
+      </>
+    ),
+  };
+
+  /* ── Composição ──────────────────────────────────────────────────────── */
+  const groups = visiblePanels(ctx);
+
+  // O rótulo do grupo vem da CONFIG quando ela declara um; senão, o padrão do
+  // escopo. Sem isso o grupo global do Template 2 — que é conteúdo, não estilo —
+  // apareceria como "ESTILO GLOBAL", e rótulo que mente é exatamente o que a
+  // refatoração desta barra veio acabar.
+  const headerFor = (g: { scope: PanelScope; label?: string; hint?: string }) => {
+    if (g.label) return { label: g.label, hint: g.hint };
+    return g.scope === 'slide'
+      ? {
+          label: 'Conteúdo',
+          value: `SLIDE ${String(activeSlideIndex + 1).padStart(2, '0')}`,
+        }
+      // 🔴 O escopo global NÃO tem mais rótulo: o "ESTILO GLOBAL" saiu da lista
+      // a pedido do Rafael, e o grupo passa a ser só mais linhas na sequência.
+      //
+      // Só ELE some. O "CONTEÚDO — SLIDE 01" é do mesmo componente e continua —
+      // e não é só a linha do topo: no Profile ele é o cabeçalho do SEGUNDO
+      // grupo, no corpo da lista. Tirar "cabeçalho do corpo" em bloco mataria
+      // o rótulo do Profile junto.
+      : {};
+  };
+
+  // Nenhum painel nasce aberto: a barra abre fechada, como no desenho, em TODOS
+  // os templates. Abrir/fechar no clique continua igual, e o estado segue local
+  // ao painel — não havia persistência entre sessões e continua não havendo.
+  const OPEN_BY_DEFAULT: PanelId[] = [];
+
+  const renderPanel = (id: PanelId) => {
+    const def = PANEL_REGISTRY[id];
+    const disabled = id === 'restaurarTemplate' && templateSlideChanges === 0;
+    return (
+      // 🔴 `key` é o id, nunca o índice: o aberto/fechado é estado local do
+      // painel e migraria de posição quando a composição mudar.
+      <SidebarPanel
+        key={id}
+        id={id}
+        icon={def.icon}
+        label={panelLabel(id, ctx)}
+        defaultOpen={OPEN_BY_DEFAULT.includes(id)}
+        badge={id === 'restaurarTemplate' && templateSlideChanges > 0 ? `${templateSlideChanges}` : undefined}
+        disabled={disabled}
+        disabledReason="Este slide ainda segue o template — não há estilo para restaurar."
+      >
+        {content[id]}
+      </SidebarPanel>
+    );
+  };
+
+  // A pílula de voltar divide a linha com o cabeçalho do PRIMEIRO grupo: no
+  // desenho as duas coisas compartilham a baseline, pílula à esquerda e o
+  // rótulo alinhado à direita na borda interna do painel.
+  // A pílula do desenho (108,6 × 18,9, texto 10,5px) é pequena demais para
+  // clicar e para ler. Cresceu para ~30 de altura e 12px de corpo.
+  //
+  // 🔴 Medido antes de escolher: o rótulo do escopo ocupa 130 dos 259 úteis,
+  // sobrando 123 para a pílula. "Voltar para Dashboard" a 12px pede 153 — não
+  // cabe ao lado sem truncar, que é o aperto que já nos mordeu. Com o rótulo
+  // curto são 98, e a linha fecha em 234 dos 259. Por isso o texto visível é
+  // "Dashboard" e a frase inteira vive no title/aria-label.
+  const backPill = (
+    <Link
+      href="/dashboard"
+      title="Voltar para Dashboard"
+      aria-label="Voltar para Dashboard"
+      // Raio das linhas do acordeão (11), não mais pílula — o tamanho novo fica.
+      className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-[var(--studio-pill)] pl-2 pr-3 py-2 text-[12px] leading-none text-[var(--studio-pill-ink)] hover:bg-[var(--studio-line)] hover:text-[var(--ink)] transition-colors"
+    >
+      <ArrowLeft className="w-4 h-4 shrink-0" />
+      Dashboard
+    </Link>
+  );
+
+  return (
+    // Painel FLUTUANTE, não coluna colada na borda: 285 de largura, margem 15 à
+    // esquerda e 18 em cima/embaixo, raio 16. É um card sobre a página.
+    <aside className="w-[285px] shrink-0 ml-[15px] my-[18px] rounded-[16px] bg-[var(--studio-panel)] flex flex-col overflow-hidden">
+      {fileInputs}
+
+      <Link href="/dashboard" className="block shrink-0 pl-[23px] pt-[26px]" aria-label="Creatools">
+        <NextImage
+          src="/LOGO_SEMFUNDO.png"
+          alt="Creatools"
+          width={468}
+          height={132}
+          priority
+          className="w-[234px] h-[66px] object-contain object-left dark:invert"
+        />
+      </Link>
+
+      <div className="shrink-0 mx-[13px] mt-[37px] h-px bg-[var(--studio-divider)]" />
+
+      {/* `studio-scroll` reserva a canaleta da barra SEMPRE, para a largura da
+          linha não mudar entre rolando e não rolando (ver globals.css).
+          A máscara desbota os últimos 20px: sem ela o último card era cortado
+          ao meio pelo rodapé, sem nenhum sinal de que havia mais coisa. */}
+      <div className="studio-scroll flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,#000_calc(100%-20px),transparent_100%)]">
+        {groups.map((g, i) => (
+          <SidebarGroup key={g.scope} {...headerFor(g)} leading={i === 0 ? backPill : undefined}>
+            {g.ids.map(renderPanel)}
+          </SidebarGroup>
+        ))}
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-black/[0.05] dark:border-white/[0.05] px-4 py-4 flex flex-col gap-2.5 bg-[var(--surface)]">
+      {/* Respiro inferior de 42 do desenho; os dois botões separados por 5. */}
+      <div className="shrink-0 px-[13px] pt-4 pb-[42px] flex flex-col gap-[5px]">
         <button
           onClick={onDownloadSlide}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-bold hover:bg-gray-700 dark:hover:bg-white/90 active:scale-[0.98] transition-all shadow-sm"
+          className="h-[46px] w-full rounded-[10px] bg-[var(--studio-panel)] border border-[var(--studio-line)] text-[14px] text-[var(--ink)] flex items-center justify-center gap-3 hover:border-[var(--studio-line-strong)] transition-colors"
         >
-          <Download className="w-3.5 h-3.5" />
+          <Download className="w-[18px] h-[18px]" />
           Baixar Slide {activeSlideIndex + 1}
         </button>
+        {/* Ação principal. Borda e sombra CASADAS na cor do TEMA, não da tinta:
+            as duas saem de `--paper`, então no claro ficam brancas e no escuro
+            acompanham o tema — um token só, sem duas regras para dessincronizar.
+            Preto sobre preto (as duas em `--ink`) chapava o botão. O
+            preenchimento continua sendo a tinta. */}
         <button
           onClick={onDownloadAll}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-black/[0.07] dark:border-white/[0.07] text-[11px] font-medium text-gray-900/50 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-all"
+          className="h-[46px] w-full rounded-[10px] bg-[var(--ink)] text-[var(--paper)] text-[14px] flex items-center justify-center gap-3 border border-[var(--paper)] shadow-[var(--sh-studio-paper)] hover:-translate-y-px active:translate-y-0 active:shadow-[var(--sh-press)] transition-all"
         >
-          <Archive className="w-3.5 h-3.5" />
-          Baixar todos os slides
+          <Archive className="w-[18px] h-[18px]" />
+          Exportar todos os slides
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

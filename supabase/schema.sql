@@ -124,7 +124,7 @@ create table if not exists public.carousels (
   published_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial')),
+  constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02')),
   constraint carousels_status_check check (status in ('draft', 'ready', 'published', 'archived')),
   constraint carousels_theme_check check (theme in ('dark', 'light'))
 );
@@ -141,7 +141,7 @@ alter table public.carousels add column if not exists archived_at timestamptz;
 alter table public.carousels add column if not exists published_at timestamptz;
 
 alter table public.carousels drop constraint if exists carousels_style_check;
-alter table public.carousels add constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial'));
+alter table public.carousels add constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02'));
 alter table public.carousels drop constraint if exists carousels_status_check;
 alter table public.carousels add constraint carousels_status_check check (status in ('draft', 'ready', 'published', 'archived'));
 alter table public.carousels drop constraint if exists carousels_theme_check;
@@ -185,6 +185,13 @@ create table if not exists public.slides (
   title_description_gap smallint,
   text_padding jsonb,
   content_layout text,
+  template_slots jsonb,
+  template_overrides jsonb,
+  -- TEMPLATE 1: estilo por SLOT de texto ({"s2.body": {"color": "#F00"}}).
+  template_slot_styles jsonb,
+  -- TEMPLATE 1: qual dos 6 modelos do spec o slide desenha. NULL nos outros
+  -- estilos e em todo deck salvo antes da coluna (aí o modelo sai da posicao).
+  template_model smallint,
   editorial_title_offset_y smallint,
   editorial_desc_offset_y smallint,
   editorial_image_offset_y smallint,
@@ -193,7 +200,8 @@ create table if not exists public.slides (
   updated_at timestamptz not null default now(),
   unique (carousel_id, position),
   constraint slides_image_type_check check (image_type in ('background', 'grid', 'mixed')),
-  constraint slides_text_alignment_check check (text_alignment in ('left', 'center', 'right'))
+  constraint slides_text_alignment_check check (text_alignment in ('left', 'center', 'right')),
+  constraint slides_template_model_check check (template_model is null or template_model between 1 and 6)
 );
 
 alter table public.slides add column if not exists highlights jsonb not null default '[]'::jsonb;
@@ -212,6 +220,10 @@ alter table public.slides add column if not exists title_letter_spacing real;
 alter table public.slides add column if not exists title_description_gap smallint;
 alter table public.slides add column if not exists text_padding jsonb;
 alter table public.slides add column if not exists content_layout text;
+alter table public.slides add column if not exists template_slots jsonb;
+alter table public.slides add column if not exists template_overrides jsonb;
+alter table public.slides add column if not exists template_slot_styles jsonb;
+alter table public.slides add column if not exists template_model smallint;
 alter table public.slides add column if not exists editorial_title_offset_y smallint;
 alter table public.slides add column if not exists editorial_desc_offset_y smallint;
 alter table public.slides add column if not exists editorial_image_offset_y smallint;
@@ -262,7 +274,7 @@ create table if not exists public.templates (
   updated_at timestamptz not null default now(),
   constraint templates_kind_check check (kind in ('carousel', 'slide', 'news')),
   constraint templates_visibility_check check (visibility in ('private', 'system')),
-  constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial'))
+  constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02'))
 );
 
 -- Asset library
@@ -465,4 +477,3 @@ create policy postflow_assets_delete on storage.objects
     bucket_id = 'postflow-assets'
     and auth.uid()::text = (storage.foldername(name))[1]
   );
-

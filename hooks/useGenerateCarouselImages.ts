@@ -4,7 +4,11 @@ import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useEditorStore } from './useEditorStore';
 import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
-import { Slide, SlideStyle } from '@/types';
+import { DEFAULT_IMAGE_POSITION, Slide, SlideStyle } from '@/types';
+import { template01ModelOf } from '@/lib/templates/template-01';
+import { template01SetImage } from '@/lib/templates/template-01/image';
+import { template02ModelOf } from '@/lib/templates/template-02';
+import { template02SetImage } from '@/lib/templates/template-02/image';
 
 /** Onde a imagem gerada é aplicada: fundo full-bleed do slide, ou imagem de conteúdo entre os textos. */
 export type ImageTarget = 'background' | 'content';
@@ -112,6 +116,41 @@ async function generateForSlideWithRetry(
   }
 }
 
+/**
+ * Onde a imagem gerada é gravada.
+ *
+ * Nos TEMPLATES 1 e 2 vai para o SLOT do slide — antes ia para os campos
+ * genéricos, que perdem do slot na hora de pintar: gerar por cima de um upload
+ * manual dizia "pronto!" e não mudava nada na tela. Nos outros estilos não
+ * existe slot, e o destino continua sendo o mesmo de sempre.
+ *
+ * 🔴 O `target` não decide nada nos templates: quem decide é o MODELO do slide
+ * (a capa do T2 tem imagem de fundo, os internos têm o bloco), e o slot dele já
+ * é único. Fazer o destino depender do `target` recriaria a segunda verdade.
+ */
+export function imagePatch(
+  slide: Slide,
+  style: SlideStyle,
+  index: number,
+  target: ImageTarget,
+  url: string
+): Partial<Slide> {
+  if (style === 'template01') {
+    return template01SetImage(slide, template01ModelOf(slide, index), url);
+  }
+  if (style === 'template02') {
+    return template02SetImage(slide, template02ModelOf(slide, index), url);
+  }
+  return target === 'content'
+    ? { contentImageUrl: url, contentImagePosition: { ...DEFAULT_IMAGE_POSITION } }
+    : {
+        backgroundImageUrl: url,
+        gridImageUrl: url,
+        imageType: 'background',
+        imagePosition: { ...DEFAULT_IMAGE_POSITION },
+      };
+}
+
 export function useGenerateCarouselImages() {
   const { slides, style, updateSlide } = useEditorStore();
   const [generating, setGenerating] = useState(false);
@@ -149,9 +188,7 @@ export function useGenerateCarouselImages() {
           const url = await generateForSlideWithRetry(slide, i, slides.length, (waitSecs) => {
             toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
           });
-          updateSlide(i, target === 'content'
-            ? { contentImageUrl: url }
-            : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
+          updateSlide(i, imagePatch(slide, style, i, target, url));
         } catch (err) {
           // Sem créditos: os próximos slides falhariam igual — para o lote.
           if (isInsufficientCredits(err)) {
@@ -198,9 +235,7 @@ export function useGenerateCarouselImages() {
       const url = await generateForSlideWithRetry(slide, index, slides.length, (waitSecs) => {
         toast.loading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`, { id: toastId });
       }, opts);
-      updateSlide(index, target === 'content'
-        ? { contentImageUrl: url }
-        : { backgroundImageUrl: url, gridImageUrl: url, imageType: 'background' });
+      updateSlide(index, imagePatch(slide, style, index, target, url));
       toast.success(`Slide ${index + 1} pronto!`, { id: toastId });
     } catch (err) {
       if (isInsufficientCredits(err)) {

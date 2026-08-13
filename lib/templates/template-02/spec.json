@@ -1,0 +1,569 @@
+{
+  "$schema": "creatools/template-spec/v1",
+  "id": "template-2",
+  "name": "Template 2",
+  "source": {
+    "figmaFileKey": "qMNw1aerJqyg72NVSeEysg",
+    "figmaFileName": "Template 2",
+    "lastModified": "2026-07-31T12:48:36Z",
+    "extractedAt": "2026-07-31"
+  },
+  "canvas": {
+    "width": 1080,
+    "height": 1350,
+    "aspectRatio": "4:5",
+    "unit": "px",
+    "coordinateOrigin": "top-left"
+  },
+  "tokens": {
+    "color": {
+      "ink": {
+        "value": "#000000",
+        "uso": "fundo da capa, texto de destaque sobre lime, títulos internos, texto do CTA"
+      },
+      "paper": {
+        "value": "#EEE5D9",
+        "uso": "fundo dos slides internos (creme)"
+      },
+      "accent": {
+        "value": "#E1FF00",
+        "uso": "marcador (highlight) atrás da frase-chave da capa"
+      },
+      "surface": {
+        "value": "#FFFFFF",
+        "uso": "headline da capa, pílula do CTA"
+      },
+      "imagePlaceholder": {
+        "value": "#CBC9BF",
+        "uso": "fill do bloco de imagem quando vazio"
+      },
+      "textMuted": {
+        "value": "#727272",
+        "uso": "corpo de texto e label 'Imagem'"
+      },
+      "textHeader": {
+        "value": "#767682",
+        "uso": "cabeçalho superior (categoria e @handle)"
+      },
+      "textHeaderOnImage": {
+        "value": "#FFFFFF",
+        "uso": "cabecalho da capa QUANDO ha imagem de fundo",
+        "razao": "#767682 tem luminancia ~0.19, quase igual a da imagem apos o scrim (0.21) -> contraste 1.07:1. Branco resolve sem precisar escurecer mais a foto."
+      }
+    },
+    "font": {
+      "display": {
+        "family": "Inter",
+        "postScript": "Inter-Bold",
+        "weight": 700,
+        "uso": "headline da capa"
+      },
+      "serif": {
+        "family": "Newsreader",
+        "postScript": "Newsreader-Medium",
+        "weight": 500,
+        "uso": "titulos dos slides internos",
+        "licenca": "LIVRE — Google Fonts / SIL OFL",
+        "substituiu": "IvyOra Text (comercial, Ivy Foundry)",
+        "alternativas": [
+          "Fraunces",
+          "Instrument Serif",
+          "Bodoni Moda"
+        ]
+      },
+      "body": {
+        "family": "Inter Display",
+        "postScript": "InterDisplay-Regular",
+        "weight": 400,
+        "uso": "corpo de texto, label 'Imagem'"
+      },
+      "ui": {
+        "family": "Inter Display",
+        "postScript": "InterDisplay-Medium",
+        "weight": 500,
+        "uso": "cabeçalho e CTA"
+      }
+    },
+    "typeRules": {
+      "lineHeightRatio": 1.0914,
+      "letterSpacingRatio": {
+        "display": -0.06,
+        "body": -0.05
+      },
+      "nota": "line-height e 109.14% do font-size em TODOS os textos do template. Letter-spacing e -6% do font-size nos textos display (headline, titulo, CTA) e -5% nos textos de corpo/UI (body, label, cabecalho)."
+    },
+    "typeScale": {
+      "coverHeadline": {
+        "exact": 76.5495,
+        "normalized": 76,
+        "letterSpacing": -4.593,
+        "lineHeight": 83.5448,
+        "font": "display",
+        "case": "UPPERCASE",
+        "align": "CENTER"
+      },
+      "slideTitle": {
+        "exact": 73.1693,
+        "normalized": 73,
+        "letterSpacing": -4.3902,
+        "lineHeight": 79.8557,
+        "font": "serif",
+        "case": "Sentence case",
+        "align": "LEFT"
+      },
+      "slideBody": {
+        "exact": 38.2853,
+        "normalized": 38,
+        "letterSpacing": -1.9143,
+        "lineHeight": 41.784,
+        "font": "body",
+        "case": "Sentence case",
+        "align": "LEFT"
+      },
+      "ctaLabel": {
+        "exact": 29.7326,
+        "normalized": 30,
+        "letterSpacing": -1.784,
+        "lineHeight": 32.4497,
+        "font": "ui",
+        "case": "UPPERCASE",
+        "align": "CENTER"
+      },
+      "imageLabel": {
+        "exact": 28.2979,
+        "normalized": 28,
+        "letterSpacing": -1.4149,
+        "lineHeight": 30.8838,
+        "font": "body",
+        "case": "Sentence case",
+        "align": "LEFT"
+      },
+      "headerMeta": {
+        "exact": 16.8046,
+        "normalized": 17,
+        "letterSpacing": -0.8402,
+        "lineHeight": 18.3402,
+        "font": "ui",
+        "case": "UPPERCASE",
+        "align": "LEFT/RIGHT"
+      }
+    },
+    "radius": {
+      "none": 0,
+      "card": 17,
+      "pill": 88.2553
+    },
+    "grid": {
+      "marginX": 85,
+      "contentTop": 147,
+      "contentBottom": 1236,
+      "contentHeight": 1089,
+      "verticalCenter": 691.5,
+      "headerY": 44,
+      "headerMarginX": 71,
+      "imageColumnWidth": 380,
+      "textColumnWidth": 409,
+      "columnGap": 121,
+      "nota": "85 + 409(texto) + 121(gap) + 380(imagem) + 85 = 1080. content-right e espelho EXATO de content-left."
+    }
+  },
+  "effects": {
+    "gradientes": "O arquivo do Figma nao contem gradientes. O scrim da capa e uma definicao do produto (Creatools), adicionada na v3 — nao foi extraida do Figma.",
+    "sombras": "NENHUMA. Nenhum node possui effects.",
+    "strokes": "NENHUM stroke visivel. Os valores de strokeWeight presentes sao residuais do Figma, sem paint associado.",
+    "opacidade": "Todos os nodes em 100%. blendMode NORMAL / PASS_THROUGH."
+  },
+  "chrome": {
+    "descricao": "Cabecalho fixo, presente e identico em TODOS os slides.",
+    "elementos": [
+      {
+        "id": "header.category",
+        "tipo": "text",
+        "conteudoExemplo": "BRANDING & DESIGN DE MARCA",
+        "variavel": true,
+        "x": 71,
+        "y": 44,
+        "align": "LEFT",
+        "style": "headerMeta",
+        "color": "textHeader"
+      },
+      {
+        "id": "header.handle",
+        "tipo": "text",
+        "conteudoExemplo": "@OANDRELONA",
+        "variavel": true,
+        "xRight": 1017,
+        "y": 44,
+        "align": "RIGHT",
+        "style": "headerMeta",
+        "color": "textHeader",
+        "nota": "No Figma a borda direita fica em 1017 (margem 63) enquanto a esquerda usa 71. Recomendado normalizar para 71/71 -> xRight 1009."
+      }
+    ]
+  },
+  "layouts": [
+    {
+      "id": "cover",
+      "nome": "Capa",
+      "figmaNodeId": "1:2",
+      "figmaFrame": "TEMPLATE 2 - SLIDE 1",
+      "background": {
+        "tipo": "layered",
+        "camadas": [
+          {
+            "z": 0,
+            "tipo": "imageSlot",
+            "id": "cover.backgroundImage",
+            "x": 0,
+            "y": 0,
+            "w": 1080,
+            "h": 1350,
+            "scaleMode": "COVER",
+            "focus": "center",
+            "variavel": true,
+            "fallback": "ink (#000000) quando nao ha imagem"
+          },
+          {
+            "z": 1,
+            "tipo": "gradient",
+            "id": "cover.scrim",
+            "x": 0,
+            "y": 0,
+            "w": 1080,
+            "h": 1350,
+            "gradientType": "LINEAR",
+            "angle": "180deg (topo -> base)",
+            "stops": [
+              {
+                "pos": 0.0,
+                "color": "rgba(0,0,0,0.60)",
+                "razao": "scrim do cabecalho"
+              },
+              {
+                "pos": 0.22,
+                "color": "rgba(0,0,0,0.25)",
+                "razao": "deixa a imagem respirar"
+              },
+              {
+                "pos": 0.62,
+                "color": "rgba(0,0,0,0.75)",
+                "razao": "comeca antes da headline (y=755 = 0.56)"
+              },
+              {
+                "pos": 1.0,
+                "color": "rgba(0,0,0,0.96)",
+                "razao": "base solida sob headline e CTA"
+              }
+            ],
+            "sempreVisivel": true
+          },
+          {
+            "z": 2,
+            "tipo": "conteudo",
+            "descricao": "cabecalho, marcador, headline, pilula e CTA"
+          }
+        ]
+      },
+      "descricao": "Imagem de fundo cobrindo o frame inteiro, degrade preto por cima dela, e os textos por cima do degrade. Sem imagem, o fundo cai para preto solido e o degrade continua (invisivel).",
+      "elementos": [
+        {
+          "id": "cover.highlight",
+          "tipo": "inlineSpan",
+          "fill": "accent",
+          "radius": 0,
+          "modo": "span de fundo atras da frase-chave",
+          "paddingX": 14,
+          "textColor": "ink"
+        },
+        {
+          "id": "cover.headline",
+          "tipo": "text",
+          "x": 120.98,
+          "y": 755,
+          "w": 836,
+          "h": 336,
+          "zIndex": 2,
+          "style": "coverHeadline",
+          "color": "surface",
+          "align": "CENTER",
+          "verticalAlign": "TOP",
+          "autoResize": "WIDTH_AND_HEIGHT",
+          "variavel": true,
+          "conteudoExemplo": "A NOVA TIPOGRAFIA DO\nFC BARCELONA REVELA\nO PODER SECRETO DO\nBRANDING!",
+          "quebrasManuais": true,
+          "linhas": 4,
+          "highlightSpan": {
+            "regra": "TODO texto sobre o marcador fica preto (ink). Marcador nunca cruza duas linhas."
+          }
+        },
+        {
+          "id": "cover.ctaPill",
+          "tipo": "rect",
+          "x": "auto",
+          "y": 1127,
+          "h": 68,
+          "fill": "surface",
+          "radius": 88.2553,
+          "zIndex": 1,
+          "centrado": true,
+          "paddingX": 78,
+          "paddingY": 18
+        },
+        {
+          "id": "cover.ctaText",
+          "tipo": "text",
+          "x": "auto",
+          "y": 1145,
+          "h": 32,
+          "zIndex": 2,
+          "style": "ctaLabel",
+          "color": "ink",
+          "align": "CENTER",
+          "variavel": true,
+          "conteudoExemplo": "CHAMADA PARA AÇÃO",
+          "centrado": true
+        }
+      ],
+      "regraCabecalho": "Com imagem de fundo -> textHeaderOnImage (#FFFFFF). Sem imagem -> textHeader (#767682)."
+    },
+    {
+      "id": "content-left",
+      "nome": "Conteudo a esquerda / Imagem a direita",
+      "figmaNodeId": "1:10",
+      "figmaFrame": "TEMPLATE 2 - SLIDE 2",
+      "duplicadoEm": [
+        "1:75 (TEMPLATE 2 - SLIDE 4)"
+      ],
+      "background": "paper",
+      "descricao": "Fundo creme. Coluna de texto (titulo serif + corpo) a esquerda, verticalmente centrada contra o bloco de imagem full-height a direita.",
+      "elementos": [
+        {
+          "id": "content.title",
+          "tipo": "text",
+          "x": 85,
+          "w": 409,
+          "style": "slideTitle",
+          "color": "ink",
+          "align": "LEFT",
+          "autoResize": "HEIGHT",
+          "variavel": true,
+          "conteudoExemplo": "Mais que um clube, é uma marca global",
+          "linhas": 3
+        },
+        {
+          "id": "content.body",
+          "tipo": "text",
+          "x": 85,
+          "w": 409,
+          "style": "slideBody",
+          "color": "textMuted",
+          "align": "LEFT",
+          "variavel": true,
+          "conteudoExemplo": "O FC Barcelona redesignou sua tipografia própria para unificar toda a comunicação visual. \n\nEntenda como o design traduz a essência de um gigante esportivo.",
+          "paragrafos": 2,
+          "separadorParagrafo": "\\n\\n"
+        },
+        {
+          "id": "content.image",
+          "tipo": "imageSlot",
+          "x": 615,
+          "y": 147,
+          "w": 380,
+          "h": 1089,
+          "radius": 17,
+          "fillVazio": "imagePlaceholder",
+          "scaleMode": "FILL",
+          "variavel": true
+        },
+        {
+          "id": "content.imageLabel",
+          "tipo": "text",
+          "x": 805.0,
+          "y": 675,
+          "h": 34,
+          "style": "imageLabel",
+          "color": "textMuted",
+          "conteudoExemplo": "Imagem",
+          "visivelSe": "imageSlot vazio",
+          "nota": "Centralizado no bloco de imagem. Some quando ha imagem real.",
+          "align": "CENTER"
+        }
+      ],
+      "verticalCentering": {
+        "container": {
+          "y": 147,
+          "h": 1089
+        },
+        "regra": "titulo + gap 31.74 + corpo, centralizados verticalmente em y=691.5",
+        "css": "position:absolute;top:147px;height:1089px;display:flex;flex-direction:column;justify-content:center"
+      }
+    },
+    {
+      "id": "content-right",
+      "nome": "Imagem a esquerda / Conteudo a direita",
+      "figmaNodeId": "1:20",
+      "figmaFrame": "TEMPLATE 2 - SLIDE 3",
+      "duplicadoEm": [
+        "1:85 (TEMPLATE 2 - SLIDE 5)"
+      ],
+      "background": "paper",
+      "descricao": "Espelho EXATO de content-left. Imagem a esquerda (x=85), texto a direita (x=586).",
+      "elementos": [
+        {
+          "id": "content.image",
+          "tipo": "imageSlot",
+          "x": 85,
+          "y": 147,
+          "w": 380,
+          "h": 1089,
+          "radius": 17,
+          "fillVazio": "imagePlaceholder",
+          "scaleMode": "FILL",
+          "variavel": true
+        },
+        {
+          "id": "content.imageLabel",
+          "tipo": "text",
+          "x": 275.0,
+          "y": 675,
+          "h": 34,
+          "style": "imageLabel",
+          "color": "textMuted",
+          "conteudoExemplo": "Imagem",
+          "visivelSe": "imageSlot vazio",
+          "align": "CENTER"
+        },
+        {
+          "id": "content.title",
+          "tipo": "text",
+          "x": 586,
+          "w": 409,
+          "style": "slideTitle",
+          "color": "ink",
+          "align": "LEFT",
+          "variavel": true,
+          "conteudoExemplo": "O caos visual de múltiplas fontes",
+          "linhas": 3
+        },
+        {
+          "id": "content.body",
+          "tipo": "text",
+          "x": 586,
+          "w": 409,
+          "style": "slideBody",
+          "color": "textMuted",
+          "align": "LEFT",
+          "variavel": true,
+          "conteudoExemplo": "Antes, o clube utilizava diversas famílias tipográficas sem conexão. Isso enfraquecia a identidade e dificultava o reconhecimento da marca nos canais digitais."
+        }
+      ],
+      "verticalCentering": {
+        "container": {
+          "y": 147,
+          "h": 1089
+        },
+        "regra": "titulo + gap 31.74 + corpo, centralizados verticalmente em y=691.5",
+        "css": "position:absolute;top:147px;height:1089px;display:flex;flex-direction:column;justify-content:center"
+      }
+    }
+  ],
+  "regrasDeLayout": {
+    "centralizacaoVertical": "O grupo de texto (titulo + gap 31.74 + corpo) e verticalmente centrado em y=691.5, que e exatamente o centro do bloco de imagem (147 + 1089/2). Esta e a regra estruturante dos slides internos: o texto sobe ou desce conforme cresce, mantendo o centro fixo.",
+    "gapTituloCorpo": 31.74,
+    "safeArea": "Cabecalho em y=44 (h=18). Conteudo comeca em y=147. Rodape livre a partir de y=1236.",
+    "profundidade": "Sem camadas sobrepostas exceto: (1) marcador lime ATRAS do headline na capa; (2) pilula branca ATRAS do texto de CTA."
+  },
+  "regrasDeGeracao": {
+    "sequenciaPadrao": [
+      "cover",
+      "content-left",
+      "content-right",
+      "content-left",
+      "content-right"
+    ],
+    "alternancia": "Apos a capa, os slides internos ALTERNAM entre content-left e content-right. Nunca dois iguais seguidos.",
+    "highlight": {
+      "quando": "Exatamente 1 frase-chave por capa, sempre em uma unica linha do headline.",
+      "comoCalcular": "1) medir a largura do trecho destacado na linha; 2) rect.w = larguraDoTrecho + 2*padding (padding ~14px cada lado, derivado: rect 652 vs linha 1 do headline); 3) rect.x = centro da linha - rect.w/2; 4) rect.y = topo da linha - 1px; 5) rect.h = 81 (= lineHeight 83.54 - 2.5); 6) caracteres do trecho recebem fill 'ink'.",
+      "restricao": "O marcador nunca deve cruzar duas linhas."
+    },
+    "limitesDeTexto": {
+      "cover.headline": {
+        "maxCharPorLinha": 17,
+        "maxLinhas": 4,
+        "quebra": "MANUAL (array)",
+        "medidoEm": "Inter Bold 76.55 / caixa 836px"
+      },
+      "cover.highlight": {
+        "regra": "contido em 1 linha do headline"
+      },
+      "cover.cta": {
+        "maxChar": 24
+      },
+      "content.title": {
+        "maxChar": 40,
+        "maxLinhas": 3,
+        "medidoEm": "Newsreader Medium 73.17 / coluna 409px"
+      },
+      "content.body": {
+        "maxChar": 220,
+        "maxLinhas": 9,
+        "paragrafos": "1 a 2, separados por \\n\\n"
+      },
+      "header.category": {
+        "maxChar": 30
+      },
+      "header.handle": {
+        "maxChar": 18
+      }
+    }
+  },
+  "inconsistenciasDetectadas": [
+    "Slides 4 e 5 sao DUPLICATAS EXATAS dos slides 2 e 3 (mesmo texto, mesmas coordenadas). O template real tem 3 arquetipos, nao 5.",
+    "Slide 3 nao e espelho perfeito do slide 2: imagem em x=88 (esperado 89), coluna de texto w=385 (slide 2 usa 409), margem direita 130 vs 89.",
+    "Cabecalho: margem esquerda 71 e margem direita 63.",
+    "Pilula de CTA da capa esta 8.5px a direita do centro do canvas.",
+    "Highlight da capa: os caracteres 'A ' e ' DO' ficam brancos sobre o fundo lime, provavelmente por selecao imprecisa.",
+    "Font-sizes com muitas casas decimais (76.5495, 73.1693...) indicam que o layout foi escalado manualmente em algum momento.",
+    "CORRIGIDO na v2: espelhamento, grid, centralizacao da pilula, margens do cabecalho, fonte comercial."
+  ],
+  "riscosDeImplementacao": [
+    "IvyOra Text e fonte comercial (Ivy Foundry). Precisa de licenca de webfont/self-host para o Creatools. Fallback proximo: Fraunces, Newsreader ou PP Editorial New.",
+    "'Inter Display' e o corte optical-size do Inter 4.x — no Google Fonts a familia 'Inter' variavel ja cobre isso via font-optical-sizing, mas o corte Display precisa ser forcado.",
+    "Letter-spacing negativo forte (-6%) muda muito o comprimento das linhas; os limites de caracteres acima ja assumem esse tracking."
+  ],
+  "camposEditaveis": {
+    "global": {
+      "header.category": {
+        "tipo": "string",
+        "default": "BRANDING & DESIGN DE MARCA",
+        "case": "UPPERCASE",
+        "maxChar": 30
+      },
+      "header.handle": {
+        "tipo": "string",
+        "default": "@OANDRELONA",
+        "case": "UPPERCASE",
+        "maxChar": 18
+      }
+    },
+    "porSlide": {
+      "cover": [
+        "headline (com marcador)",
+        "cta"
+      ],
+      "content-left": [
+        "title",
+        "body",
+        "image"
+      ],
+      "content-right": [
+        "title",
+        "body",
+        "image"
+      ]
+    },
+    "nota": "header.category e header.handle sao globais do carrossel, mas aceitam override por slide."
+  },
+  "version": 3
+}

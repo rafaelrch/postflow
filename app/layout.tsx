@@ -63,6 +63,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* IvyOra Text — projeto web do Adobe Fonts. É a serifada do TEMPLATE 1
+            (spec do Figma) e a do catálogo do editor. Não pode ser self-hosted:
+            a licença serve pelo CDN do Adobe.
+
+            `crossOrigin` não é enfeite: a exportação lê os @font-face das folhas
+            do documento para embutir as fontes em data: URL no PNG. Sem CORS o
+            `cssRules` fica ilegível e o PNG sairia com a fonte substituta
+            enquanto a tela mostra a certa — ver lib/fontEmbed.ts. */}
+        <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
+        <link rel="stylesheet" href="https://use.typekit.net/edr7www.css" crossOrigin="anonymous" />
         {/* Preserva fontes que o editor de slides usa (catálogo) */}
         <link
           href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@700;800&family=Bebas+Neue&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=Fjalla+One&family=Inter:wght@400;700;900&family=Lato:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;600;700&family=Raleway:wght@700;800&family=Roboto:wght@400;500&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap"

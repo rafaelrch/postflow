@@ -13,9 +13,12 @@ vi.mock('@/lib/supabase-server', () => ({
   }),
 }));
 
-// Estes testes cobrem sessão/mídia/derivação de path — usuário pro passa direto
-// pela trava de custo (fatia 4b) sem tocar o banco. A trava tem teste próprio
-// em tests/reels-upload-cost-gate.test.ts.
+// Estes testes cobrem sessão/mídia/derivação de path. A trava de posse do reel
+// (anti-IDOR) tem teste próprio em tests/reels-upload-cost-gate.test.ts.
+// Este arquivo descreve o comportamento da rota com Reels LIGADO. O gate da
+// chave desligada tem teste próprio em tests/reels-feature-flag.test.tsx.
+vi.mock('@/lib/feature-flags', () => ({ REELS_ENABLED: true }));
+
 let POST: typeof import('../app/api/reels/upload-url/route').POST;
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';

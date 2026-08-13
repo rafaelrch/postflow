@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { REELS_ENABLED } from '@/lib/feature-flags';
 import {
   isAllowedVideoMime,
   validateVideoMeta,
@@ -23,7 +24,7 @@ import {
  *     ANTES de assinar. O teto de 1 reel do plano gratuito que existia aqui saiu
  *     junto com o plano: sem free, não há limite de acervo a impor.
  */
-export const REELS_BUCKET = 'postflow-reels';
+const REELS_BUCKET = 'postflow-reels';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,6 +36,13 @@ interface UploadUrlBody {
 }
 
 export async function POST(request: Request) {
+  // Funcionalidade desligada: a rota some do ponto de vista de quem chama. Isso
+  // vem ANTES de qualquer coisa — nem sessão, nem banco, nem URL assinada. Não
+  // faz sentido deixar um endpoint de upload aberto pra algo que está fora do ar.
+  if (!REELS_ENABLED) {
+    return NextResponse.json({ error: 'Não encontrado.' }, { status: 404 });
+  }
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

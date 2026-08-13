@@ -70,18 +70,23 @@ export default function FormatDropdown({ value, onChange }: FormatDropdownProps)
         aria-haspopup="listbox"
         aria-expanded={open}
         title="Formato do carrossel"
-        className="flex items-center gap-1.5 text-xs font-semibold rounded-[10px] px-2.5 py-1 transition-[box-shadow,transform] active:translate-x-[1px] active:translate-y-[1px]"
+        // Caixa do desenho: 175 × 40, branca, borda fina, raio 10. O rótulo fica
+        // à esquerda e o chevron encostado na direita.
+        className="w-[175px] h-[40px] flex items-center gap-2.5 text-[14px] rounded-[10px] pl-[21px] pr-3 transition-[box-shadow,transform] active:translate-x-[1px] active:translate-y-[1px]"
         style={{
-          background: 'var(--paper)',
+          background: 'var(--studio-surface)',
           color: 'var(--ink)',
-          border: `1.5px solid ${open ? 'var(--ink)' : 'var(--line-strong)'}`,
+          border: `1px solid ${open ? 'var(--ink)' : 'var(--studio-line)'}`,
           boxShadow: open ? 'var(--sh-1)' : 'none',
         }}
       >
-        <ActiveIcon className="w-3.5 h-3.5" />
-        <span>{active.menuLabel}</span>
+        <ActiveIcon className="w-[18px] h-[18px] shrink-0" />
+        {/* Só o NOME no gatilho ("Carrossel"), como no desenho: a proporção
+            passou a viver na barra de status, em "1080 × 1350px". Na lista
+            aberta o `menuLabel` completo continua — lá ela desempata. */}
+        <span className="flex-1 text-left truncate">{active.menuLabel.replace(/\s*\(.*\)$/, '')}</span>
         <ChevronDown
-          className="w-3.5 h-3.5 transition-transform"
+          className="w-4 h-4 shrink-0 transition-transform"
           style={{ transform: open ? 'rotate(180deg)' : 'none', color: 'var(--ink-dim)' }}
         />
       </button>

@@ -7,6 +7,8 @@ import { getFormat } from '@/lib/formats';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
+import Template01Slide from '@/components/slides/Template01Slide';
+import Template02Slide from '@/components/slides/Template02Slide';
 
 interface SlidePreviewProps {
   slide: Slide;
@@ -27,7 +29,9 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
   ref
 ) {
   // Dimensões do formato ativo — a moldura escalada acompanha a proporção real.
-  const { width: SLIDE_W, height: SLIDE_H } = getFormat(globalSettings.format);
+  const fmt = getFormat(globalSettings.format);
+  const SLIDE_W = fmt.width;
+  const SLIDE_H = fmt.height;
 
   const profileData = {
     photo: globalSettings.profileBadge.photo || '',
@@ -65,7 +69,23 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
           pointerEvents: innerPointerEvents,
         }}
       >
-        {style === 'profile' ? (
+        {style === 'template02' ? (
+          <Template02Slide
+            slide={slide}
+            globalSettings={globalSettings}
+            slideIndex={slideIndex}
+            totalSlides={totalSlides}
+            forExport={forExport}
+          />
+        ) : style === 'template01' ? (
+          <Template01Slide
+            slide={slide}
+            globalSettings={globalSettings}
+            slideIndex={slideIndex}
+            totalSlides={totalSlides}
+            forExport={forExport}
+          />
+        ) : style === 'profile' ? (
           <ProfileSlide
             slide={slide}
             globalSettings={globalSettings}
