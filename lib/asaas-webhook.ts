@@ -181,8 +181,20 @@ export interface WebhookContext {
   /** Última cobrança conhecida (pay_xxx), quando o evento é de cobrança. */
   paymentId: string | null;
   customerId: string | null;
-  /** externalReference = id do lead. Pode não vir; ver nota em buildSubscriptionPatch. */
+  /**
+   * externalReference = id do lead. NA PRÁTICA VEM SEMPRE NULL: mandamos na
+   * criação do checkout e o Asaas não propaga para payment nem para
+   * subscription (medido em sandbox, 12/08/2026). Continua sendo lido porque é
+   * a fonte mais direta SE um dia passar a vir. Ver `checkoutSession`.
+   */
   externalReference: string | null;
+  /**
+   * `checkoutSession` — o id do checkout que o POST /v3/checkouts nos devolveu.
+   * É o que o Asaas DE FATO devolve no webhook, e a chave de
+   * payment_checkout_refs, que traduz de volta para o lead. Sem isto a
+   * atribuição lead↔pagamento se perde.
+   */
+  checkoutSession: string | null;
   value: number | null;
   cycle: string | null;
   billingType: string | null;
@@ -215,6 +227,9 @@ export function extractContext(payload: unknown): WebhookContext {
     customerId: str(payment.customer) ?? str(subscription.customer),
     externalReference:
       str(payment.externalReference) ?? str(subscription.externalReference),
+    // Ordem payment → subscription: nos eventos de cobrança os dois trazem o
+    // MESMO id de checkout, e nos de assinatura só o segundo existe.
+    checkoutSession: str(payment.checkoutSession) ?? str(subscription.checkoutSession),
     value: num(payment.value) ?? num(subscription.value),
     cycle: str(subscription.cycle),
     billingType: str(payment.billingType) ?? str(subscription.billingType),
@@ -252,6 +267,27 @@ export function intervalFor(input: {
   return 'month';
 }
 
+/**
+ * Aplica o lead resolvido pela `payment_checkout_refs` ao contexto.
+ *
+ * PRECEDÊNCIA, e a ordem importa:
+ *   1. `externalReference` do evento — a fonte direta. Hoje nunca vem, mas se o
+ *      Asaas passar a mandar, ele ganha: veio do próprio objeto do pagamento.
+ *   2. lead resolvido pelo `checkoutSession` — o caminho que funciona hoje.
+ *
+ * Separado de buildSubscriptionPatch porque a resolução exige banco (fica na
+ * rota) enquanto a REGRA de precedência é pura e precisa de teste próprio.
+ * Devolve o mesmo ctx quando não há nada a mudar.
+ */
+export function withResolvedLead(
+  ctx: WebhookContext,
+  resolvedLeadId: string | null,
+): WebhookContext {
+  if (ctx.externalReference) return ctx;
+  if (!resolvedLeadId) return ctx;
+  return { ...ctx, externalReference: resolvedLeadId };
+}
+
 /** Linha existente, no que interessa para decidir o patch. */
 export interface CurrentSubscription {
   status?: string | null;
@@ -268,10 +304,11 @@ export type SubscriptionPatch = Record<string, unknown>;
  *
  * Regras que valem a pena ler antes de mexer:
  *
- * • NUNCA sobrescreve external_reference com null. Ele é o id do lead e a doc
- *   não garante que o externalReference do checkout se propague para os objetos
- *   de payment/subscription nos eventos. Se o evento não trouxer, o que já está
- *   gravado vale — perder essa chave quebra a conciliação lead↔pagamento.
+ * • NUNCA sobrescreve external_reference com null. Ele é o id do lead, e o Asaas
+ *   comprovadamente NÃO propaga o externalReference do checkout para os objetos
+ *   de payment/subscription (por isso existe withResolvedLead + a
+ *   payment_checkout_refs). Se nem o evento nem a ponte resolverem, o que já
+ *   está gravado vale — perder essa chave quebra a conciliação lead↔pagamento.
  *
  * • 'confirm_receipt' NÃO mexe em status. Só registra a cobrança e o status cru,
  *   para conciliação. Ver o aviso em EVENT_ACTIONS.

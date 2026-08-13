@@ -8,10 +8,25 @@ export const metadata = { referrer: 'no-referrer' as const };
 
 /**
  * Cadastro "pagamento primeiro": só é possível criar conta com um pagamento
- * confirmado. O `?ref=` é a referência que a página de retorno do checkout
- * repassa; quem valida de fato é o servidor, no /api/asaas/signup-intent, e o
- * gate final é o trigger enforce_paid_signup_precondition no banco. Aqui a
+ * confirmado. O `?t=` é o token assinado que o checkout do Asaas devolve na
+ * successUrl; quem valida de fato é o servidor, no /api/asaas/signup-intent, e
+ * o gate final é o trigger enforce_paid_signup_precondition no banco. Aqui a
  * checagem é só de formato, para não renderizar o formulário à toa.
+ *
+ * ⚠️ ESTA PÁGINA NÃO LIBERA NADA, E CHEGAR AQUI NÃO É PROVA DE PAGAMENTO.
+ * (O aviso morava na antiga /assinatura/sucesso, que era a primeira tela depois
+ * do checkout; desde que o successUrl aponta para cá, ele vale para esta.)
+ * O Asaas redireciona de volta ANTES de a cobrança ser confirmada, e o token só
+ * responde "de qual lead é esta volta" (ver lib/signup-token.ts) — nunca "pagou".
+ * Quem cria a assinatura é o webhook (PAYMENT_CONFIRMED), e o cadastro exige
+ * essa linha no banco. Se um dia alguém for tentado a "adiantar" o acesso a
+ * partir daqui — renderizar o formulário sem consultar o servidor, confiar no
+ * formato do token, o que for: é exatamente assim que se dá acesso de graça a
+ * quem fechou o checkout sem pagar.
+ *
+ * Token ausente ou adulterado não é erro do comprador — provavelmente ele
+ * chegou de um link velho —, então o texto é acolhedor; o que muda é não
+ * seguirmos para o formulário.
  *
  * Não há mais caminho gratuito: o plano free foi removido.
  */

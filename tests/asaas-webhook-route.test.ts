@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TOKEN = 'token-de-webhook-com-mais-de-32-caracteres-ok';
+/** Id do checkout (o `id` de POST /v3/checkouts, que volta como checkoutSession). */
+const SESSION = '008a7f76-2ae2-4100-9652-65b7b2ded675';
+const LEAD_ID = '3f8a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b';
 
 const {
   mockGetCustomer,
@@ -9,6 +12,7 @@ const {
   mockSubMaybeSingle,
   mockSubUpsert,
   mockRpc,
+  mockRefMaybeSingle,
 } = vi.hoisted(() => ({
   mockGetCustomer: vi.fn(),
   mockEventInsert: vi.fn(),
@@ -16,6 +20,7 @@ const {
   mockSubMaybeSingle: vi.fn(),
   mockSubUpsert: vi.fn(),
   mockRpc: vi.fn(),
+  mockRefMaybeSingle: vi.fn(),
 }));
 
 // Relativo ao ARQUIVO DE TESTE — mesmo módulo que a rota importa como
@@ -30,6 +35,9 @@ vi.mock('@/lib/supabase-admin', () => ({
           insert: mockEventInsert,
           update: () => ({ eq: mockEventUpdateEq }),
         };
+      }
+      if (table === 'payment_checkout_refs') {
+        return { select: () => ({ eq: () => ({ maybeSingle: mockRefMaybeSingle }) }) };
       }
       // subscriptions
       return {
@@ -66,6 +74,10 @@ function paymentEvent(event: string, over: Record<string, unknown> = {}, eventId
       value: 59.5,
       billingType: 'CREDIT_CARD',
       status: 'CONFIRMED',
+      // Como o Asaas manda de verdade: externalReference NULL (ele não propaga o
+      // que enviamos na criação do checkout) e checkoutSession preenchido.
+      externalReference: null,
+      checkoutSession: SESSION,
       ...over,
     },
   };
@@ -82,6 +94,7 @@ beforeEach(() => {
   mockEventUpdateEq.mockResolvedValue({ error: null });
   mockSubMaybeSingle.mockResolvedValue({ data: null });
   mockSubUpsert.mockResolvedValue({ error: null });
+  mockRefMaybeSingle.mockResolvedValue({ data: { lead_id: LEAD_ID }, error: null });
   mockRpc.mockResolvedValue({ error: null });
   mockGetCustomer.mockResolvedValue({ id: 'cus_1', email: 'pagador@test.com' });
 });
@@ -279,6 +292,104 @@ describe('POST /api/asaas/webhook — efeitos no banco', () => {
     const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
     expect(res.status).toBe(200);
     expect(mockEventUpdateEq).toHaveBeenCalled(); // evento concluído
+  });
+});
+
+describe('POST /api/asaas/webhook — atribuição do lead (external_reference)', () => {
+  // Este bloco existe por causa de um bug real: no primeiro pagamento em sandbox
+  // tudo funcionou MENOS external_reference, que ficou NULL. Causa: o Asaas não
+  // devolve o externalReference que mandamos no checkout — devolve
+  // `checkoutSession`. A ponte é a payment_checkout_refs.
+  it('resolve o lead por payment.checkoutSession', async () => {
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(mockRefMaybeSingle).toHaveBeenCalled();
+    expect(upsertedRow().external_reference).toBe(LEAD_ID);
+  });
+
+  it('resolve por subscription.checkoutSession quando não há objeto payment', async () => {
+    mockSubMaybeSingle.mockResolvedValue({ data: { id: 'sub_1', user_id: null } });
+
+    await POST(
+      webhookRequest({
+        id: 'evt_sub_1',
+        event: 'SUBSCRIPTION_CREATED',
+        subscription: {
+          object: 'subscription',
+          id: 'sub_1',
+          customer: 'cus_1',
+          status: 'ACTIVE',
+          cycle: 'MONTHLY',
+          externalReference: null,
+          checkoutSession: SESSION,
+        },
+      }),
+    );
+
+    expect(upsertedRow().external_reference).toBe(LEAD_ID);
+  });
+
+  it('PREFERE externalReference quando ele vier preenchido — e nem consulta a ponte', async () => {
+    // Hoje nunca vem, mas se o Asaas passar a mandar, a fonte direta ganha.
+    await POST(
+      webhookRequest(
+        paymentEvent('PAYMENT_CONFIRMED', { externalReference: 'lead-vindo-do-asaas' }),
+      ),
+    );
+
+    expect(upsertedRow().external_reference).toBe('lead-vindo-do-asaas');
+    expect(mockRefMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('sem NENHUMA pista: grava external_reference NULL, loga e não quebra', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await POST(
+      webhookRequest(
+        paymentEvent('PAYMENT_CONFIRMED', { externalReference: null, checkoutSession: null }),
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    // Nunca inventa: a coluna não é escrita, então continua NULL no banco.
+    expect(upsertedRow().external_reference).toBeUndefined();
+    expect(upsertedRow().status).toBe('active'); // o pagamento vale mais
+    expect(err).toHaveBeenCalled();
+  });
+
+  it('checkoutSession sem linha na ponte: NULL, log, e o pagamento segue', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockRefMaybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(res.status).toBe(200);
+    expect(upsertedRow().external_reference).toBeUndefined();
+    expect(upsertedRow().status).toBe('active');
+    expect(err).toHaveBeenCalled();
+  });
+
+  it('falha ao consultar a ponte não derruba o evento', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockRefMaybeSingle.mockRejectedValue(new Error('db fora do ar'));
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(res.status).toBe(200);
+    expect(upsertedRow().status).toBe('active');
+    expect(mockEventUpdateEq).toHaveBeenCalled(); // evento concluído
+  });
+
+  it('não apaga o external_reference já gravado quando nada resolve', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockRefMaybeSingle.mockResolvedValue({ data: null, error: null });
+    mockSubMaybeSingle.mockResolvedValue({
+      data: { id: 'sub_1', external_reference: 'lead-de-antes', user_id: null },
+    });
+
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(upsertedRow().external_reference).toBe('lead-de-antes');
   });
 });
 

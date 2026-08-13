@@ -3,13 +3,84 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mail } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'signup';
+
+/** Espelha PASSWORD_MIN da rota. O servidor recusa de novo, por último. */
+const PASSWORD_MIN = 6;
+
+/**
+ * Esperas entre as tentativas automáticas enquanto o pagamento está sendo
+ * confirmado. /cadastro é a PRIMEIRA tela depois do checkout, então chegar aqui
+ * antes do webhook do Asaas é o caso comum, não o raro — e mandar a pessoa
+ * clicar num botão para descobrir isso seria empurrar o nosso problema para ela.
+ *
+ * Crescente e cobrindo ~92s no total (0s, 4s, 12s, 27s, 52s, 92s): um cartão
+ * pode levar bem mais que os ~12s da primeira versão. Curto no começo, porque
+ * quase sempre resolve em segundos; espaçado no fim, para não martelar o
+ * servidor durante a espera longa.
+ *
+ * O ORÇAMENTO que sustenta isso mudou de lugar: o resolve tem balde próprio
+ * (consume_rate_window, 15/min por ip+token), separado do commit, que continua
+ * em 5/min. Antes os dois dividiam o mesmo, e alongar a espera aqui daria 429
+ * justamente em quem esperou direitinho. Ver supabase/migrations/
+ * 20260813_resolve_rate_limit.sql.
+ */
+const RETRY_DELAYS_MS = [4_000, 8_000, 15_000, 25_000, 40_000];
+
+/** O que o passo de resolve conclui: ou o e-mail da conta, ou um impedimento. */
+type ResolveOutcome =
+  | { ok: true; email: string }
+  | { ok: false; code?: string; message: string };
+
+async function resolvePaidEmail(token: string): Promise<ResolveOutcome> {
+  try {
+    const res = await fetch('/api/asaas/signup-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      email?: string;
+      error?: string;
+      code?: string;
+    };
+    if (res.ok && res.status !== 202 && data.ok && data.email) {
+      return { ok: true, email: data.email };
+    }
+    return { ok: false, code: data.code, message: signupIntentMessage(data.code, data.error) };
+  } catch {
+    return { ok: false, message: 'Não foi possível confirmar o pagamento. Tente de novo em instantes.' };
+  }
+}
+
+/**
+ * Os estados do pagamento, em português. O `code` é o contrato com
+ * app/api/asaas/signup-intent/route.ts; o texto mora aqui.
+ *
+ * Só `payment_pending` manda esperar — nos outros dois esperar não resolve, e
+ * dizer "estamos confirmando" era mandar recarregar a página para sempre.
+ */
+function signupIntentMessage(code: string | undefined, fallback?: string): string {
+  switch (code) {
+    case 'payment_pending':
+      return 'Ainda estamos confirmando seu pagamento. Tente de novo em instantes.';
+    case 'account_exists':
+      return 'Este pagamento já tem uma conta. Faça login para entrar.';
+    case 'no_payment_found':
+      return 'Não encontramos um pagamento para este link de cadastro. Se você já pagou, use o link que abriu ao concluir o pagamento — ou fale com o suporte.';
+    case 'weak_password':
+      return `Escolha uma senha de pelo menos ${PASSWORD_MIN} caracteres.`;
+    default:
+      return fallback || 'Não foi possível confirmar o pagamento.';
+  }
+}
 
 export default function AuthForm({
   mode,
@@ -33,15 +104,87 @@ export default function AuthForm({
 
   const [email, setEmail] = useState(lockedEmail ?? '');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  /** Só no cadastro: descobrindo de quem é a conta antes de mostrar o form. */
+  const [resolving, setResolving] = useState(isSignup && !!signupToken && !lockedEmail);
+  /** Motivo pelo qual não há formulário a mostrar (pagamento pendente etc.). */
+  const [blocked, setBlocked] = useState<{ message: string; code?: string } | null>(null);
+  /** Qual tentativa de resolve está valendo. 0 = a inicial. */
+  const [attempt, setAttempt] = useState(0);
+  /**
+   * A PROMESSA de cada tentativa, não um "já comecei". A diferença é o bug que
+   * travava a tela: com um booleano, a segunda montagem do StrictMode saía pelo
+   * guard sem se pendurar em nada, e o resultado do fetch da primeira era
+   * descartado pelo `active` já falso — ninguém mais chamava setResolving(false)
+   * e o spinner ficava para sempre, com o servidor tendo respondido 200.
+   *
+   * Guardando a promessa, o fetch continua acontecendo UMA vez por tentativa
+   * (a cota de consume_passwordless_rate é o motivo do guard) e toda montagem
+   * viva se pendura no mesmo resultado, tenha ele chegado antes ou depois.
+   * Mesmo padrão do verificationRef em app/(auth)/definir-senha/page.tsx.
+   */
+  const attemptsRef = useRef(new Map<number, Promise<ResolveOutcome>>());
 
   const title = isSignup ? 'Criar conta' : 'Entrar';
 
+  /**
+   * O e-mail da conta é o DE QUEM PAGOU, decidido pelo Asaas — não o que a
+   * pessoa digitaria aqui. Um campo editável seria mentira: ela digita um e o
+   * sistema usa outro (foi assim que o teste real confundiu dois endereços
+   * parecidos). Então perguntamos ao servidor de quem é a conta e exibimos
+   * travado. Este passo não cria nada nem envia e-mail.
+   */
+  useEffect(() => {
+    if (!isSignup || !signupToken || lockedEmail) return;
+
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const attempts = attemptsRef.current;
+    let pending = attempts.get(attempt);
+    if (!pending) {
+      pending = resolvePaidEmail(signupToken);
+      attempts.set(attempt, pending);
+    }
+
+    void pending.then((outcome) => {
+      if (!active) return;
+
+      if (outcome.ok) {
+        setEmail(outcome.email);
+        setResolving(false);
+        return;
+      }
+
+      // Webhook ainda não chegou. Esperar RESOLVE — então esperamos nós, em vez
+      // de devolver um botão para a pessoa clicar.
+      if (outcome.code === 'payment_pending' && attempt < RETRY_DELAYS_MS.length) {
+        timer = setTimeout(() => setAttempt((a) => a + 1), RETRY_DELAYS_MS[attempt]);
+        return;
+      }
+
+      setBlocked({ message: outcome.message, code: outcome.code });
+      setResolving(false);
+    });
+
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isSignup, signupToken, lockedEmail, attempt]);
+
+  /** Botão manual, só depois de as automáticas se esgotarem. */
+  const retryResolve = () => {
+    setBlocked(null);
+    setResolving(true);
+    setAttempt((a) => a + 1);
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
 
     try {
       const supabase = createClient();
@@ -50,36 +193,55 @@ export default function AuthForm({
         // Sem prova de pagamento não deixa cadastrar. A prova é o token
         // assinado que veio na successUrl do checkout do Asaas (HMAC do id do
         // lead, ver lib/signup-token.ts) — quem valida é o servidor. Não
-        // confia no e-mail travado no form, que é client-side.
+        // confia no e-mail exibido no form, que é client-side.
         const token = signupToken;
         if (!token) {
           toast.error('Não encontramos o pagamento desta assinatura. Assine um plano antes de criar a conta.');
           return;
         }
 
+        // Barrado no cliente para não gastar cota do rate limit com erro de
+        // digitação. O servidor recusa de novo (code weak_password).
+        if (password.length < PASSWORD_MIN) {
+          toast.error(`Escolha uma senha de pelo menos ${PASSWORD_MIN} caracteres.`);
+          return;
+        }
+        if (password !== passwordConfirm) {
+          toast.error('As senhas não conferem.');
+          return;
+        }
+
         if (confirmationSent) return;
+        setLoading(true);
         const verifyRes = await fetch('/api/asaas/signup-intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ token, password }),
         });
-        if (verifyRes.status === 202) {
-          // O webhook ainda não confirmou o pagamento. Não é erro de quem pagou
-          // — é corrida com o Asaas; pedir para tentar de novo é honesto.
-          toast('Ainda estamos confirmando seu pagamento. Tente de novo em instantes.');
-          return;
-        }
-        if (!verifyRes.ok) {
-          const verifyData = await verifyRes.json().catch(() => ({}));
-          toast.error(verifyData.error || 'Não foi possível confirmar o pagamento para este e-mail.');
+        if (!verifyRes.ok || verifyRes.status === 202) {
+          const verifyData = (await verifyRes.json().catch(() => ({}))) as {
+            error?: string;
+            code?: string;
+          };
+          // Cada estado tem a SUA mensagem: antes os três caíam em "ainda
+          // estamos confirmando seu pagamento" — falso em dois deles, e a
+          // pessoa recarregava a página achando que a lentidão era nossa.
+          const message = signupIntentMessage(verifyData.code, verifyData.error);
+          if (verifyData.code === 'payment_pending' || verifyData.code === 'account_exists') {
+            toast(message);
+          } else {
+            toast.error(message);
+          }
           return;
         }
 
         setConfirmationSent(true);
         window.history.replaceState(null, '', '/cadastro');
-        toast.success('Link enviado. Confira sua caixa de entrada.');
+        toast.success('Conta criada. Confirme seu e-mail para entrar.');
         return;
       }
+
+      setLoading(true);
 
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -130,26 +292,77 @@ export default function AuthForm({
                 <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
                   Enviamos um e-mail de confirmação
                   {email ? <> para <strong style={{ color: 'var(--ink)' }}>{email}</strong></> : null}.
-                  Clique no link para confirmar seu e-mail e criar sua senha.
+                  Clique no link para confirmar e entrar.
                 </p>
               </div>
-              <p className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>Após a confirmação, você definirá a senha na próxima página.</p>
+              <p className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>Sua senha já está definida — depois de confirmar, é só entrar.</p>
+            </div>
+          ) : resolving ? (
+            <div className="brand-card flex flex-col gap-2" style={{ padding: 24 }} data-testid="signup-resolving">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--ink-dim)' }} />
+                <p className="text-[14px]" style={{ color: 'var(--ink-dim)' }}>Confirmando seu pagamento…</p>
+              </div>
+              {attempt > 0 && (
+                <p className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                  A confirmação da operadora costuma levar alguns segundos, e às vezes até um minuto. Estamos verificando sozinhos — não precisa fazer nada nem recarregar a página.
+                </p>
+              )}
+            </div>
+          ) : blocked ? (
+            <div className="brand-card flex flex-col gap-4" style={{ padding: 24 }}>
+              <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>{blocked.message}</p>
+              {/* A saída depende do estado: quem já tem conta vai para o login;
+                  quem está esperando o webhook só precisa tentar de novo. */}
+              {blocked.code === 'account_exists' ? (
+                <Link href="/login" className="brand-btn accent w-full justify-center">Ir para o login</Link>
+              ) : blocked.code === 'payment_pending' ? (
+                // Só aparece depois das automáticas. Cada clique gasta mais uma
+                // cota do rate limit, por isso não é a primeira coisa oferecida.
+                <Button type="button" className="w-full" onClick={retryResolve}>
+                  Tentar de novo
+                </Button>
+              ) : (
+                <Link href="/precos" className="brand-btn w-full justify-center">Ver planos</Link>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="brand-card flex flex-col gap-4" style={{ padding: 20 }}>
-              <Field icon={Mail} label="E-mail" value={email} onChange={setEmail} placeholder="voce@email.com" type="email" autoComplete="email" required readOnly={!!lockedEmail} />
+              {isSignup ? (
+                // Texto fixo, não input: o e-mail vem do pagamento e não é
+                // editável. Um campo editável aqui seria mentira — a conta
+                // nasceria no endereço do pagamento, não no digitado.
+                <div>
+                  <label className="section-kicker block mb-2">Conta para o e-mail do pagamento</label>
+                  <div
+                    className="brand-input flex items-center gap-2"
+                    style={{ color: 'var(--ink)', cursor: 'default' }}
+                    aria-readonly="true"
+                    data-testid="signup-paid-email"
+                  >
+                    <Mail className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-dim)' }} />
+                    <span className="truncate">{email}</span>
+                  </div>
+                  <p className="mt-2 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                    A conta é criada neste endereço, o mesmo do pagamento.
+                  </p>
+                </div>
+              ) : (
+                <Field icon={Mail} label="E-mail" value={email} onChange={setEmail} placeholder="voce@email.com" type="email" autoComplete="email" required readOnly={!!lockedEmail} />
+              )}
 
-              {!isSignup && <div>
+              <div>
                 <label className="section-kicker block mb-2">Senha</label>
                 <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--ink-dim)' }} />
                   <input
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     type={showPassword ? 'text' : 'password'}
-                    minLength={6}
+                    minLength={PASSWORD_MIN}
                     required
                     autoComplete={isSignup ? 'new-password' : 'current-password'}
-                    placeholder="mínimo 6 caracteres"
+                    placeholder={`mínimo ${PASSWORD_MIN} caracteres`}
                     className="brand-input"
                     style={{ paddingLeft: 40, paddingRight: 44 }}
                   />
@@ -163,7 +376,27 @@ export default function AuthForm({
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>}
+              </div>
+
+              {isSignup && (
+                <div>
+                  <label className="section-kicker block mb-2">Confirmar senha</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--ink-dim)' }} />
+                    <input
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      type={showPassword ? 'text' : 'password'}
+                      minLength={PASSWORD_MIN}
+                      required
+                      autoComplete="new-password"
+                      placeholder="repita a senha"
+                      className="brand-input"
+                      style={{ paddingLeft: 40 }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <Button type="submit" className="w-full mt-2" disabled={loading}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}

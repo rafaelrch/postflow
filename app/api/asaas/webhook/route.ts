@@ -7,6 +7,7 @@ import {
   buildSubscriptionPatch,
   extractContext,
   verifyAccessToken,
+  withResolvedLead,
   type CurrentSubscription,
 } from '../../../../lib/asaas-webhook';
 import { getCustomer } from '../../../../lib/asaas/customers';
@@ -118,6 +119,61 @@ export async function POST(req: NextRequest) {
 
 type Admin = ReturnType<typeof createAdminSupabaseClient>;
 
+/**
+ * Traduz o `checkoutSession` do evento de volta para o lead que abriu o
+ * checkout, via payment_checkout_refs.
+ *
+ * Existe porque o Asaas NÃO devolve o externalReference que mandamos na criação
+ * do checkout — nem em payment nem em subscription. O que ele devolve é o id do
+ * checkout, e a ponte para o lead é nossa. Ver
+ * supabase/migrations/20260812b_checkout_refs.sql.
+ *
+ * NUNCA lança e NUNCA inventa: sem pista, devolve null e o patch grava
+ * external_reference NULL. O pagamento vale mais que a atribuição, e um lead
+ * errado é pior que lead nenhum — ele atribuiria a conversão à pessoa errada.
+ */
+async function resolveLeadId(
+  admin: Admin,
+  ctx: ReturnType<typeof extractContext>,
+): Promise<string | null> {
+  // O evento já trouxe a fonte direta: não gasta uma consulta.
+  if (ctx.externalReference) return null;
+
+  if (!ctx.checkoutSession) {
+    console.error(
+      `[asaas/webhook] no_checkout_session event=${ctx.event ?? 'unknown'} ` +
+        `subscription=${ctx.subscriptionId ?? '?'}: lead não atribuível`,
+    );
+    return null;
+  }
+
+  try {
+    const { data, error } = await admin
+      .from('payment_checkout_refs')
+      .select('lead_id')
+      .eq('checkout_session_id', ctx.checkoutSession)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[asaas/webhook] checkout_ref_lookup_failed');
+      return null;
+    }
+    if (!data?.lead_id) {
+      // Checkout criado antes desta ponte existir, ou insert da ref que falhou
+      // na rota de checkout. Recuperável à mão pelo painel do Asaas.
+      console.error(
+        `[asaas/webhook] checkout_ref_not_found session=${ctx.checkoutSession}`,
+      );
+      return null;
+    }
+    return data.lead_id as string;
+  } catch {
+    // Indisponibilidade do banco não pode derrubar o evento.
+    console.error('[asaas/webhook] checkout_ref_lookup_threw');
+    return null;
+  }
+}
+
 async function processEvent(admin: Admin, ctx: ReturnType<typeof extractContext>) {
   // Evento fora da nossa lista: registrado e ignorado. A lista do Asaas tem
   // ~30 eventos; tratamos 10.
@@ -136,7 +192,10 @@ async function processEvent(admin: Admin, ctx: ReturnType<typeof extractContext>
     .eq('id', ctx.subscriptionId)
     .maybeSingle();
 
-  const patch = buildSubscriptionPatch(ctx, (current ?? null) as CurrentSubscription | null);
+  // Resolve o lead ANTES de montar o patch: é ele que vira external_reference.
+  const resolved = withResolvedLead(ctx, await resolveLeadId(admin, ctx));
+
+  const patch = buildSubscriptionPatch(resolved, (current ?? null) as CurrentSubscription | null);
 
   // E-MAIL DO PAGADOR. É a chave do cadastro posterior
   // (enforce_paid_signup_precondition casa por lower(email)), então precisa ser

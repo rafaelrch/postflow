@@ -35,8 +35,13 @@ const CHECKOUT_MINUTES_TO_EXPIRE = 60;
  * virar um customer via API antes do checkout, porque o checkout não devolvia
  * e-mail nenhum. No Asaas o checkout hospedado coleta os dados do pagador
  * sozinho (inclusive o CPF, que NÓS não pedimos), então não criamos customer
- * no caminho feliz. O que amarra a volta ao comprador é o `externalReference`
- * = id do lead, que o webhook devolve.
+ * no caminho feliz.
+ *
+ * O que amarra a volta ao comprador é a linha em `payment_checkout_refs`
+ * (checkout.id → lead.id) gravada no fim desta rota — NÃO o `externalReference`.
+ * Medido em sandbox: o Asaas aceita o externalReference e nunca o devolve no
+ * webhook. Continuamos mandando porque ele aparece no painel deles e serve para
+ * conciliação manual, mas ele não é a chave de nada aqui.
  *
  * Guard B1 preservado: usuário logado com assinatura que ainda cobra recebe
  * 409 antes de qualquer chamada ao Asaas.
@@ -91,8 +96,9 @@ export async function POST(req: NextRequest) {
     const { data: lead, error: leadError } = await admin
       .from('leads')
       // Só o id: o resto do lead não vai para o Asaas (ver o comentário sobre
-      // customerData abaixo). A linha precisa existir porque é ela que vira o
-      // externalReference — a única amarra entre o pagamento e o comprador.
+      // customerData abaixo). A linha precisa existir porque é ela que vira a
+      // ponta lead da payment_checkout_refs — a amarra entre pagamento e
+      // comprador — e porque a FK da tabela recusaria um lead inexistente.
       .select('id')
       .eq('id', leadId)
       .maybeSingle();
@@ -134,7 +140,16 @@ export async function POST(req: NextRequest) {
         // NEXT_PUBLIC_APP_URL para o túnel (ngrok/cloudflared), não para
         // localhost:3000.
         callback: {
-          successUrl: appUrl(`/assinatura/sucesso?t=${encodeURIComponent(token)}`),
+          // Direto no cadastro, sem página de recado no meio: a única coisa que
+          // aquela tela fazia era pedir mais um clique para chegar aqui. Se o
+          // webhook ainda não tiver chegado, /cadastro já sabe esperar sozinho
+          // (estado payment_pending, com tentativas automáticas).
+          //
+          // ⚠️ CHEGAR NO /cadastro NÃO É PROVA DE PAGAMENTO — o Asaas redireciona
+          // antes de a cobrança ser confirmada, e o token só diz "de qual lead é
+          // esta volta". Quem cria a assinatura é o webhook (PAYMENT_CONFIRMED);
+          // o cadastro exige essa linha no banco.
+          successUrl: appUrl(`/cadastro?t=${encodeURIComponent(token)}`),
           cancelUrl: appUrl('/assinatura/cancelado'),
           expiredUrl: appUrl('/assinatura/expirado'),
         },
@@ -164,8 +179,9 @@ export async function POST(req: NextRequest) {
         // o checkout hospedado pede tudo isso ao comprador.
         //
         // Consequência que o webhook resolve: o e-mail do pagador só é
-        // conhecido depois, via GET /v3/customers/{id}. Quem liga o pagamento
-        // a esta pessoa é o externalReference acima.
+        // conhecido depois, via GET /v3/customers/{id}. E ele identifica QUEM
+        // PAGOU, não QUAL LEAD converteu — os dois endereços divergem na
+        // prática. Quem liga o pagamento ao lead é a payment_checkout_refs.
       },
       {
         // SEM RETRY. O client repete 5xx/429 por padrão, o que é certo para
@@ -180,6 +196,42 @@ export async function POST(req: NextRequest) {
     if (!checkout?.link) {
       console.error('[asaas/checkout] checkout_without_link');
       return NextResponse.json({ error: 'Não foi possível criar o checkout.' }, { status: 502 });
+    }
+
+    // PONTE checkout → lead. O externalReference acima NÃO volta no webhook (o
+    // Asaas aceita e nunca devolve). O que volta é `checkoutSession`, que é este
+    // `checkout.id`. Guardar o par aqui é a única forma de saber, lá no webhook,
+    // qual lead converteu. Ver supabase/migrations/20260812b_checkout_refs.sql.
+    //
+    // ORDEM: só depois de o checkout existir. Gravar antes criaria refs para
+    // checkouts que o Asaas recusou.
+    //
+    // FALHA NÃO DERRUBA A RESPOSTA, e isso é deliberado: neste ponto o checkout
+    // já foi criado e já é pagável. Devolver erro faria o comprador perder um
+    // link válido para não perder um dado de atribuição — trocar dinheiro por
+    // métrica. Loga e segue: o pagamento funciona, só a atribuição do lead se
+    // perde, e o par ainda dá para reconstruir à mão pelo painel do Asaas
+    // (o externalReference aparece lá).
+    if (checkout.id) {
+      // try/catch além do `error` do Supabase: uma exceção aqui cairia no catch
+      // geral da rota e viraria 500 — exatamente a resposta que este bloco
+      // existe para evitar.
+      try {
+        const { error: refError } = await admin.from('payment_checkout_refs').insert({
+          checkout_session_id: checkout.id,
+          lead_id: lead.id as string,
+          plan_interval: interval,
+        });
+        if (refError) {
+          console.error(`[asaas/checkout] checkout_ref_insert_failed checkout=${checkout.id}`);
+        }
+      } catch {
+        console.error(`[asaas/checkout] checkout_ref_insert_threw checkout=${checkout.id}`);
+      }
+    } else {
+      // Não deveria acontecer (id é obrigatório na resposta), mas se acontecer
+      // o pagamento continua válido e sem rastro de atribuição — precisa gritar.
+      console.error('[asaas/checkout] checkout_without_id: atribuição do lead ficará perdida');
     }
 
     return NextResponse.json({ url: checkout.link });

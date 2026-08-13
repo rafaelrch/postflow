@@ -8,6 +8,7 @@ import {
   statusForAction,
   statusFromAsaasSubscription,
   verifyAccessToken,
+  withResolvedLead,
   EVENT_ACTIONS,
 } from '../lib/asaas-webhook';
 
@@ -180,6 +181,70 @@ describe('extractContext', () => {
     expect(() => extractContext('texto')).not.toThrow();
     expect(() => extractContext({ payment: 'nao-e-objeto' })).not.toThrow();
     expect(extractContext({}).action).toBe('ignore');
+  });
+});
+
+describe('extractContext — checkoutSession', () => {
+  // Medido no primeiro pagamento real em sandbox: o Asaas NÃO devolve o
+  // externalReference que mandamos na criação do checkout, mas devolve o
+  // checkoutSession (= o id do checkout) nos dois objetos.
+  const SESSION = '008a7f76-2ae2-4100-9652-65b7b2ded675';
+
+  it('lê checkoutSession do objeto payment', () => {
+    const ctx = extractContext(
+      paymentEvent('PAYMENT_CONFIRMED', { externalReference: null, checkoutSession: SESSION }),
+    );
+    expect(ctx.externalReference).toBeNull();
+    expect(ctx.checkoutSession).toBe(SESSION);
+  });
+
+  it('lê checkoutSession do objeto subscription quando não há payment', () => {
+    const ctx = extractContext(
+      subscriptionEvent('SUBSCRIPTION_CREATED', {
+        externalReference: null,
+        checkoutSession: SESSION,
+      }),
+    );
+    expect(ctx.checkoutSession).toBe(SESSION);
+  });
+
+  it('sem checkoutSession em lugar nenhum: null, sem lançar', () => {
+    expect(extractContext(paymentEvent('PAYMENT_CONFIRMED')).checkoutSession).toBeNull();
+    expect(extractContext(null).checkoutSession).toBeNull();
+  });
+});
+
+describe('withResolvedLead', () => {
+  const SESSION = '008a7f76-2ae2-4100-9652-65b7b2ded675';
+
+  it('usa o lead resolvido pela ponte quando o evento não traz externalReference', () => {
+    const ctx = extractContext(
+      paymentEvent('PAYMENT_CONFIRMED', { externalReference: null, checkoutSession: SESSION }),
+    );
+    expect(withResolvedLead(ctx, 'lead-da-ponte').externalReference).toBe('lead-da-ponte');
+  });
+
+  it('PREFERE o externalReference do evento — a fonte direta ganha', () => {
+    const ctx = extractContext(
+      paymentEvent('PAYMENT_CONFIRMED', {
+        externalReference: 'lead-do-asaas',
+        checkoutSession: SESSION,
+      }),
+    );
+    expect(withResolvedLead(ctx, 'lead-da-ponte').externalReference).toBe('lead-do-asaas');
+  });
+
+  it('sem nada resolvido, continua null — nunca inventa', () => {
+    const ctx = extractContext(paymentEvent('PAYMENT_CONFIRMED', { externalReference: null }));
+    expect(withResolvedLead(ctx, null).externalReference).toBeNull();
+  });
+
+  it('não muta o contexto recebido', () => {
+    const ctx = extractContext(
+      paymentEvent('PAYMENT_CONFIRMED', { externalReference: null, checkoutSession: SESSION }),
+    );
+    withResolvedLead(ctx, 'lead-da-ponte');
+    expect(ctx.externalReference).toBeNull();
   });
 });
 
