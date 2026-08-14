@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
 import { CREDIT_COSTS, getUserCredits } from '@/lib/credits';
+import CancelSubscriptionButton from '@/components/billing/CancelSubscriptionButton';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -56,9 +57,16 @@ export default async function ContaPage() {
               </span>
               <span className="font-medium">{fmtDate(sub.current_period_end)}</span>
             </div>
-            {sub.cancel_at_period_end && (
-              <p className="text-[var(--warn)]">Cancelamento agendado — não haverá nova cobrança.</p>
-            )}
+            {/*
+              O botão de cancelar (com o popup de confirmação) é client
+              component porque esta página é server. Quando já existe
+              cancelamento agendado, ele mostra o ESTADO no lugar do botão —
+              um botão que não faz nada é pior que nenhum botão.
+            */}
+            <CancelSubscriptionButton
+              currentPeriodEnd={sub.current_period_end}
+              cancelAtPeriodEnd={sub.cancel_at_period_end}
+            />
           </div>
         ) : (
           <div className="mt-4">

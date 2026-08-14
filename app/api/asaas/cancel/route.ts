@@ -1,18 +1,22 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
-import { cancelUserSubscription } from '@/lib/asaas-subscription-admin';
+import { scheduleSubscriptionCancellation } from '@/lib/asaas-subscription-admin';
 
 export const runtime = 'nodejs';
 
 /**
  * Cancela a assinatura do usuário logado.
  *
- * NÃO EXISTE UI PARA ISTO, de propósito: o Rafael decidiu que o cancelamento
- * segue manual por enquanto (o Asaas não tem portal do cliente como a Stripe
- * tinha). Esta rota existe para o caminho de servidor estar pronto e testado
- * quando a decisão mudar — e para dar suporte a um cancelamento operacional
- * sem alguém precisar mexer no banco à mão.
+ * A UI é o botão do card "Assinatura" em /conta
+ * (components/billing/CancelSubscriptionButton.tsx). O Asaas não tem portal do
+ * cliente como a Stripe tinha, então este é o único caminho de cancelamento —
+ * serve tanto para o usuário quanto para um cancelamento operacional, sem
+ * ninguém precisar mexer no banco à mão.
+ *
+ * O acesso NÃO acaba na hora: cancela no Asaas (para não cobrar de novo) e
+ * marca cancel_at_period_end mantendo o acesso até o fim do ciclo já pago. Ver
+ * scheduleSubscriptionCancellation — e não troque pelo cancelamento imediato.
  *
  * O id da assinatura NÃO vem do request. Ele é resolvido a partir da sessão:
  * aceitar um id do cliente deixaria qualquer usuário logado cancelar a
@@ -36,7 +40,7 @@ export async function POST() {
     );
   }
 
-  const result = await cancelUserSubscription(subscription.subscription_id);
+  const result = await scheduleSubscriptionCancellation(subscription.subscription_id);
 
   if (!result.ok) {
     const status = result.reason === 'not_found' ? 404 : 502;
@@ -46,5 +50,13 @@ export async function POST() {
     );
   }
 
-  return NextResponse.json({ canceled: true, alreadyCanceled: result.alreadyCanceled });
+  // current_period_end vem da assinatura que JÁ tínhamos lido: é a data que a
+  // tela mostra como fim do acesso. Pode ser null, e a tela trata isso sem
+  // afirmar dia nenhum.
+  return NextResponse.json({
+    canceled: true,
+    alreadyCanceled: result.alreadyCanceled,
+    cancelAtPeriodEnd: true,
+    currentPeriodEnd: subscription.current_period_end,
+  });
 }
