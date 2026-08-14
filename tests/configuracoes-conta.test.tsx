@@ -18,9 +18,9 @@ const { mockGetUser, mockFrom } = vi.hoisted(() => ({
 vi.mock('@/lib/supabase-server', () => ({
   createServerSupabaseClient: async () => ({ auth: { getUser: mockGetUser }, from: mockFrom }),
 }));
-// O formulário de senha tem suíte própria (tests/trocar-senha.test.tsx).
-vi.mock('@/components/settings/ChangePasswordForm', () => ({
-  default: () => <div data-testid="form-senha-stub" />,
+// O botão/diálogo de senha tem suíte própria (tests/trocar-senha.test.tsx).
+vi.mock('@/components/settings/ChangePasswordButton', () => ({
+  default: () => <button type="button" data-testid="botao-senha-stub">Trocar senha</button>,
 }));
 
 function perfil(data: unknown) {
@@ -74,11 +74,30 @@ describe('/configuracoes/conta', () => {
     const screen = await renderAba();
 
     expect(screen.getByTestId('conta-email').textContent).toBe('cliente@example.com');
-    expect(screen.getByTestId('form-senha-stub')).toBeTruthy();
+    expect(screen.getByTestId('botao-senha-stub')).toBeTruthy();
   });
 
-  it('a troca de senha vive nesta aba', async () => {
+  it('a troca de senha vive nesta aba, atrás de um BOTÃO', async () => {
     const screen = await renderAba();
-    expect(screen.getByTestId('form-senha-stub')).toBeTruthy();
+    expect(screen.getByTestId('botao-senha-stub')).toBeTruthy();
+  });
+
+  /**
+   * O pedido desta fase: a aba tem de caber na janela. O que dá para garantir
+   * em teste é a CAUSA do estouro — a quantidade de conteúdo empilhado —, não
+   * a altura renderizada (jsdom não faz layout). Então: um cartão só, e
+   * nenhum campo de senha no documento antes do clique.
+   */
+  it('é UM cartão só — o segundo é que empurrava a página para fora da janela', async () => {
+    const screen = await renderAba();
+
+    expect(screen.container.querySelectorAll('section')).toHaveLength(1);
+    expect(screen.queryByText('Trocar a senha')).toBeNull();
+  });
+
+  it('nenhum campo de senha existe antes do clique', async () => {
+    const screen = await renderAba();
+
+    expect(screen.container.querySelectorAll('input[type="password"]')).toHaveLength(0);
   });
 });

@@ -7,6 +7,11 @@
  * sentasse no computador destravado de um cliente tomaria a conta. O teste do
  * "senha atual errada" é o que garante que a reautenticação não vire opcional
  * numa refatoração futura.
+ *
+ * Desde a Fase 18 o formulário mora atrás de um BOTÃO, num diálogo: aberto na
+ * página, ele empurrava a aba para além da altura da janela. Daí o `abrir()`
+ * antes de cada caso — e os testes de que, fechado, ele não existe no
+ * documento e não troca senha nenhuma.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
@@ -42,13 +47,20 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function renderForm() {
-  const { default: ChangePasswordForm } = await import('../components/settings/ChangePasswordForm');
-  return render(<ChangePasswordForm />);
+async function renderBotao() {
+  const { default: ChangePasswordButton } = await import('../components/settings/ChangePasswordButton');
+  return render(<ChangePasswordButton />);
+}
+
+/** Renderiza e ABRE o diálogo — o estado em que os casos abaixo começam. */
+async function abrir() {
+  const screen = await renderBotao();
+  fireEvent.click(screen.getByTestId('abrir-trocar-senha'));
+  return screen;
 }
 
 function preencher(
-  screen: Awaited<ReturnType<typeof renderForm>>,
+  screen: Awaited<ReturnType<typeof renderBotao>>,
   { atual = SENHA_ATUAL, nova = SENHA_NOVA, confirmacao }: {
     atual?: string;
     nova?: string;
@@ -64,10 +76,10 @@ function preencher(
   fireEvent.submit(screen.getByTestId('form-trocar-senha'));
 }
 
-describe('ChangePasswordForm — a senha atual é obrigatória', () => {
+describe('ChangePasswordButton — a senha atual é obrigatória', () => {
   it('senha atual ERRADA é recusada e NADA é alterado', async () => {
     mockSignIn.mockResolvedValue({ data: {}, error: { message: 'Invalid login credentials' } });
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen);
 
     await waitFor(() =>
@@ -79,7 +91,7 @@ describe('ChangePasswordForm — a senha atual é obrigatória', () => {
   });
 
   it('reautentica com o e-mail DA SESSÃO, nunca com um digitado na tela', async () => {
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen);
 
     await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
@@ -97,7 +109,7 @@ describe('ChangePasswordForm — a senha atual é obrigatória', () => {
     mockSignIn.mockImplementation(async () => { ordem.push('signIn'); return { data: {}, error: null }; });
     mockUpdateUser.mockImplementation(async () => { ordem.push('updateUser'); return { error: null }; });
 
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen);
 
     await waitFor(() => expect(screen.getByTestId('senha-trocada')).toBeTruthy());
@@ -105,9 +117,9 @@ describe('ChangePasswordForm — a senha atual é obrigatória', () => {
   });
 });
 
-describe('ChangePasswordForm — regras da senha nova', () => {
+describe('ChangePasswordButton — regras da senha nova', () => {
   it('senha curta é recusada sem nem chamar o Supabase', async () => {
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen, { nova: 'a'.repeat(PASSWORD_MIN - 1) });
 
     await waitFor(() => expect(screen.getByTestId('erro-trocar-senha')).toBeTruthy());
@@ -117,7 +129,7 @@ describe('ChangePasswordForm — regras da senha nova', () => {
   });
 
   it('confirmação diferente é recusada', async () => {
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen, { confirmacao: 'outra-coisa-qualquer' });
 
     await waitFor(() =>
@@ -127,7 +139,7 @@ describe('ChangePasswordForm — regras da senha nova', () => {
   });
 
   it('senha nova igual à atual é recusada', async () => {
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen, { nova: SENHA_ATUAL });
 
     await waitFor(() =>
@@ -137,9 +149,9 @@ describe('ChangePasswordForm — regras da senha nova', () => {
   });
 });
 
-describe('ChangePasswordForm — sucesso', () => {
+describe('ChangePasswordButton — sucesso', () => {
   it('troca de fato e confirma na tela, avisando que a sessão continua', async () => {
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen);
 
     await waitFor(() => expect(screen.getByTestId('senha-trocada')).toBeTruthy());
@@ -150,10 +162,88 @@ describe('ChangePasswordForm — sucesso', () => {
 
   it('falha do Supabase na troca NÃO diz que trocou', async () => {
     mockUpdateUser.mockResolvedValue({ error: { message: 'boom' } });
-    const screen = await renderForm();
+    const screen = await abrir();
     preencher(screen);
 
     await waitFor(() => expect(screen.getByTestId('erro-trocar-senha')).toBeTruthy());
     expect(screen.queryByTestId('senha-trocada')).toBeNull();
+  });
+});
+
+describe('ChangePasswordButton — o formulário fica escondido atrás do botão', () => {
+  it('antes do clique NÃO existe formulário no documento', async () => {
+    const screen = await renderBotao();
+
+    // Não é "está invisível": não está lá. É isso que tira a altura da página.
+    expect(screen.queryByTestId('form-trocar-senha')).toBeNull();
+    expect(screen.queryByTestId('senha-atual')).toBeNull();
+    expect(screen.container.querySelectorAll('input')).toHaveLength(0);
+    expect(screen.getByTestId('abrir-trocar-senha')).toBeTruthy();
+  });
+
+  it('depois do clique o formulário aparece, num diálogo', async () => {
+    const screen = await abrir();
+
+    expect(screen.getByTestId('form-trocar-senha')).toBeTruthy();
+    expect(screen.getByTestId('senha-atual')).toBeTruthy();
+    const dialogo = screen.container.querySelector('[role="dialog"]');
+    expect(dialogo).toBeTruthy();
+    expect(dialogo?.getAttribute('aria-modal')).toBe('true');
+  });
+
+  it('FECHAR sem salvar não troca senha nenhuma', async () => {
+    const screen = await abrir();
+
+    fireEvent.change(screen.getByTestId('senha-atual'), { target: { value: SENHA_ATUAL } });
+    fireEvent.change(screen.getByTestId('senha-nova'), { target: { value: SENHA_NOVA } });
+    fireEvent.click(screen.getByTestId('fechar-trocar-senha'));
+
+    expect(screen.queryByTestId('form-trocar-senha')).toBeNull();
+    // O que mais importa: nem reautenticação, nem troca.
+    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(mockUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('o botão Cancelar também só fecha', async () => {
+    const screen = await abrir();
+    fireEvent.click(screen.getByTestId('cancelar-trocar-senha'));
+
+    expect(screen.queryByTestId('form-trocar-senha')).toBeNull();
+    expect(mockUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('reabrir vem em branco — senha digitada não fica pendurada', async () => {
+    const screen = await abrir();
+    fireEvent.change(screen.getByTestId('senha-atual'), { target: { value: 'digitei-e-desisti' } });
+    fireEvent.click(screen.getByTestId('fechar-trocar-senha'));
+
+    fireEvent.click(screen.getByTestId('abrir-trocar-senha'));
+    expect((screen.getByTestId('senha-atual') as HTMLInputElement).value).toBe('');
+  });
+
+  it('erro de uma tentativa não sobrevive ao fechar', async () => {
+    mockSignIn.mockResolvedValue({ data: {}, error: { message: 'Invalid login credentials' } });
+    const screen = await abrir();
+    preencher(screen);
+    await waitFor(() => expect(screen.getByTestId('erro-trocar-senha')).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId('fechar-trocar-senha'));
+    fireEvent.click(screen.getByTestId('abrir-trocar-senha'));
+
+    expect(screen.queryByTestId('erro-trocar-senha')).toBeNull();
+  });
+
+  it('durante o envio o diálogo não fecha por engano', async () => {
+    // Fechar no meio deixaria a troca acontecendo sem ninguém para mostrar o
+    // resultado — a pessoa não saberia se a senha mudou.
+    mockSignIn.mockImplementation(() => new Promise(() => {}));
+    const screen = await abrir();
+    preencher(screen);
+
+    await waitFor(() =>
+      expect((screen.getByTestId('salvar-senha') as HTMLButtonElement).disabled).toBe(true),
+    );
+    fireEvent.click(screen.getByTestId('fechar-trocar-senha'));
+    expect(screen.getByTestId('form-trocar-senha')).toBeTruthy();
   });
 });
