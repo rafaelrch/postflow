@@ -2,10 +2,25 @@ import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
 import { CREDIT_COSTS, getUserCredits } from '@/lib/credits';
+import CancelSubscriptionButton from '@/components/billing/CancelSubscriptionButton';
 
+/**
+ * timeZone fixo em São Paulo, e não é detalhe: o fim do período pago é gravado
+ * como o fim do dia em Brasília (ver endOfDayBrasilia em lib/asaas-webhook.ts),
+ * que em UTC já é o dia SEGUINTE. Sem fixar o fuso, esta página — renderizada
+ * no servidor, em UTC — mostraria um dia a mais que o popup de confirmação,
+ * renderizado no navegador do usuário.
+ */
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '—';
+  return new Date(t).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+  });
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -56,9 +71,16 @@ export default async function ContaPage() {
               </span>
               <span className="font-medium">{fmtDate(sub.current_period_end)}</span>
             </div>
-            {sub.cancel_at_period_end && (
-              <p className="text-[var(--warn)]">Cancelamento agendado — não haverá nova cobrança.</p>
-            )}
+            {/*
+              O botão de cancelar (com o popup de confirmação) é client
+              component porque esta página é server. Quando já existe
+              cancelamento agendado, ele mostra o ESTADO no lugar do botão —
+              um botão que não faz nada é pior que nenhum botão.
+            */}
+            <CancelSubscriptionButton
+              currentPeriodEnd={sub.current_period_end}
+              cancelAtPeriodEnd={sub.cancel_at_period_end}
+            />
           </div>
         ) : (
           <div className="mt-4">

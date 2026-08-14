@@ -339,7 +339,10 @@ describe('buildSubscriptionPatch', () => {
   });
 
   it('SUBSCRIPTION_DELETED sem ciclo pago restante: corta agora', () => {
-    const ctx = extractContext(subscriptionEvent('SUBSCRIPTION_DELETED'));
+    // nextDueDate no PASSADO de propósito: o evento é a fonte mais fresca do
+    // fim do período (ver periodEndFor), então deixá-lo no futuro do fixture
+    // descreveria uma assinatura que AINDA tem ciclo pago — o oposto do caso.
+    const ctx = extractContext(subscriptionEvent('SUBSCRIPTION_DELETED', { nextDueDate: '2026-06-30' }));
     const patch = buildSubscriptionPatch(
       ctx,
       { status: 'active', current_period_end: '2026-07-01T00:00:00.000Z' },
@@ -347,6 +350,99 @@ describe('buildSubscriptionPatch', () => {
     );
     expect(patch.status).toBe('canceled');
     expect(patch.cancel_at_period_end).toBe(true);
+  });
+
+  /**
+   * O BUG DA FASE 16, e o motivo deste bloco existir.
+   *
+   * `current_period_end` nunca era gravado por ninguém: a data do fim do ciclo
+   * só existia em `next_due_date`. Com a coluna sempre nula, o ramo
+   * 'end_of_cycle' lia NaN, concluía "não sobrou ciclo pago" e CORTAVA O ACESSO
+   * NA HORA — revertendo em silêncio a regra que ele deveria implementar. Quem
+   * tinha pago o mês perdia o mês ao cancelar.
+   *
+   * O traço no lugar da data em /conta era só a parte visível disso.
+   */
+  describe('current_period_end — a fonte única do fim do período pago', () => {
+    it('⚠️ end_of_cycle NÃO corta acesso de quem tem ciclo pago restante', () => {
+      // Linha legada: gravada antes do conserto, com current_period_end nulo.
+      // Este é exatamente o estado de TODAS as assinaturas em produção hoje.
+      const ctx = extractContext(
+        subscriptionEvent('SUBSCRIPTION_DELETED', {
+          status: 'INACTIVE',
+          nextDueDate: '2026-09-14',
+        }),
+      );
+      const patch = buildSubscriptionPatch(ctx, { status: 'active', current_period_end: null }, AGORA);
+
+      expect(patch.cancel_at_period_end).toBe(true);
+      // O que não pode acontecer de jeito nenhum: virar 'canceled' agora.
+      expect(patch.status).toBeUndefined();
+      // E a data passa a existir, que é o que a tela mostra.
+      expect(patch.current_period_end).toBe(new Date('2026-09-14T23:59:59.999-03:00').toISOString());
+    });
+
+    it('evento de assinatura: o fim do período é o nextDueDate, até o fim do dia em Brasília', () => {
+      const ctx = extractContext(subscriptionEvent('SUBSCRIPTION_UPDATED', { nextDueDate: '2026-09-14' }));
+      const patch = buildSubscriptionPatch(ctx, null, AGORA);
+
+      expect(patch.current_period_end).toBe(new Date('2026-09-14T23:59:59.999-03:00').toISOString());
+      // O eco cru do provedor continua onde sempre esteve.
+      expect(patch.next_due_date).toBe('2026-09-14');
+    });
+
+    it('PAYMENT_CONFIRMED: pagar a cobrança de hoje compra UM CICLO à frente', () => {
+      const ctx = extractContext(paymentEvent('PAYMENT_CONFIRMED', { dueDate: '2026-08-14' }));
+      const patch = buildSubscriptionPatch(ctx, null, AGORA);
+
+      // Mensal (value 59,50): 14/08 pago ⇒ acesso até 14/09.
+      expect(patch.current_period_end).toBe(new Date('2026-09-14T23:59:59.999-03:00').toISOString());
+    });
+
+    it('PAYMENT_CONFIRMED anual soma um ano, e o fim do mês não estoura', () => {
+      const anual = extractContext(
+        paymentEvent('PAYMENT_CONFIRMED', { dueDate: '2026-08-14', value: 499 }),
+      );
+      expect(buildSubscriptionPatch(anual, null, AGORA).current_period_end).toBe(
+        new Date('2027-08-14T23:59:59.999-03:00').toISOString(),
+      );
+
+      // 31/01 + 1 mês não existe: fica no último dia de fevereiro, nunca em março.
+      const mensal = extractContext(paymentEvent('PAYMENT_CONFIRMED', { dueDate: '2027-01-31' }));
+      expect(buildSubscriptionPatch(mensal, null, AGORA).current_period_end).toBe(
+        new Date('2027-02-28T23:59:59.999-03:00').toISOString(),
+      );
+    });
+
+    it('cobrança que NÃO libera acesso não mexe no fim do período', () => {
+      // O vencimento de uma cobrança vencida/estornada não compra ciclo nenhum:
+      // somar um mês aqui daria acesso de graça a quem não pagou.
+      for (const evento of ['PAYMENT_OVERDUE', 'PAYMENT_REFUNDED', 'PAYMENT_RECEIVED']) {
+        const ctx = extractContext(paymentEvent(evento, { dueDate: '2026-08-14' }));
+        expect(buildSubscriptionPatch(ctx, { status: 'active' }, AGORA)).not.toHaveProperty(
+          'current_period_end',
+        );
+      }
+    });
+
+    it('o fim do período só AVANÇA: evento atrasado não encurta ciclo já pago', () => {
+      // O nextDueDate de SUBSCRIPTION_CREATED é o dia da PRIMEIRA cobrança
+      // (ainda não paga). Reentregue depois do pagamento, ele puxaria a data
+      // para trás e cortaria o acesso de quem já pagou.
+      const ctx = extractContext(subscriptionEvent('SUBSCRIPTION_CREATED', { nextDueDate: '2026-08-14' }));
+      const patch = buildSubscriptionPatch(
+        ctx,
+        { status: 'active', current_period_end: '2026-09-14T23:59:59.999-03:00' },
+        AGORA,
+      );
+
+      expect(patch).not.toHaveProperty('current_period_end');
+    });
+
+    it('sem data nenhuma no evento, NÃO inventa data', () => {
+      const ctx = extractContext(subscriptionEvent('SUBSCRIPTION_UPDATED', { nextDueDate: null }));
+      expect(buildSubscriptionPatch(ctx, null, AGORA)).not.toHaveProperty('current_period_end');
+    });
   });
 
   it('SUBSCRIPTION_UPDATED reflete o status cru da assinatura', () => {

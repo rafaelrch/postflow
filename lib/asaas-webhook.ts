@@ -198,7 +198,17 @@ export interface WebhookContext {
   value: number | null;
   cycle: string | null;
   billingType: string | null;
-  nextDueDate: string | null;
+  /**
+   * `subscription.nextDueDate` — a data da PRÓXIMA cobrança da assinatura, e
+   * portanto o fim do período que já foi pago. Só existe nos eventos de
+   * assinatura.
+   */
+  subscriptionNextDueDate: string | null;
+  /**
+   * `payment.dueDate` — o vencimento DAQUELA cobrança. ⚠️ Não confundir com o
+   * de cima: este é o começo do período, não o fim. Ver periodEndFor.
+   */
+  paymentDueDate: string | null;
   /** Status cru do Asaas, do objeto que veio no evento. */
   rawStatus: string | null;
 }
@@ -233,7 +243,8 @@ export function extractContext(payload: unknown): WebhookContext {
     value: num(payment.value) ?? num(subscription.value),
     cycle: str(subscription.cycle),
     billingType: str(payment.billingType) ?? str(subscription.billingType),
-    nextDueDate: str(subscription.nextDueDate) ?? str(payment.dueDate),
+    subscriptionNextDueDate: str(subscription.nextDueDate),
+    paymentDueDate: str(payment.dueDate),
     rawStatus: isPaymentEvent ? str(payment.status) : str(subscription.status),
   };
 }
@@ -265,6 +276,89 @@ export function intervalFor(input: {
       `linha anterior. Assinatura ${input.subscriptionId ?? '(sem id)'} gravada como 'month'.`,
   );
   return 'month';
+}
+
+// ─── Fim do período pago ────────────────────────────────────
+
+/**
+ * ⚠️ QUAL COLUNA MANDA, e por quê — leia antes de mexer.
+ *
+ * A FONTE ÚNICA de "até quando o acesso vale" é `current_period_end`. É ela que
+ * a view user_active_subscription expõe, que /conta mostra, que a rota de
+ * cancelamento devolve e que o ramo 'end_of_cycle' consulta para decidir se
+ * corta o acesso agora.
+ *
+ * `next_due_date` NÃO é fonte de verdade: é o ECO CRU do que o Asaas mandou,
+ * pelo mesmo motivo (e no mesmo par) que `subscription_status` é o eco cru de
+ * `status` — serve para conciliação e debug, não para regra. Ninguém lê o eco
+ * para decidir acesso.
+ *
+ * Escolhi gravar current_period_end em vez de fazer os leitores usarem
+ * next_due_date por três razões concretas:
+ *   1. `next_due_date` é coluna `date` (dia, sem hora e sem fuso). Fim de acesso
+ *      é um INSTANTE, e o app inteiro já trabalha com timestamptz.
+ *   2. Nos eventos de COBRANÇA o Asaas não manda "próximo vencimento": manda o
+ *      vencimento DAQUELA cobrança, que é o começo do período. O fim tem que ser
+ *      derivado (vencimento + 1 ciclo). Ou seja: existe cálculo, e cálculo
+ *      precisa de um lugar só — este.
+ *   3. Trocar os leitores exigiria mexer na view, nas funções de crédito que
+ *      ordenam por current_period_end e em todo o vocabulário do app, sem
+ *      ganho nenhum.
+ *
+ * O que NÃO pode voltar a existir: as duas colunas vivas com uma sempre nula.
+ * Toda gravação de uma passa por aqui junto com a outra.
+ */
+
+/**
+ * Fim do dia `YYYY-MM-DD` no horário de Brasília, em ISO.
+ *
+ * O Asaas é brasileiro e as datas dele são dias do calendário local, sem hora.
+ * Ancorar em UTC cortaria o acesso às 21h do dia anterior para o usuário; o
+ * país não tem mais horário de verão desde 2019, então -03:00 é estável.
+ * Formato inválido devolve null — data inventada é pior que data ausente.
+ */
+export function endOfDayBrasilia(day: string | null | undefined): string | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const t = Date.parse(`${day}T23:59:59.999-03:00`);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+/**
+ * `YYYY-MM-DD` + um ciclo. Dia que não existe no mês de destino cai no último
+ * dia dele (31/01 + 1 mês = 28/02), nunca transborda para o mês seguinte —
+ * transbordar daria um dia de acesso a mais a cada cobrança.
+ */
+export function addCycle(day: string, interval: PlanInterval): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const alvoAno = interval === 'year' ? y + 1 : mo === 12 ? y + 1 : y;
+  const alvoMes = interval === 'year' ? mo : mo === 12 ? 1 : mo + 1;
+  // Dia 0 do mês seguinte = último dia do mês alvo.
+  const ultimoDia = new Date(Date.UTC(alvoAno, alvoMes, 0)).getUTCDate();
+  const alvoDia = Math.min(d, ultimoDia);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${alvoAno}-${pad(alvoMes)}-${pad(alvoDia)}`;
+}
+
+/**
+ * Fim do período pago que ESTE evento comprova, ou null quando o evento não
+ * comprova nenhum.
+ *
+ *   • Evento de assinatura: `nextDueDate` é literalmente a próxima cobrança, ou
+ *     seja, o fim do período atual.
+ *   • Evento de cobrança: só quando a ação é 'grant' (PAYMENT_CONFIRMED). Pagar
+ *     a cobrança que vence hoje compra um ciclo à frente. Vencimento de cobrança
+ *     VENCIDA ou ESTORNADA não compra nada — somar um ciclo ali daria acesso de
+ *     graça a quem não pagou.
+ *   • Qualquer outro caso: null. Não se inventa data.
+ */
+export function periodEndFor(ctx: WebhookContext, interval: PlanInterval): string | null {
+  if (ctx.subscriptionNextDueDate) return endOfDayBrasilia(ctx.subscriptionNextDueDate);
+  if (ctx.action === 'grant' && ctx.paymentDueDate) {
+    return endOfDayBrasilia(addCycle(ctx.paymentDueDate, interval));
+  }
+  return null;
 }
 
 /**
@@ -344,7 +438,26 @@ export function buildSubscriptionPatch(
   if (ctx.value !== null) patch.value = ctx.value;
   if (ctx.billingType) patch.billing_type = ctx.billingType;
   if (ctx.cycle) patch.cycle = ctx.cycle;
-  if (ctx.nextDueDate) patch.next_due_date = ctx.nextDueDate;
+  // Eco cru do provedor (ver o bloco "QUAL COLUNA MANDA"): registra, não decide.
+  const echoDueDate = ctx.subscriptionNextDueDate ?? ctx.paymentDueDate;
+  if (echoDueDate) patch.next_due_date = echoDueDate;
+
+  /**
+   * O fim do período pago só AVANÇA.
+   *
+   * O `nextDueDate` de SUBSCRIPTION_CREATED é o dia da PRIMEIRA cobrança, que
+   * ainda não foi paga (o checkout cria a assinatura com nextDueDate = hoje).
+   * Reentregue depois do pagamento — e o Asaas reentrega —, ele puxaria a data
+   * para trás e cortaria o acesso de quem já pagou o ciclo. Um evento atrasado
+   * nunca pode encurtar período pago; só a próxima cobrança confirmada estende.
+   */
+  const periodEnd = periodEndFor(ctx, patch.plan_interval as PlanInterval);
+  if (periodEnd) {
+    const gravado = current?.current_period_end ? Date.parse(current.current_period_end) : NaN;
+    if (!Number.isFinite(gravado) || Date.parse(periodEnd) > gravado) {
+      patch.current_period_end = periodEnd;
+    }
+  }
 
   // Só grava se veio algo; jamais apaga o que já existe.
   const externalReference = ctx.externalReference ?? current?.external_reference ?? null;
@@ -367,10 +480,19 @@ export function buildSubscriptionPatch(
   if (ctx.action === 'end_of_cycle') {
     patch.cancel_at_period_end = true;
     patch.canceled_at = nowIso;
-    // Só corta o acesso agora se não sobrou ciclo pago.
-    const periodEnd = current?.current_period_end
-      ? Date.parse(current.current_period_end)
-      : NaN;
+    /**
+     * Só corta o acesso agora se não sobrou ciclo pago.
+     *
+     * O valor DESTE evento tem precedência sobre o gravado: é o mesmo campo que
+     * o patch acima está prestes a escrever, e decidir com a linha antiga seria
+     * decidir com um dado que já sabemos desatualizado. É também o que salva as
+     * assinaturas legadas, gravadas quando current_period_end nunca era
+     * preenchido — sem isto, elas perdem o acesso no ato do cancelamento.
+     */
+    const fimDoAcesso = (patch.current_period_end as string | undefined)
+      ?? current?.current_period_end
+      ?? null;
+    const periodEnd = fimDoAcesso ? Date.parse(fimDoAcesso) : NaN;
     const hasPaidRemainder = Number.isFinite(periodEnd) && periodEnd > now.getTime();
     if (!hasPaidRemainder) patch.status = 'canceled';
     return patch;

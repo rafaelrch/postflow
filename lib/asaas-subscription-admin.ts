@@ -19,20 +19,108 @@ export type CancelResult =
   | { ok: false; reason: 'not_found' | 'provider_error' };
 
 /**
- * Cancela a assinatura no Asaas e marca 'canceled' no banco.
+ * DUAS funções de cancelamento, e o que as separa é o acesso do usuário:
  *
- * ORDEM IMPORTA: primeiro o gateway, depois o banco. Se invertêssemos e o
- * DELETE falhasse, o usuário veria "cancelado" enquanto o cartão continuaria
- * sendo cobrado todo mês — o pior erro possível deste fluxo. Do jeito certo, a
- * falha aparece como erro e nada mente para o usuário.
+ *   • scheduleSubscriptionCancellation — o usuário pediu para cancelar. Para de
+ *     cobrar, MAS o acesso vai até o fim do ciclo já pago.
+ *   • cancelSubscriptionNow — corta na hora. É o que a troca de plano precisa,
+ *     porque a assinatura nova entra no lugar da antiga imediatamente.
  *
- * 404 do Asaas é tratado como sucesso: assinatura que não existe lá já está
+ * São duas funções em vez de um parâmetro `immediate` de propósito: uma flag
+ * booleana solta atravessando camadas é como "cancelou e perdeu o mês que já
+ * tinha pago" nasce — basta alguém esquecer de passá-la num caller novo. Com
+ * nomes distintos, escolher errado exige escrever o nome errado.
+ */
+
+/**
+ * Cancela no Asaas. NÃO toca no nosso banco — quem chama decide o que gravar.
+ *
+ * ORDEM IMPORTA para os dois callers: primeiro o gateway, depois o banco. Se
+ * invertêssemos e o DELETE falhasse, o usuário veria "cancelado" enquanto o
+ * cartão continuaria sendo cobrado todo mês — o pior erro possível deste fluxo.
+ * Do jeito certo, a falha aparece como erro e nada mente para o usuário.
+ *
+ * 404 do Asaas conta como sucesso: assinatura que não existe lá já está
  * cancelada para todos os efeitos, e travar o cancelamento local por causa
  * disso deixaria uma linha 'active' eterna no nosso banco.
  */
-export async function cancelUserSubscription(
+async function cancelAtGateway(subscriptionId: string): Promise<boolean> {
+  try {
+    await cancelSubscription(subscriptionId);
+    return true;
+  } catch (err) {
+    if (err instanceof AsaasError && err.status === 404) return true;
+    console.error('[asaas] cancel_failed');
+    return false;
+  }
+}
+
+async function applyCancelPatch(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  subscriptionId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await admin.from('subscriptions').update(patch).eq('id', subscriptionId);
+  if (error) {
+    // O gateway já parou de cobrar; só o nosso reflexo falhou. É recuperável
+    // pelo webhook (SUBSCRIPTION_DELETED), então não é erro fatal — mas
+    // precisa aparecer no log, senão fica uma linha 'active' fantasma.
+    console.error('[asaas] cancel_local_sync_failed');
+  }
+}
+
+/**
+ * Cancelamento PEDIDO PELO USUÁRIO: para de cobrar, mantém o acesso.
+ *
+ * No banco marca cancel_at_period_end e NÃO mexe no status — é o status que dá
+ * acesso, e quem pagou o mês fica com o mês. Quem derruba o status no fim é o
+ * fluxo que já existe: o DELETE no Asaas volta como SUBSCRIPTION_DELETED, que
+ * chega como 'end_of_cycle', e buildSubscriptionPatch (lib/asaas-webhook.ts)
+ * decide ali, comparando com current_period_end. A regra de cortar acesso mora
+ * em um lugar só.
+ *
+ * Isso vale INCLUSIVE quando current_period_end é nulo: inventar uma data aqui,
+ * ou cortar o acesso "por precaução", tiraria do usuário um período que ele
+ * pagou. O webhook resolve com o dado real quando chegar — e desde a Fase 16
+ * ele deriva a data do próprio evento antes de decidir, então nem o caso nulo
+ * corta acesso indevidamente.
+ */
+export async function scheduleSubscriptionCancellation(
   subscriptionId: string,
 ): Promise<CancelResult> {
+  const admin = createAdminSupabaseClient();
+
+  const { data: row } = await admin
+    .from('subscriptions')
+    .select('id, status, cancel_at_period_end')
+    .eq('id', subscriptionId)
+    .maybeSingle();
+
+  if (!row?.id) return { ok: false, reason: 'not_found' };
+  // Já cancelada ou já agendada: nada a fazer. Isto protege o clique duplo do
+  // lado do servidor também, não só pelo botão desabilitado na tela.
+  if (row.status === 'canceled' || row.cancel_at_period_end) {
+    return { ok: true, alreadyCanceled: true };
+  }
+
+  if (!(await cancelAtGateway(subscriptionId))) return { ok: false, reason: 'provider_error' };
+
+  await applyCancelPatch(admin, subscriptionId, {
+    cancel_at_period_end: true,
+    canceled_at: new Date().toISOString(),
+  });
+
+  return { ok: true, alreadyCanceled: false };
+}
+
+/**
+ * Cancelamento IMEDIATO: derruba o acesso agora.
+ *
+ * ⚠️ NÃO use no cancelamento pedido pelo usuário — cortaria um ciclo que ele já
+ * pagou. Existe para a troca de plano (preparePlanChange), onde cancelar agora
+ * é justamente o ponto: a assinatura nova assume no lugar da antiga.
+ */
+export async function cancelSubscriptionNow(subscriptionId: string): Promise<CancelResult> {
   const admin = createAdminSupabaseClient();
 
   const { data: row } = await admin
@@ -44,26 +132,12 @@ export async function cancelUserSubscription(
   if (!row?.id) return { ok: false, reason: 'not_found' };
   if (row.status === 'canceled') return { ok: true, alreadyCanceled: true };
 
-  try {
-    await cancelSubscription(subscriptionId);
-  } catch (err) {
-    if (!(err instanceof AsaasError) || err.status !== 404) {
-      console.error('[asaas] cancel_failed');
-      return { ok: false, reason: 'provider_error' };
-    }
-  }
+  if (!(await cancelAtGateway(subscriptionId))) return { ok: false, reason: 'provider_error' };
 
-  const { error } = await admin
-    .from('subscriptions')
-    .update({ status: 'canceled', canceled_at: new Date().toISOString() })
-    .eq('id', subscriptionId);
-
-  if (error) {
-    // O gateway já parou de cobrar; só o nosso reflexo falhou. É recuperável
-    // pelo webhook (SUBSCRIPTION_DELETED), então não é erro fatal — mas
-    // precisa aparecer no log, senão fica uma linha 'active' fantasma.
-    console.error('[asaas] cancel_local_sync_failed');
-  }
+  await applyCancelPatch(admin, subscriptionId, {
+    status: 'canceled',
+    canceled_at: new Date().toISOString(),
+  });
 
   return { ok: true, alreadyCanceled: false };
 }
@@ -112,7 +186,9 @@ export async function preparePlanChange(
   // assinatura nenhuma.
   planFor(nextInterval);
 
-  const canceled = await cancelUserSubscription(subscriptionId);
+  // IMEDIATO de propósito: a assinatura nova entra no lugar desta. Deixar a
+  // antiga viva até o fim do ciclo faria o usuário ter duas ao mesmo tempo.
+  const canceled = await cancelSubscriptionNow(subscriptionId);
   if (!canceled.ok) return { ok: false, reason: 'provider_error' };
 
   return { ok: true, canceledId: subscriptionId, nextInterval };

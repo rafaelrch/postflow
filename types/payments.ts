@@ -75,10 +75,17 @@ export interface SubscriptionRow {
   /** MONTHLY | YEARLY, como o Asaas devolve. */
   cycle: string | null;
   value: number | null;
-  /** Coluna `date`: chega como 'YYYY-MM-DD', não ISO completo. */
+  /**
+   * ECO CRU do vencimento que o Asaas mandou ('YYYY-MM-DD', coluna `date`).
+   * Está para current_period_end como subscription_status está para status:
+   * serve para conciliação e debug, NÃO para decidir acesso. Ver o bloco
+   * "QUAL COLUNA MANDA" em lib/asaas-webhook.ts.
+   */
   next_due_date: string | null;
   cancel_at_period_end: boolean;
+  /** Sem equivalente no Asaas; ninguém lê. */
   current_period_start: string | null;
+  /** FONTE ÚNICA de até quando o acesso vale. Derivada em periodEndFor(). */
   current_period_end: string | null;
   canceled_at: string | null;
   metadata: Record<string, unknown>;
