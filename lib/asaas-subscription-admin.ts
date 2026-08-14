@@ -79,10 +79,11 @@ async function applyCancelPatch(
  * decide ali, comparando com current_period_end. A regra de cortar acesso mora
  * em um lugar só.
  *
- * Isso vale INCLUSIVE quando current_period_end é nulo (assinatura antiga, ou
- * webhook que ainda não preencheu): inventar uma data aqui, ou cortar o acesso
- * "por precaução", tiraria do usuário um período que ele pagou. O webhook
- * resolve com o dado real quando chegar.
+ * Isso vale INCLUSIVE quando current_period_end é nulo: inventar uma data aqui,
+ * ou cortar o acesso "por precaução", tiraria do usuário um período que ele
+ * pagou. O webhook resolve com o dado real quando chegar — e desde a Fase 16
+ * ele deriva a data do próprio evento antes de decidir, então nem o caso nulo
+ * corta acesso indevidamente.
  */
 export async function scheduleSubscriptionCancellation(
   subscriptionId: string,

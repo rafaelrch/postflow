@@ -25,6 +25,10 @@ function fmtDia(iso: string | null): string | null {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    // Fuso fixo: a data vem gravada como o fim do dia em Brasília, que em UTC
+    // já é o dia seguinte. Sem isto, o navegador de quem estiver fora do Brasil
+    // (ou o servidor, em /conta) mostraria um dia diferente do outro.
+    timeZone: 'America/Sao_Paulo',
   });
 }
 
@@ -100,8 +104,16 @@ export default function CancelSubscriptionButton({
         type="button"
         data-testid="abrir-cancelamento"
         onClick={() => { setErro(null); setAberto(true); }}
-        className="brand-btn outline sm"
-        style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+        /*
+          Vermelho sólido com texto branco. SEM a classe `outline`: o .brand-btn
+          base já traz a borda e a sombra dura da marca (--sh-2 = 4px 4px 0 0
+          var(--ink)), com --sh-3 no hover e --sh-press no clique. Só o fundo e a
+          cor do texto mudam aqui — sombra nova, inventada, sairia do padrão do
+          resto do app e não seguiria o tema.
+          #fff sobre --danger (#C0392B) dá ~5,4:1, acima do 4,5:1 da WCAG AA.
+        */
+        className="brand-btn sm"
+        style={{ background: 'var(--danger)', color: '#fff' }}
       >
         Cancelar assinatura
       </button>
@@ -186,8 +198,15 @@ export default function CancelSubscriptionButton({
                 data-testid="confirmar-cancelamento"
                 onClick={confirmar}
                 disabled={enviando}
-                className="brand-btn outline flex-1 justify-center"
-                style={{ padding: '10px 14px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                /*
+                  Mesmo vermelho sólido do botão de /conta: são a mesma ação, e
+                  duas aparências para a mesma coisa é o que confunde. O
+                  desabilitado durante o envio continua vindo do
+                  .brand-btn:disabled (opacidade + sombra --sh-1), sem estilo
+                  próprio. "Manter assinatura" segue com o peso da saída segura.
+                */
+                className="brand-btn flex-1 justify-center"
+                style={{ padding: '10px 14px', background: 'var(--danger)', color: '#fff' }}
               >
                 {enviando ? 'Cancelando…' : 'Sim, cancelar'}
               </button>

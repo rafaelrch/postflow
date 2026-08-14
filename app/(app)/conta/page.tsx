@@ -4,9 +4,23 @@ import { getActiveSubscription } from '@/lib/subscription';
 import { CREDIT_COSTS, getUserCredits } from '@/lib/credits';
 import CancelSubscriptionButton from '@/components/billing/CancelSubscriptionButton';
 
+/**
+ * timeZone fixo em São Paulo, e não é detalhe: o fim do período pago é gravado
+ * como o fim do dia em Brasília (ver endOfDayBrasilia em lib/asaas-webhook.ts),
+ * que em UTC já é o dia SEGUINTE. Sem fixar o fuso, esta página — renderizada
+ * no servidor, em UTC — mostraria um dia a mais que o popup de confirmação,
+ * renderizado no navegador do usuário.
+ */
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '—';
+  return new Date(t).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+  });
 }
 
 const STATUS_LABEL: Record<string, string> = {
