@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 import { appUrl } from '@/lib/app-url';
+import { isPasswordLengthInvalid } from '@/lib/password-rules';
 import { getSubscription } from '../../../../lib/asaas/subscriptions';
 import { verifySignupToken } from '../../../../lib/signup-token';
 import { rateLimit, clientIp } from '../../../../lib/rate-limit';
@@ -76,9 +77,13 @@ export const SIGNUP_INTENT_CODES = {
   weakPassword: 'weak_password',
 } as const;
 
-/** bcrypt trunca em 72 bytes — aceitar mais é prometer o que não se cumpre. */
-export const PASSWORD_MIN = 6;
-export const PASSWORD_MAX = 72;
+/**
+ * Os números moram em lib/password-rules.ts, que é a fonte única dos três
+ * fluxos de senha (cadastro pago, troca em /configuracoes/conta, redefinição
+ * pelo link de recuperação). Re-exportados aqui só para não quebrar quem já
+ * importava desta rota.
+ */
+export { PASSWORD_MIN, PASSWORD_MAX } from '@/lib/password-rules';
 
 /**
  * Tetos do passo de RESOLVE, em consume_rate_window (20260813). Cobrem a espera
@@ -323,7 +328,7 @@ export async function POST(req: NextRequest) {
 
   // Depois do token, nunca antes: quem não provou de onde veio não recebe
   // resposta específica de nada.
-  if (password !== undefined && (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX)) {
+  if (password !== undefined && isPasswordLengthInvalid(password)) {
     return NextResponse.json(
       { error: generic.error, code: SIGNUP_INTENT_CODES.weakPassword },
       { status: 400 },

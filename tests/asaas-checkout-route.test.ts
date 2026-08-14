@@ -83,6 +83,39 @@ describe('POST /api/asaas/checkout — corpo enviado ao Asaas', () => {
     expect(body.items).toHaveLength(1);
   });
 
+  /**
+   * DESCRIÇÃO DA COBRANÇA. Sem ela a fatura do cliente sai como "Descrição não
+   * informada" — cobrança irreconhecível é das maiores causas de contestação, e
+   * chargeback custa mais que a venda.
+   *
+   * A comparação é contra PLANS, não contra uma string digitada: um teste com o
+   * texto escrito à mão passaria a aprovar exatamente a divergência que ele
+   * deveria pegar.
+   */
+  it('manda a descrição da cobrança, vinda de lib/plans.ts', async () => {
+    const { PLANS } = await import('../lib/plans');
+
+    await POST(jsonRequest({ interval: 'month', leadId: LEAD_ID }));
+    const [mensal] = mockCreateCheckout.mock.calls[0];
+    expect(mensal.subscription.description).toBe(PLANS.month.chargeDescription);
+    expect(mensal.subscription.description).toBeTruthy();
+
+    mockCreateCheckout.mockClear();
+    await POST(jsonRequest({ interval: 'year', leadId: LEAD_ID }));
+    const [anual] = mockCreateCheckout.mock.calls[0];
+    expect(anual.subscription.description).toBe(PLANS.year.chargeDescription);
+    // Cada plano com a sua: fatura de anual não pode dizer "Mensal".
+    expect(anual.subscription.description).not.toBe(mensal.subscription.description);
+  });
+
+  it('a descrição identifica o produto para quem lê a fatura do cartão', async () => {
+    const { PLANS } = await import('../lib/plans');
+    for (const plano of [PLANS.month, PLANS.year]) {
+      expect(plano.chargeDescription).toMatch(/creatools/i);
+      expect(plano.chargeDescription).toContain(plano.label);
+    }
+  });
+
   it('externalReference é o id do lead — é ele que liga o pagamento ao comprador', async () => {
     await POST(jsonRequest({ interval: 'month', leadId: LEAD_ID }));
 

@@ -227,7 +227,7 @@ describe('CancelSubscriptionButton — estados', () => {
  * MANDA" em lib/asaas-webhook.ts). Enquanto ninguém gravava essa coluna, os
  * três mostravam "—" — e o webhook cortava o acesso na hora do cancelamento.
  */
-describe('/conta — a data vem da fonte única', () => {
+describe('/configuracoes/assinatura — a data vem da fonte única', () => {
   const FIM_DO_CICLO = '2026-09-15T02:59:59.999Z'; // 14/09 23:59:59.999 em Brasília
 
   beforeEach(() => {
@@ -244,9 +244,11 @@ describe('/conta — a data vem da fonte única', () => {
     });
   });
 
+  // A aba de assinatura é a antiga /conta, migrada na Fase 17. /conta virou
+  // redirect e é testada em tests/configuracoes-abas.test.tsx.
   async function renderConta() {
-    const { default: ContaPage } = await import('../app/(app)/conta/page');
-    return render(await ContaPage());
+    const { default: AssinaturaPage } = await import('../app/(app)/configuracoes/assinatura/page');
+    return render(await AssinaturaPage());
   }
 
   it('mostra o dia do fim do ciclo, não um traço', async () => {

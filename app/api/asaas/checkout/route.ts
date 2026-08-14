@@ -168,6 +168,21 @@ export async function POST(req: NextRequest) {
         subscription: {
           cycle: plan.cycle,
           nextDueDate: today,
+          // DESCRIÇÃO DA COBRANÇA. Sem ela a fatura do cliente sai como
+          // "Descrição não informada" — cobrança irreconhecível é das maiores
+          // causas de contestação, e chargeback custa mais que a venda.
+          //
+          // O texto sai de lib/plans.ts, junto com preço e ciclo, e não daqui:
+          // mesma regra que impede o valor cobrado de divergir do anunciado.
+          // items[].name/description NÃO resolvem — a produção já manda os dois
+          // e a cobrança continua sem descrição.
+          //
+          // ⚠️ Ver `description` em AsaasCheckoutSubscriptionInput: o campo é
+          // comprovadamente o certo em /v3/subscriptions, mas o repasse pelo
+          // checkout hospedado só se confirma pagando um checkout no sandbox.
+          // Mandar não custa nada nem quebra nada — o Asaas ignora em silêncio
+          // o que não conhece (medido: campo inventado devolve 200).
+          description: plan.chargeDescription,
         },
         // customerData é OMITIDO de propósito, e isso é tudo-ou-nada.
         //

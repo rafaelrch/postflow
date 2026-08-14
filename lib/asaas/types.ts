@@ -361,6 +361,20 @@ export interface AsaasCheckoutSubscriptionInput {
   endDate?: string;
   /** YYYY-MM-DD */
   nextDueDate?: string;
+  /**
+   * Descrição da cobrança gerada — o texto que o cliente lê na fatura. Sem ela
+   * o Asaas mostra "Descrição não informada".
+   *
+   * ⚠️ SUPORTE NÃO CONFIRMADO NESTE ENDPOINT. Medido no sandbox em 14/08/2026:
+   * o POST /v3/checkouts aceita (200) mas não devolve o campo no eco de
+   * `subscription` — e faz exatamente o mesmo com um campo inventado, então
+   * aceitação não prova nada. Não existe GET /v3/checkouts (404) para
+   * inspecionar o que ficou gravado. O que ESTÁ provado é o campo em si: POST
+   * /v3/subscriptions com `description` gera a cobrança já com a descrição.
+   *
+   * Confirmar exige pagar um checkout no sandbox e ler a assinatura que nascer.
+   */
+  description?: string;
 }
 
 export interface AsaasCheckoutInstallmentInput {
