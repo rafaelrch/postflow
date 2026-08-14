@@ -4,7 +4,6 @@ import { useCallback, useRef } from 'react';
 import { useEditorStore } from './useEditorStore';
 import { createClient } from '@/lib/supabase';
 import { mapSlideToDbRow } from '@/lib/slide-mapper';
-import { handleProjectLimit } from './useUpgradeStore';
 
 export function useAutoSave() {
   const setSaveStatus = useEditorStore((s) => s.setSaveStatus);
@@ -97,9 +96,6 @@ export function useAutoSave() {
 
       setSaveStatus('saved');
     } catch (err) {
-      // Teto de 5 carrosséis do plano free (trigger no banco): o INSERT do novo
-      // carrossel foi recusado. Nada foi apagado; abre o modal de upgrade.
-      handleProjectLimit(err);
       console.error('[auto-save]', err);
       setSaveStatus('unsaved');
     }

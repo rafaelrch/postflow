@@ -11,7 +11,6 @@ import { SlideStyle } from '@/types';
 import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import { normalizeHandle } from '@/lib/utils';
 import { duplicateCarouselPayload, duplicateSlidesPayload } from '@/lib/carousel-duplicate';
-import { handleProjectLimit } from '@/hooks/useUpgradeStore';
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
 import Template02Slide from '@/components/slides/Template02Slide';
@@ -209,8 +208,6 @@ export default function DashboardClient({
         .single();
 
       if (error || !newCarousel) {
-        // Teto de 5 carrosséis do plano free: nada foi apagado, abre upgrade.
-        if (handleProjectLimit(error)) return;
         toast.error('Erro ao duplicar');
         return;
       }

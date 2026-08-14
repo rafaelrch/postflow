@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getActiveSubscription } from '@/lib/subscription';
-import { getEntitlement } from '@/lib/entitlements';
 import { CREDIT_COSTS, getUserCredits } from '@/lib/credits';
 
 function fmtDate(iso: string | null): string {
@@ -20,15 +19,12 @@ export default async function ContaPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [sub, credits, plan] = user
+  const [sub, credits] = user
     ? await Promise.all([
         getActiveSubscription(supabase, user.id),
         getUserCredits(supabase, user.id),
-        getEntitlement(supabase, user.id),
       ])
-    : [null, null, 'free' as const];
-
-  const isPro = plan === 'pro';
+    : [null, null];
 
   return (
     <div className="p-8 max-w-2xl mx-auto w-full overflow-y-auto">
@@ -38,7 +34,7 @@ export default async function ContaPage() {
         className="chip filled mt-3 inline-flex text-[11px]"
         data-testid="plan-badge"
       >
-        {isPro ? 'Plano Pago' : 'Plano Grátis'}
+        {sub ? `Plano ${sub.plan_interval === 'year' ? 'Anual' : 'Mensal'}` : 'Sem assinatura'}
       </span>
 
       <section className="mt-8 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6">
@@ -67,15 +63,14 @@ export default async function ContaPage() {
         ) : (
           <div className="mt-4">
             <p className="text-sm text-[var(--ink-dim)]">
-              Você está no <strong className="text-[var(--foreground)]">plano Grátis</strong>: editor e
-              templates manuais completos, export sem marca d’água e até 5 carrosséis salvos. Os recursos
-              de IA (carrosséis e imagens geradas por IA) são exclusivos dos planos pagos.
+              Não encontramos uma assinatura ativa nesta conta. O acesso ao Creatools
+              começa pela assinatura.
             </p>
             <Link
               href="/precos"
               className="brand-btn accent mt-4 inline-flex"
             >
-              Fazer upgrade
+              Ver planos
             </Link>
           </div>
         )}
@@ -100,12 +95,11 @@ export default async function ContaPage() {
               Custos vêm de CREDIT_COSTS (lib/credits.ts) interpolados, não
               digitados: só o carrossel e a imagem consomem crédito, e a copy não
               pode divergir do objeto numa próxima edição de texto.
-              Notícia não tem custo — tem TETO, e só no plano Grátis
-              (FREE_NEWS_DAILY_LIMIT, lib/news-quota.ts); quem vê esta caixa é
-              assinante, para quem a notícia é ilimitada. "Thread do X" é estilo
+              Notícia não tem custo nem teto: o plano gratuito, único que tinha
+              limite diário, saiu do produto. "Thread do X" é estilo
               de carrossel (FORMATO B em lib/openai.ts), não um item à parte.
               Não há CTA de upgrade aqui: quem tem assinatura ativa leva 409
-              `alreadySubscribed` no checkout (app/api/abacatepay/checkout/route.ts).
+              `alreadySubscribed` no checkout (app/api/asaas/checkout/route.ts).
             */}
             <p className="text-xs text-[var(--ink-dim)]">
               Carrossel com IA custa {CREDIT_COSTS.carousel} créditos — o mesmo nos 3 estilos,

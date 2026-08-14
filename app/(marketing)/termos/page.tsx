@@ -49,8 +49,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
       <p>
         O Creatools é uma plataforma (SaaS) que auxilia criadores e empresas a produzir carrosséis,
         posts e imagens para redes sociais com apoio de inteligência artificial, incluindo a API da
-        OpenAI. O serviço é oferecido em um plano gratuito e em planos pagos por assinatura,
-        conforme descritos em{' '}
+        OpenAI. O serviço é oferecido mediante assinatura paga, conforme os planos descritos em{' '}
         <Link href="/precos" className="underline underline-offset-4">
           /precos
         </Link>
@@ -73,7 +72,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '3. Planos, pagamento e renovação automática',
     body: (
       <p>
-        O Creatools é vendido por assinatura recorrente, processada pela AbacatePay: plano mensal
+        O Creatools é vendido por assinatura recorrente, processada pelo Asaas: plano mensal
         (R$ 59,50/mês) ou plano anual (R$ 499,00/ano). A assinatura renova automaticamente ao fim de cada ciclo até que seja
         cancelada. Você pode cancelar a renovação a qualquer momento pelo e-mail{' '}
         <Canais />, com efeito ao término do período já pago — sem cobranças futuras. Consulte também a nossa{' '}

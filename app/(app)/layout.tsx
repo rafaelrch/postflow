@@ -5,7 +5,6 @@ import ThemeProvider from '@/components/ThemeProvider';
 import AppSidebar from '@/components/ui/AppSidebar';
 import AuthProvider from '@/components/AuthProvider';
 import CreditsExhaustedModal from '@/components/ui/CreditsExhaustedModal';
-import UpgradeModal from '@/components/ui/UpgradeModal';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,7 +17,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <CreditsExhaustedModal />
-        <UpgradeModal />
         <Toaster
           position="bottom-right"
           toastOptions={{

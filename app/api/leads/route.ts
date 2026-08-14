@@ -14,8 +14,9 @@ const RATE_WINDOW_MS = 60_000;
 /**
  * Grava um lead (nome/e-mail/telefone + plano escolhido) no submit do popup de
  * preços, ANTES do checkout. É o passo que não pode depender de a compra se
- * concluir: captura interesse para remarketing e registra o e-mail do comprador
- * (a AbacatePay não devolve e-mail no checkout — ver supabase/leads-schema.sql).
+ * concluir: captura interesse para remarketing e gera o id que vira o
+ * `externalReference` do checkout do Asaas — a chave pela qual o webhook liga o
+ * pagamento de volta a quem comprou (ver supabase/leads-schema.sql).
  *
  * Insere via service role de propósito: `leads` tem RLS sem policy (deny para o
  * client), então dados de contato de terceiros nunca ficam legíveis no browser.
@@ -55,24 +56,34 @@ export async function POST(req: NextRequest) {
     const admin = createAdminSupabaseClient();
     // Upsert por e-mail: reenvio do mesmo endereço atualiza nome/telefone/plano
     // (+ updated_at via trigger) em vez de acumular duplicata. Ver leads-schema.sql.
-    const { error } = await admin.from('leads').upsert(
-      {
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        plan_interval: interval,
-      },
-      { onConflict: 'email' },
-    );
+    //
+    // O `select('id')` não é enfeite: o id do lead é o externalReference do
+    // checkout do Asaas, ou seja, a chave que liga o pagamento de volta a quem
+    // comprou. Sem devolvê-lo aqui, o passo seguinte (POST /api/asaas/checkout)
+    // não tem o que mandar. Com o upsert por e-mail, reenviar o mesmo endereço
+    // devolve o MESMO id — o lead não se multiplica.
+    const { data, error } = await admin
+      .from('leads')
+      .upsert(
+        {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          plan_interval: interval,
+        },
+        { onConflict: 'email' },
+      )
+      .select('id')
+      .single();
 
-    if (error) {
+    if (error || !data?.id) {
       // Nenhum campo do erro é confiável para log: até `code` pode conter PII
       // se uma dependência ou mock devolver um objeto fora do contrato esperado.
       console.error('[api/leads] database_write_failed');
       return NextResponse.json({ error: 'Não foi possível registrar seus dados.' }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, leadId: data.id as string });
   } catch {
     // Exceções podem incorporar payloads na própria mensagem; registre só o
     // identificador estável do evento, sem o objeto ou texto arbitrário.

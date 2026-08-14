@@ -15,6 +15,9 @@ const VALIDO: LeadForm = {
   phone: '(11) 99999-9999',
 };
 
+/** ID que o saveLead devolve — vira o externalReference do checkout. */
+const LEAD_ID = '3f8a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b';
+
 describe('validação de campos', () => {
   it('e-mail: aceita formato válido, rejeita malformado', () => {
     expect(isValidEmail('a@b.com')).toBe(true);
@@ -66,6 +69,7 @@ describe('submitLeadThenCheckout — ordem e contrato', () => {
     const calls: string[] = [];
     const saveLead = vi.fn(async () => {
       calls.push('save');
+      return LEAD_ID;
     });
     const startCheckout = vi.fn(async () => {
       calls.push('checkout');
@@ -78,8 +82,8 @@ describe('submitLeadThenCheckout — ordem e contrato', () => {
     expect(calls).toEqual(['save', 'checkout']); // ordem garantida
   });
 
-  it('passa o MESMO e-mail normalizado ao lead e ao checkout (customer nasce com o e-mail certo)', async () => {
-    const saveLead = vi.fn(async () => {});
+  it('normaliza o e-mail no lead e leva ao checkout o ID devolvido pelo save', async () => {
+    const saveLead = vi.fn(async () => LEAD_ID);
     const startCheckout = vi.fn(async () => {});
 
     await submitLeadThenCheckout(VALIDO, 'year', { saveLead, startCheckout });
@@ -88,11 +92,24 @@ describe('submitLeadThenCheckout — ordem e contrato', () => {
     expect(saveLead).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'rafael@test.com', interval: 'year', name: 'Rafael Rocha' }),
     );
-    expect(startCheckout).toHaveBeenCalledWith('year', 'rafael@test.com');
+    // O que segue para o checkout é o ID da linha gravada, não o e-mail: é ele
+    // que vira o externalReference do Asaas e liga o pagamento de volta.
+    expect(startCheckout).toHaveBeenCalledWith('year', LEAD_ID);
+  });
+
+  it('save sem ID: não inicia checkout (sem lead gravado ninguém reconhece quem pagou)', async () => {
+    const saveLead = vi.fn(async () => '');
+    const startCheckout = vi.fn(async () => {});
+
+    await expect(
+      submitLeadThenCheckout(VALIDO, 'month', { saveLead, startCheckout }),
+    ).rejects.toThrow(/registrar seus dados/i);
+
+    expect(startCheckout).not.toHaveBeenCalled();
   });
 
   it('e-mail inválido: lança LeadValidationError e NÃO salva nem inicia checkout', async () => {
-    const saveLead = vi.fn(async () => {});
+    const saveLead = vi.fn(async () => LEAD_ID);
     const startCheckout = vi.fn(async () => {});
 
     await expect(

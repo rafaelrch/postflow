@@ -2,42 +2,52 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '@/components/auth/AuthForm';
-import FreeSignupForm from '@/components/auth/FreeSignupForm';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { referrer: 'no-referrer' as const };
 
 /**
- * Cadastro "pagamento primeiro" (AbacatePay): só é possível criar conta com um
- * checkout pago. O checkout devolve `?ref=<uuid>` — um id nosso, gerado na
- * criação e presente só na URL de retorno de quem pagou. Resolvemos ref → linha
- * em subscriptions → id do checkout, confirmamos PAID relendo a API (fonte de
- * verdade, não o timing do webhook) e recuperamos o e-mail pago antes de
- * liberar o formulário.
+ * Cadastro "pagamento primeiro": só é possível criar conta com um pagamento
+ * confirmado. O `?t=` é o token assinado que o checkout do Asaas devolve na
+ * successUrl; quem valida de fato é o servidor, no /api/asaas/signup-intent, e
+ * o gate final é o trigger enforce_paid_signup_precondition no banco. Aqui a
+ * checagem é só de formato, para não renderizar o formulário à toa.
+ *
+ * ⚠️ ESTA PÁGINA NÃO LIBERA NADA, E CHEGAR AQUI NÃO É PROVA DE PAGAMENTO.
+ * (O aviso morava na antiga /assinatura/sucesso, que era a primeira tela depois
+ * do checkout; desde que o successUrl aponta para cá, ele vale para esta.)
+ * O Asaas redireciona de volta ANTES de a cobrança ser confirmada, e o token só
+ * responde "de qual lead é esta volta" (ver lib/signup-token.ts) — nunca "pagou".
+ * Quem cria a assinatura é o webhook (PAYMENT_CONFIRMED), e o cadastro exige
+ * essa linha no banco. Se um dia alguém for tentado a "adiantar" o acesso a
+ * partir daqui — renderizar o formulário sem consultar o servidor, confiar no
+ * formato do token, o que for: é exatamente assim que se dá acesso de graça a
+ * quem fechou o checkout sem pagar.
+ *
+ * Token ausente ou adulterado não é erro do comprador — provavelmente ele
+ * chegou de um link velho —, então o texto é acolhedor; o que muda é não
+ * seguirmos para o formulário.
+ *
+ * Não há mais caminho gratuito: o plano free foi removido.
  */
 export default async function CadastroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string; plan?: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
-  const { ref, plan } = await searchParams;
+  const { t } = await searchParams;
 
-  // Caminho FREE explícito: só quando ?plan=free e SEM ref pago. Não interfere
-  // no gating do caminho pago abaixo.
-  if (plan === 'free' && !ref) {
-    return (
-      <Suspense fallback={null}>
-        <FreeSignupForm />
-      </Suspense>
-    );
+  // Só o FORMATO do token (<uuid>.<hmac base64url>) é conferido aqui, para não
+  // renderizar o formulário à toa. A assinatura é validada no servidor, em
+  // /api/asaas/signup-intent, e o gate final é enforce_paid_signup_precondition
+  // no banco. O ponto do separador é o que a validação antiga (?ref=) rejeitava.
+  if (!t || !/^[0-9a-fA-F-]{36}\.[A-Za-z0-9_-]{43}$/.test(t)) {
+    return <Shell><NoSubscription /></Shell>;
   }
-
-  // Caminho PAGO (inalterado): exige ref válido do checkout.
-  if (!ref || !/^[A-Za-z0-9_-]{8,160}$/.test(ref)) return <Shell><NoSubscription /></Shell>;
 
   return (
     <Suspense fallback={null}>
-      <AuthForm mode="signup" checkoutRef={ref} />
+      <AuthForm mode="signup" signupToken={t} />
     </Suspense>
   );
 }

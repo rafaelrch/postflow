@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import LeadCaptureModal from '@/components/billing/LeadCaptureModal';
+import { planFor, type PlanInterval } from '@/lib/plans';
 
 /**
  * Botão "assinar" de um plano. Em vez de ir direto ao checkout, abre o popup de
- * captura de lead (nome/e-mail/telefone). O e-mail coletado ali é o que segue
- * para a AbacatePay — a API dela não devolve e-mail no checkout, então ele
- * PRECISA ser coletado antes; e o lead é gravado mesmo que a compra não se
- * conclua (remarketing). Ver LeadCaptureModal / submitLeadThenCheckout.
+ * captura de lead (nome/e-mail/telefone). O lead é gravado mesmo que a compra
+ * não se conclua (remarketing), e o id dele é o que amarra o pagamento ao
+ * comprador no Asaas. Ver LeadCaptureModal / submitLeadThenCheckout.
  */
 export default function CheckoutButton({
   interval,
@@ -17,7 +17,7 @@ export default function CheckoutButton({
   className,
   variant = 'primary',
 }: {
-  interval: 'month' | 'year';
+  interval: PlanInterval;
   children: React.ReactNode;
   className?: string;
   variant?: 'primary' | 'accent' | 'outline';
@@ -32,7 +32,7 @@ export default function CheckoutButton({
       {open && (
         <LeadCaptureModal
           interval={interval}
-          planLabel={interval === 'year' ? 'Anual' : 'Mensal'}
+          planLabel={planFor(interval).label}
           onClose={() => setOpen(false)}
         />
       )}

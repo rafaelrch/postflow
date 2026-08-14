@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Trava de custo do upload de reel (fatia 4b): editar o próprio reel é sempre
-// liberado; criar reel novo é barrado para free com >= 1 reel; posse verificada
-// server-side (anti-IDOR); falha fechada.
+// Trava do upload de reel: posse verificada server-side (anti-IDOR) e falha
+// fechada. O teto de 1 reel que existia aqui era do PLANO GRATUITO e saiu junto
+// com ele — os testes que restam não dependem de entitlement, e um deles vigia
+// justamente que a contagem de reels não volte a rodar.
 
-const { mockGetUser, mockSign, mockOwned, mockCount, mockGetEntitlement } = vi.hoisted(() => ({
+const { mockGetUser, mockSign, mockOwned, mockCount } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSign: vi.fn(),
   mockOwned: vi.fn(),
   mockCount: vi.fn(),
-  mockGetEntitlement: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase-server', () => ({
@@ -21,7 +21,9 @@ vi.mock('@/lib/supabase-server', () => ({
       return {
         select: (_col: string, opts?: { count?: string; head?: boolean }) => {
           if (opts && opts.count) {
-            // Caminho de CONTAGEM: .select('id',{count}).eq('user_id', uid)
+            // Caminho de CONTAGEM: só existia para o teto do plano free. Se
+            // alguém reintroduzir a contagem, mockCount registra a chamada e o
+            // teste "(a)" quebra.
             return { eq: () => Promise.resolve(mockCount()) };
           }
           // Caminho de POSSE: .select('id').eq('id',reelId).eq('user_id',uid).maybeSingle()
@@ -32,12 +34,8 @@ vi.mock('@/lib/supabase-server', () => ({
   }),
 }));
 
-vi.mock('@/lib/entitlements', () => ({
-  getEntitlement: (...args: unknown[]) => mockGetEntitlement(...args),
-}));
-
-// A trava de custo só é exercitável com Reels LIGADO — com a chave desligada a
-// rota corta em 404 antes de tudo (coberto em tests/reels-feature-flag.test.tsx).
+// A trava só é exercitável com Reels LIGADO — com a chave desligada a rota
+// corta em 404 antes de tudo (coberto em tests/reels-feature-flag.test.tsx).
 vi.mock('@/lib/feature-flags', () => ({ REELS_ENABLED: true }));
 
 let POST: typeof import('../app/api/reels/upload-url/route').POST;
@@ -59,38 +57,27 @@ beforeEach(async () => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({ data: { user: { id: USER } } });
   mockSign.mockResolvedValue({ data: { path: `${USER}/reels/x.mp4`, token: 'tok', signedUrl: 'https://x/y' }, error: null });
-  mockGetEntitlement.mockResolvedValue('free');
   mockOwned.mockResolvedValue({ data: null, error: null });
   mockCount.mockResolvedValue({ count: 0, error: null });
   ({ POST } = await import('../app/api/reels/upload-url/route'));
 });
 
-describe('(a) free com 1 reel pedindo upload NOVO', () => {
-  it('403 free_reel_limit, SEM assinar URL', async () => {
-    mockGetEntitlement.mockResolvedValue('free');
-    mockCount.mockResolvedValue({ count: 1, error: null });
+describe('(a) reel NOVO não tem mais teto', () => {
+  it('assina sem contar reels do usuário', async () => {
     const res = await POST(req({ ...MP4 })); // sem reelId = novo
-    expect(res.status).toBe(403);
-    expect((await res.json()).code).toBe('free_reel_limit');
-    expect(mockSign).not.toHaveBeenCalled();
-  });
-
-  it('free com 0 reels PODE criar o primeiro (assina)', async () => {
-    mockCount.mockResolvedValue({ count: 0, error: null });
-    const res = await POST(req({ ...MP4 }));
     expect(res.status).toBe(200);
     expect(mockSign).toHaveBeenCalledTimes(1);
+    // O acervo não é mais limitado: nenhuma contagem deve rodar.
+    expect(mockCount).not.toHaveBeenCalled();
   });
 });
 
-describe('(b) free trocando o vídeo do PRÓPRIO reel', () => {
-  it('LIBERADO (assina), mesmo com 1 reel', async () => {
-    mockGetEntitlement.mockResolvedValue('free');
+describe('(b) troca do vídeo do PRÓPRIO reel', () => {
+  it('LIBERADO (assina)', async () => {
     mockOwned.mockResolvedValue({ data: { id: OWN_REEL }, error: null });
     const res = await POST(req({ ...MP4, reelId: OWN_REEL }));
     expect(res.status).toBe(200);
     expect(mockSign).toHaveBeenCalledTimes(1);
-    // Caminho de edição não depende de contar reels.
     expect(mockCount).not.toHaveBeenCalled();
   });
 });
@@ -115,25 +102,7 @@ describe('(c) IDOR — reelId de OUTRO usuário', () => {
   });
 });
 
-describe('(d) PRO sem restrição', () => {
-  it('cria reel novo mesmo com vários reels (assina)', async () => {
-    mockGetEntitlement.mockResolvedValue('pro');
-    mockCount.mockResolvedValue({ count: 9, error: null });
-    const res = await POST(req({ ...MP4 }));
-    expect(res.status).toBe(200);
-    expect(mockSign).toHaveBeenCalledTimes(1);
-  });
-});
-
 describe('falha fechada', () => {
-  it('erro na contagem NÃO libera reel novo do free (403)', async () => {
-    mockGetEntitlement.mockResolvedValue('free');
-    mockCount.mockResolvedValue({ count: null, error: { message: 'boom' } });
-    const res = await POST(req({ ...MP4 }));
-    expect(res.status).toBe(403);
-    expect(mockSign).not.toHaveBeenCalled();
-  });
-
   it('erro ao checar posse NÃO libera edição (403)', async () => {
     mockOwned.mockResolvedValue({ data: null, error: { message: 'boom' } });
     const res = await POST(req({ ...MP4, reelId: OWN_REEL }));

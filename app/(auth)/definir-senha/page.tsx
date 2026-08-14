@@ -12,6 +12,21 @@ import {
   type PaidSignupSessionResult,
 } from '@/lib/paid-signup-callback';
 
+/**
+ * Aterrissagem do link de confirmação — e, desde que a senha passou para o
+ * formulário de cadastro, quase sempre só isso.
+ *
+ * POR QUE O LINK AINDA CAI AQUI, e não direto no /onboarding: o Supabase
+ * devolve a sessão no FRAGMENTO da URL (#access_token), que nunca é enviado ao
+ * servidor. Uma rota protegida decidiria no middleware, antes de qualquer JS
+ * ler o fragmento, e mandaria a pessoa para o login. Esta página é o que troca
+ * o fragmento por sessão em cookie.
+ *
+ * Com app_metadata.password_set (gravado por /api/asaas/signup-intent quando a
+ * senha veio do cadastro) não há nada a perguntar: encaminha para /onboarding.
+ * O formulário abaixo ficou como FALLBACK das contas antigas, criadas quando o
+ * cadastro ainda era só e-mail e a senha nascia aqui.
+ */
 export default function DefinirSenhaPage() {
   const router = useRouter();
   const [password, setPassword] = useState('');
@@ -38,12 +53,20 @@ export default function DefinirSenhaPage() {
     void verificationRef.current.then((result) => {
       if (!active) return;
       const eligible = Boolean(result && isPaidPasswordlessSession({ user: result.user }));
+
+      // Senha já definida no cadastro: a sessão está de pé, não há o que pedir.
+      if (eligible && result?.user.app_metadata?.password_set === true) {
+        router.replace('/onboarding');
+        router.refresh();
+        return;
+      }
+
       passwordClientRef.current = eligible && result ? result.client : null;
       setConfirmed(eligible);
       setChecking(false);
     });
     return () => { active = false; };
-  }, []);
+  }, [router]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

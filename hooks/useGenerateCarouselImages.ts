@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useEditorStore } from './useEditorStore';
 import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
-import { handlePlanRequired } from './useUpgradeStore';
 import { DEFAULT_IMAGE_POSITION, Slide, SlideStyle } from '@/types';
 import { template01ModelOf } from '@/lib/templates/template-01';
 import { template01SetImage } from '@/lib/templates/template-01/image';
@@ -42,11 +41,6 @@ class GenerateImageError extends Error {
 
 function isInsufficientCredits(err: unknown): boolean {
   return err instanceof GenerateImageError && err.code === 'insufficient_credits';
-}
-
-/** 402 plan_required: usuário free tentou gerar imagem com IA. */
-function isPlanRequired(err: unknown): boolean {
-  return err instanceof GenerateImageError && err.code === 'plan_required';
 }
 
 function sleep(ms: number): Promise<void> {
@@ -181,7 +175,6 @@ export function useGenerateCarouselImages() {
     let done = 0;
     let firstError: string | null = null;
     let creditsOut = false;
-    let planOut = false;
 
     // Concorrência limitada (2 por vez) + retry automático em 429 — a OpenAI
     // limita geração de imagem a poucas por minuto, e disparar tudo de uma vez
@@ -189,7 +182,7 @@ export function useGenerateCarouselImages() {
     const CONCURRENCY = 2;
     let cursor = 0;
     const worker = async () => {
-      while (cursor < targets.length && !creditsOut && !planOut) {
+      while (cursor < targets.length && !creditsOut) {
         const { slide, i } = targets[cursor++];
         try {
           const url = await generateForSlideWithRetry(slide, i, slides.length, (waitSecs) => {
@@ -197,11 +190,6 @@ export function useGenerateCarouselImages() {
           });
           updateSlide(i, imagePatch(slide, style, i, target, url));
         } catch (err) {
-          // Plano free tentou IA: para o lote e abre o modal de upgrade.
-          if (isPlanRequired(err)) {
-            planOut = true;
-            return;
-          }
           // Sem créditos: os próximos slides falhariam igual — para o lote.
           if (isInsufficientCredits(err)) {
             creditsOut = true;
@@ -223,10 +211,7 @@ export function useGenerateCarouselImages() {
     setGenerating(false);
     useCreditsStore.getState().refresh();
 
-    if (planOut) {
-      toast.dismiss(toastId);
-      handlePlanRequired({ code: 'plan_required' }); // free: modal de upgrade
-    } else if (creditsOut) {
+    if (creditsOut) {
       toast.dismiss(toastId);
       handleInsufficientCredits({ code: 'insufficient_credits' }); // abre o popup global
     } else if (firstError && done === targets.length) {
@@ -253,10 +238,7 @@ export function useGenerateCarouselImages() {
       updateSlide(index, imagePatch(slide, style, index, target, url));
       toast.success(`Slide ${index + 1} pronto!`, { id: toastId });
     } catch (err) {
-      if (isPlanRequired(err)) {
-        toast.dismiss(toastId);
-        handlePlanRequired({ code: 'plan_required' }); // free: modal de upgrade
-      } else if (isInsufficientCredits(err)) {
+      if (isInsufficientCredits(err)) {
         toast.dismiss(toastId);
         handleInsufficientCredits({ code: 'insufficient_credits' }); // abre o popup global
       } else {

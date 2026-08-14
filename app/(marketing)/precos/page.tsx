@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Check, ArrowLeft } from 'lucide-react';
 import CheckoutButton from '@/components/billing/CheckoutButton';
+import { PLANS } from '@/lib/plans';
 
 export const metadata = {
   title: 'Planos e preços — Creatools',
@@ -42,47 +43,23 @@ function Canais() {
   );
 }
 
-const MONTHLY_PRICE = 'R$ 59,50';
-const YEARLY_PRICE = 'R$ 499';
+// Preço vem de lib/plans.ts, a MESMA fonte que a rota de checkout usa para
+// montar items[].value. Escrever o número aqui de novo é como se anuncia um
+// valor e se cobra outro.
+const MONTHLY_PRICE = PLANS.month.priceLabel;
+const YEARLY_PRICE = PLANS.year.priceLabel;
 const YEARLY_MONTHLY_EQUIV = 'R$ 41,58/mês';
 
-// Plano gratuito: Studio manual completo, sem nenhuma IA.
-// Cada linha abaixo é verificável no código — não escreva nada aqui que você
-// não consiga apontar num arquivo:
-//   - formatos 4:5 / 1:1 / 9:16 .......... lib/formats.ts (FORMAT_LIST)
-//   - 3 estilos de carrossel ............. types/index.ts (SlideStyle)
-//   - teto de 5 projetos salvos .......... enforce_free_carousel_limit (>= 5)
-//   - teto de 4 notícias por dia ......... FREE_NEWS_DAILY_LIMIT / trigger 24h
-//   - sem IA ............................. as 2 rotas de IA exigem requirePlan 'pro'
-//   - calendário ......................... /agenda não tem gate de plano: o proxy só
-//     exige sessão, a policy scheduled_posts_owner só compara auth.uid() = user_id e
-//     o único trigger da tabela é set_updated_at. Por isso ele aparece nos DOIS cards
-//     — listar só no pago faria o free pagar por algo que já tem.
-const FREE_FEATURES = [
-  'Studio de edição completo (4:5, 1:1, 9:16)',
-  'Carrosséis e notícias manuais, nos 3 estilos: Editorial, Minimalista e Thread do X',
-  'Calendário de postagem',
-  'Até 5 carrosséis salvos',
-  'Até 4 notícias por dia',
-  'Sem recursos de IA',
-];
-
-// Planos pagos: a IA é exclusividade daqui, e os tetos do Grátis somem.
-// Referências: geração de carrossel e de imagem em app/api/generate-*/route.ts
-// (ambas com requireEntitlement({ requirePlan: 'pro' })); custo de 5 créditos
-// em lib/credits.ts (CREDIT_COSTS); mesada 200/300 em supabase/credits-and-flow.sql.
-// "Ilimitado" aqui vale para o ACERVO (os triggers de limite dão `return new`
-// quando o plano é 'pro'), NÃO para a geração por IA — essa é limitada pelos
-// créditos do mês. Não escreva "carrosséis ilimitados por IA": seria falso.
+// Só existem planos pagos: o plano gratuito foi removido do produto (o backend
+// dele saiu na migration 20260812). Nada aqui pode prometer acesso sem assinar.
 const FEATURES = [
-  'Carrosséis gerados por IA: texto dos slides, legenda e hashtags',
-  'Imagens com IA',
-  'Créditos de IA todo mês: 200 no mensal, 300 no anual (carrossel e imagem custam 5 cada)',
-  'Projetos salvos ilimitados',
-  'Notícias sem limite diário',
-  'Studio de edição completo',
-  'Calendário de postagem',
-  'Tudo do plano Grátis incluído',
+  'Carrosséis completos gerados por IA (texto + layout)',
+  'Imagens com IA (OpenAI gpt-image-2) — 5 créditos cada',
+  'Créditos de IA todo mês (200 no mensal, 300 no anual)',
+  'Calendário de conteúdo',
+  'Projetos ilimitados',
+  'Editor visual completo (4:5, 1:1, 9:16)',
+  'Export PNG, ZIP e MP4 — sem marca d’água',
 ];
 
 export default function PrecosPage() {
@@ -96,37 +73,13 @@ export default function PrecosPage() {
         <header className="text-center mb-14">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Escolha seu plano</h1>
           <p className="mt-4 text-[var(--ink-dim)] text-lg">
-            O Grátis já tem o Studio completo. Os planos pagos somam IA e tiram os limites.
+            Tudo do PostFlow, sem limites. Cancele quando quiser.
           </p>
         </header>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {/* Grátis */}
-          <div className="rounded-2xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-8 shadow-[var(--sh-2)]">
-            <div className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-dim)]">Grátis</div>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-4xl font-bold">R$ 0</span>
-              <span className="text-[var(--ink-dim)]">/sempre</span>
-            </div>
-            <p className="mt-2 text-sm text-[var(--ink-dim)]">Editor e templates manuais completos.</p>
-            <ul className="mt-6 space-y-3">
-              {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm">
-                  <Check size={18} className="mt-0.5 shrink-0 text-[var(--success)]" />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8">
-              <Link
-                href="/cadastro?plan=free"
-                className="brand-btn outline w-full justify-center"
-              >
-                Começar grátis
-              </Link>
-            </div>
-          </div>
-
+        {/* Dois planos, não três: a grade é de 2 colunas e fica centrada. Manter
+            md:grid-cols-3 deixaria um buraco de coluna vazia. */}
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           {/* Mensal */}
           <div className="rounded-2xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-8 shadow-[var(--sh-2)]">
             <div className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-dim)]">Mensal</div>

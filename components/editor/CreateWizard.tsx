@@ -43,7 +43,6 @@ import {
   template02TextSlotsForModel,
 } from '@/lib/templates/template-02';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
-import { handlePlanRequired, handleProjectLimit } from '@/hooks/useUpgradeStore';
 import toast from 'react-hot-toast';
 
 interface CreateWizardProps {
@@ -837,7 +836,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          if (handlePlanRequired(err)) return; // free tentou IA: modal de upgrade
           if (handleInsufficientCredits(err)) return; // popup global avisa a recarga
           throw new Error(err.error || 'Falha na geração com IA');
         }
@@ -1168,12 +1166,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
         openEditor(carousel.id, carousel.title);
       } catch (persistErr) {
-        // Teto de 5 carrosséis do plano free (trigger no banco): mostra o modal
-        // de upgrade e NÃO abre um editor local órfão (nada foi salvo/apagado).
-        if (handleProjectLimit(persistErr)) {
-          onClose();
-          return;
-        }
         console.error('[create-wizard] falha ao persistir, abrindo editor local:', persistErr);
         openEditor(null, defaultTitle);
       }

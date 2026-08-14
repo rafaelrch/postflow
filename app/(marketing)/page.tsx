@@ -908,26 +908,11 @@ function DoTheMath() {
 
 /* ─── Planos ──────────────────────────────────────────────────── */
 
-// Plano gratuito: editor e templates manuais completos, sem nenhuma IA.
-// O export é PNG por slide e ZIP do carrossel inteiro — é literalmente o que
-// hooks/useExport.ts faz (slide-N.png via canvas.toDataURL, e o zip montado com
-// JSZip). NÃO existe export em MP4 fora dos Reels, que estão desligados: prometer
-// MP4 aqui é prometer o que o produto não entrega.
-const FREE_FEATURES = [
-  'Editor visual completo, slide a slide',
-  '3 estilos: Editorial, Minimalista e Thread do X',
-  'News cards no formato do feed (1080×1350)',
-  'Export em PNG por slide ou ZIP com o carrossel inteiro',
-  'Agenda de conteúdo',
-  'Até 5 carrosséis salvos',
-  'Sem recursos de IA',
-];
-
-// Planos pagos: o EXCLUSIVO deles é a IA — e os tetos do Free somem.
-// A agenda NÃO é exclusiva: /agenda não tem trava de plano nenhuma (a policy
+// Só existem planos pagos: o plano gratuito foi removido do produto (o backend
+// dele saiu na migration 20260812). Nada aqui pode prometer acesso sem assinar.
+// A agenda NÃO é exclusiva de plano: /agenda não tem trava nenhuma (a policy
 // scheduled_posts_owner só compara auth.uid() = user_id, a tabela não tem
-// trigger de limite e o proxy só exige sessão). Por isso ela aparece nos DOIS
-// cards — não "restaure" isso para exclusividade do pago.
+// trigger de limite e o proxy só exige sessão).
 // A IA devolve title/description/highlightWord/backgroundColor por slide, mais
 // caption e hashtags (types/index.ts: SlideAIData e CarouselAIResponse). Layout,
 // fontes e formato são escolha do usuário no wizard — não venha escrever que a
@@ -938,14 +923,15 @@ const PLAN_FEATURES = [
   'Créditos de IA que renovam todo mês',
   'Agenda de conteúdo',
   'Projetos ilimitados',
-  'Tudo do plano Grátis incluído',
+  'Editor visual completo, slide a slide',
+  'Export Full HD (PNG, ZIP e MP4), sem marca d’água',
 ];
 
 function Pricing() {
   // Escolher um plano abre o popup de captura de lead (nome/e-mail/telefone) —
   // o MESMO fluxo do /precos (CheckoutButton → LeadCaptureModal). O e-mail
-  // coletado segue para a AbacatePay; a landing não vai mais direto ao checkout
-  // AbacatePay nem pula a captura de lead.
+  // coletado vira um lead e o id dele segue para o checkout do Asaas; a landing
+  // não vai direto ao checkout nem pula a captura de lead.
   const [modalInterval, setModalInterval] = useState<'month' | 'year' | null>(null);
 
   return (
@@ -963,42 +949,9 @@ function Pricing() {
           </p>
         </FadeUp>
 
-        <div className="mt-14 grid md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
-          {/* Grátis */}
-          <FadeUp>
-            <div className="rounded-[28px] p-8" style={{ background: 'var(--lp-band)' }}>
-              <span className="lp-badge" style={{ background: 'var(--lp-black)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
-                Grátis
-              </span>
-              <div className="mt-5 flex items-baseline">
-                <span className="lp-h" style={{ fontSize: 56 }}>R$0</span>
-                <span className="ml-2 text-[14px]" style={{ color: 'var(--lp-gray)' }}>/sempre</span>
-              </div>
-              <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
-                Editor e templates manuais completos.
-                <br />Sem cartão, sem prazo.
-              </p>
-              <div className="mt-6 -mx-8 px-8 py-3" style={{ background: '#EBEBE9' }}>
-                <p className="text-[13px] font-bold tracking-tight">100% MANUAL</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 5 carrosséis salvos</p>
-              </div>
-              <ul className="mt-6 space-y-2.5">
-                {FREE_FEATURES.map((perk) => (
-                  <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'var(--lp-gray-2)' }}>
-                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#C5C5C0' }} />
-                    {perk}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/cadastro?plan=free"
-                className="lp-btn white w-full justify-between mt-8 !bg-white !rounded-full"
-              >
-                Começar grátis <ArrowChip />
-              </Link>
-            </div>
-          </FadeUp>
-
+        {/* Dois planos, não três: grade de 2 colunas e centrada. Manter
+            md:grid-cols-3 deixaria um buraco de coluna vazia. */}
+        <div className="mt-14 grid md:grid-cols-2 gap-6 max-w-3xl mx-auto items-start">
           {/* Mensal */}
           <FadeUp delay={0.05}>
             <div className="rounded-[28px] p-8" style={{ background: 'var(--lp-band)' }}>

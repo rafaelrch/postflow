@@ -67,7 +67,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         Coletamos: (a) dados de cadastro — nome, e-mail e telefone; (b) dados de pagamento —
-        processados diretamente pela AbacatePay, nossa processadora de pagamentos (o Creatools não
+        processados diretamente pelo Asaas, nossa processadora de pagamentos (o Creatools não
         armazena números de cartão de crédito); (c) dados de uso da plataforma, incluindo prompts,
         conteúdos gerados e histórico de créditos; (d) dados técnicos, como endereço IP e
         identificadores de sessão, coletados via cookies.
@@ -100,7 +100,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '5. Compartilhamento com terceiros e transferência internacional',
     body: (
       <p>
-        Compartilhamos dados com prestadores essenciais ao funcionamento do serviço: AbacatePay
+        Compartilhamos dados com prestadores essenciais ao funcionamento do serviço: Asaas
         (processamento de pagamentos) e Supabase (banco de dados e autenticação).{' '}
         <strong className="text-[var(--ink)]">
           Os prompts e conteúdos que você envia para gerar carrosséis, textos e imagens são

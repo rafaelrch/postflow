@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { getEntitlement } from '@/lib/entitlements';
 import { REELS_ENABLED } from '@/lib/feature-flags';
 import {
   isAllowedVideoMime,
@@ -21,11 +20,9 @@ import {
  *     RLS por usuário do Storage não tem como ser burlada.
  *   - MIME e tamanho validados server-side (mesma fonte: lib/reels-media.ts).
  *     Duração/dimensões são medidas no cliente (precisam de <video>).
- *   - TRAVA DE CUSTO (fatia 4b): o trigger free_reel_limit é BEFORE INSERT na
- *     tabela `reels`, então não cobre upload órfão (assinar URL + subir vídeo
- *     sem inserir linha). Aqui, ANTES de assinar: trocar o vídeo de um reel que
- *     é do próprio usuário é sempre liberado; criar um reel NOVO é barrado para
- *     free que já tem >= 1 reel (403 free_reel_limit). Falha fechada.
+ *   - Na TROCA de vídeo de um reel existente, a posse é verificada server-side
+ *     ANTES de assinar. O teto de 1 reel do plano gratuito que existia aqui saiu
+ *     junto com o plano: sem free, não há limite de acervo a impor.
  */
 const REELS_BUCKET = 'postflow-reels';
 
@@ -73,7 +70,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Formato inválido.', code: 'mime' }, { status: 422 });
   }
 
-  // ── Trava de custo (anti-upload-órfão), ANTES de assinar qualquer URL ──────
+  // ── Posse do reel (anti-IDOR), ANTES de assinar qualquer URL ──────────────
   const reelId = typeof body.reelId === 'string' ? body.reelId.trim() : '';
   if (reelId) {
     // TROCA de vídeo de um reel existente. Posse verificada SERVER-SIDE contra
@@ -93,27 +90,10 @@ export async function POST(request: Request) {
     if (ownErr || !owned) {
       return NextResponse.json({ error: 'Não foi possível preparar o upload.' }, { status: 403 });
     }
-    // Dono confirmado → libera a troca de vídeo, independente do plano.
-  } else {
-    // Reel NOVO: free com >= 1 reel é barrado antes de assinar (fecha o furo).
-    // Falha fechada: entitlement não resolvido = free; contagem indefinida = barra.
-    const plan = await getEntitlement(supabase, user.id);
-    if (plan !== 'pro') {
-      const { count, error: countErr } = await supabase
-        .from('reels')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      if (countErr || count === null || count >= 1) {
-        return NextResponse.json(
-          {
-            error: 'O plano gratuito guarda 1 Reel. Apague o atual ou faça upgrade para criar outro.',
-            code: 'free_reel_limit',
-          },
-          { status: 403 },
-        );
-      }
-    }
+    // Dono confirmado → libera a troca de vídeo.
   }
+  // Reel NOVO não tem mais teto: o limite de 1 reel era do plano gratuito, que
+  // saiu junto com o trigger free_reel_limit no banco.
 
   const ext = extForMime(mime);
   const uuid =

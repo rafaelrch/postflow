@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
-import { startAbacateCheckout } from '@/lib/start-checkout';
+import { startAsaasCheckout } from '@/lib/start-checkout';
 import {
   submitLeadThenCheckout,
   LeadValidationError,
@@ -42,21 +42,23 @@ export default function LeadCaptureModal({
     setErrors({});
     try {
       await submitLeadThenCheckout(form, interval, {
-        // Grava o lead ANTES de qualquer redirect: só resolve com HTTP ok.
+        // Grava o lead ANTES de qualquer redirect: só resolve com HTTP ok, e
+        // devolve o id — é ele que segue para o checkout (externalReference).
         saveLead: async (lead) => {
           const res = await fetch('/api/leads', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(lead),
           });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.leadId) {
             throw new Error(data.error || 'Não foi possível registrar seus dados.');
           }
+          return data.leadId as string;
         },
-        startCheckout: startAbacateCheckout,
+        startCheckout: startAsaasCheckout,
       });
-      // Sucesso ⇒ startAbacateCheckout já redirecionou; nada a fazer.
+      // Sucesso ⇒ startAsaasCheckout já redirecionou; nada a fazer.
     } catch (err) {
       if (err instanceof LeadValidationError) {
         setErrors(err.errors);

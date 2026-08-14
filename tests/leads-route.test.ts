@@ -15,6 +15,21 @@ vi.mock('../lib/supabase-admin', () => ({
 
 import { POST } from '../app/api/leads/route';
 
+const LEAD_ID = '3f8a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b';
+
+/**
+ * A rota faz `.upsert(...).select('id').single()` — ela precisa do id de volta,
+ * porque é ele que vira o externalReference do checkout do Asaas. O mock
+ * reproduz essa cadeia; `mockResolvedValue` direto no upsert não serve mais.
+ */
+function upsertChain(result: { data?: { id: string } | null; error?: unknown }) {
+  return {
+    select: () => ({
+      single: async () => ({ data: result.data ?? null, error: result.error ?? null }),
+    }),
+  };
+}
+
 // Cada request carrega um IP via x-forwarded-for. IP distinto por teste (ou
 // explícito) evita que o rate limit de um caso vaze pro outro.
 function jsonRequest(body: unknown, ip = '10.0.0.1') {
@@ -33,7 +48,7 @@ afterEach(() => {
 describe('POST /api/leads', () => {
   it('grava o lead com os 3 campos + plano, e-mail normalizado (upsert por e-mail)', async () => {
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({ error: null });
+    mockUpsert.mockReturnValue(upsertChain({ data: { id: LEAD_ID } }));
 
     const res = await POST(
       jsonRequest({
@@ -45,7 +60,11 @@ describe('POST /api/leads', () => {
     );
 
     expect(res.status).toBe(200);
-    expect((await res.json()).ok).toBe(true);
+    const payload = await res.json();
+    expect(payload.ok).toBe(true);
+    // O id volta para o client porque é ele que segue para o checkout como
+    // externalReference. Sem isso o pagamento não tem como ser reconhecido.
+    expect(payload.leadId).toBe(LEAD_ID);
 
     expect(mockFrom).toHaveBeenCalledWith('leads');
     // e-mail duplicado faz UPSERT (onConflict email), não insert → não duplica linha
@@ -57,7 +76,7 @@ describe('POST /api/leads', () => {
 
   it('default de plano é month quando ausente/estranho', async () => {
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({ error: null });
+    mockUpsert.mockReturnValue(upsertChain({ data: { id: LEAD_ID } }));
 
     await POST(jsonRequest({ name: 'Ana', email: 'ana@test.com', phone: '11999998888' }));
 
@@ -96,7 +115,7 @@ describe('POST /api/leads', () => {
 
   it('erro do banco vira 500', async () => {
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({ error: { code: '23505', message: 'unique violation' } });
+    mockUpsert.mockReturnValue(upsertChain({ error: { code: '23505', message: 'unique violation' } }));
 
     const res = await POST(jsonRequest({ name: 'Rafael', email: 'r@test.com', phone: '11999999999' }));
 
@@ -106,9 +125,11 @@ describe('POST /api/leads', () => {
   it('erro do banco não escreve mensagem com PII no console', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({
-      error: { code: '11999999999', message: 'duplicate key: email=segredo@example.com, phone=11999999999' },
-    });
+    mockUpsert.mockReturnValue(
+      upsertChain({
+        error: { code: '11999999999', message: 'duplicate key: email=segredo@example.com, phone=11999999999' },
+      }),
+    );
 
     const res = await POST(jsonRequest({ name: 'Rafael', email: 'segredo@example.com', phone: '11999999999' }));
 
@@ -134,7 +155,7 @@ describe('POST /api/leads', () => {
 
   it('rate limit: a 11ª requisição do mesmo IP em 1 min recebe 429', async () => {
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({ error: null });
+    mockUpsert.mockReturnValue(upsertChain({ data: { id: LEAD_ID } }));
 
     const ip = '203.0.113.7';
     // 10 permitidas

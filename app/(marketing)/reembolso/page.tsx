@@ -72,7 +72,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '3. Prazos de estorno',
     body: (
       <p>
-        O reembolso é processado pela AbacatePay em poucos dias úteis após a aprovação do pedido. Como
+        O reembolso é processado pelo Asaas em poucos dias úteis após a aprovação do pedido. Como
         a assinatura é paga por cartão de crédito, o prazo para o valor aparecer na sua fatura
         depende da operadora do cartão e do banco emissor, podendo levar até 1 ou 2 ciclos de
         faturamento.

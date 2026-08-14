@@ -42,7 +42,9 @@ const COPY_FILES = [
   'app/(marketing)/page.tsx',
   'app/(marketing)/precos/page.tsx',
   'components/ui/CreditsExhaustedModal.tsx',
-  'components/ui/UpgradeModal.tsx',
+  // components/ui/UpgradeModal.tsx saiu junto com o plano gratuito: era o
+  // upsell do free, e sem free não há para onde subir. Se um modal de upgrade
+  // voltar a existir, ele volta para esta lista.
   'components/ui/AppSidebar.tsx',
 ];
 
@@ -123,8 +125,8 @@ describe('copy de créditos x CREDIT_COSTS', () => {
 
   it.each(COPY_FILES)('%s não cobra créditos por notícia — notícia tem teto, não custo', (file) => {
     // Notícias nascem no cliente e nenhuma rota debita crédito por elas; o que
-    // existe é FREE_NEWS_DAILY_LIMIT, e só no plano Grátis. Teto legítimo
-    // ("Até 4 notícias por dia") não fala em crédito e continua passando.
+    // existia era FREE_NEWS_DAILY_LIMIT, que saiu com o plano gratuito. Uma
+    // frase de teto não fala em crédito e continua passando.
     const cobrando = newsNumberSentences(read(file)).filter((s) => /cr[ée]dito/i.test(s));
     expect(cobrando, 'frase liga notícia a número e a crédito').toEqual([]);
   });
