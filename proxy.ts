@@ -1,7 +1,27 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const protectedPrefixes = ['/dashboard', '/generator', '/agenda', '/news', '/twitter', '/setup', '/onboarding', '/conta'];
+// /configuracoes entra junto com /conta: a página migrou para lá, e uma sem a
+// outra deixaria a tela nova aberta a visitante sem sessão.
+const protectedPrefixes = ['/dashboard', '/generator', '/agenda', '/news', '/twitter', '/setup', '/onboarding', '/conta', '/configuracoes'];
+
+/**
+ * Rotas de auth: quem JÁ está logado é mandado para o app.
+ *
+ * ⚠️ /redefinir-senha NÃO ENTRA AQUI — nem aqui nem em protectedPrefixes. As
+ * duas listas quebrariam a redefinição de senha, cada uma do seu jeito:
+ *
+ *   • como rota PROTEGIDA — o Supabase manda a sessão no FRAGMENTO da URL
+ *     (#access_token…), que nunca chega ao servidor. O proxy veria um visitante
+ *     anônimo e mandaria para o login antes de qualquer JS ler o fragmento, com
+ *     o link do e-mail já queimado. Foi assim que este projeto se mordeu uma
+ *     vez, no /definir-senha.
+ *   • como rota de AUTH — quem clicasse no link estando logado (sessão velha em
+ *     outra aba) seria expulso para /dashboard sem nunca ver o formulário.
+ *
+ * /recuperar-senha fica fora pelo mesmo espírito: é a saída de quem NÃO
+ * consegue entrar, e não pode depender de estado de sessão nenhum.
+ */
 const authPrefixes = ['/login', '/cadastro'];
 
 export async function proxy(request: NextRequest) {
@@ -69,6 +89,7 @@ export const config = {
     '/setup/:path*',
     '/onboarding/:path*',
     '/conta/:path*',
+    '/configuracoes/:path*',
     '/login',
     '/cadastro',
   ],

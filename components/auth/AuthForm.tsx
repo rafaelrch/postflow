@@ -8,11 +8,12 @@ import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail } from 'luci
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
+// IMPORTADO, não copiado: até a Fase 17 havia um `const PASSWORD_MIN = 6` aqui
+// "espelhando a rota". Espelho de regra é como um fluxo passa a aceitar o que o
+// outro recusa. O servidor continua recusando de novo, por último.
+import { PASSWORD_MIN } from '@/lib/password-rules';
 
 type AuthMode = 'login' | 'signup';
-
-/** Espelha PASSWORD_MIN da rota. O servidor recusa de novo, por último. */
-const PASSWORD_MIN = 6;
 
 /**
  * Esperas entre as tentativas automáticas enquanto o pagamento está sendo
@@ -395,6 +396,23 @@ export default function AuthForm({
                       style={{ paddingLeft: 40 }}
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Só no login: no cadastro a conta ainda não existe, e oferecer
+                  "esqueci minha senha" ali seria oferecer recuperar o que não
+                  há. Fica logo abaixo do campo de senha, que é onde a pessoa
+                  descobre que não lembra. */}
+              {!isSignup && (
+                <div className="-mt-1">
+                  <Link
+                    href="/recuperar-senha"
+                    data-testid="esqueci-minha-senha"
+                    className="text-[12.5px] underline underline-offset-4"
+                    style={{ color: 'var(--ink-dim)' }}
+                  >
+                    Esqueci minha senha
+                  </Link>
                 </div>
               )}
 

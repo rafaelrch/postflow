@@ -10,7 +10,7 @@ import {
   Clapperboard,
   Calendar,
   Palette,
-  CreditCard,
+  Settings,
   Sun,
   Moon,
   LogOut,
@@ -42,7 +42,9 @@ const navItems: NavItem[] = [
     : []),
   { href: '/agenda',     label: 'Agenda',       icon: Calendar },
   { href: '/onboarding', label: 'Onboarding',   icon: Palette },
-  { href: '/conta',      label: 'Assinatura',   icon: CreditCard },
+  // `match: ['/conta']` mantém o item aceso no instante entre clicar num link
+  // antigo de /conta e o redirect levar para /configuracoes/assinatura.
+  { href: '/configuracoes', label: 'Configurações', icon: Settings, match: ['/conta'] },
 ];
 
 export default function AppSidebar() {
@@ -256,8 +258,10 @@ export default function AppSidebar() {
         className={cn('shrink-0 py-3 border-t', collapsed ? 'px-2' : 'px-3')}
         style={{ borderColor: 'var(--line)' }}
       >
+        {/* O badge é a identidade de quem está logado, então aponta para a aba
+            "Conta" — não para a de assinatura, que é o item de navegação. */}
         <Link
-          href="/conta"
+          href="/configuracoes/conta"
           className={cn(
             'flex items-center mb-2 rounded-[10px] transition-colors hover:border-[var(--ink)]',
             collapsed ? 'justify-center p-1.5' : 'gap-3 px-2 py-2.5'

@@ -28,6 +28,22 @@ export interface Plan {
   itemName: string;
   /** items[].description do checkout. A doc limita a 150 caracteres. */
   itemDescription: string;
+  /**
+   * DESCRIÇÃO DA COBRANÇA — o texto que o cliente vê na fatura e no e-mail do
+   * Asaas. A cobrança de produção sai hoje como "Descrição não informada", e
+   * cobrança irreconhecível é das maiores causas de contestação.
+   *
+   * Vai em `subscription.description` no POST /v3/checkouts. Medido contra o
+   * SANDBOX em 14/08/2026: `description` é o campo certo — uma assinatura
+   * criada direto (POST /v3/subscriptions) com ele gera a cobrança já com
+   * `description` preenchida. O que NÃO deu para confirmar sem pagar um
+   * checkout de verdade é se o checkout hospedado repassa o campo: ele aceita
+   * (200) mas não devolve no eco — igualzinho ao que faz com um campo
+   * inventado — e não existe GET /v3/checkouts para ler o que ficou gravado.
+   *
+   * Curto de propósito: é texto de fatura, e fatura corta o que é longo.
+   */
+  chargeDescription: string;
 }
 
 /** Formata em BRL como a página de preços já exibia (R$ 59,50 / R$ 499). */
@@ -46,6 +62,7 @@ export const PLANS: Record<PlanInterval, Plan> = {
     priceLabel: formatBrl(59.5),
     itemName: 'Creatools Mensal',
     itemDescription: 'Assinatura mensal do Creatools: carrosséis com IA, 200 créditos por mês.',
+    chargeDescription: 'Creatools — Plano Mensal',
   },
   year: {
     interval: 'year',
@@ -55,6 +72,7 @@ export const PLANS: Record<PlanInterval, Plan> = {
     priceLabel: formatBrl(499),
     itemName: 'Creatools Anual',
     itemDescription: 'Assinatura anual do Creatools: carrosséis com IA, 300 créditos por mês.',
+    chargeDescription: 'Creatools — Plano Anual',
   },
 };
 

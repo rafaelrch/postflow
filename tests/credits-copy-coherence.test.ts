@@ -38,7 +38,9 @@ import { CREDIT_COSTS } from '../lib/credits';
  */
 
 const COPY_FILES = [
-  'app/(app)/conta/page.tsx',
+  // A antiga /conta virou a aba de assinatura das Configurações (Fase 17), e a
+  // copy de créditos foi junto — a checagem segue o arquivo.
+  'app/(app)/configuracoes/assinatura/page.tsx',
   'app/(marketing)/page.tsx',
   'app/(marketing)/precos/page.tsx',
   'components/ui/CreditsExhaustedModal.tsx',
@@ -135,8 +137,8 @@ describe('copy de créditos x CREDIT_COSTS', () => {
     expect(read(file)).not.toMatch(/refin(?:ar|a|amento)/i);
   });
 
-  it('a /conta interpola CREDIT_COSTS em vez de digitar os números', () => {
-    const conta = read('app/(app)/conta/page.tsx');
+  it('a aba de assinatura interpola CREDIT_COSTS em vez de digitar os números', () => {
+    const conta = read('app/(app)/configuracoes/assinatura/page.tsx');
     expect(conta).toContain('CREDIT_COSTS.carousel');
     expect(conta).toContain('CREDIT_COSTS.image');
   });
