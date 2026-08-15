@@ -22,6 +22,7 @@ const {
   mockUpdateUserById,
   mockGetSubscription,
   mockResend,
+  mockCancelScheduledEmail,
 } = vi.hoisted(() => ({
   mockLimit: vi.fn(),
   mockCheckoutRefs: vi.fn(),
@@ -30,7 +31,14 @@ const {
   mockUpdateUserById: vi.fn(),
   mockGetSubscription: vi.fn(),
   mockResend: vi.fn(),
+  mockCancelScheduledEmail: vi.fn(),
 }));
+
+// O CLIENTE do Resend é testado de verdade (contra fetch) em
+// tests/asaas-webhook-route.test.ts. Aqui o que está sob teste é a LIGAÇÃO —
+// "concluir o cadastro cancela o aviso agendado" —, então o módulo é mockado
+// para não disputar o stub global de fetch com o endpoint admin do GoTrue.
+vi.mock('../lib/resend', () => ({ cancelScheduledEmail: mockCancelScheduledEmail }));
 
 // Relativo ao ARQUIVO DE TESTE — mesmo módulo que a rota importa como
 // '../../../../lib/asaas/subscriptions'.
@@ -119,6 +127,7 @@ beforeEach(() => {
   mockCreateUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
   mockUpdateUserById.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
   mockResend.mockResolvedValue({ error: null });
+  mockCancelScheduledEmail.mockResolvedValue(true);
 
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-key');
   // Busca do usuário existente (endpoint admin do GoTrue). Por padrão: ninguém.
@@ -528,5 +537,77 @@ describe('POST /api/asaas/signup-intent — o que continua genérico', () => {
       expect(Object.keys(body).every((k) => ['error', 'code', 'pending'].includes(k))).toBe(true);
       __resetRateLimit();
     }
+  });
+});
+
+/**
+ * FLUXO NORMAL vs. PAGAMENTO ÓRFÃO.
+ *
+ * O webhook agenda um e-mail "seu acesso está pronto, clique para criar sua
+ * conta" toda vez que uma assinatura vira ativa sem dono — porque no instante
+ * do webhook é impossível saber se a pessoa ainda está na tela. Quem separa os
+ * dois casos é ESTE ponto: se ela terminar o cadastro dentro da janela, o envio
+ * é cancelado e ela nunca recebe o convite para criar a conta que acabou de
+ * criar.
+ */
+describe('POST /api/asaas/signup-intent — aviso de pagamento órfão', () => {
+  it('fluxo normal: concluir o cadastro CANCELA o aviso agendado', async () => {
+    mockLimit.mockResolvedValue({
+      data: [sub({ orphan_notice_email_id: 'email_agendado_1' })],
+      error: null,
+    });
+
+    const res = await POST(intentRequest(token));
+
+    expect(res.status).toBe(200);
+    expect(mockCancelScheduledEmail).toHaveBeenCalledWith('email_agendado_1');
+  });
+
+  it('sem aviso agendado, não chama o Resend à toa', async () => {
+    const res = await POST(intentRequest(token));
+
+    expect(res.status).toBe(200);
+    expect(mockCancelScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  it('o passo RESOLVE não cancela nada (ela ainda não criou a conta)', async () => {
+    mockLimit.mockResolvedValue({
+      data: [sub({ orphan_notice_email_id: 'email_agendado_1' })],
+      error: null,
+    });
+
+    // Sem senha no corpo = resolve: só descobre de quem é a conta.
+    const res = await POST(intentRequest(token, ORIGIN, {}));
+
+    expect(res.status).toBe(200);
+    expect(mockCancelScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  it('cadastro RECUSADO mantém o aviso agendado (ela continua sem conta)', async () => {
+    mockLimit.mockResolvedValue({
+      data: [sub({ orphan_notice_email_id: 'email_agendado_1' })],
+      error: null,
+    });
+    // A confirmação não saiu: o cadastro não se completou.
+    mockResend.mockResolvedValue({ error: { message: 'smtp down' } });
+
+    const res = await POST(intentRequest(token));
+
+    expect(res.status).toBe(403);
+    expect(mockCancelScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  it('falha ao cancelar NÃO derruba o cadastro (ele já está feito)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockLimit.mockResolvedValue({
+      data: [sub({ orphan_notice_email_id: 'email_agendado_1' })],
+      error: null,
+    });
+    mockCancelScheduledEmail.mockResolvedValue(false);
+
+    const res = await POST(intentRequest(token));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true });
   });
 });

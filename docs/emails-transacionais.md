@@ -134,9 +134,38 @@ Resend, que só transporta. Template do Resend só entra em jogo em e-mail manda
 pela **API do Resend** pelo nosso código.
 
 Então ele serve para: (a) preview e ajuste visual no dashboard do Resend, e
-(b) o dia em que a gente mandar esse e-mail pela API em vez de deixar o Supabase
-mandar. Enquanto isso não acontecer, **a fonte de verdade do que o cliente recebe
-é o painel do Supabase**, seção 2. Se editar um, edite o outro.
+(b) e-mails que o **nosso código** manda pela API. Para tudo que sai do Auth
+(confirmação de cadastro, recuperação de senha), **a fonte de verdade do que o
+cliente recebe é o painel do Supabase**, seção 2. Se editar um, edite o outro.
+
+### Quem usa este template hoje
+
+O **aviso de pagamento órfão** — a única coisa no app que chama a API do Resend.
+
+Quem paga entra numa corrida: a conta só nasce depois que o webhook do Asaas
+confirma o pagamento, e a tela de `/cadastro` espera esse webhook por ~92s antes
+de desistir. Se ele demorar mais (instabilidade do Asaas, nossa função fora do
+ar, a fila deles pausada por 15 falhas seguidas), a pessoa **pagou e não
+consegue criar a conta** — e, antes disto existir, ninguém era avisado.
+
+Agora o webhook agenda este e-mail no Resend para dali a 15 minutos, com
+`{{{CONFIRMATION_URL}}}` apontando para `/cadastro?t=<token do lead>`; se a
+pessoa concluir o cadastro dentro da janela, o envio é **cancelado** e ela nunca
+o recebe. Ver `lib/orphan-signup-notice.ts` para o raciocínio inteiro (inclusive
+por que a decisão não pode ser tomada no instante do webhook).
+
+O texto do template já servia sem uma vírgula de mudança — "Seu pagamento foi
+confirmado. Falta um passo: criar a senha" descreve exatamente este caso.
+
+⚠️ Ele NÃO pode ir pelo Supabase Auth: no instante em que precisa sair, o
+usuário do Supabase **ainda não existe** (a assinatura está com `user_id` null).
+Não há a quem o Auth mandaria e-mail.
+
+⚠️ Exige `RESEND_API_KEY` nas env vars do app (Vercel, Preview **e**
+Production). É uma chave DIFERENTE do SMTP da seção 3 no sentido de onde mora:
+aquela vive dentro do painel do Supabase, esta no nosso app. Sem ela nada é
+enviado — o webhook loga `missing_RESEND_API_KEY` e segue, sem quebrar o
+registro do pagamento.
 
 ---
 
