@@ -24,6 +24,16 @@ describe('UI Financeiro', () => {
     expect(screen.getByTestId('finance-empty-state').textContent).toContain('Nenhuma transação no período');
   });
 
+  it('confirmado sem recebimento mostra estado compacto em vez de grafico vazio', () => {
+    if (!base.revenue.ok) throw new Error('fixture invalida');
+    const revenue = { ...base.revenue.value, confirmed: { count: 1, amount: 59.5 } };
+    render(<FinanceDashboard data={{ ...base, revenue: ok(revenue) }} period={period} />);
+
+    expect(screen.getByTestId('finance-received-empty').textContent).toContain('Nenhuma receita recebida no período');
+    expect(screen.getByTestId('finance-received-empty').textContent).toContain('1 pagamento confirmado ainda não aparece como recebido');
+    expect(screen.queryByRole('img', { name: 'Série de receita recebida bruta' })).toBeNull();
+  });
+
   it('falha de receita nao apaga os outros tres blocos nem vira zero', () => {
     render(<FinanceDashboard data={{ ...base, revenue: { ok: false } }} period={period} />);
     expect(screen.getByText('Receita do período não carregou')).toBeTruthy();

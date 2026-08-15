@@ -12,6 +12,24 @@ function BlockFailure({ label }: { label: string }) {
 }
 
 function RevenueChart({ revenue }: { revenue: FinanceRevenue }) {
+  if (revenue.received.count === 0 || revenue.series.length === 0) {
+    return (
+      <article className="admin-finance-panel admin-revenue-empty" data-testid="finance-received-empty">
+        <ReceiptText size={17} aria-hidden />
+        <div>
+          <h3>Nenhuma receita recebida no período</h3>
+          <p>
+            {revenue.confirmed.count > 0
+              ? revenue.confirmed.count === 1
+                ? '1 pagamento confirmado ainda não aparece como recebido.'
+                : `${formatCount(revenue.confirmed.count)} pagamentos confirmados ainda não aparecem como recebidos.`
+              : 'Não houve liquidação registrada neste recorte.'}
+          </p>
+        </div>
+      </article>
+    );
+  }
+
   const values = revenue.series.map((point) => point.amount);
   const max = Math.max(...values, 1);
   const points = revenue.series.map((point, index) => {
