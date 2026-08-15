@@ -7,6 +7,7 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { trackProductEvent } from '@/lib/product-events';
 
 interface ScheduleModalProps {
   onClose: () => void;
@@ -102,6 +103,7 @@ export default function ScheduleModal({ onClose, onSaveFirst }: ScheduleModalPro
         toast.error('Erro ao agendar');
         return;
       }
+      trackProductEvent('schedule_created', { schedule_type: 'carousel' });
       toast.success('Agendado na agenda!');
       onClose();
     } finally {

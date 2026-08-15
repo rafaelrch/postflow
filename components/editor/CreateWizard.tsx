@@ -28,6 +28,7 @@ import { freeFormSlideFields } from '@/lib/generated-slide-fields';
 import SlidePreview from '@/components/editor/SlidePreview';
 import type { Slide, GlobalSettings } from '@/types';
 import { createClient } from '@/lib/supabase';
+import { trackProductEvent } from '@/lib/product-events';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import {
   TEMPLATE_01_DEFAULT_CORNERS,
@@ -1163,6 +1164,14 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           await supabase.from('carousels').delete().eq('id', carousel.id);
           throw new Error(slidesError.message || 'Falha ao salvar slides');
         }
+
+        const sourceEvent = contentMode === 'ai'
+          ? 'carousel_generated_with_ai'
+          : contentMode === 'json' ? 'carousel_imported_json' : 'carousel_created_manually';
+        trackProductEvent('carousel_created', { source: contentMode, style, slide_count: slides.length });
+        // A rota de geração já registra o sucesso de IA. Manual/JSON nascem
+        // inteiramente no navegador e precisam do evento específico aqui.
+        if (contentMode !== 'ai') trackProductEvent(sourceEvent, { style, slide_count: slides.length });
 
         openEditor(carousel.id, carousel.title);
       } catch (persistErr) {

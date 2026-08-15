@@ -104,7 +104,12 @@ export async function requireActiveSubscription(): Promise<SubscriptionGuardResu
  * 401 não autenticado · 402 sem assinatura (subscription_required) ·
  * 402 sem saldo (insufficient_credits) · 500 erro inesperado.
  */
-export async function requireCredits(cost: number): Promise<SubscriptionGuardResult> {
+export type CreditTracking = {
+  feature: 'carousel' | 'image';
+  operationId: string;
+};
+
+export async function requireCredits(cost: number, tracking?: CreditTracking): Promise<SubscriptionGuardResult> {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -133,7 +138,14 @@ export async function requireCredits(cost: number): Promise<SubscriptionGuardRes
 
   // O RPC roda com o JWT do usuário e confere auth.uid() = p_user no banco.
   // Service role aqui eliminaria essa vinculação e ampliaria o blast radius.
-  const { data, error } = await supabase.rpc('consume_credits', { p_user: user.id, p_cost: cost });
+  const { data, error } = tracking
+    ? await supabase.rpc('consume_credits_tracked', {
+        p_user: user.id,
+        p_cost: cost,
+        p_feature: tracking.feature,
+        p_idempotency_key: tracking.operationId,
+      })
+    : await supabase.rpc('consume_credits', { p_user: user.id, p_cost: cost });
   if (error) {
     // Discrimina pela MENSAGEM, não pelo errcode: as RPCs endurecidas lançam
     // vários erros distintos com o mesmo P0001 (insufficient_credits,
@@ -166,9 +178,16 @@ export async function requireCredits(cost: number): Promise<SubscriptionGuardRes
  * Estorna créditos debitados quando a geração falha (best-effort).
  * RPC separado, restrito a service_role, com valor positivo e teto no allowance.
  */
-export async function refundCredits(userId: string, amount: number): Promise<void> {
+export async function refundCredits(userId: string, amount: number, tracking?: CreditTracking): Promise<void> {
   if (amount <= 0) return;
   const admin = createAdminSupabaseClient();
-  const { error } = await admin.rpc('refund_credits', { p_user: userId, p_amount: amount });
+  const { error } = tracking
+    ? await admin.rpc('refund_credits_tracked', {
+        p_user: userId,
+        p_amount: amount,
+        p_feature: tracking.feature,
+        p_idempotency_key: tracking.operationId,
+      })
+    : await admin.rpc('refund_credits', { p_user: userId, p_amount: amount });
   if (error) console.error('[refundCredits]', error);
 }

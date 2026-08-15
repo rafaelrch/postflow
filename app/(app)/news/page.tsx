@@ -27,6 +27,7 @@ import {
   type ChaveDeLote,
 } from '@/lib/news-batches';
 import Pagination from '@/components/ui/Pagination';
+import { trackProductEvent } from '@/lib/product-events';
 
 // ── Canvas export helpers ─────────────────────────────────────────────────────
 
@@ -731,6 +732,7 @@ export default function NewsPage() {
         return built;
       }
       currentBatchIdRef.current = batchId;
+      trackProductEvent('news_batch_created', { item_count: built.length });
       return built.map((it, i) => ({ ...it, dbId: (data[i] as { id: string } | undefined)?.id }));
     } catch (err) {
       console.error('[news] erro inesperado ao salvar lote:', err);

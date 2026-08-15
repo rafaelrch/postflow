@@ -1,12 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { toFile } from 'openai';
 import { openai, buildImagePrompt } from '@/lib/openai';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { requireCredits, refundCredits } from '@/lib/subscription';
 import { CREDIT_COSTS } from '@/lib/credits';
 import { downloadReferenceImage } from '@/lib/generate-image-reference';
+import { normalizeGenerationError, recordAiGenerationBestEffort } from '@/lib/product-events';
 
 export const maxDuration = 120;
+
+function analyticsAfter(task: () => Promise<void>) {
+  try { after(task); } catch { void task(); }
+}
 
 interface GenerateImageBody {
   slideId: string;
@@ -22,6 +28,10 @@ interface GenerateImageBody {
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
+  const operationId = randomUUID();
+  const chargeOperationId = randomUUID();
+  const refundOperationId = randomUUID();
   let body: GenerateImageBody;
   try {
     body = await req.json();
@@ -39,7 +49,7 @@ export async function POST(req: NextRequest) {
   // Com o plano gratuito removido, "plano pago" e "assinatura ativa" são a
   // mesma pergunta.
   const charged = CREDIT_COSTS.image;
-  const guard = await requireCredits(charged);
+  const guard = await requireCredits(charged, { feature: 'image', operationId: chargeOperationId });
   if (!guard.ok) return guard.response;
   const { userId } = guard;
 
@@ -47,6 +57,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createServerSupabaseClient();
     const prompt = buildImagePrompt({ title, description, isCover, isFinal, userPrompt });
     let b64: string | undefined;
+    let inputTokens: number | undefined;
+    let outputTokens: number | undefined;
 
     if (referenceImageUrl) {
       // Com imagem de referência: usa o endpoint de edição (image-to-image).
@@ -64,6 +76,8 @@ export async function POST(req: NextRequest) {
         n: 1,
       });
       b64 = response.data?.[0]?.b64_json;
+      inputTokens = response.usage?.input_tokens;
+      outputTokens = response.usage?.output_tokens;
     } else {
       const response = await openai.images.generate({
         model: 'gpt-image-2',
@@ -73,6 +87,8 @@ export async function POST(req: NextRequest) {
         n: 1,
       });
       b64 = response.data?.[0]?.b64_json;
+      inputTokens = response.usage?.input_tokens;
+      outputTokens = response.usage?.output_tokens;
     }
 
     if (!b64) throw new Error('OpenAI não retornou imagem');
@@ -100,9 +116,35 @@ export async function POST(req: NextRequest) {
     const url = publicData?.publicUrl;
     if (!url) throw new Error('Não foi possível obter URL pública');
 
+    analyticsAfter(() => recordAiGenerationBestEffort({
+      operationId,
+      userId,
+      feature: 'image',
+      status: 'succeeded',
+      model: 'gpt-image-2',
+      generationType: referenceImageUrl ? 'edit' : 'generate',
+      quality,
+      credits: charged,
+      durationMs: Date.now() - startedAt,
+      inputTokens,
+      outputTokens,
+    }));
+
     return NextResponse.json({ url, prompt });
   } catch (err) {
-    await refundCredits(userId, charged);
+    await refundCredits(userId, charged, { feature: 'image', operationId: refundOperationId });
+    analyticsAfter(() => recordAiGenerationBestEffort({
+      operationId,
+      userId,
+      feature: 'image',
+      status: 'failed',
+      model: 'gpt-image-2',
+      generationType: referenceImageUrl ? 'edit' : 'generate',
+      quality,
+      credits: charged,
+      durationMs: Date.now() - startedAt,
+      errorCode: normalizeGenerationError(err),
+    }));
     const message = err instanceof Error ? err.message : 'Falha desconhecida';
     const lower = message.toLowerCase();
 

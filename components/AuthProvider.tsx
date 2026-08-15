@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import GlobalOnboardingModal from '@/components/onboarding/GlobalOnboardingModal';
+import { trackProductEvent } from '@/lib/product-events';
 
 // A checagem de onboarding roda uma vez por usuário — o proxy (middleware) já
 // protege as rotas a cada navegação, então repetir getSession + select em
@@ -56,6 +57,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
 
       if (onboardingCheckedFor !== session.user.id) {
+        if (!window.sessionStorage.getItem('postflow-session-id')) {
+          window.sessionStorage.setItem('postflow-session-id', crypto.randomUUID());
+          trackProductEvent('session_started');
+        }
         onboardingCheckedFor = session.user.id;
         void checkOnboarding(session);
       } else {

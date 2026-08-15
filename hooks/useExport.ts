@@ -4,6 +4,7 @@ import { useRef, useCallback } from 'react';
 import { useEditorStore } from './useEditorStore';
 import { getFormat } from '@/lib/formats';
 import toast from 'react-hot-toast';
+import { trackProductEvent } from '@/lib/product-events';
 
 export function useExport() {
   const { slides, activeSlideIndex, globalSettings } = useEditorStore();
@@ -72,6 +73,10 @@ export function useExport() {
       link.download = `slide-${idx + 1}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
+      trackProductEvent('carousel_exported_single', {
+        export_format: 'png',
+        slide_count: slides.length,
+      });
       toast.success('Slide baixado!', { id: 'export' });
     } catch (err) {
       console.error(err);
@@ -98,6 +103,10 @@ export function useExport() {
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       saveAs(zipBlob, 'carrossel-postflow.zip');
+      trackProductEvent('carousel_exported_all', {
+        export_format: 'zip',
+        slide_count: slides.length,
+      });
       toast.success('ZIP baixado!', { id: 'zip' });
     } catch (err) {
       console.error(err);

@@ -30,6 +30,12 @@ vi.mock('@/lib/supabase-server', () => ({
   createServerSupabaseClient: mockCreateServerSupabaseClient,
 }));
 
+vi.mock('@/lib/product-events', () => ({
+  normalizeGenerationError: () => 'generation_failed',
+  recordAiGenerationBestEffort: vi.fn().mockResolvedValue(undefined),
+  recordProductEventBestEffort: vi.fn().mockResolvedValue(undefined),
+}));
+
 import {
   BRAND_PALETTE_LIMIT,
   BRAND_TEXT_LIMIT,

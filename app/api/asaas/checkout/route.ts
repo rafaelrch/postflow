@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 import { appUrl } from '@/lib/app-url';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { createAdminSupabaseClient } from '@/lib/supabase-admin';
@@ -10,6 +10,7 @@ import { rateLimit, clientIp } from '../../../../lib/rate-limit';
 import { isPlanInterval, planFor } from '../../../../lib/plans';
 import { createSignupToken } from '../../../../lib/signup-token';
 import { AsaasError } from '../../../../lib/asaas/client';
+import { recordProductEventBestEffort } from '../../../../lib/product-events';
 
 export const runtime = 'nodejs';
 
@@ -249,6 +250,12 @@ export async function POST(req: NextRequest) {
       console.error('[asaas/checkout] checkout_without_id: atribuição do lead ficará perdida');
     }
 
+    // Checkout é pré-login; só há user_id derivável da sessão quando o
+    // comprador já estava autenticado. Jamais aceitamos user_id do body.
+    if (user) {
+      try { after(() => recordProductEventBestEffort(user.id, 'checkout_started', { source: interval })); }
+      catch { void recordProductEventBestEffort(user.id, 'checkout_started', { source: interval }); }
+    }
     return NextResponse.json({ url: checkout.link });
   } catch (err) {
     // O objeto de erro NÃO é logado inteiro: ele carrega o corpo da requisição,

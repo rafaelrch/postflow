@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { after, NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { openai, CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT, WEB_SEARCH_PROMPT_ADDENDUM } from '@/lib/openai';
 import { requireActiveSubscription, requireCredits, refundCredits } from '@/lib/subscription';
@@ -7,8 +8,13 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { BrandContext, formatBrandContextAsPrompt, getBrandContext } from '@/lib/brand-context';
 import { GenerateCarouselInput, CarouselAIResponse } from '@/types';
 import { template02Addendum } from '@/lib/templates/template-02';
+import { normalizeGenerationError, recordAiGenerationBestEffort } from '@/lib/product-events';
 
 export const maxDuration = 60;
+
+function analyticsAfter(task: () => Promise<void>) {
+  try { after(task); } catch { void task(); }
+}
 
 function sanitizeJson(str: string): string {
   // Remove control characters inside JSON string values (ASCII 0x00–0x1F except \t \n \r)
@@ -31,8 +37,14 @@ function parseAIJson(text: string): CarouselAIResponse {
 export async function POST(req: NextRequest) {
   let userId: string | null = null;
   let charged = 0;
+  const startedAt = Date.now();
+  const operationId = randomUUID();
+  const chargeOperationId = randomUUID();
+  const refundOperationId = randomUUID();
+  let metadata: Partial<Pick<GenerateCarouselInput, 'style' | 'slideCount' | 'language'>> = {};
   try {
     const body: GenerateCarouselInput & { manual?: boolean } = await req.json();
+    metadata = { style: body.style, slideCount: body.slideCount, language: body.language };
 
     // Superfície MANUAL (esqueleto vazio): sem IA e sem crédito, então NÃO
     // passa por requireCredits. Exige assinatura ativa como o resto do produto
@@ -57,7 +69,7 @@ export async function POST(req: NextRequest) {
     // "assinatura ativa" viraram a mesma pergunta — perguntar duas vezes só
     // criaria dois lugares para errar.
     const cost = CREDIT_COSTS.carousel;
-    const guard = await requireCredits(cost);
+    const guard = await requireCredits(cost, { feature: 'carousel', operationId: chargeOperationId });
     if (!guard.ok) return guard.response;
     userId = guard.userId;
     charged = cost;
@@ -110,10 +122,41 @@ export async function POST(req: NextRequest) {
     const text = response.output_text;
     const aiData = parseAIJson(text);
 
+    analyticsAfter(() => recordAiGenerationBestEffort({
+      operationId,
+      userId: userId!,
+      feature: 'carousel',
+      status: 'succeeded',
+      model: 'gpt-5.4-nano',
+      generationType: body.webSearch ? 'web_search' : 'standard',
+      style: body.style,
+      language: body.language ?? 'pt-BR',
+      slideCount: body.slideCount,
+      credits: charged,
+      durationMs: Date.now() - startedAt,
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+    }));
+
     return NextResponse.json(aiData);
   } catch (err) {
     // Geração falhou após debitar: estorna os créditos.
-    if (userId && charged > 0) await refundCredits(userId, charged);
+    if (userId && charged > 0) {
+      await refundCredits(userId, charged, { feature: 'carousel', operationId: refundOperationId });
+      analyticsAfter(() => recordAiGenerationBestEffort({
+        operationId,
+        userId: userId!,
+        feature: 'carousel',
+        status: 'failed',
+        model: 'gpt-5.4-nano',
+        style: metadata.style,
+        language: metadata.language ?? 'pt-BR',
+        slideCount: metadata.slideCount,
+        credits: charged,
+        durationMs: Date.now() - startedAt,
+        errorCode: normalizeGenerationError(err),
+      }));
+    }
     console.error('[generate-carousel]', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erro interno' },

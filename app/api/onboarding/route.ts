@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { recordProductEventBestEffort } from '@/lib/product-events';
 
 const PROFILE_FIELDS = 'brand_name, workspace_name, photo_url, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, onboarding_completed';
 
@@ -93,6 +94,8 @@ export async function PUT(request: Request) {
       ? await supabase.from('projects').update(project).eq('id', existing.id)
       : await supabase.from('projects').insert(project);
     if (projectError) return NextResponse.json({ error: 'Perfil salvo, mas o projeto não pôde ser atualizado.' }, { status: 500 });
+    try { after(() => recordProductEventBestEffort(user.id, 'onboarding_completed')); }
+    catch { void recordProductEventBestEffort(user.id, 'onboarding_completed'); }
   }
 
   return NextResponse.json({ profile });
