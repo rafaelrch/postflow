@@ -27,37 +27,37 @@ vi.mock('@/lib/admin-metrics', async (importOriginal) => {
 const PERIODO = resolvePeriod({ periodo: '30d' }, new Date('2026-08-15T12:00:00Z'));
 
 function overview(overrides: Partial<AdminOverview> = {}): AdminOverview {
+  const ok = <T,>(value: T) => ({ ok: true as const, value });
   return {
     generatedAt: '2026-08-15T12:00:00.000Z',
-    accounts: { total: 12 },
+    accounts: { total: ok(12) },
     profiles: {
-      total: 9,
-      createdInPeriod: 4,
-      createdInPreviousPeriod: 2,
-      onboardingCompleted: 6,
-      onboardingIncomplete: 3,
+      total: ok(9),
+      createdInPeriod: ok(4),
+      createdInPreviousPeriod: ok(2),
+      onboardingCompleted: ok(6),
+      onboardingIncomplete: ok(3),
     },
     subscriptions: {
-      active: 7,
-      withAccount: 6,
-      withoutAccount: 1,
-      monthly: 5,
-      yearly: 2,
-      scheduledCancellation: 1,
+      active: ok(7),
+      withAccount: ok(6),
+      withoutAccount: ok(1),
+      monthly: ok(5),
+      yearly: ok(2),
+      scheduledCancellation: ok(1),
     },
-    recurring: { mrr: 5 * 59.5 + (2 * 499) / 12, arr: (5 * 59.5 + (2 * 499) / 12) * 12 },
+    recurring: ok({ mrr: 5 * 59.5 + (2 * 499) / 12, arr: (5 * 59.5 + (2 * 499) / 12) * 12, monthly: 5, yearly: 2 }),
     renewals: {
-      next7: { monthly: 2, yearly: 1, count: 3, amount: 2 * 59.5 + 499 },
-      next30: { monthly: 4, yearly: 1, count: 5, amount: 4 * 59.5 + 499 },
+      next7: ok({ monthly: 2, yearly: 1, count: 3, amount: 2 * 59.5 + 499, undated: 0 }),
+      next30: ok({ monthly: 4, yearly: 1, count: 5, amount: 4 * 59.5 + 499, undated: 0 }),
     },
     funnel: {
-      leads: 10,
-      leadsPrevious: 5,
-      checkoutAttempts: 8,
-      checkoutLeads: 4,
-      checkoutLeadsCapped: false,
+      leads: ok(10),
+      leadsPrevious: ok(5),
+      checkoutAttempts: ok(8),
+      checkoutLeads: ok({ count: 4, capped: false }),
     },
-    credits: { zeroBalance: 2 },
+    credits: { zeroBalance: ok(2) },
     ...overrides,
   };
 }
@@ -99,12 +99,12 @@ describe('Visão geral', () => {
     await renderizar(
       overview({
         subscriptions: {
-          active: 7,
-          withAccount: 7,
-          withoutAccount: 0,
-          monthly: 5,
-          yearly: 2,
-          scheduledCancellation: 0,
+          active: { ok: true, value: 7 },
+          withAccount: { ok: true, value: 7 },
+          withoutAccount: { ok: true, value: 0 },
+          monthly: { ok: true, value: 5 },
+          yearly: { ok: true, value: 2 },
+          scheduledCancellation: { ok: true, value: 0 },
         },
       }),
     );
@@ -158,11 +158,10 @@ describe('Visão geral', () => {
     await renderizar(
       overview({
         funnel: {
-          leads: 10,
-          leadsPrevious: 0,
-          checkoutAttempts: 8,
-          checkoutLeads: 4,
-          checkoutLeadsCapped: false,
+          leads: { ok: true, value: 10 },
+          leadsPrevious: { ok: true, value: 0 },
+          checkoutAttempts: { ok: true, value: 8 },
+          checkoutLeads: { ok: true, value: { count: 4, capped: false } },
         },
       }),
     );
@@ -205,5 +204,25 @@ describe('Visão geral', () => {
     expect(screen.getByTestId('admin-tentar-de-novo')).toBeTruthy();
     expect(screen.queryByTestId('card-mrr')).toBeNull();
     erro.mockRestore();
+  });
+
+  it('falha de um card fica isolada e nunca vira zero', async () => {
+    await renderizar(overview({ accounts: { total: { ok: false } } }));
+    const falho = screen.getByTestId('card-contas');
+    expect(falho.textContent).toMatch(/Não deu para ler/);
+    expect(within(falho).getByRole('button', { name: /tentar de novo/i })).toBeTruthy();
+    expect(falho.textContent).not.toMatch(/\b0\b/);
+    expect(within(screen.getByTestId('card-mrr')).getByText('R$ 380,67')).toBeTruthy();
+  });
+
+  it('avisa quantas renovações ativas ficaram fora por não terem data', async () => {
+    const base = overview();
+    await renderizar(overview({
+      renewals: {
+        next7: { ok: true, value: { monthly: 2, yearly: 1, count: 3, amount: 618, undated: 2 } },
+        next30: base.renewals.next30,
+      },
+    }));
+    expect(screen.getByTestId('card-renovacoes-7').textContent).toMatch(/2 sem data de renovação.*não entram nesta conta/);
   });
 });

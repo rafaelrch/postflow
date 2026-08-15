@@ -4,6 +4,7 @@ import { formatCount, formatDateTime, formatMoney, formatVariation } from '@/lib
 import { formatCivil, type ResolvedPeriod } from '@/lib/admin-period';
 import { PLANS } from '@/lib/plans';
 import MetricCard from '@/components/admin/MetricCard';
+import MetricRetryButton from '@/components/admin/MetricRetryButton';
 import SplitBar from '@/components/admin/SplitBar';
 import RetryPanel from '@/components/admin/RetryPanel';
 import {
@@ -52,6 +53,13 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
 
   const { accounts, profiles, subscriptions, recurring, renewals, funnel, credits } = data;
   const janela = periodDescription(period);
+  const renewalDetail = (window: typeof renewals.next7) => {
+    if (!window.ok) return undefined;
+    const base = `${formatCount(window.value.count)} assinatura(s) · ${window.value.monthly} mensal · ${window.value.yearly} anual`;
+    return window.value.undated > 0
+      ? `${base} · ${formatCount(window.value.undated)} sem data de renovação — não entram nesta conta`
+      : base;
+  };
 
   return (
     <div className="admin-metric-sections">
@@ -70,16 +78,18 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
             icon={CircleDollarSign}
             featured
             label="MRR normalizado"
-            value={formatMoney(recurring.mrr)}
+            failed={!recurring.ok}
+            value={recurring.ok ? formatMoney(recurring.value.mrr) : undefined}
             hint={`Mensais ativas × ${PLANS.month.priceLabel} + anuais ativas × ${PLANS.year.priceLabel} ÷ 12. Preços lidos de lib/plans.ts. É compromisso recorrente contratado — NÃO é dinheiro recebido.`}
-            detail={`${subscriptions.monthly} mensais · ${subscriptions.yearly} anuais`}
+            detail={recurring.ok ? `${recurring.value.monthly} mensais · ${recurring.value.yearly} anuais` : undefined}
           />
           <MetricCard
             testId="card-arr"
             icon={BadgeDollarSign}
             featured
             label="ARR estimado"
-            value={formatMoney(recurring.arr)}
+            failed={!recurring.ok}
+            value={recurring.ok ? formatMoney(recurring.value.arr) : undefined}
             hint="MRR normalizado × 12. Projeção do que a base atual renderia em doze meses se nada mudasse. Não é histórico nem receita reconhecida."
           />
           <MetricCard
@@ -87,18 +97,20 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
             icon={CalendarClock}
             featured
             label="Renovações · 7 dias"
-            value={formatMoney(renewals.next7.amount)}
+            failed={!renewals.next7.ok}
+            value={renewals.next7.ok ? formatMoney(renewals.next7.value.amount) : undefined}
             hint="Assinaturas ativas, SEM cancelamento agendado, cujo current_period_end cai nos próximos 7 dias. A mensal cobra um mês e a anual cobra o ano inteiro — por isso o valor aqui não é dividido por 12."
-            detail={`${formatCount(renewals.next7.count)} assinatura(s) · ${renewals.next7.monthly} mensal · ${renewals.next7.yearly} anual`}
+            detail={renewalDetail(renewals.next7)}
           />
           <MetricCard
             testId="card-renovacoes-30"
             icon={ReceiptText}
             featured
             label="Renovações · 30 dias"
-            value={formatMoney(renewals.next30.amount)}
+            failed={!renewals.next30.ok}
+            value={renewals.next30.ok ? formatMoney(renewals.next30.value.amount) : undefined}
             hint="Mesma regra da janela de 7 dias, estendida para 30. Caixa previsto, não garantido: uma cobrança pode falhar."
-            detail={`${formatCount(renewals.next30.count)} assinatura(s) · ${renewals.next30.monthly} mensal · ${renewals.next30.yearly} anual`}
+            detail={renewalDetail(renewals.next30)}
           />
         </div>
       </section>
@@ -117,44 +129,54 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
             testId="card-assinaturas-ativas"
             icon={WalletCards}
             label="Assinaturas ativas"
-            value={formatCount(subscriptions.active)}
+            failed={!subscriptions.active.ok}
+            value={subscriptions.active.ok ? formatCount(subscriptions.active.value) : undefined}
             hint="Linhas em subscriptions com status active ou trialing, com ou sem conta vinculada. Não é o mesmo que “usuário ativo”: mede pagamento, não uso."
           />
           <MetricCard
             testId="card-assinantes-com-conta"
             icon={UserCheck}
             label="Assinantes com conta"
-            value={formatCount(subscriptions.withAccount)}
+            failed={!subscriptions.withAccount.ok}
+            value={subscriptions.withAccount.ok ? formatCount(subscriptions.withAccount.value) : undefined}
             hint="Assinaturas ativas com user_id preenchido — quem pagou E já criou/vinculou a conta."
           />
           <MetricCard
             testId="card-pagou-sem-conta"
             icon={TriangleAlert}
-            tone={subscriptions.withoutAccount > 0 ? 'accent' : 'default'}
+            tone={subscriptions.withoutAccount.ok && subscriptions.withoutAccount.value > 0 ? 'accent' : 'default'}
             label="Pagou e não criou conta"
-            value={formatCount(subscriptions.withoutAccount)}
+            failed={!subscriptions.withoutAccount.ok}
+            value={subscriptions.withoutAccount.ok ? formatCount(subscriptions.withoutAccount.value) : undefined}
             hint="Assinaturas ativas com user_id nulo. O pagamento entrou antes da conta existir e o cadastro nunca foi concluído. Cada linha aqui é dinheiro parado esperando uma ação sua."
-            detail={subscriptions.withoutAccount > 0 ? 'Precisa de ação: cliente pagou e está sem acesso.' : 'Ninguém pendurado no momento.'}
+            detail={subscriptions.withoutAccount.ok ? (subscriptions.withoutAccount.value > 0 ? 'Precisa de ação: cliente pagou e está sem acesso.' : 'Ninguém pendurado no momento.') : undefined}
           />
           <MetricCard
             testId="card-cancelamentos-agendados"
             icon={CalendarClock}
-            tone={subscriptions.scheduledCancellation > 0 ? 'warn' : 'default'}
+            tone={subscriptions.scheduledCancellation.ok && subscriptions.scheduledCancellation.value > 0 ? 'warn' : 'default'}
             label="Cancelamentos agendados"
-            value={formatCount(subscriptions.scheduledCancellation)}
+            failed={!subscriptions.scheduledCancellation.ok}
+            value={subscriptions.scheduledCancellation.ok ? formatCount(subscriptions.scheduledCancellation.value) : undefined}
             hint="Assinaturas ainda ativas com cancel_at_period_end = true: já pediram cancelamento e mantêm acesso até o fim do período pago. Não é churn consumado."
           />
         </div>
 
         <article className="admin-distribution-card" data-testid="card-distribuicao">
           <h3>Distribuição mensal × anual</h3>
-          <SplitBar
-            parts={[
-              { label: 'Mensal', value: subscriptions.monthly, className: 'admin-split-monthly' },
-              { label: 'Anual', value: subscriptions.yearly, className: 'admin-split-annual' },
-            ]}
-          />
-          {subscriptions.active === 0 && <p>Sem assinatura ativa para distribuir.</p>}
+          {subscriptions.monthly.ok && subscriptions.yearly.ok ? (
+            <>
+              <SplitBar
+                parts={[
+                  { label: 'Mensal', value: subscriptions.monthly.value, className: 'admin-split-monthly' },
+                  { label: 'Anual', value: subscriptions.yearly.value, className: 'admin-split-annual' },
+                ]}
+              />
+              {subscriptions.monthly.value + subscriptions.yearly.value === 0 ? <p>Sem assinatura ativa para distribuir.</p> : null}
+            </>
+          ) : (
+            <div className="admin-inline-failure"><span>Não deu para ler a distribuição.</span><MetricRetryButton /></div>
+          )}
         </article>
       </section>
 
@@ -172,24 +194,27 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
             testId="card-leads"
             icon={UserPlus}
             label="Leads no período"
-            value={formatCount(funnel.leads)}
+            failed={!funnel.leads.ok}
+            value={funnel.leads.ok ? formatCount(funnel.leads.value) : undefined}
             hint="Linhas em leads com created_at no período. O e-mail é único: reenvio do mesmo endereço atualiza o lead, não cria outro."
-            variation={formatVariation(variation(funnel.leads, funnel.leadsPrevious))}
-            detail={`Anterior: ${formatCount(funnel.leadsPrevious)}`}
+            variation={funnel.leads.ok && funnel.leadsPrevious.ok ? formatVariation(variation(funnel.leads.value, funnel.leadsPrevious.value)) : undefined}
+            detail={funnel.leadsPrevious.ok ? `Anterior: ${formatCount(funnel.leadsPrevious.value)}` : 'Comparação anterior indisponível'}
           />
           <MetricCard
             testId="card-checkouts"
             icon={CreditCard}
             label="Checkouts iniciados"
-            value={formatCount(funnel.checkoutLeads)}
+            failed={!funnel.checkoutLeads.ok}
+            value={funnel.checkoutLeads.ok ? formatCount(funnel.checkoutLeads.value.count) : undefined}
             hint="PESSOAS distintas (lead_id) com ao menos um checkout aberto no período. Um mesmo lead pode abrir vários checkouts; contar tentativas como pessoas infla o funil."
-            detail={funnel.checkoutLeadsCapped ? `Piso: leitura limitada a ${formatCount(CHECKOUT_LEADS_CAP)} checkouts` : `${formatCount(funnel.checkoutAttempts)} tentativa(s) de checkout`}
+            detail={funnel.checkoutLeads.ok ? (funnel.checkoutLeads.value.capped ? `Piso: leitura limitada a ${formatCount(CHECKOUT_LEADS_CAP)} checkouts` : funnel.checkoutAttempts.ok ? `${formatCount(funnel.checkoutAttempts.value)} tentativa(s) de checkout` : 'Tentativas indisponíveis') : undefined}
           />
           <MetricCard
             testId="card-contas"
             icon={Users}
             label="Contas cadastradas"
-            value={formatCount(accounts.total)}
+            failed={!accounts.total.ok}
+            value={accounts.total.ok ? formatCount(accounts.total.value) : undefined}
             hint="Total de usuários no Supabase Auth, lido no servidor. É a contagem exata de contas — profiles pode divergir, porque o perfil nasce em outro passo do fluxo."
             detail="Total acumulado, não o período"
           />
@@ -197,25 +222,28 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
             testId="card-perfis-periodo"
             icon={UserPlus}
             label="Perfis criados no período"
-            value={formatCount(profiles.createdInPeriod)}
+            failed={!profiles.createdInPeriod.ok}
+            value={profiles.createdInPeriod.ok ? formatCount(profiles.createdInPeriod.value) : undefined}
             hint="Linhas em profiles com created_at dentro do período. Conta PERFIS, não contas do Auth: quem pagou e travou antes do onboarding pode ter conta sem perfil."
             detail={janela}
-            variation={formatVariation(variation(profiles.createdInPeriod, profiles.createdInPreviousPeriod))}
+            variation={profiles.createdInPeriod.ok && profiles.createdInPreviousPeriod.ok ? formatVariation(variation(profiles.createdInPeriod.value, profiles.createdInPreviousPeriod.value)) : undefined}
           />
           <MetricCard
             testId="card-onboarding-concluido"
             icon={UserCheck}
             label="Onboarding concluído"
-            value={formatCount(profiles.onboardingCompleted)}
+            failed={!profiles.onboardingCompleted.ok}
+            value={profiles.onboardingCompleted.ok ? formatCount(profiles.onboardingCompleted.value) : undefined}
             hint="Perfis com onboarding_completed = true, acumulado até agora."
-            detail={`${formatCount(profiles.total)} perfis no total`}
+            detail={profiles.total.ok ? `${formatCount(profiles.total.value)} perfis no total` : 'Total de perfis indisponível'}
           />
           <MetricCard
             testId="card-onboarding-incompleto"
             icon={LogIn}
-            tone={profiles.onboardingIncomplete > 0 ? 'warn' : 'default'}
+            tone={profiles.onboardingIncomplete.ok && profiles.onboardingIncomplete.value > 0 ? 'warn' : 'default'}
             label="Onboarding incompleto"
-            value={formatCount(profiles.onboardingIncomplete)}
+            failed={!profiles.onboardingIncomplete.ok}
+            value={profiles.onboardingIncomplete.ok ? formatCount(profiles.onboardingIncomplete.value) : undefined}
             hint="Perfis com onboarding_completed = false. Entrou e não terminou de se apresentar — o produto rende pouco para essa pessoa."
           />
         </div>
@@ -240,9 +268,10 @@ export default async function OverviewMetrics({ period }: { period: ResolvedPeri
           <MetricCard
             testId="card-sem-creditos"
             icon={Gauge}
-            tone={credits.zeroBalance > 0 ? 'warn' : 'default'}
+            tone={credits.zeroBalance.ok && credits.zeroBalance.value > 0 ? 'warn' : 'default'}
             label="Clientes com 0 créditos"
-            value={formatCount(credits.zeroBalance)}
+            failed={!credits.zeroBalance.ok}
+            value={credits.zeroBalance.ok ? formatCount(credits.zeroBalance.value) : undefined}
             hint="Linhas em user_credits com balance = 0 agora. É saldo, não consumo histórico: não existe ledger de crédito para dizer quanto foi gasto em quê."
           />
         </div>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   estimatedArr,
@@ -50,7 +50,7 @@ function applyFilters(rows: Row[], filters: Filter[]): Row[] {
   );
 }
 
-function fakeAdmin(tables: Record<string, Row[]>, authTotal: number) {
+function fakeAdmin(tables: Record<string, Row[]>, authTotal: number, failingTable?: string) {
   return {
     auth: {
       admin: {
@@ -74,6 +74,9 @@ function fakeAdmin(tables: Record<string, Row[]>, authTotal: number) {
         },
         then(resolve: (result: unknown) => unknown, reject?: (error: unknown) => unknown) {
           try {
+            if (table === failingTable) {
+              return Promise.resolve({ data: null, count: null, error: { message: 'boom' } }).then(resolve, reject);
+            }
             const matched = applyFilters(tables[table], filters);
             const result = head
               ? { count: matched.length, data: null, error: null }
@@ -126,6 +129,8 @@ function cenario() {
       sub({ user_id: null, current_period_end: '2026-09-01T00:00:00Z' }),
       // Cancelamento agendado renovando em 2 dias: NÃO pode entrar na previsão.
       sub({ cancel_at_period_end: true, current_period_end: '2026-08-17T00:00:00Z' }),
+      // Ativa, sem cancelamento e sem data: não entra na previsão e precisa ser avisada.
+      sub({ current_period_end: null }),
       // Canceladas/inadimplentes não contam como ativas.
       sub({ status: 'canceled' }),
       sub({ status: 'past_due' }),
@@ -186,81 +191,93 @@ describe('fórmulas', () => {
 });
 
 describe('loadAdminOverview', () => {
+  function value<T>(result: { ok: true; value: T } | { ok: false }): T {
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('resultado inesperadamente indisponível');
+    return result.value;
+  }
+
   it('conta assinaturas ativas pelo estado, não pelo total da tabela', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.subscriptions.active).toBe(7);
-    expect(data.subscriptions.monthly).toBe(5);
-    expect(data.subscriptions.yearly).toBe(2);
-    expect(data.accounts.total).toBe(12);
+    expect(value(data.subscriptions.active)).toBe(8);
+    expect(value(data.subscriptions.monthly)).toBe(6);
+    expect(value(data.subscriptions.yearly)).toBe(2);
+    expect(value(data.accounts.total)).toBe(12);
   });
 
   it('"pagou e não criou conta" conta só as ativas com user_id nulo', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.subscriptions.withoutAccount).toBe(1);
-    expect(data.subscriptions.withAccount).toBe(6);
-    expect(data.subscriptions.withAccount + data.subscriptions.withoutAccount).toBe(
-      data.subscriptions.active,
+    expect(value(data.subscriptions.withoutAccount)).toBe(1);
+    expect(value(data.subscriptions.withAccount)).toBe(7);
+    expect(value(data.subscriptions.withAccount) + value(data.subscriptions.withoutAccount)).toBe(
+      value(data.subscriptions.active),
     );
   });
 
   it('MRR e ARR saem das ativas por plano', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.recurring.mrr).toBeCloseTo(normalizedMrr(5, 2), 10);
-    expect(data.recurring.arr).toBeCloseTo(data.recurring.mrr * 12, 10);
+    const recurring = value(data.recurring);
+    expect(recurring.mrr).toBeCloseTo(normalizedMrr(6, 2), 10);
+    expect(recurring.arr).toBeCloseTo(recurring.mrr * 12, 10);
   });
 
   it('renovação prevista IGNORA assinatura com cancelamento agendado', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
     // Janela de 7 dias (15/08 → 22/08): mensal 18/08, mensal 20/08 (trialing) e
     // anual 20/08. A que vence em 17/08 tem cancel_at_period_end e fica fora.
-    expect(data.renewals.next7.monthly).toBe(2);
-    expect(data.renewals.next7.yearly).toBe(1);
-    expect(data.renewals.next7.count).toBe(3);
-    expect(data.renewals.next7.amount).toBeCloseTo(2 * 59.5 + 499, 10);
+    const next7 = value(data.renewals.next7);
+    expect(next7.monthly).toBe(2);
+    expect(next7.yearly).toBe(1);
+    expect(next7.count).toBe(3);
+    expect(next7.amount).toBeCloseTo(2 * 59.5 + 499, 10);
+    expect(next7.undated).toBe(1);
   });
 
   it('cancelamento agendado aparece no próprio card', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.subscriptions.scheduledCancellation).toBe(1);
+    expect(value(data.subscriptions.scheduledCancellation)).toBe(1);
   });
 
   it('a janela de 30 dias contém a de 7 e continua sem o cancelamento agendado', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.renewals.next30.count).toBeGreaterThanOrEqual(data.renewals.next7.count);
+    const next7 = value(data.renewals.next7);
+    const next30 = value(data.renewals.next30);
+    expect(next30.count).toBeGreaterThanOrEqual(next7.count);
     // 18/08, 20/08 (trialing), 20/08 anual, 01/09 (a sem conta) e 10/09.
-    expect(data.renewals.next30.count).toBe(5);
+    expect(next30.count).toBe(5);
   });
 
   it('checkouts contam PESSOAS distintas, não tentativas', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.funnel.checkoutAttempts).toBe(4);
-    expect(data.funnel.checkoutLeads).toBe(2);
-    expect(data.funnel.checkoutLeadsCapped).toBe(false);
+    expect(value(data.funnel.checkoutAttempts)).toBe(4);
+    expect(value(data.funnel.checkoutLeads)).toEqual({ count: 2, capped: false });
   });
 
   it('recorta leads e perfis pelo período, com período anterior comparável', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.funnel.leads).toBe(2);
-    expect(data.funnel.leadsPrevious).toBe(1);
-    expect(data.profiles.createdInPeriod).toBe(2);
-    expect(data.profiles.createdInPreviousPeriod).toBe(1);
+    expect(value(data.funnel.leads)).toBe(2);
+    expect(value(data.funnel.leadsPrevious)).toBe(1);
+    expect(value(data.profiles.createdInPeriod)).toBe(2);
+    expect(value(data.profiles.createdInPreviousPeriod)).toBe(1);
   });
 
   it('onboarding e saldo zero vêm do estado atual', async () => {
     const data = await loadAdminOverview(fakeAdmin(cenario(), 12), PERIODO, AGORA);
-    expect(data.profiles.onboardingCompleted).toBe(2);
-    expect(data.profiles.onboardingIncomplete).toBe(1);
-    expect(data.credits.zeroBalance).toBe(2);
+    expect(value(data.profiles.onboardingCompleted)).toBe(2);
+    expect(value(data.profiles.onboardingIncomplete)).toBe(1);
+    expect(value(data.credits.zeroBalance)).toBe(2);
   });
 
-  it('erro de leitura sobe em vez de virar zero na tela', async () => {
-    const quebrado = fakeAdmin(cenario(), 12) as unknown as {
+  it('isola uma falha sem derrubar nem zerar as outras métricas', async () => {
+    const quebrado = fakeAdmin(cenario(), 12, 'profiles') as unknown as {
       auth: { admin: { listUsers: () => Promise<unknown> } };
     };
     quebrado.auth.admin.listUsers = async () => ({ data: null, error: { message: 'boom' } });
-
-    await expect(
-      loadAdminOverview(quebrado as unknown as SupabaseClient, PERIODO, AGORA),
-    ).rejects.toThrow(/listUsers/);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const data = await loadAdminOverview(quebrado as unknown as SupabaseClient, PERIODO, AGORA);
+    expect(data.accounts.total).toEqual({ ok: false });
+    expect(data.profiles.total).toEqual({ ok: false });
+    expect(value(data.subscriptions.active)).toBe(8);
+    spy.mockRestore();
   });
 });

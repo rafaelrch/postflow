@@ -1,4 +1,5 @@
 import MetricHint from './MetricHint';
+import MetricRetryButton from './MetricRetryButton';
 import type { LucideIcon } from 'lucide-react';
 
 /**
@@ -17,7 +18,7 @@ export type MetricTone = 'default' | 'accent' | 'warn';
 
 export interface MetricCardProps {
   label: string;
-  value: string;
+  value?: string;
   /** Definição exata da métrica — vira o texto do "?". */
   hint: string;
   /** Linha de apoio embaixo do número (recorte, composição, ressalva). */
@@ -27,6 +28,8 @@ export interface MetricCardProps {
   tone?: MetricTone;
   icon: LucideIcon;
   featured?: boolean;
+  /** Falha isolada: nunca renderiza zero/traço como substituto. */
+  failed?: boolean;
   testId?: string;
 }
 
@@ -39,6 +42,7 @@ export default function MetricCard({
   tone = 'default',
   icon: Icon,
   featured = false,
+  failed = false,
   testId,
 }: MetricCardProps) {
   return (
@@ -49,6 +53,7 @@ export default function MetricCard({
       data-hint={hint}
       data-tone={tone}
       data-featured={featured ? 'true' : 'false'}
+      data-failed={failed ? 'true' : 'false'}
       className="admin-metric-card"
     >
       <header>
@@ -57,9 +62,16 @@ export default function MetricCard({
         <MetricHint label={label} hint={hint} />
       </header>
 
-      <p className="admin-metric-value">{value}</p>
+      {failed ? (
+        <div className="admin-metric-failure" role="status">
+          <p>Não deu para ler</p>
+          <MetricRetryButton />
+        </div>
+      ) : (
+        <p className="admin-metric-value">{value}</p>
+      )}
 
-      {(detail || variation) && (
+      {!failed && (detail || variation) && (
         <footer>
           {variation && <span className={`admin-metric-variation ${variation.trim().startsWith('-') ? 'negative' : 'positive'}`}>{variation}</span>}
           {variation && detail && <span aria-hidden>·</span>}
