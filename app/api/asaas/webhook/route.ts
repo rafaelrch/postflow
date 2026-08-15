@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase-admin';
 // Imports relativos (não alias) pelo mesmo motivo das outras rotas: manter os
 // módulos mockáveis a partir do arquivo de teste.
@@ -19,6 +19,7 @@ import {
   type NoticeSubscriptionState,
 } from '../../../../lib/orphan-signup-notice';
 import { appUrl } from '../../../../lib/app-url';
+import { recordAsaasFinancialTransaction } from '../../../../lib/asaas-financial-event';
 
 export const runtime = 'nodejs';
 
@@ -128,6 +129,19 @@ export async function POST(req: NextRequest) {
       .eq('event_id', ctx.eventId);
     if (error) console.error('[asaas/webhook] processed_mark_failed');
   }
+
+  // 5. PROJEÇÃO ANALÍTICA — sempre DEPOIS do caminho que concede/revoga
+  // acesso E da marcação processed_at. `after()` é a primitiva estável do
+  // Next 16 para analytics pós-resposta: o 200 não espera esta RPC, mas a
+  // plataforma mantém a invocação viva. A migration pode ainda não existir ou
+  // o banco pode recusá-la; o catch registra a falha sem governar pagamento.
+  after(async () => {
+    try {
+      await recordAsaasFinancialTransaction(admin, payload);
+    } catch {
+      console.error('[asaas/webhook] financial_transaction_record_failed');
+    }
+  });
 
   return NextResponse.json({ received: true });
 }

@@ -1,19 +1,24 @@
 import { requireAdminPage } from '@/lib/admin-page-guard';
-import UnderConstruction from '@/components/admin/UnderConstruction';
+import { createAdminSupabaseClient } from '@/lib/supabase-admin';
+import { resolvePeriod } from '@/lib/admin-period';
+import { loadAdminFinance } from '@/lib/admin-finance';
+import FinanceShell from '@/components/admin/FinanceShell';
+import FinanceDashboard from './FinanceDashboard';
 
-export default async function AdminFinanceiroPage() {
+export default async function AdminFinanceiroPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireAdminPage();
+  const period = resolvePeriod(await searchParams);
+  const data = await loadAdminFinance(createAdminSupabaseClient(), period);
 
   return (
-    <UnderConstruction
-      title="Financeiro"
-      summary="Receita recebida, reembolso, chargeback e histórico por pagamento são a Fatia 3. Hoje o banco guarda o ESTADO atual da assinatura e o payload cru do webhook — o mesmo pagamento gera vários eventos, então somar payload dobraria o valor."
-      pending={[
-        'Tabela normalizada de transações: uma linha por provider_payment_id, atualizada pelo webhook.',
-        'Distinguir PAYMENT_CONFIRMED (venda) de PAYMENT_RECEIVED (dinheiro na conta).',
-        'Taxas do Asaas para separar bruto de líquido.',
-        'Histórico de status da assinatura, sem o qual churn e MRR perdido não são calculáveis.',
-      ]}
-    />
+    <div className="admin-page">
+      <FinanceShell period={period}>
+        <FinanceDashboard data={data} period={period} />
+      </FinanceShell>
+    </div>
   );
 }

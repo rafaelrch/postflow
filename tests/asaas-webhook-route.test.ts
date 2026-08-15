@@ -15,8 +15,11 @@ const {
   mockRefMaybeSingle,
   mockSubUpdateEq,
   mockSubUpdate,
+  afterTasks,
+  mockAfter,
 } = vi.hoisted(() => {
   const mockSubUpdateEq = vi.fn();
+  const afterTasks: Array<() => Promise<void>> = [];
   return {
     mockGetCustomer: vi.fn(),
     mockEventInsert: vi.fn(),
@@ -27,8 +30,15 @@ const {
     mockRefMaybeSingle: vi.fn(),
     mockSubUpdateEq,
     mockSubUpdate: vi.fn(() => ({ eq: mockSubUpdateEq })),
+    afterTasks,
+    mockAfter: vi.fn((task: () => Promise<void>) => { afterTasks.push(task); }),
   };
 });
+
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: mockAfter,
+}));
 
 // Relativo ao ARQUIVO DE TESTE — mesmo módulo que a rota importa como
 // '../../../../lib/asaas/customers'.
@@ -98,6 +108,7 @@ function upsertedRow() {
 }
 
 beforeEach(() => {
+  afterTasks.length = 0;
   vi.stubEnv('ASAAS_WEBHOOK_TOKEN', TOKEN);
   mockEventInsert.mockResolvedValue({ error: null });
   mockEventUpdateEq.mockResolvedValue({ error: null });
@@ -294,7 +305,7 @@ describe('POST /api/asaas/webhook — efeitos no banco', () => {
 
   it('primeiro pagamento (sem dono) NÃO chama refresh_credits', async () => {
     await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
-    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockRpc.mock.calls.filter(([name]) => name === 'refresh_credits')).toHaveLength(0);
   });
 
   it('falha do refresh_credits não derruba o evento', async () => {
@@ -305,6 +316,45 @@ describe('POST /api/asaas/webhook — efeitos no banco', () => {
     const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
     expect(res.status).toBe(200);
     expect(mockEventUpdateEq).toHaveBeenCalled(); // evento concluído
+  });
+});
+
+describe('POST /api/asaas/webhook — projeção financeira best-effort', () => {
+  it('grava a transação somente DEPOIS de processar a assinatura', async () => {
+    const order: string[] = [];
+    mockSubUpsert.mockImplementation(async () => {
+      order.push('acesso');
+      return { error: null };
+    });
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'record_asaas_payment_transaction') order.push('analítica');
+      return { error: null };
+    });
+
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+    expect(order).toEqual(['acesso']);
+    expect(mockEventUpdateEq).toHaveBeenCalledTimes(1);
+    expect(afterTasks).toHaveLength(1);
+    await afterTasks[0]();
+    expect(order).toEqual(['acesso', 'analítica']);
+  });
+
+  it('falha da gravação analítica NÃO interrompe pagamento, acesso nem processed_at', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockRpc.mockImplementation(async (name: string) => ({
+      error: name === 'record_asaas_payment_transaction' ? { message: 'migration ainda ausente' } : null,
+    }));
+
+    const response = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+    expect(mockSubUpsert).toHaveBeenCalledTimes(1);
+    expect(upsertedRow().status).toBe('active');
+    expect(mockEventUpdateEq).toHaveBeenCalledTimes(1);
+    expect(afterTasks).toHaveLength(1);
+    await afterTasks[0]();
+    expect(error.mock.calls.flat().join(' ')).toContain('financial_transaction_record_failed');
   });
 });
 

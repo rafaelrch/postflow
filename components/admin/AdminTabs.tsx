@@ -30,7 +30,7 @@ import AdminThemeToggle from './AdminThemeToggle';
 export const ADMIN_TABS = [
   { href: '/admin', label: 'Visão geral', icon: LayoutDashboard, ready: true },
   { href: '/admin/clientes', label: 'Clientes', icon: Users, ready: true },
-  { href: '/admin/financeiro', label: 'Financeiro', icon: WalletCards, ready: false },
+  { href: '/admin/financeiro', label: 'Financeiro', icon: WalletCards, ready: true },
   { href: '/admin/produto', label: 'Produto', icon: Box, ready: false },
   { href: '/admin/saude', label: 'Saúde', icon: Activity, ready: false },
 ] as const;
