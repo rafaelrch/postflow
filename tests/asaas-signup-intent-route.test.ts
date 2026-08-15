@@ -98,6 +98,8 @@ function sub(over: Record<string, unknown> = {}) {
     email: 'pagador@test.com',
     status: 'active',
     user_id: null,
+    payment_confirmation_required: true,
+    payment_confirmed_at: '2026-08-15T12:00:00.000Z',
     ...over,
   };
 }
@@ -172,6 +174,32 @@ describe('POST /api/asaas/signup-intent — os três estados do pagamento', () =
     expect(res.status).toBe(202);
     expect(await res.json()).toMatchObject({ pending: true, code: 'payment_pending' });
     expect(mockCreateUser).not.toHaveBeenCalled();
+  });
+
+  it('SUBSCRIPTION_CREATED ativo, mas sem PAYMENT_CONFIRMED => espera e não cria conta', async () => {
+    mockLimit.mockResolvedValue({
+      data: [sub({ payment_confirmation_required: true, payment_confirmed_at: null })],
+      error: null,
+    });
+
+    const res = await POST(intentRequest(token));
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toMatchObject({ pending: true, code: 'payment_pending' });
+    expect(mockCreateUser).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalledWith('prepare_paid_signup_intent', expect.anything());
+  });
+
+  it('assinatura ativa anterior ao corte continua liberada sem confirmação retroativa', async () => {
+    mockLimit.mockResolvedValue({
+      data: [sub({ payment_confirmation_required: false, payment_confirmed_at: null })],
+      error: null,
+    });
+
+    const res = await POST(intentRequest(token));
+
+    expect(res.status).toBe(200);
+    expect(mockCreateUser).toHaveBeenCalledTimes(1);
   });
 
   it('(c) assinatura JÁ REIVINDICADA (user_id != null) => 409 account_exists', async () => {

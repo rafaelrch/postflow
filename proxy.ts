@@ -3,7 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // /configuracoes entra junto com /conta: a página migrou para lá, e uma sem a
 // outra deixaria a tela nova aberta a visitante sem sessão.
-const protectedPrefixes = ['/dashboard', '/generator', '/agenda', '/news', '/twitter', '/setup', '/onboarding', '/conta', '/configuracoes'];
+// /admin entra como PRIMEIRA barreira: sem sessão, nem chega a renderizar.
+// ⚠️ Isto NÃO é o controle de acesso administrativo. O proxy só sabe se existe
+// sessão — qualquer cliente logado passaria por aqui. Quem decide se a conta é
+// admin é requireAdmin() (lib/admin-auth.ts), no servidor de cada página e de
+// cada route handler sob /admin.
+const protectedPrefixes = ['/dashboard', '/generator', '/agenda', '/news', '/twitter', '/setup', '/onboarding', '/conta', '/configuracoes', '/admin'];
 
 /**
  * Rotas de auth: quem JÁ está logado é mandado para o app.
@@ -90,6 +95,8 @@ export const config = {
     '/onboarding/:path*',
     '/conta/:path*',
     '/configuracoes/:path*',
+    '/admin',
+    '/admin/:path*',
     '/login',
     '/cadastro',
   ],
