@@ -185,3 +185,28 @@ registro do pagamento.
 - Logo: `https://www.creatools.com.br/ICON_SEMFUNDO.png`, 36×36. É a URL de
   produção. Se o arquivo sair do ar, os seis e-mails ficam com um alt quebrado —
   o texto "Creatools" ao lado é imagem-independente justamente por isso.
+
+---
+
+## 7. Troca de e-mail da conta — o que depende do PAINEL
+
+A tela existe (`/configuracoes/conta` → "Trocar e-mail") e usa o fluxo nativo do
+Supabase (`updateUser({ email })`). O código está pronto; **duas coisas são
+configuração de painel e não têm como ser feitas daqui**:
+
+1. **Colar `trocar-email.html` no template "Change Email Address".** Enquanto
+   isso não for feito, quem pedir a troca recebe o e-mail **default do Supabase,
+   em inglês** — vale para todos os seis templates (ver §1), mas este é o que a
+   funcionalidade nova depende.
+
+2. **Ligar "Secure email change"** (Authentication → Providers → Email →
+   *Secure email change*). Com ele ligado, a confirmação vai para as **duas**
+   caixas: a antiga fica sabendo que alguém pediu a troca, e a troca só se
+   completa quando ambas confirmam. Desligado, basta confirmar na caixa NOVA —
+   e aí quem sentar num computador destravado troca o e-mail sozinho. O template
+   `trocar-email.html` já usa `{{ .Email }}` e `{{ .NewEmail }}`, que é o corpo
+   que os dois lados recebem.
+
+Nada no código contorna nenhum dos dois: contornar significaria escrever
+`auth.users.email` com service_role, que é exatamente a tomada de conta que o
+fluxo existe para impedir.
