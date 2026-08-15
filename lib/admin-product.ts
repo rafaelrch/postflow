@@ -14,6 +14,15 @@ export interface ProductActivity {
   existingNews: number;
 }
 
+/**
+ * Distingue ausência de coleta de uma janela coletada sem ocorrências.
+ * `null` significa “nunca coletamos”; depois do primeiro evento, zero é um
+ * fato legítimo e deve continuar sendo mostrado como zero.
+ */
+export function displayObservedCount(value: number, collectedSince: string | null): number | null {
+  return collectedSince ? value : null;
+}
+
 export interface ProductCreation {
   contentSeries: CountPoint[];
   carouselModes: { mode: string; count: number }[];

@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadAdminProduct, parseProductBlock } from '../lib/admin-product';
+import { displayObservedCount, loadAdminProduct, parseProductBlock } from '../lib/admin-product';
 import { resolvePeriod } from '../lib/admin-period';
 
 describe('métricas administrativas de produto', () => {
+  it('distingue nunca coletado de coleta com zero', () => {
+    expect(displayObservedCount(0, null)).toBeNull();
+    expect(displayObservedCount(0, '2026-08-15T10:00:00Z')).toBe(0);
+  });
+
   it('mapeia números e mantém token ausente como desconhecido', () => {
     expect(parseProductBlock('credits_ai', {
       credits_by_feature: [{ feature: 'image', credits: '10' }],

@@ -1,5 +1,5 @@
 import { AlertTriangle, BarChart3, Box, Download, ImageIcon, Newspaper, Sparkles, Users, WalletCards } from 'lucide-react';
-import type { AdminProduct, CountPoint } from '@/lib/admin-product';
+import { displayObservedCount, type AdminProduct, type CountPoint } from '@/lib/admin-product';
 import type { ResolvedPeriod } from '@/lib/admin-period';
 import { formatCount, formatDateTime } from '@/lib/admin-format';
 import MetricCard from '@/components/admin/MetricCard';
@@ -24,21 +24,30 @@ function Series({ points, value }: { points: CountPoint[]; value: (point: CountP
 }
 
 export default function ProductDashboard({ data, period }: { data: AdminProduct; period: ResolvedPeriod }) {
+  // A coleta começa no primeiro evento, não na criação da tabela. Antes disso,
+  // 0 seria uma afirmação falsa; depois disso, 0 é um resultado observável.
+  const collectedSince = data.activity.ok ? data.activity.value.collectedSince : null;
+  const observedCount = (value: number) => {
+    const displayed = displayObservedCount(value, collectedSince);
+    return displayed === null ? '—' : formatCount(displayed);
+  };
   const failureRate = data.creditsAi.ok
     ? data.creditsAi.value.aiSucceeded + data.creditsAi.value.aiFailed === 0 ? 0 : data.creditsAi.value.aiFailed / (data.creditsAi.value.aiSucceeded + data.creditsAi.value.aiFailed) * 100
     : 0;
   return <div className="admin-product-sections">
-    <p className="admin-collection-note">{data.activity.ok && data.activity.value.collectedSince
-      ? `Dados de evento coletados a partir de ${formatDateTime(data.activity.value.collectedSince)}.`
-      : 'A coleta começa quando a migration da F4 for aplicada e o primeiro evento chegar. Não há passado fabricado.'}</p>
+    <p className="admin-collection-note">{!data.activity.ok
+      ? 'Não foi possível verificar o estado da coleta de eventos agora.'
+      : collectedSince
+        ? `Dados de evento coletados a partir de ${formatDateTime(collectedSince)}.`
+        : 'A tabela de eventos está disponível, mas nenhum evento foi coletado ainda. A coleta começa quando o primeiro evento chegar.'}</p>
 
     <section className="admin-metric-section" aria-labelledby="product-activity">
       <div className="admin-group-heading"><div><h2 id="product-activity">Atividade</h2><p>Usuários distintos, nunca sessões</p></div><span className="admin-scope-badge">Janela até {period.toDate}</span></div>
       {!data.activity.ok ? <Failure label="Atividade" /> : <>
         <div className="admin-metrics-grid">
-          <MetricCard icon={Users} label="DAU" value={formatCount(data.activity.value.dau)} hint="Usuários distintos com evento nas últimas 24 horas do recorte." featured />
-          <MetricCard icon={Users} label="WAU" value={formatCount(data.activity.value.wau)} hint="Usuários distintos com evento nos últimos 7 dias até o fim do recorte." />
-          <MetricCard icon={Users} label="MAU" value={formatCount(data.activity.value.mau)} hint="Usuários distintos com evento nos últimos 30 dias até o fim do recorte." />
+          <MetricCard icon={Users} label="DAU" value={observedCount(data.activity.value.dau)} hint="Usuários distintos com evento nas últimas 24 horas do recorte." featured />
+          <MetricCard icon={Users} label="WAU" value={observedCount(data.activity.value.wau)} hint="Usuários distintos com evento nos últimos 7 dias até o fim do recorte." />
+          <MetricCard icon={Users} label="MAU" value={observedCount(data.activity.value.mau)} hint="Usuários distintos com evento nos últimos 30 dias até o fim do recorte." />
           <MetricCard icon={BarChart3} label="Stickiness DAU ÷ MAU" value={data.activity.value.mau ? `${(data.activity.value.dau / data.activity.value.mau * 100).toFixed(1)}%` : '—'} hint="Só existe quando há MAU. Sessões repetidas não aumentam o numerador." />
         </div>
         <div className="admin-product-grid"><article className="admin-product-panel"><h3>Usuários ativos por dia</h3><Series points={data.activity.value.series.map((x) => ({ bucket: x.bucket, count: x.users }))} value={(x) => x.count} /></article><article className="admin-product-panel"><h3>Conteúdo existente hoje</h3><List rows={[{ label: 'Carrosséis ainda existentes', value: formatCount(data.activity.value.existingCarousels) }, { label: 'Cards de notícia ainda existentes', value: formatCount(data.activity.value.existingNews) }]} empty="Nenhum conteúdo existente." /><p className="admin-data-note">Foto atual, não total histórico: itens apagados não entram.</p></article></div>
@@ -49,10 +58,10 @@ export default function ProductDashboard({ data, period }: { data: AdminProduct;
       <div className="admin-group-heading"><div><h2 id="product-creation">Criação e saída</h2><p>Eventos observados em {period.label.toLowerCase()}</p></div></div>
       {!data.creation.ok ? <Failure label="Criação e exportação" /> : <>
         <div className="admin-metrics-grid">
-          <MetricCard icon={Download} label="Exportações" value={formatCount(data.creation.value.exportsSingle + data.creation.value.exportsAll)} detail={`${formatCount(data.creation.value.exportsSingle)} avulsa(s) · ${formatCount(data.creation.value.exportsAll)} ZIP(s)`} hint="Exportação concluída no navegador." featured />
-          <MetricCard icon={ImageIcon} label="Imagens geradas" value={formatCount(data.creation.value.images)} hint="Gerações de imagem concluídas." />
-          <MetricCard icon={Newspaper} label="Lotes de notícias" value={formatCount(data.creation.value.newsBatches)} hint="Lotes criados; não soma cada card do lote." />
-          <MetricCard icon={Box} label="Agendamentos" value={formatCount(data.creation.value.schedules)} hint="Novos agendamentos criados no período." />
+          <MetricCard icon={Download} label="Exportações" value={observedCount(data.creation.value.exportsSingle + data.creation.value.exportsAll)} detail={collectedSince ? `${formatCount(data.creation.value.exportsSingle)} avulsa(s) · ${formatCount(data.creation.value.exportsAll)} ZIP(s)` : 'Ainda não há coleta para separar os tipos'} hint="Exportação concluída no navegador." featured />
+          <MetricCard icon={ImageIcon} label="Imagens geradas" value={observedCount(data.creation.value.images)} hint="Gerações de imagem concluídas." />
+          <MetricCard icon={Newspaper} label="Lotes de notícias" value={observedCount(data.creation.value.newsBatches)} hint="Lotes criados; não soma cada card do lote." />
+          <MetricCard icon={Box} label="Agendamentos" value={observedCount(data.creation.value.schedules)} hint="Novos agendamentos criados no período." />
         </div>
         <div className="admin-product-grid">
           <article className="admin-product-panel"><h3>Conteúdo criado por dia</h3><Series points={data.creation.value.contentSeries} value={(x) => x.count} /></article>
