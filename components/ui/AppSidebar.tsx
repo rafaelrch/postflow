@@ -16,6 +16,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { REELS_ENABLED } from '@/lib/feature-flags';
@@ -47,7 +48,19 @@ const navItems: NavItem[] = [
   { href: '/configuracoes', label: 'Configurações', icon: Settings, match: ['/conta'] },
 ];
 
-export default function AppSidebar() {
+/**
+ * `isAdmin` chega calculado do servidor (app/(app)/layout.tsx) porque a regra
+ * mora em `ADMIN_EMAILS`, que é env de servidor e NÃO pode virar bundle.
+ *
+ * ⚠️ ESCONDER O ITEM NÃO É CONTROLE DE ACESSO. /admin é protegido no servidor,
+ * em cada página (`requireAdminPage`) e cada route handler (`requireAdmin`):
+ * quem não está na allowlist toma 403 digitando a URL, com ou sem atalho. Este
+ * item é conveniência — o Rafael cansou de digitar /admin na barra de endereço.
+ *
+ * O default `false` fecha: renderizado sem a prop (teste antigo, uso novo fora
+ * da shell), o atalho não aparece.
+ */
+export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -319,6 +332,23 @@ export default function AppSidebar() {
             </div>
           )}
         </Link>
+        {/* Atalho para o painel — a volta ("Voltar ao produto", em /admin)
+            já existia; esta é a ida. Visual do PRODUTO, não do admin: o painel
+            tem linguagem própria em app/admin/admin.css e ela não atravessa
+            para cá. */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            data-testid="sidebar-admin-link"
+            className={cn('brand-btn ghost w-full mb-2', collapsed ? 'justify-center' : 'justify-start')}
+            style={{ padding: '9px 12px', color: 'var(--ink-dim)' }}
+            title={collapsed ? 'Painel administrativo' : undefined}
+            aria-label="Painel administrativo"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            {!collapsed && <span>Painel admin</span>}
+          </Link>
+        )}
         <button
           onClick={handleSignOut}
           className={cn('brand-btn ghost w-full mb-2', collapsed ? 'justify-center' : 'justify-start')}

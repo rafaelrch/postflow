@@ -1,13 +1,20 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import ChangePasswordButton from '@/components/settings/ChangePasswordButton';
+import ChangeEmailButton from '@/components/settings/ChangeEmailButton';
 
 /**
- * Aba "Conta": os dados que a conta REALMENTE tem, e a troca de senha.
+ * Aba "Conta": os dados que a conta REALMENTE tem, a troca de senha e a troca
+ * de e-mail.
  *
- * O e-mail é só leitura porque trocar e-mail não é um fluxo que exista hoje —
- * mudaria a chave que liga a conta ao pagamento (o webhook casa por
- * lower(email)) e precisa de confirmação nos dois endereços. Um campo editável
- * aqui prometeria algo que nada implementa.
+ * ── O E-MAIL AGORA É TROCÁVEL, E POR QUAL CAMINHO ───────────────────────────
+ * Pelo fluxo nativo do Supabase, com confirmação: a rota /api/conta/email só
+ * PEDE a troca, e o endereço muda quando o link é aberto. Nada aqui escreve em
+ * `auth.users.email` — ver lib/account-email-change.ts.
+ *
+ * O `lower(email)` que liga conta e pagamento vale ANTES de a conta existir (o
+ * gate de cadastro e o claim). Depois do claim o vínculo é `user_id`, então
+ * trocar o e-mail do Auth não desliga assinatura, crédito nem renovação, e
+ * `subscriptions.email` — que é o e-mail de quem PAGOU — segue intocado.
  *
  * Nome e criação saem de public.profiles / auth.users. Nenhum campo é inventado:
  * o que não existe no banco não aparece na tela.
@@ -59,15 +66,18 @@ export default async function ConfiguracoesContaPage() {
         <Dado rotulo="Conta criada em" testId="conta-criada-em" valor={fmtDate(user?.created_at)} />
       </dl>
 
-      <p className="mt-5 text-xs leading-relaxed text-[var(--ink-dim)]">
-        O e-mail da conta é o mesmo do pagamento e não pode ser alterado por aqui. Se
-        precisar trocar, fale com o suporte.
-      </p>
-
       {/* Mesma gramática visual do botão de cancelar assinatura na outra aba:
           ação separada do conteúdo por uma linha, no rodapé do cartão. */}
-      <div className="mt-5 pt-4 border-t border-[var(--border)]">
-        <ChangePasswordButton />
+      <div className="mt-5 pt-4 border-t border-[var(--border)] flex flex-col items-start">
+        {/* `new_email` é o pedido de troca ainda não confirmado. Vem do
+            servidor para sobreviver a recarga e a outro dispositivo. */}
+        <ChangeEmailButton
+          currentEmail={user?.email ?? '—'}
+          pendingEmail={(user as { new_email?: string | null } | null)?.new_email?.trim() || null}
+        />
+        <div className="mt-3">
+          <ChangePasswordButton />
+        </div>
       </div>
     </section>
   );

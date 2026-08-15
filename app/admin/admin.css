@@ -591,6 +591,9 @@ html.dark .admin-root {
 /* Saúde — alertas informam e apontam registros; nunca oferecem mutação. */
 .admin-health-sections { display: flex; min-width: 0; flex-direction: column; padding: 18px 28px 32px; }
 .admin-health-grid { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-reconcile { display: flex; min-width: 0; margin-bottom: 12px; flex-wrap: wrap; align-items: center; gap: 10px; }
+.admin-reconcile p { margin: 0; color: var(--admin-text-secondary); font-size: 10px; }
+.admin-reconcile p[role='alert'] { color: var(--admin-danger); }
 .admin-health-card { display: flex; min-width: 0; padding: 15px; flex-direction: column; gap: 14px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 10px; }
 .admin-health-card[data-severity='critical'] { border-color: color-mix(in srgb, var(--admin-danger) 42%, var(--admin-border)); }
 .admin-health-card[data-severity='high'] { border-color: color-mix(in srgb, var(--admin-warning) 36%, var(--admin-border)); }

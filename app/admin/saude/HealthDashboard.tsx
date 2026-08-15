@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, CircleAlert, ShieldAlert, TriangleAlert } fr
 import { HEALTH_CHECKS, type HealthAlert, type HealthCheckResult, type HealthSeverity } from '@/lib/admin-health';
 import { formatCount, formatDateTime } from '@/lib/admin-format';
 import MetricRetryButton from '@/components/admin/MetricRetryButton';
+import ReconcileButton from '@/components/admin/ReconcileButton';
 
 const severityLabel: Record<HealthSeverity, string> = {
   critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo',
@@ -56,9 +57,13 @@ export default function HealthDashboard({ checks }: { checks: HealthCheckResult[
     <div className="admin-health-sections">
       <section className="admin-metric-section" aria-labelledby="health-alerts-title">
         <div className="admin-group-heading">
-          <div><h2 id="health-alerts-title">Verificações operacionais</h2><p>Somente leitura · nenhuma ação é executada automaticamente</p></div>
+          {/* "Somente leitura" continua verdadeiro para as VERIFICAÇÕES: elas
+              não escrevem nada. A reconciliação é uma ação explícita, sua, e
+              mesmo ela não concede nem revoga acesso. */}
+          <div><h2 id="health-alerts-title">Verificações operacionais</h2><p>Leitura contínua · nenhuma ação é executada automaticamente</p></div>
           <span className="admin-scope-badge">{HEALTH_CHECKS.length} regras ativas</span>
         </div>
+        <ReconcileButton />
         <div className="admin-health-grid">
           {checks.map((check, index) => check.ok
             ? <AlertCard key={check.value.key} alert={check.value} />
