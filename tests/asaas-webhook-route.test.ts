@@ -13,15 +13,22 @@ const {
   mockSubUpsert,
   mockRpc,
   mockRefMaybeSingle,
-} = vi.hoisted(() => ({
-  mockGetCustomer: vi.fn(),
-  mockEventInsert: vi.fn(),
-  mockEventUpdateEq: vi.fn(),
-  mockSubMaybeSingle: vi.fn(),
-  mockSubUpsert: vi.fn(),
-  mockRpc: vi.fn(),
-  mockRefMaybeSingle: vi.fn(),
-}));
+  mockSubUpdateEq,
+  mockSubUpdate,
+} = vi.hoisted(() => {
+  const mockSubUpdateEq = vi.fn();
+  return {
+    mockGetCustomer: vi.fn(),
+    mockEventInsert: vi.fn(),
+    mockEventUpdateEq: vi.fn(),
+    mockSubMaybeSingle: vi.fn(),
+    mockSubUpsert: vi.fn(),
+    mockRpc: vi.fn(),
+    mockRefMaybeSingle: vi.fn(),
+    mockSubUpdateEq,
+    mockSubUpdate: vi.fn(() => ({ eq: mockSubUpdateEq })),
+  };
+});
 
 // Relativo ao ARQUIVO DE TESTE — mesmo módulo que a rota importa como
 // '../../../../lib/asaas/customers'.
@@ -43,6 +50,8 @@ vi.mock('@/lib/supabase-admin', () => ({
       return {
         select: () => ({ eq: () => ({ maybeSingle: mockSubMaybeSingle }) }),
         upsert: mockSubUpsert,
+        // Marca do aviso de pagamento órfão (orphan_notice_email_id).
+        update: mockSubUpdate,
       };
     },
     rpc: mockRpc,
@@ -97,6 +106,10 @@ beforeEach(() => {
   mockRefMaybeSingle.mockResolvedValue({ data: { lead_id: LEAD_ID }, error: null });
   mockRpc.mockResolvedValue({ error: null });
   mockGetCustomer.mockResolvedValue({ id: 'cus_1', email: 'pagador@test.com' });
+  mockSubUpdateEq.mockResolvedValue({ error: null });
+  // O aviso de pagamento órfão emite o MESMO token da successUrl do checkout.
+  vi.stubEnv('SIGNUP_TOKEN_SECRET', 'segredo-de-teste-com-mais-de-16-chars');
+  vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.test');
 });
 
 afterEach(() => {
@@ -433,5 +446,179 @@ describe('POST /api/asaas/webhook — tolerância', () => {
     const res = await POST(webhookRequest('{isso nao e json'));
     expect(res.status).toBe(400);
     expect(mockEventInsert).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * AVISO DE PAGAMENTO ÓRFÃO — quem pagou e não conseguiu criar a conta.
+ *
+ * Estes testes NÃO mockam lib/resend: mockam o `fetch`. É de propósito — os dois
+ * casos que mais importam ("a chave não está configurada" e "o Resend devolveu
+ * 500") são comportamento DO CLIENTE, e um stub do módulo os testaria de
+ * mentira. O que precisa ficar provado é que nada disso derruba o webhook.
+ */
+describe('POST /api/asaas/webhook — aviso de pagamento órfão', () => {
+  /** Última chamada de agendamento ao Resend, já com o corpo desserializado. */
+  function resendCall() {
+    const call = mockFetch.mock.calls.find((c) => String(c[0]).endsWith('/emails'));
+    if (!call) return null;
+    const init = call[1] as { headers: Record<string, string>; body: string };
+    return { headers: init.headers, body: JSON.parse(init.body) as Record<string, any> };
+  }
+
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.stubEnv('RESEND_API_KEY', 're_chave_de_teste');
+    mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 'email_agendado_1' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  it('assinatura SEM DONO => agenda UMA vez, para o e-mail de quem pagou', async () => {
+    // Sem linha anterior: primeiro pagamento, a conta ainda não existe.
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+    expect(res.status).toBe(200);
+
+    const sent = resendCall();
+    expect(sent).not.toBeNull();
+    expect(mockFetch.mock.calls.filter((c) => String(c[0]).endsWith('/emails'))).toHaveLength(1);
+
+    // O destinatário é o e-mail do PAGADOR (GET /v3/customers), nunca um
+    // endereço vindo do request.
+    expect(sent!.body.to).toEqual(['pagador@test.com']);
+    expect(sent!.body.template.id).toBe('creatools-ative-seu-acesso');
+  });
+
+  it('o link leva ao /cadastro com o token assinado do lead', async () => {
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    const url = resendCall()!.body.template.variables.CONFIRMATION_URL as string;
+    expect(url.startsWith('https://app.test/cadastro?t=')).toBe(true);
+
+    // O token é determinístico (HMAC do id do lead): é o MESMO que a successUrl
+    // do checkout carregou. Recriá-lo aqui é o ponto do desenho.
+    const { createSignupToken } = await import('../lib/signup-token');
+    const { verifySignupToken } = await import('../lib/signup-token');
+    expect(url).toContain(encodeURIComponent(createSignupToken(LEAD_ID)));
+    expect(verifySignupToken(decodeURIComponent(url.split('t=')[1]))).toBe(LEAD_ID);
+  });
+
+  it('agenda para o FUTURO (a tela ainda tem ~92s de tentativas)', async () => {
+    const antes = Date.now();
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    const scheduledAt = Date.parse(resendCall()!.body.scheduled_at as string);
+    expect(scheduledAt - antes).toBeGreaterThan(92_000);
+  });
+
+  it('manda Idempotency-Key por assinatura (duas entregas em paralelo)', async () => {
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+    expect(resendCall()!.headers['Idempotency-Key']).toBe('orphan-notice:sub_1');
+  });
+
+  it('grava o id do e-mail para poder cancelar depois', async () => {
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(mockSubUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ orphan_notice_email_id: 'email_agendado_1' }),
+    );
+  });
+
+  it('assinatura JÁ REIVINDICADA (user_id) => NÃO agenda', async () => {
+    mockSubMaybeSingle.mockResolvedValue({
+      data: { id: 'sub_1', user_id: 'user-1', email: 'pagador@test.com' },
+    });
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+    expect(res.status).toBe(200);
+    expect(resendCall()).toBeNull();
+  });
+
+  it('JÁ AVISADA => não agenda de novo (evento diferente, mesma assinatura)', async () => {
+    mockSubMaybeSingle.mockResolvedValue({
+      data: { id: 'sub_1', user_id: null, orphan_notice_email_id: 'email_agendado_1' },
+    });
+
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED', {}, 'evt_outro')));
+    expect(resendCall()).toBeNull();
+  });
+
+  it('MESMO evento entregue duas vezes => UM e-mail só', async () => {
+    await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    // Segunda entrega: o insert colide na PK de payment_webhook_events, que é a
+    // primeira trava — a rota sai antes mesmo de processar.
+    mockEventInsert.mockResolvedValue({ error: { code: '23505' } });
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(await res.json()).toMatchObject({ duplicate: true });
+    expect(mockFetch.mock.calls.filter((c) => String(c[0]).endsWith('/emails'))).toHaveLength(1);
+  });
+
+  it('PAYMENT_RECEIVED (conciliação, não libera acesso) => NÃO agenda', async () => {
+    await POST(webhookRequest(paymentEvent('PAYMENT_RECEIVED')));
+    expect(resendCall()).toBeNull();
+  });
+
+  it('sem lead atribuível => não agenda (link sem token não leva a lugar nenhum)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockRefMaybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+    expect(res.status).toBe(200);
+    expect(resendCall()).toBeNull();
+  });
+
+  it('RESEND_API_KEY AUSENTE => loga alto, webhook segue 200 e grava a assinatura', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('RESEND_API_KEY', '');
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ received: true });
+    // A assinatura é gravada de qualquer jeito: o pagamento vale mais que o aviso.
+    expect(mockSubUpsert).toHaveBeenCalledTimes(1);
+    expect(err.mock.calls.flat().join(' ')).toContain('missing_RESEND_API_KEY');
+    // Nada de fallback silencioso: nenhuma chamada saiu.
+    expect(resendCall()).toBeNull();
+    // E não marca como avisada — uma reentrega ainda pode agendar.
+    expect(mockSubUpdate).not.toHaveBeenCalled();
+  });
+
+  it('Resend devolve 500 => webhook não quebra, assinatura criada', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ received: true });
+    expect(mockSubUpsert).toHaveBeenCalledTimes(1);
+    expect(mockSubUpdate).not.toHaveBeenCalled();
+  });
+
+  it('Resend fora do ar (fetch lança) => webhook não quebra', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch.mockRejectedValue(new TypeError('network down'));
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(res.status).toBe(200);
+    expect(mockSubUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('falha ao gravar a marca => grita, mas o webhook segue 200', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockSubUpdateEq.mockResolvedValue({ error: { message: 'boom' } });
+
+    const res = await POST(webhookRequest(paymentEvent('PAYMENT_CONFIRMED')));
+
+    expect(res.status).toBe(200);
+    expect(err.mock.calls.flat().join(' ')).toContain('orphan_notice_mark_failed');
   });
 });

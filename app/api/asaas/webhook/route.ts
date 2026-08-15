@@ -11,8 +11,23 @@ import {
   type CurrentSubscription,
 } from '../../../../lib/asaas-webhook';
 import { getCustomer } from '../../../../lib/asaas/customers';
+import { sendTemplateEmail } from '../../../../lib/resend';
+import { createSignupToken } from '../../../../lib/signup-token';
+import {
+  decideOrphanNotice,
+  noticeSendAt,
+  type NoticeSubscriptionState,
+} from '../../../../lib/orphan-signup-notice';
+import { appUrl } from '../../../../lib/app-url';
 
 export const runtime = 'nodejs';
+
+/**
+ * Template publicado no Resend (alias, não uuid: o alias é estável e legível).
+ * Ver docs/emails-transacionais.md §5 — o texto dele ("Seu pagamento foi
+ * confirmado. Falta um passo: criar a senha") descreve exatamente este caso.
+ */
+const ORPHAN_NOTICE_TEMPLATE = 'creatools-ative-seu-acesso';
 
 /**
  * Webhook do Asaas.
@@ -188,7 +203,10 @@ async function processEvent(admin: Admin, ctx: ReturnType<typeof extractContext>
 
   const { data: current } = await admin
     .from('subscriptions')
-    .select('id, status, plan_interval, external_reference, current_period_end, user_id, email')
+    // Uma string literal só, sem concatenar: o PostgREST infere o tipo da linha
+    // a partir DESTE literal, e quebrá-lo em pedaços faz `current` virar
+    // GenericStringError (o tsc acusa em current?.email).
+    .select('id, status, plan_interval, external_reference, current_period_end, user_id, email, orphan_notice_email_id')
     .eq('id', ctx.subscriptionId)
     .maybeSingle();
 
@@ -236,6 +254,96 @@ async function processEvent(admin: Admin, ctx: ReturnType<typeof extractContext>
   }
 
   await refreshCreditsOnRenewal(admin, ctx, current as CurrentSubscription | null, patch);
+
+  await scheduleOrphanNotice(admin, ctx, current as NoticeSubscriptionState | null, patch);
+}
+
+/**
+ * Agenda o aviso para quem PAGOU e ainda não tem conta.
+ *
+ * ── NUNCA LANÇA, e isso é a coisa mais importante deste bloco ───────────────
+ *
+ * Chega DEPOIS do upsert de propósito: a assinatura já está gravada quando este
+ * código roda. Se ele explodisse, o `catch` do POST devolveria
+ * `processed: false` e o evento ficaria com processed_at null — trocaríamos
+ * "não avisou a pessoa" por "não registrou o pagamento", que é muito pior. Por
+ * isso o try/catch abraça tudo, inclusive createSignupToken (que lança quando
+ * SIGNUP_TOKEN_SECRET falta) e a gravação do id.
+ *
+ * As travas de QUANDO mandar (só 'grant', só sem dono, só uma vez, só com lead
+ * e e-mail do pagador) moram em decideOrphanNotice, que é puro. Aqui só há I/O.
+ */
+async function scheduleOrphanNotice(
+  admin: Admin,
+  ctx: ReturnType<typeof extractContext>,
+  current: NoticeSubscriptionState | null,
+  patch: Record<string, unknown>,
+) {
+  try {
+    const decision = decideOrphanNotice({
+      action: ctx.action,
+      subscriptionId: ctx.subscriptionId,
+      // Sempre o e-mail que o Asaas informou para a COBRANÇA (o patch acabou de
+      // escrevê-lo a partir de GET /v3/customers), com o que já estava gravado
+      // como reserva. Nunca um endereço vindo de request.
+      payerEmail: (patch.email as string | undefined) ?? null,
+      // external_reference = id do lead. O patch já resolveu a precedência
+      // (evento > payment_checkout_refs > linha existente).
+      leadId: (patch.external_reference as string | undefined) ?? null,
+      current,
+    });
+
+    if (!decision.schedule) {
+      // 'not_grant' e 'already_claimed' são o caminho NORMAL (todo evento que
+      // não libera acesso, toda renovação de quem já tem conta): logar viraria
+      // ruído em cima do fluxo saudável. Os outros três são anomalia.
+      if (decision.reason !== 'not_grant' && decision.reason !== 'already_claimed') {
+        console.error(
+          `[asaas/webhook] orphan_notice_skipped reason=${decision.reason} ` +
+            `subscription=${ctx.subscriptionId ?? '?'}`,
+        );
+      }
+      return;
+    }
+
+    // O MESMO token da successUrl do checkout: createSignupToken é
+    // determinístico (HMAC do id do lead), então dá para recriá-lo aqui sem ter
+    // guardado nada. E ele continua NÃO sendo prova de pagamento — quem libera
+    // é a assinatura ativa mais o gate do banco. O e-mail só encurta o caminho.
+    const url = appUrl(`/cadastro?t=${encodeURIComponent(createSignupToken(decision.leadId))}`);
+
+    const emailId = await sendTemplateEmail({
+      to: decision.to,
+      templateId: ORPHAN_NOTICE_TEMPLATE,
+      variables: { CONFIRMATION_URL: url },
+      scheduledAt: noticeSendAt(),
+      // Segunda trava de idempotência, para duas entregas do Asaas em paralelo:
+      // a requisição repetida devolve o mesmo id em vez de agendar outro envio.
+      idempotencyKey: `orphan-notice:${decision.subscriptionId}`,
+    });
+
+    // null = chave ausente ou Resend fora do ar. Já foi logado alto em
+    // lib/resend.ts; aqui a única decisão é NÃO marcar a assinatura como
+    // avisada, para que uma reentrega do Asaas ainda tenha chance de agendar.
+    if (!emailId) return;
+
+    const { error } = await admin
+      .from('subscriptions')
+      .update({ orphan_notice_email_id: emailId, orphan_notice_at: new Date().toISOString() })
+      .eq('id', decision.subscriptionId);
+
+    // Agendou e não conseguiu anotar: o e-mail vai sair e não teremos como
+    // cancelá-lo. Precisa gritar — mas não desfaz nada, porque o pior caso é um
+    // e-mail a mais para alguém que já criou a conta, e o link dele cai em
+    // /cadastro, que responde 'account_exists' e manda para o login.
+    if (error) {
+      console.error(
+        `[asaas/webhook] orphan_notice_mark_failed subscription=${decision.subscriptionId}`,
+      );
+    }
+  } catch {
+    console.error('[asaas/webhook] orphan_notice_failed');
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ import { isPasswordLengthInvalid } from '@/lib/password-rules';
 import { getSubscription } from '../../../../lib/asaas/subscriptions';
 import { verifySignupToken } from '../../../../lib/signup-token';
 import { rateLimit, clientIp } from '../../../../lib/rate-limit';
+import { cancelScheduledEmail } from '../../../../lib/resend';
 
 export const runtime = 'nodejs';
 
@@ -110,7 +111,11 @@ const RESOLVE_RATE_PER_REF = 30;
  * que muda entre eles é o balde do rate limit (`step`).
  */
 async function gate(req: NextRequest, leadId: string, step: 'resolve' | 'commit'): Promise<
-  { deny: NextResponse; ok?: never } | { deny?: never; ok: { subscriptionId: string; email: string } }
+  | { deny: NextResponse; ok?: never }
+  | {
+      deny?: never;
+      ok: { subscriptionId: string; email: string; noticeEmailId: string | null };
+    }
 > {
   const admin = createAdminSupabaseClient();
 
@@ -157,7 +162,7 @@ async function gate(req: NextRequest, leadId: string, step: 'resolve' | 'commit'
   // vez de sumir da consulta e virar "não encontrei pagamento".
   const { data: rows } = await admin
     .from('subscriptions')
-    .select('id, email, status, user_id')
+    .select('id, email, status, user_id, orphan_notice_email_id')
     .eq('external_reference', leadId)
     .eq('payment_provider', 'asaas')
     .order('updated_at', { ascending: false })
@@ -242,7 +247,17 @@ async function gate(req: NextRequest, leadId: string, step: 'resolve' | 'commit'
   const email = (row.email as string | null)?.trim().toLowerCase();
   if (!email) return { deny: NextResponse.json(generic, { status: 403 }) };
 
-  return { ok: { subscriptionId: row.id as string, email } };
+  return {
+    ok: {
+      subscriptionId: row.id as string,
+      email,
+      // Aviso de pagamento órfão que o webhook agendou (ver
+      // lib/orphan-signup-notice.ts). Se esta pessoa terminar o cadastro, o
+      // commit cancela o envio — ela não pode receber "crie sua conta" logo
+      // depois de tê-la criado.
+      noticeEmailId: (row.orphan_notice_email_id as string | null) ?? null,
+    },
+  };
 }
 
 /**
@@ -338,7 +353,7 @@ export async function POST(req: NextRequest) {
   try {
     const gated = await gate(req, leadId, step);
     if (gated.deny) return gated.deny;
-    const { subscriptionId, email } = gated.ok;
+    const { subscriptionId, email, noticeEmailId } = gated.ok;
 
     // RESOLVE termina aqui. O formulário só queria saber de quem é a conta.
     if (password === undefined) return NextResponse.json({ ok: true, email });
@@ -412,6 +427,22 @@ export async function POST(req: NextRequest) {
       options: { emailRedirectTo: appUrl('/definir-senha') },
     });
     if (resent.error) return NextResponse.json(generic, { status: 403 });
+
+    // A pessoa CHEGOU. Cancela o aviso de pagamento órfão que o webhook havia
+    // agendado — ela acabou de escolher a senha e já recebeu a confirmação; um
+    // e-mail dizendo "clique para criar sua conta" minutos depois só confundiria.
+    //
+    // ÚLTIMO PASSO e BEST-EFFORT, de propósito: vem depois de tudo que pode
+    // recusar o cadastro (se o commit falhar, o aviso CONTINUA agendado, que é o
+    // certo — ela ainda não tem conta). E falhar aqui não pode virar 403: o
+    // cadastro já está feito, e o pior caso é um e-mail a mais cujo link cai em
+    // /cadastro, que responde 'account_exists' e manda para o login.
+    if (noticeEmailId) {
+      const canceled = await cancelScheduledEmail(noticeEmailId);
+      if (!canceled) {
+        console.error(`[asaas/signup-intent] orphan_notice_cancel_failed sub=${subscriptionId}`);
+      }
+    }
 
     return NextResponse.json({ ok: true, email });
   } catch {
