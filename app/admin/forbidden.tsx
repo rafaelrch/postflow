@@ -10,14 +10,13 @@ import Link from 'next/link';
  */
 export default function AdminForbidden() {
   return (
-    <section className="brand-card max-w-xl p-6 sm:p-8" data-testid="admin-403">
-      <p className="section-kicker">403 · acesso negado</p>
-      <h2 className="font-display mt-1 text-3xl leading-none">Esta conta não tem acesso</h2>
-      <hr className="hairline my-4" />
-      <p className="text-sm text-[var(--ink-2)]">
+    <section className="admin-state-card" data-testid="admin-403">
+      <p className="admin-state-code">403 · acesso negado</p>
+      <h2>Esta conta não tem acesso</h2>
+      <p>
         Você está autenticado, mas esta conta não pode ver o painel administrativo.
       </p>
-      <Link href="/dashboard" className="brand-btn mt-5 outline">
+      <Link href="/dashboard" className="admin-state-action admin-state-action--secondary">
         Voltar ao Creatools
       </Link>
     </section>

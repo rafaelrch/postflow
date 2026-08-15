@@ -11,9 +11,9 @@ export default function SplitBar({
   const total = parts.reduce((sum, part) => sum + part.value, 0);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="admin-split">
       <div
-        className="flex h-3 w-full overflow-hidden rounded-full border-[1.5px] border-[var(--ink)] bg-[var(--paper-3)]"
+        className="admin-split-track"
         role="img"
         aria-label={parts.map((part) => `${part.label}: ${part.value}`).join(', ')}
       >
@@ -26,13 +26,13 @@ export default function SplitBar({
             />
           ))}
       </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--ink-dim)]">
+      <ul>
         {parts.map((part) => (
-          <li key={part.label} className="flex items-center gap-1.5">
-            <span aria-hidden className={`h-2 w-2 rounded-full ${part.className}`} />
+          <li key={part.label}>
+            <span aria-hidden className={`admin-split-dot ${part.className}`} />
             <span>{part.label}</span>
-            <span className="font-mono text-[var(--ink)]">{part.value}</span>
-            <span className="font-mono">
+            <span className="admin-tabular">{part.value}</span>
+            <span className="admin-tabular">
               {total > 0 ? `(${Math.round((part.value / total) * 100)}%)` : '(—)'}
             </span>
           </li>

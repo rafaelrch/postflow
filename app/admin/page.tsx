@@ -22,19 +22,11 @@ export default async function AdminOverviewPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const admin = await requireAdminPage();
+  await requireAdminPage();
   const period = resolvePeriod(await searchParams);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="font-display text-3xl leading-none">Visão geral</h2>
-        <p className="mt-1 text-[11px] text-[var(--ink-dim)]">
-          Sessão de <span className="font-mono">{admin.email}</span> · valores em BRL, fuso de São
-          Paulo
-        </p>
-      </div>
-
+    <div className="admin-page">
       <OverviewShell period={period}>
         <OverviewMetrics period={period} />
       </OverviewShell>

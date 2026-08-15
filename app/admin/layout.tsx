@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import ThemeProvider from '@/components/ThemeProvider';
 import AdminTabs from '@/components/admin/AdminTabs';
-import AdminThemeToggle from '@/components/admin/AdminThemeToggle';
+import { requireAdminPage } from '@/lib/admin-page-guard';
+import './admin.css';
 
 /**
  * Moldura do painel administrativo.
@@ -11,9 +12,9 @@ import AdminThemeToggle from '@/components/admin/AdminThemeToggle';
  * é a navegação de QUEM USA o produto. Aqui a pessoa não cria carrossel nem
  * gasta crédito — ela olha o negócio. Reaproveitar a sidebar do cliente
  * significaria carregar estado de assinatura/créditos que o admin não usa e
- * misturar dois contextos que devem ficar separados até visualmente. Os
- * TOKENS e os componentes de marca (brand-card, chip, brand-btn) são
- * reaproveitados inteiros — o que não se reaproveita é a navegação.
+ * misturar dois contextos que devem ficar separados até visualmente. O admin
+ * usa tokens próprios em admin.css, todos sob `.admin-root`, para a linguagem
+ * de painel não alterar nenhuma superfície do produto.
  *
  * ── ESTE LAYOUT NÃO É O CONTROLE DE ACESSO ──────────────────────────────────
  * Ele é só cromo. A autorização mora em requireAdmin() dentro de CADA página e
@@ -29,25 +30,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // A guarda continua obrigatória em cada page. Aqui ela roda uma segunda vez
+  // apenas para entregar a identidade da sessão ao rodapé da navegação.
+  const admin = await requireAdminPage();
+
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-[var(--paper-2)] text-[var(--ink)]">
-        <header className="border-b-[1.5px] border-[var(--ink)] bg-[var(--paper)]">
-          <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-5 sm:px-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="section-kicker">Creatools · interno</p>
-                <h1 className="section-title">Painel administrativo</h1>
-              </div>
-              <AdminThemeToggle />
-            </div>
-
-            <AdminTabs />
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+      <div className="admin-root">
+        <AdminTabs email={admin.email} />
+        <main className="admin-main" data-testid="admin-conteudo">
+          {children}
+        </main>
       </div>
     </ThemeProvider>
   );

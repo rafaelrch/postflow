@@ -15,16 +15,16 @@ export default function RetryPanel({ message }: { message?: string }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="brand-card flex flex-col items-start gap-3 border-[var(--danger)] p-6" role="alert">
-      <p className="section-kicker text-[var(--danger)]">Falha ao carregar</p>
-      <p className="max-w-prose text-sm text-[var(--ink-2)]">
+    <div className="admin-retry-panel" role="alert">
+      <p>Falha ao carregar</p>
+      <p>
         {message ?? 'Não foi possível ler os números agora. Nada foi alterado — o painel só lê dados.'}
       </p>
       <button
         type="button"
         onClick={() => startTransition(() => router.refresh())}
         disabled={pending}
-        className="brand-btn sm primary"
+        className="admin-retry-button"
         data-testid="admin-tentar-de-novo"
       >
         {pending ? 'Tentando…' : 'Tentar de novo'}

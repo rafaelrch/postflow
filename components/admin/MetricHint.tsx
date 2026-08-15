@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { CircleHelp } from 'lucide-react';
 
 /**
  * A definição da métrica, atrás de um "?".
@@ -37,7 +38,7 @@ export default function MetricHint({ label, hint }: { label: string; hint: strin
   }, [open]);
 
   return (
-    <span ref={containerRef} className="relative flex shrink-0">
+    <span ref={containerRef} className="admin-hint-wrap">
       <button
         type="button"
         aria-expanded={open}
@@ -47,13 +48,9 @@ export default function MetricHint({ label, hint }: { label: string; hint: strin
         // mouseenter abre, o clique que vem logo depois fecha, e o "?" vira um
         // botão que não faz nada. É um disclosure, não um tooltip.
         onClick={() => setOpen((value) => !value)}
-        className={`font-mono flex h-5 w-5 items-center justify-center rounded-full border text-[10px] transition-colors ${
-          open
-            ? 'border-[var(--ink)] text-[var(--ink)]'
-            : 'border-[var(--line-strong)] text-[var(--ink-dim)]'
-        }`}
+        className="admin-hint-button"
       >
-        ?
+        <CircleHelp size={14} strokeWidth={1.65} aria-hidden />
       </button>
 
       {open && (
@@ -61,7 +58,7 @@ export default function MetricHint({ label, hint }: { label: string; hint: strin
           role="tooltip"
           id={hintId}
           data-testid="metric-hint"
-          className="absolute top-6 right-0 z-20 w-60 rounded-[var(--radius-sm)] border-[1.5px] border-[var(--ink)] bg-[var(--paper)] p-2.5 text-[11px] leading-snug text-[var(--ink-2)] shadow-[var(--sh-1)]"
+          className="admin-hint-tooltip"
         >
           {hint}
         </span>

@@ -15,26 +15,38 @@ export default function UnderConstruction({
   /** O que precisa existir antes desta aba poder mostrar número. */
   pending: string[];
 }) {
-  return (
-    <section className="brand-card max-w-3xl p-6 sm:p-8" data-testid="admin-em-construcao">
-      <p className="section-kicker">Em construção</p>
-      <h2 className="font-display mt-1 text-3xl leading-none">{title}</h2>
-      <hr className="hairline my-4" />
-      <p className="max-w-prose text-sm text-[var(--ink-2)]">{summary}</p>
+  const icons = { Clientes: Users, Financeiro: WalletCards, Produto: Box, Saúde: Activity } as const;
+  const Icon = icons[title as keyof typeof icons] ?? Clock3;
 
-      <p className="section-kicker mt-6">Falta para esta aba existir</p>
-      <ul className="mt-2 space-y-1.5">
+  return (
+    <div className="admin-page">
+      <header className="admin-topbar">
+        <div className="admin-section-title">
+          <span className="admin-section-icon"><Icon size={16} strokeWidth={1.8} /></span>
+          <div><h1>{title}</h1><p>Área interna</p></div>
+        </div>
+        <span className="admin-scope-badge admin-topbar-badge">Em breve</span>
+      </header>
+
+      <section className="admin-empty-state" data-testid="admin-em-construcao">
+        <span className="admin-empty-icon"><Clock3 size={18} strokeWidth={1.7} /></span>
+        <p className="admin-empty-eyebrow">Em construção</p>
+        <h2>{title}</h2>
+        <p className="admin-empty-summary">{summary}</p>
+
+        <p className="admin-empty-list-title">Falta para esta área existir</p>
+        <ul>
         {pending.map((item) => (
-          <li key={item} className="flex gap-2 text-sm text-[var(--ink-dim)]">
-            <span aria-hidden className="text-[var(--accent)]">—</span>
+          <li key={item}>
+            <span aria-hidden>—</span>
             <span>{item}</span>
           </li>
         ))}
-      </ul>
+        </ul>
 
-      <p className="mt-6 text-[11px] text-[var(--ink-muted)]">
-        Nenhum número é exibido aqui de propósito: número inventado é pior que aba vazia.
-      </p>
-    </section>
+        <p className="admin-empty-note">Nenhum número é exibido aqui de propósito: número inventado é pior que aba vazia.</p>
+      </section>
+    </div>
   );
 }
+import { Activity, Box, Clock3, Users, WalletCards } from 'lucide-react';

@@ -1,4 +1,5 @@
 import MetricHint from './MetricHint';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * Card de métrica do painel.
@@ -14,18 +15,6 @@ import MetricHint from './MetricHint';
 
 export type MetricTone = 'default' | 'accent' | 'warn';
 
-const TONE_RING: Record<MetricTone, string> = {
-  default: 'border-[var(--ink)]',
-  accent: 'border-[var(--accent)]',
-  warn: 'border-[var(--warn)]',
-};
-
-const TONE_VALUE: Record<MetricTone, string> = {
-  default: 'text-[var(--ink)]',
-  accent: 'text-[var(--accent)]',
-  warn: 'text-[var(--ink)]',
-};
-
 export interface MetricCardProps {
   label: string;
   value: string;
@@ -36,6 +25,8 @@ export interface MetricCardProps {
   /** Variação já formatada contra o período anterior, quando é honesta. */
   variation?: string | null;
   tone?: MetricTone;
+  icon: LucideIcon;
+  featured?: boolean;
   testId?: string;
 }
 
@@ -46,6 +37,8 @@ export default function MetricCard({
   detail,
   variation,
   tone = 'default',
+  icon: Icon,
+  featured = false,
   testId,
 }: MetricCardProps) {
   return (
@@ -54,21 +47,22 @@ export default function MetricCard({
       // A definição também fica no DOM como atributo: é o que permite o teste
       // afirmar "nenhum card sem contrato" sem depender de abrir cada "?".
       data-hint={hint}
-      className={`brand-card flex flex-col gap-2 p-4 sm:p-5 ${TONE_RING[tone]}`}
+      data-tone={tone}
+      data-featured={featured ? 'true' : 'false'}
+      className="admin-metric-card"
     >
-      <header className="flex items-start justify-between gap-2">
-        <h3 className="section-kicker leading-tight">{label}</h3>
+      <header>
+        <span className="admin-metric-icon"><Icon size={15} strokeWidth={1.75} aria-hidden /></span>
+        <h3>{label}</h3>
         <MetricHint label={label} hint={hint} />
       </header>
 
-      <p className={`font-mono text-3xl leading-none font-medium tabular-nums ${TONE_VALUE[tone]}`}>
-        {value}
-      </p>
+      <p className="admin-metric-value">{value}</p>
 
       {(detail || variation) && (
-        <footer className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--ink-dim)]">
-          {variation && <span className="font-mono text-[var(--ink-2)]">{variation}</span>}
-          {variation && detail && <span aria-hidden className="text-[var(--line-strong)]">·</span>}
+        <footer>
+          {variation && <span className={`admin-metric-variation ${variation.trim().startsWith('-') ? 'negative' : 'positive'}`}>{variation}</span>}
+          {variation && detail && <span aria-hidden>·</span>}
           {detail && <span>{detail}</span>}
         </footer>
       )}

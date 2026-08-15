@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { BarChart3, CalendarDays } from 'lucide-react';
 import { PERIOD_PRESETS, type ResolvedPeriod } from '@/lib/admin-period';
 import OverviewSkeleton from './OverviewSkeleton';
 
@@ -43,6 +44,7 @@ export default function OverviewShell({
 
   const [de, setDe] = useState(period.fromDate);
   const [ate, setAte] = useState(period.toDate);
+  const [showCustom, setShowCustom] = useState(period.key === 'custom');
 
   // O servidor pode corrigir o intervalo (data inválida cai em 30 dias).
   // Reespelha, para os inputs não mostrarem um recorte que não está na tela.
@@ -67,83 +69,58 @@ export default function OverviewShell({
   const invalidRange = Boolean(de && ate && de > ate);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admin-overview-shell">
       <section
         aria-label="Filtro de período"
         data-pending={pending ? 'true' : 'false'}
-        className="flex flex-col gap-3"
+        className="admin-topbar"
       >
-        {/* Dois grupos, não uma fila só: no celular a linha quebra ENTRE os
-            presets e o intervalo custom, em vez de deixar "Últimos 90 dias"
-            grudado no campo "De". */}
-        <div className="flex flex-wrap items-center gap-2">
-          {PERIOD_PRESETS.map((preset) => (
+        <div className="admin-section-title">
+          <span className="admin-section-icon"><BarChart3 size={16} strokeWidth={1.8} /></span>
+          <div>
+            <h1>Visão geral</h1>
+            <p>Valores em BRL · fuso de São Paulo</p>
+          </div>
+        </div>
+
+        <div className="admin-period-wrap">
+          <div className="admin-segmented" aria-label="Período da aquisição">
+            {PERIOD_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => selectPreset(preset.key)}
+                aria-label={preset.label}
+                aria-pressed={period.key === preset.key}
+                data-testid={`periodo-${preset.key}`}
+              >
+                {preset.key === 'hoje' ? 'Hoje' : preset.key.replace('d', ' dias')}
+              </button>
+            ))}
             <button
-              key={preset.key}
               type="button"
-              onClick={() => selectPreset(preset.key)}
-              aria-pressed={period.key === preset.key}
-              data-testid={`periodo-${preset.key}`}
-              className={`brand-btn sm ${period.key === preset.key ? 'primary' : 'outline'}`}
+              aria-label="Período personalizado"
+              aria-pressed={period.key === 'custom'}
+              onClick={() => setShowCustom((value) => !value)}
             >
-              {preset.label}
+              <CalendarDays size={14} strokeWidth={1.8} />
             </button>
-          ))}
-
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="section-kicker" htmlFor="periodo-de">
-            De
-          </label>
-          <input
-            id="periodo-de"
-            type="date"
-            value={de}
-            max={ate || undefined}
-            onChange={(event) => setDe(event.target.value)}
-            // width inline e não classe: `.brand-input` declara width:100% fora
-            // de @layer, e CSS sem camada vence as utilities do Tailwind (que
-            // ficam em layer) — a data esticava na linha inteira.
-            style={{ width: '9.5rem' }}
-            className="brand-input font-mono py-1.5 text-[12px]"
-          />
-          <label className="section-kicker" htmlFor="periodo-ate">
-            Até
-          </label>
-          <input
-            id="periodo-ate"
-            type="date"
-            value={ate}
-            min={de || undefined}
-            onChange={(event) => setAte(event.target.value)}
-            style={{ width: '9.5rem' }}
-            className="brand-input font-mono py-1.5 text-[12px]"
-          />
-          <button
-            type="button"
-            onClick={applyCustom}
-            disabled={invalidRange}
-            data-testid="periodo-custom-aplicar"
-            className={`brand-btn sm ${period.key === 'custom' ? 'primary' : 'outline'}`}
-          >
-            Aplicar
-          </button>
-        </div>
+        {showCustom && (
+          <div className="admin-custom-period">
+            <label htmlFor="periodo-de">De</label>
+            <input id="periodo-de" type="date" value={de} max={ate || undefined} onChange={(event) => setDe(event.target.value)} />
+            <label htmlFor="periodo-ate">Até</label>
+            <input id="periodo-ate" type="date" value={ate} min={de || undefined} onChange={(event) => setAte(event.target.value)} />
+            <button type="button" onClick={applyCustom} disabled={invalidRange} data-testid="periodo-custom-aplicar">Aplicar</button>
+          </div>
+        )}
 
-        {invalidRange && (
-          <p className="text-[11px] text-[var(--danger)]">
-            A data inicial precisa ser anterior à final.
-          </p>
-        )}
-        {period.customInvalid && (
-          <p className="text-[11px] text-[var(--warn)]">
-            O intervalo pedido na URL era inválido. Mostrando os últimos 30 dias.
-          </p>
-        )}
+        {invalidRange && <p className="admin-filter-message admin-filter-message--danger">A data inicial precisa ser anterior à final.</p>}
+        {period.customInvalid && <p className="admin-filter-message">O intervalo pedido era inválido. Mostrando os últimos 30 dias.</p>}
       </section>
-
-      <hr className="hairline soft" />
 
       {pending ? <OverviewSkeleton /> : children}
     </div>

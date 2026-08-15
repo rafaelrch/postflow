@@ -7,13 +7,11 @@ export default function OverviewSkeleton({ cards = 8 }: { cards?: number }) {
     <div
       aria-hidden
       data-testid="admin-skeleton"
-      className="grid animate-pulse grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      className="admin-metrics-grid admin-skeleton"
     >
       {Array.from({ length: cards }).map((_, index) => (
-        <div key={index} className="brand-card flex flex-col gap-3 border-[var(--line-strong)] p-5">
-          <div className="h-2.5 w-24 rounded-full bg-[var(--paper-3)]" />
-          <div className="h-7 w-20 rounded-[var(--radius-sm)] bg-[var(--paper-3)]" />
-          <div className="h-2 w-32 rounded-full bg-[var(--paper-3)]" />
+        <div key={index} className="admin-metric-card">
+          <div /><div /><div />
         </div>
       ))}
     </div>
