@@ -23,10 +23,26 @@ export interface HealthAlert {
   rows: HealthAlertRow[];
 }
 
+/**
+ * Qual FUNÇÃO do banco responde cada regra.
+ *
+ * As dez originais vivem em `admin_health_check`. A regra de cancelamento
+ * nasceu numa função própria (`admin_health_cancellation_check`) para não
+ * exigir um `create or replace` das outras dez — e, principalmente, para que a
+ * janela entre o deploy do código e a aplicação da migration derrube só o card
+ * novo, e não a aba inteira. Ver 20260815e_cancellation_not_reflected_check.sql.
+ */
+const RPC_PADRAO = 'admin_health_check';
+
 export const HEALTH_CHECKS = [
   { key: 'unconfirmed_subscription', title: 'Assinatura ativa sem pagamento confirmado', severity: 'high', description: 'Ativa há mais de 10 minutos, sem PAYMENT_CONFIRMED e sem transação confirmada.', suggestedAction: 'Conferir a cobrança e o histórico do webhook antes de decidir qualquer acesso.' },
   { key: 'confirmed_unprocessed', title: 'Pagamento confirmado não processado', severity: 'critical', description: 'PAYMENT_CONFIRMED chegou, mas processed_at continua vazio.', suggestedAction: 'Investigar o erro do webhook e reconciliar manualmente o evento.' },
-  { key: 'stale_webhook', title: 'Webhook parado há mais de 5 minutos', severity: 'high', description: 'Evento recebido e ainda não concluído após a janela operacional.', suggestedAction: 'Verificar logs, dependências e a fila do Asaas.' },
+  { key: 'stale_webhook', title: 'Webhook parado há mais de 5 minutos', severity: 'high', description: 'Evento recebido e ainda não concluído após a janela operacional.', suggestedAction: 'Verificar logs, dependências e a fila do Asaas. Se for evento de assinatura, "Reconciliar eventos pendentes" resolve sem tocar em acesso.' },
+  // Problema DIFERENTE de stale_webhook, e por isso alerta separado: lá o
+  // evento não processou; aqui o estado local diverge do Asaas — é este que
+  // infla o MRR e mantém acesso depois do período pago. Um pode acontecer sem
+  // o outro.
+  { key: 'cancellation_not_reflected', rpc: 'admin_health_cancellation_check', title: 'Cancelamento do Asaas não refletido', severity: 'high', description: 'O Asaas sinalizou cancelamento e a assinatura continua ativa e renovando aqui.', suggestedAction: 'Rodar "Reconciliar eventos pendentes". O que sobrar é decisão sua: o painel não revoga acesso de ninguém.' },
   { key: 'paid_without_account', title: 'Pagamento sem conta vinculada', severity: 'high', description: 'Pagamento confirmado há mais de 30 minutos e assinatura ainda sem user_id.', suggestedAction: 'Confirmar se o aviso de cadastro foi entregue e contatar o cliente se necessário.' },
   { key: 'missing_period_end', title: 'Assinatura ativa sem fim do período', severity: 'medium', description: 'A renovação não entra na previsão de caixa porque current_period_end está vazio.', suggestedAction: 'Conferir a assinatura no Asaas e reconciliar a data.' },
   { key: 'payment_problem', title: 'Pagamento exige atenção', severity: 'high', description: 'Inadimplência, falha, reembolso ou chargeback registrado.', suggestedAction: 'Revisar a cobrança e decidir o contato ou tratamento adequado.' },
@@ -79,7 +95,7 @@ async function loadCheck(
   now: Date,
 ): Promise<HealthCheckResult> {
   try {
-    const { data, error } = await admin.rpc('admin_health_check', {
+    const { data, error } = await admin.rpc(('rpc' in definition ? definition.rpc : RPC_PADRAO), {
       p_check_key: definition.key,
       p_now: now.toISOString(),
       p_limit: 20,
