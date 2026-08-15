@@ -108,6 +108,33 @@ export async function requireAdmin(): Promise<AdminAccess> {
 }
 
 /**
+ * Versão que NÃO interrompe: só responde "esta sessão veria o painel?".
+ *
+ * Existe para a CONVENIÊNCIA de mostrar/esconder o atalho para /admin na
+ * navegação do produto — e não para autorizar nada. A fonte da verdade continua
+ * sendo `decideAdminAccess`: aqui não há regra nova, só o mesmo `requireAdmin`
+ * reduzido a um booleano.
+ *
+ * ⚠️ ESCONDER LINK NÃO É CONTROLE DE ACESSO. Quem protege /admin é
+ * `requireAdminPage()` em cada página e `requireAdmin()` em cada route handler,
+ * no servidor. Digitar a URL na barra de endereços continua batendo em 403 para
+ * quem não está na allowlist, com atalho visível ou não.
+ *
+ * Nunca lança: um erro ao montar o client do Supabase (env faltando, cookie
+ * ilegível) derrubaria a shell inteira do produto por causa de um item de menu.
+ * Falha fecha — sem certeza, o atalho não aparece.
+ */
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  try {
+    const access = await requireAdmin();
+    return access.ok;
+  } catch {
+    console.error('[admin-auth] is_current_user_admin_failed');
+    return false;
+  }
+}
+
+/**
  * Resposta padrão das rotas administrativas negadas.
  *
  * O corpo NÃO diz qual das condições falhou: para quem está do lado de fora,

@@ -1,33 +1,20 @@
-'use client';
+import AppShell from '@/components/AppShell';
+import { isCurrentUserAdmin } from '@/lib/admin-auth';
 
-import { Toaster } from 'react-hot-toast';
-import ThemeProvider from '@/components/ThemeProvider';
-import AppSidebar from '@/components/ui/AppSidebar';
-import AuthProvider from '@/components/AuthProvider';
-import CreditsExhaustedModal from '@/components/ui/CreditsExhaustedModal';
+/**
+ * Shell do produto. Server Component por UM motivo: decidir se esta sessão vê o
+ * atalho para /admin sem que a regra viaje para o navegador.
+ *
+ * `ADMIN_EMAILS` é env de servidor (nunca NEXT_PUBLIC_). A decisão roda aqui,
+ * reusando `decideAdminAccess` via `isCurrentUserAdmin()`, e o que desce para o
+ * cliente é um booleano — nem a lista, nem o e-mail que casou com ela.
+ *
+ * ⚠️ E o booleano NÃO é controle de acesso: ele decide um item de menu. /admin
+ * é protegido no servidor, em cada página e cada route handler. Ver
+ * lib/admin-auth.ts.
+ */
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const isAdmin = await isCurrentUserAdmin();
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-        <div className="flex h-screen overflow-hidden bg-[var(--background)]">
-          <AppSidebar />
-          <main className="flex-1 flex flex-col overflow-hidden">
-            {children}
-          </main>
-        </div>
-        <CreditsExhaustedModal />
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: 'var(--surface-elevated)',
-              color: 'var(--foreground)',
-              border: '1px solid var(--border)',
-            },
-          }}
-        />
-      </ThemeProvider>
-    </AuthProvider>
-  );
+  return <AppShell isAdmin={isAdmin}>{children}</AppShell>;
 }
