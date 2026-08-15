@@ -1,18 +1,20 @@
 import { requireAdminPage } from '@/lib/admin-page-guard';
-import UnderConstruction from '@/components/admin/UnderConstruction';
+import { createAdminSupabaseClient } from '@/lib/supabase-admin';
+import { loadAdminHealth } from '@/lib/admin-health';
+import { Activity } from 'lucide-react';
+import HealthDashboard from './HealthDashboard';
 
 export default async function AdminSaudePage() {
   await requireAdminPage();
+  const checks = await loadAdminHealth(createAdminSupabaseClient());
 
   return (
-    <UnderConstruction
-      title="Saúde"
-      summary="Webhook parado, assinatura ativa sem current_period_end, intent de cadastro expirado e cobrança em atraso já existem no banco e viram alerta numa fatia própria. Ficam de fora daqui porque alerta operacional precisa de regra de severidade e de ação sugerida — um número solto na Visão geral não ajuda a consertar nada."
-      pending={[
-        'Regras de severidade: a partir de quanto tempo um webhook sem processed_at é incidente.',
-        'Ação ao lado de cada alerta (reprocessar, conferir no Asaas, contatar o cliente).',
-        'Falhas de geração de IA, que hoje só existem no log e não em fonte consultável.',
-      ]}
-    />
+    <div className="admin-page">
+      <header className="admin-topbar">
+        <div className="admin-section-title"><span className="admin-section-icon"><Activity size={16} /></span><div><h1>Saúde</h1><p>Alertas e inconsistências acionáveis</p></div></div>
+        <span className="admin-scope-badge admin-topbar-badge">Somente leitura</span>
+      </header>
+      <HealthDashboard checks={checks} />
+    </div>
   );
 }
