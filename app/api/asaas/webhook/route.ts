@@ -220,7 +220,7 @@ async function processEvent(admin: Admin, ctx: ReturnType<typeof extractContext>
     // Uma string literal só, sem concatenar: o PostgREST infere o tipo da linha
     // a partir DESTE literal, e quebrá-lo em pedaços faz `current` virar
     // GenericStringError (o tsc acusa em current?.email).
-    .select('id, status, plan_interval, external_reference, current_period_end, user_id, email, orphan_notice_email_id')
+    .select('id, status, plan_interval, external_reference, current_period_end, user_id, email, orphan_notice_email_id, payment_confirmation_required, payment_confirmed_at')
     .eq('id', ctx.subscriptionId)
     .maybeSingle();
 

@@ -162,7 +162,7 @@ async function gate(req: NextRequest, leadId: string, step: 'resolve' | 'commit'
   // vez de sumir da consulta e virar "não encontrei pagamento".
   const { data: rows } = await admin
     .from('subscriptions')
-    .select('id, email, status, user_id, orphan_notice_email_id')
+    .select('id, email, status, user_id, orphan_notice_email_id, payment_confirmation_required, payment_confirmed_at')
     .eq('external_reference', leadId)
     .eq('payment_provider', 'asaas')
     .order('updated_at', { ascending: false })
@@ -231,7 +231,16 @@ async function gate(req: NextRequest, leadId: string, step: 'resolve' | 'commit'
 
   // (b) Existe e é desta pessoa, mas o webhook ainda não confirmou. AQUI
   // "tente de novo em instantes" é verdade: esperar resolve mesmo.
-  const row = unclaimed.find((r) => r.status === 'active');
+  const row = unclaimed.find(
+    (r) =>
+      r.status === 'active' &&
+      // Linhas anteriores à migration são explicitamente grandfathered
+      // (required=false) e nunca perdem acesso. Nas novas, só o instante
+      // gravado por PAYMENT_CONFIRMED abre o cadastro. provider_payment_id e
+      // status ACTIVE não provam pagamento: SUBSCRIPTION_CREATED pode trazer o
+      // segundo e outros eventos de cobrança podem trazer o primeiro.
+      (r.payment_confirmation_required === false || Boolean(r.payment_confirmed_at)),
+  );
   if (!row?.id) {
     return {
       deny: NextResponse.json({ pending: true, code: SIGNUP_INTENT_CODES.pending }, { status: 202 }),

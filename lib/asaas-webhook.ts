@@ -391,6 +391,22 @@ export interface CurrentSubscription {
   user_id?: string | null;
 }
 
+/**
+ * Prova monotônica de que o primeiro pagamento foi confirmado.
+ *
+ * `provider_payment_id` não serve: outros eventos de cobrança também o trazem.
+ * `status='active'` também não serve: SUBSCRIPTION_CREATED com status ACTIVE é
+ * configuração da recorrência, não pagamento. Só a ação `grant`, mapeada
+ * exclusivamente de PAYMENT_CONFIRMED, grava este instante; eventos atrasados
+ * ou duplicados nunca o apagam.
+ */
+export function paymentConfirmationFor(
+  action: WebhookAction,
+  now: Date = new Date(),
+): string | null {
+  return action === 'grant' ? now.toISOString() : null;
+}
+
 export type SubscriptionPatch = Record<string, unknown>;
 
 /**
@@ -435,6 +451,8 @@ export function buildSubscriptionPatch(
 
   if (ctx.customerId) patch.provider_customer_id = ctx.customerId;
   if (ctx.paymentId) patch.provider_payment_id = ctx.paymentId;
+  const paymentConfirmedAt = paymentConfirmationFor(ctx.action, now);
+  if (paymentConfirmedAt) patch.payment_confirmed_at = paymentConfirmedAt;
   if (ctx.value !== null) patch.value = ctx.value;
   if (ctx.billingType) patch.billing_type = ctx.billingType;
   if (ctx.cycle) patch.cycle = ctx.cycle;

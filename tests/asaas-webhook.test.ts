@@ -3,6 +3,7 @@ import {
   actionFor,
   allowanceFor,
   buildSubscriptionPatch,
+  paymentConfirmationFor,
   extractContext,
   intervalFor,
   statusForAction,
@@ -289,7 +290,56 @@ describe('buildSubscriptionPatch', () => {
       value: 59.5,
       cancel_at_period_end: false,
       canceled_at: null,
+      payment_confirmed_at: AGORA.toISOString(),
     });
+  });
+
+  it('só PAYMENT_CONFIRMED grava a prova; eventos de assinatura e cobrança não a inventam', () => {
+    expect(paymentConfirmationFor('grant', AGORA)).toBe(AGORA.toISOString());
+    for (const action of ['sync', 'confirm_receipt', 'past_due', 'payment_failed', 'revoke'] as const) {
+      expect(paymentConfirmationFor(action, AGORA)).toBeNull();
+    }
+
+    const created = buildSubscriptionPatch(
+      extractContext(subscriptionEvent('SUBSCRIPTION_CREATED')),
+      null,
+      AGORA,
+    );
+    expect(created).not.toHaveProperty('payment_confirmed_at');
+  });
+
+  it('é independente da ordem: pagamento primeiro grava prova e assinatura posterior não a apaga', () => {
+    const confirmed = buildSubscriptionPatch(
+      extractContext(paymentEvent('PAYMENT_CONFIRMED')),
+      null,
+      AGORA,
+    );
+    const subscriptionLater = buildSubscriptionPatch(
+      extractContext(subscriptionEvent('SUBSCRIPTION_CREATED')),
+      { status: 'active' },
+      new Date('2026-08-15T12:00:05.000Z'),
+    );
+
+    expect(confirmed.payment_confirmed_at).toBe(AGORA.toISOString());
+    // O upsert parcial não recebe null: preserva a prova já gravada.
+    expect(subscriptionLater).not.toHaveProperty('payment_confirmed_at');
+  });
+
+  it('sequência normal: assinatura espera e PAYMENT_CONFIRMED posterior grava a prova', () => {
+    const created = buildSubscriptionPatch(
+      extractContext(subscriptionEvent('SUBSCRIPTION_CREATED')),
+      null,
+      AGORA,
+    );
+    const confirmed = buildSubscriptionPatch(
+      extractContext(paymentEvent('PAYMENT_CONFIRMED')),
+      { status: created.status as string },
+      new Date('2026-08-15T12:05:00.000Z'),
+    );
+
+    expect(created).not.toHaveProperty('payment_confirmed_at');
+    expect(confirmed.payment_confirmed_at).toBe('2026-08-15T12:05:00.000Z');
+    expect(confirmed.status).toBe('active');
   });
 
   it('PAYMENT_RECEIVED NÃO altera status', () => {

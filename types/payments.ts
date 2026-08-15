@@ -64,6 +64,10 @@ export interface SubscriptionRow {
   provider_subscription_id: string | null;
   /** Última cobrança conhecida. */
   provider_payment_id: string | null;
+  /** false somente para linhas anteriores ao corte P1, preservadas sem revogação. */
+  payment_confirmation_required: boolean;
+  /** Prova monotônica gravada exclusivamente por PAYMENT_CONFIRMED. */
+  payment_confirmed_at: string | null;
   /** externalReference do Asaas: o id do lead que originou a compra. */
   external_reference: string | null;
   status: SubscriptionStatus;

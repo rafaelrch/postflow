@@ -219,10 +219,28 @@ describe('POST /api/asaas/webhook — efeitos no banco', () => {
       status: 'active',
       provider_customer_id: 'cus_1',
       provider_payment_id: 'pay_1',
+      payment_confirmed_at: expect.any(String),
     });
     // Pagamento-primeiro: a conta ainda não existe, então o webhook NÃO
     // inventa dono. Não escrever a coluna preserva o NULL do banco.
     expect(row.user_id).toBeUndefined();
+  });
+
+  it('SUBSCRIPTION_CREATED sozinho não grava prova de pagamento e continua 2xx', async () => {
+    const res = await POST(
+      webhookRequest({
+        id: 'evt_sub_created',
+        event: 'SUBSCRIPTION_CREATED',
+        subscription: {
+          id: 'sub_1', customer: 'cus_1', status: 'ACTIVE', cycle: 'MONTHLY',
+          checkoutSession: SESSION,
+        },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(upsertedRow().status).toBe('active');
+    expect(upsertedRow()).not.toHaveProperty('payment_confirmed_at');
   });
 
   it('usa o e-mail do CUSTOMER do Asaas, não o que estava gravado do lead', async () => {
