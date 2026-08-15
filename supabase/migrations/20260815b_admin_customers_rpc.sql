@@ -7,18 +7,18 @@
 -- de requireAdminPage(). Nenhuma tabela/view nova é exposta.
 
 create schema if not exists extensions;
+-- pg_trgm e uma extensao pre-configurada no Supabase e pode ser habilitada
+-- pelo papel postgres usado no SQL Editor. Ela so atende os indices das
+-- tabelas public abaixo; nao tentamos alterar objetos gerenciados pelo Auth.
 create extension if not exists pg_trgm with schema extensions;
 
--- Trigramas mantêm busca por fragmento/domínio indexável. Um índice btree de
--- prefixo faria o e-mail colado funcionar, mas esconderia resultados como
--- "@empresa.com" — perigoso numa tela de suporte.
-create index if not exists idx_auth_users_admin_email_trgm
-  on auth.users using gin (lower(email) extensions.gin_trgm_ops)
-  where deleted_at is null;
-
-create index if not exists idx_auth_users_admin_created
-  on auth.users (created_at desc, id)
-  where deleted_at is null;
+-- auth.users pertence a supabase_auth_admin nos projetos hospedados. Nem o
+-- papel postgres do SQL Editor deve criar indices nela. Por isso a busca por
+-- fragmento de e-mail das contas faz sequential scan em auth.users. Isso e
+-- aceitavel no volume atual; a partir de aproximadamente 10 mil contas,
+-- acompanhe com EXPLAIN (ANALYZE, BUFFERS). Se ficar lento, espelhe id/e-mail
+-- normalizado em uma tabela public mantida por trigger/backfill e crie o GIN
+-- trgm nessa copia. Nao tente indexar diretamente a tabela gerenciada do Auth.
 
 create index if not exists idx_profiles_admin_name_trgm
   on public.profiles using gin (lower(name) extensions.gin_trgm_ops);
@@ -36,6 +36,19 @@ create index if not exists idx_subscriptions_admin_user_recent
 create index if not exists idx_subscriptions_admin_orphan_recent
   on public.subscriptions (updated_at desc, id)
   where user_id is null;
+
+-- O SQL Editor hospedado executa como postgres, e SECURITY DEFINER conserva
+-- os privilegios do criador. Falhamos durante a migration (nao em runtime) se
+-- esse papel algum dia deixar de poder consultar auth.users.
+do $$
+begin
+  if not has_table_privilege(current_user, 'auth.users', 'select') then
+    raise exception
+      'admin_list_customers requer SELECT em auth.users para o owner %',
+      current_user;
+  end if;
+end
+$$;
 
 create or replace function public.admin_list_customers(
   p_search text default null,

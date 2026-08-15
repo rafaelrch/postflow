@@ -63,6 +63,11 @@ beforeAll(async () => {
 afterAll(async () => db?.close?.());
 
 describe('admin_list_customers — SQL real', () => {
+  it('nao tenta criar indices na tabela auth.users gerenciada pelo Supabase', () => {
+    expect(migration).not.toMatch(/create\s+index[\s\S]*?on\s+auth\.users/i);
+    expect(migration).toContain("has_table_privilege(current_user, 'auth.users', 'select')");
+  });
+
   it('busca o e-mail de quem pagou e ainda não tem conta', async () => {
     const result = await list('orfa@example.com');
     expect(result.total).toBe(1);
