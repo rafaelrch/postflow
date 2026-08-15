@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import type { ScheduledPost } from './page';
 import CarouselPreview from '@/components/editor/CarouselPreview';
+import { trackProductEvent } from '@/lib/product-events';
 
 /* ─── Types ───────────────────────────────────────────── */
 
@@ -163,6 +164,7 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
           return;
         }
         setPosts((prev) => [...prev, data as ScheduledPost]);
+        trackProductEvent('schedule_created', { schedule_type: input.kind });
         toast.success('Agendado');
       }
       setEditor(null);

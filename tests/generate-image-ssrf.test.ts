@@ -14,6 +14,8 @@ const {
   mockToFile,
   mockUpload,
   mockGetPublicUrl,
+  mockRecordAiGeneration,
+  mockAfter,
 } = vi.hoisted(() => ({
   mockLookup: vi.fn(),
   mockHttpsRequest: vi.fn(),
@@ -25,6 +27,13 @@ const {
   mockToFile: vi.fn(),
   mockUpload: vi.fn(),
   mockGetPublicUrl: vi.fn(),
+  mockRecordAiGeneration: vi.fn(),
+  mockAfter: vi.fn((task: () => Promise<void>) => { void task().catch(() => undefined); }),
+}));
+
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: mockAfter,
 }));
 
 vi.mock('node:dns/promises', () => ({ lookup: mockLookup }));
@@ -37,6 +46,10 @@ vi.mock('@/lib/openai', () => ({
 vi.mock('@/lib/subscription', () => ({
   requireCredits: mockRequireCredits,
   refundCredits: mockRefundCredits,
+}));
+vi.mock('@/lib/product-events', () => ({
+  normalizeGenerationError: () => 'generation_failed',
+  recordAiGenerationBestEffort: mockRecordAiGeneration,
 }));
 // Usuário autorizado (pro): o foco destes testes é a barreira anti-SSRF e o
 // estorno de créditos, não o split de plano (coberto nos testes de entitlement).
@@ -357,7 +370,11 @@ describe('barreira e estorno de créditos', () => {
     expect((await POST(request(validUrl))).status).toBe(500);
     expect(mockRequireCredits).toHaveBeenCalledTimes(1);
     expect(mockRefundCredits).toHaveBeenCalledTimes(1);
-    expect(mockRefundCredits).toHaveBeenCalledWith(userId, expect.any(Number));
+    expect(mockRefundCredits).toHaveBeenCalledWith(
+      userId,
+      expect.any(Number),
+      expect.objectContaining({ feature: 'image', operationId: expect.any(String) }),
+    );
     expect(mockEdit).not.toHaveBeenCalled();
   });
 
@@ -365,6 +382,14 @@ describe('barreira e estorno de créditos', () => {
     expect((await POST(request(validUrl))).status).toBe(200);
     expect(mockRequireCredits).toHaveBeenCalledTimes(1);
     expect(mockEdit).toHaveBeenCalledTimes(1);
+    expect(mockRefundCredits).not.toHaveBeenCalled();
+  });
+
+  it('falha da instrumentação não bloqueia a geração nem provoca estorno', async () => {
+    mockRecordAiGeneration.mockRejectedValueOnce(new Error('telemetria indisponível'));
+    const response = await POST(request(validUrl));
+    expect(response.status).toBe(200);
+    expect(mockAfter).toHaveBeenCalledTimes(1);
     expect(mockRefundCredits).not.toHaveBeenCalled();
   });
 });
