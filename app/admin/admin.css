@@ -627,6 +627,36 @@ html.dark .admin-root {
 .admin-health-failure strong { color: var(--admin-text); font-size: 11px; }
 .admin-health-failure p { margin: 3px 0 0; color: var(--admin-text-secondary); font-size: 9.5px; }
 
+/* Produto — séries compactas e listas sem expor conteúdo dos clientes. */
+.admin-product-sections { display: flex; min-width: 0; flex-direction: column; padding: 18px 28px 32px; gap: 28px; }
+.admin-collection-note { margin: 0; padding: 10px 12px; color: var(--admin-text-secondary); background: var(--admin-accent-soft); border: 1px solid color-mix(in srgb, var(--admin-accent) 18%, var(--admin-border)); border-radius: 8px; font-size: 10px; line-height: 1.4; }
+.admin-product-grid { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-product-panel { min-width: 0; padding: 15px; overflow: hidden; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 10px; }
+.admin-product-panel > h3 { margin: 0; color: var(--admin-text); font-size: 11px; font-weight: 600; }
+.admin-product-list { display: flex; margin-top: 9px; flex-direction: column; }
+.admin-product-list > div { display: flex; min-width: 0; min-height: 39px; align-items: center; justify-content: space-between; padding: 6px 0; gap: 12px; border-bottom: 1px solid var(--admin-border); }
+.admin-product-list > div:last-child { border-bottom: 0; }
+.admin-product-list span { min-width: 0; }
+.admin-product-list strong, .admin-product-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-product-list strong { color: var(--admin-text-secondary); font-size: 10px; font-weight: 600; }
+.admin-product-list small { margin-top: 2px; color: var(--admin-text-muted); font-size: 8.5px; }
+.admin-product-list b { flex: 0 0 auto; color: var(--admin-text); font-size: 11px; font-variant-numeric: tabular-nums; }
+.admin-product-series { display: flex; margin-top: 12px; flex-direction: column; gap: 7px; }
+.admin-product-series > div { display: grid; grid-template-columns: 42px minmax(0, 1fr) 32px; align-items: center; gap: 8px; }
+.admin-product-series time, .admin-product-series b { color: var(--admin-text-muted); font-size: 8.5px; font-variant-numeric: tabular-nums; }
+.admin-product-series b { color: var(--admin-text-secondary); text-align: right; }
+.admin-product-series span { height: 5px; overflow: hidden; background: var(--admin-surface-soft); border-radius: 999px; }
+.admin-product-series i { display: block; height: 100%; background: var(--admin-accent); border-radius: inherit; }
+.admin-product-empty { margin: 12px 0 0; color: var(--admin-text-muted); font-size: 10px; }
+.admin-product-big { display: block; margin-top: 16px; color: var(--admin-text); font-size: 28px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.admin-product-disabled { color: var(--admin-text-muted); background: var(--admin-surface-soft); }
+.admin-product-disabled p { margin: 8px 0 0; font-size: 10px; line-height: 1.45; }
+.admin-product-failure { display: flex; min-width: 0; align-items: flex-start; padding: 15px; gap: 10px; color: var(--admin-warning); background: var(--admin-warning-soft); border: 1px solid color-mix(in srgb, var(--admin-warning) 30%, var(--admin-border)); border-radius: 10px; }
+.admin-product-failure > div { min-width: 0; flex: 1; }
+.admin-product-failure strong { color: var(--admin-text); font-size: 11px; }
+.admin-product-failure p { margin: 3px 0 0; color: var(--admin-text-secondary); font-size: 9.5px; }
+.admin-product-loading { margin: 18px 28px; padding: 24px; color: var(--admin-text-muted); background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 10px; font-size: 11px; }
+
 .admin-root :focus-visible { outline: 2px solid color-mix(in srgb, var(--admin-accent) 70%, transparent); outline-offset: 2px; }
 
 @media (max-width: 1180px) and (min-width: 1024px) {
@@ -719,6 +749,9 @@ html.dark .admin-root {
   .admin-health-summary { flex-wrap: wrap; }
   .admin-health-summary dl { width: 100%; margin-left: 0; justify-content: flex-start; }
   .admin-health-summary dl div { align-items: flex-start; }
+  .admin-product-sections { padding: 16px; gap: 24px; }
+  .admin-product-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-product-loading { margin: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

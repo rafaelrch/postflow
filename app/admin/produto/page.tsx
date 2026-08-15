@@ -1,18 +1,17 @@
 import { requireAdminPage } from '@/lib/admin-page-guard';
-import UnderConstruction from '@/components/admin/UnderConstruction';
+import { createAdminSupabaseClient } from '@/lib/supabase-admin';
+import { resolvePeriod } from '@/lib/admin-period';
+import { loadAdminProduct } from '@/lib/admin-product';
+import ProductShell from '@/components/admin/ProductShell';
+import ProductDashboard from './ProductDashboard';
 
-export default async function AdminProdutoPage() {
+export default async function AdminProdutoPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireAdminPage();
-
-  return (
-    <UnderConstruction
-      title="Produto"
-      summary="Uso de feature, exportações, criação por IA × manual e retenção não são mensuráveis hoje: o produto não registra evento nenhum. Contar linhas de carousels ou news_entries mediria “conteúdo que ainda existe”, não uso — registros apagados somem do histórico, e exportação acontece no navegador sem deixar rastro."
-      pending={[
-        'Tabela append-only de eventos de produto (usuário, evento, feature, timestamp), sem conteúdo gerado.',
-        'Marcar a data de início da coleta, para o painel não fingir histórico anterior a ela.',
-        'Ledger de créditos, para saber o consumo por feature em vez do saldo atual.',
-      ]}
-    />
-  );
+  const period = resolvePeriod(await searchParams);
+  const data = await loadAdminProduct(createAdminSupabaseClient(), period);
+  return <div className="admin-page"><ProductShell period={period}><ProductDashboard data={data} period={period} /></ProductShell></div>;
 }
