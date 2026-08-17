@@ -1089,7 +1089,7 @@ function Pricing() {
   // menores que os das outras seções. No mobile pode rolar à vontade, então os
   // valores base ficam confortáveis e só o md: aperta.
   return (
-    <section id="planos" className="py-12 md:py-6 px-6 bg-white">
+    <section id="planos" className="py-12 md:py-4 px-6 bg-white">
       <div className="max-w-5xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge soft">Comece agora</span>
@@ -1105,7 +1105,7 @@ function Pricing() {
 
         {/* Dois planos, não três: grade de 2 colunas e centrada. Manter
             md:grid-cols-3 deixaria um buraco de coluna vazia. */}
-        <div className="mt-6 grid md:grid-cols-2 gap-5 max-w-3xl mx-auto items-start">
+        <div className="mt-4 grid md:grid-cols-2 gap-5 max-w-3xl mx-auto items-start">
           {/* Mensal */}
           <FadeUp delay={0.05}>
             <div className="rounded-[28px] p-7" style={{ background: 'var(--lp-band)' }}>
@@ -1127,7 +1127,7 @@ function Pricing() {
                     (CREDIT_COSTS.image) = 40 imagens. */}
                 <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 imagens com IA</p>
               </div>
-              <ul className="mt-4 space-y-1.5">
+              <ul className="mt-3 space-y-1.5">
                 {PLAN_FEATURES.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'var(--lp-gray-2)' }}>
                     <Check className="w-4 h-4 mt-[2px] shrink-0" strokeWidth={3} style={{ color: 'var(--lp-black)' }} aria-hidden="true" />
@@ -1182,7 +1182,7 @@ function Pricing() {
                 <p className="text-[13px] font-bold tracking-tight">300 CRÉDITOS TODO MÊS</p>
                 <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 imagens com IA</p>
               </div>
-              <ul className="mt-4 space-y-1.5">
+              <ul className="mt-3 space-y-1.5">
                 {PLAN_FEATURES.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
                     <Check className="w-4 h-4 mt-[2px] shrink-0 text-white" strokeWidth={3} aria-hidden="true" />
@@ -1202,7 +1202,7 @@ function Pricing() {
         </div>
 
         <FadeUp delay={0.15}>
-          <p className="mt-6 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
+          <p className="mt-5 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
             Precisa de ajuda? Fale com a gente pelo e-mail <Canais />. Respondemos rápido.
           </p>
         </FadeUp>
