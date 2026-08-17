@@ -461,7 +461,10 @@ function Truth() {
 const STEPS = [
   {
     title: 'Diga o tema',
-    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o estilo: editorial, minimalista ou thread do X.',
+    // Os quatro nomes são os do wizard (TEMPLATES em CreateWizard.tsx). O
+    // `minimalist` existe no editor mas NÃO é oferecido na criação — não pode
+    // aparecer aqui como opção.
+    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o template: Profile, Editorial, Template 1 ou Template 2.',
   },
   {
     title: 'A IA monta tudo',
@@ -469,7 +472,7 @@ const STEPS = [
   },
   {
     title: 'Exporte e publique',
-    desc: 'Baixe em Full HD (PNG ou ZIP), agende no calendário e publique você mesmo no seu perfil.',
+    desc: 'Baixe em Full HD (PNG ou ZIP), marque o dia no calendário e publique você mesmo no seu perfil.',
   },
 ];
 
@@ -648,7 +651,7 @@ const FEATURES: Feature[] = [
     title: (<>Carrosséis completos <span style={{ color: '#8B8B87' }}>a partir de uma frase</span></>),
     body: 'Você digita o tema, a IA escreve título, subtítulo e o texto de cada slide, com gancho de abertura e CTA de fechamento. Tudo editável num editor visual, slide por slide.',
     bullets: [
-      '3 estilos prontos: Editorial, Minimalista e Thread do X',
+      '4 templates prontos: Profile (cara de thread do X), Editorial, Template 1 e Template 2',
       'Gancho, desenvolvimento e CTA escritos pela IA',
       'Editor visual completo pra ajustar tudo antes de exportar',
     ],
@@ -901,10 +904,15 @@ function Results() {
               <span className="text-[10px] opacity-35">@orafaelrocha_</span>
             </div>
           </FadeUp>
-          {/* Minimalista */}
+          {/* Template 2. A seção promete "o tipo de post que você VAI criar", então
+              todo rótulo aqui tem que ser um template que o wizard oferece — o
+              `minimalist` não é. Dos quatro reais, este card é o Template 2: o creme
+              é o token `paper` do spec (#EEE5D9, fundo dos slides internos), e é o
+              único creme entre os templates de verdade. Editorial já é o card ao
+              lado e o Profile é o card de thread, à direita. */}
           <FadeUp delay={0.07}>
-            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#F4F3EF' }}>
-              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: '#B5B5B0' }}>Minimalista</span>
+            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#EEE5D9' }}>
+              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: '#B5B5B0' }}>Template 2</span>
               <p className="lp-h text-[19px] md:text-[22px]">Rotina de conteúdo em 30 min por dia</p>
               <span className="text-[10px]" style={{ color: '#B5B5B0' }}>@orafaelrocha_</span>
             </div>
@@ -1031,7 +1039,9 @@ function DoTheMath() {
 // IA gera "layout" ou "design".
 const PLAN_FEATURES = [
   'Carrosséis gerados por IA: texto dos slides, legenda e hashtags',
-  'Imagens com IA (OpenAI gpt-image-2): 5 créditos cada',
+  // Sem nome de modelo nem de fornecedor: o motor troca sem aviso e não é ele
+  // que vende. Os 5 créditos são CREDIT_COSTS.image (lib/credits.ts).
+  'Imagens com IA: 5 créditos cada',
   'Créditos de IA que renovam todo mês',
   'Agenda de conteúdo',
   'Projetos ilimitados',
@@ -1185,11 +1195,11 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'O Creatools publica automaticamente no Instagram?',
-    a: 'O Creatools cria, organiza e agenda seus posts no calendário. A publicação você faz direto no Instagram com o arquivo exportado em Full HD, sem conectar sua conta a ferramentas de terceiros e sem risco pro seu perfil.',
+    a: 'Não. O Creatools cria e organiza seus posts num calendário de planejamento. A publicação você faz direto no Instagram com o arquivo exportado em Full HD, sem conectar sua conta a ferramentas de terceiros e sem risco pro seu perfil.',
   },
   {
     q: 'Como funciona a geração de imagens com IA?',
-    a: 'Cada imagem é gerada sob medida pro seu slide com o gpt-image-2 da OpenAI e custa 5 créditos do seu plano, o mesmo saldo que os carrosséis usam.',
+    a: 'Você diz o assunto e a imagem sai pronta pro slide, sob medida pro contexto dele — sem precisar escrever prompt. Cada imagem custa 5 créditos do seu plano, o mesmo saldo que os carrosséis usam.',
   },
   {
     q: 'Preciso de ajuda com minha assinatura, como faço?',
