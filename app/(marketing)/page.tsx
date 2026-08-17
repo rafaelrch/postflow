@@ -318,19 +318,22 @@ function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           className="lp-h tracking-tighter"
-          /* IvyOra Text em bold italic. A família é `ivyora-text`, do projeto web
-             do Adobe Fonts (kit carregado em app/layout.tsx) — NÃO 'IvyOra Text',
+          /* IvyOra Text em itálico. A família é `ivyora-text`, do projeto web do
+             Adobe Fonts (kit carregado em app/layout.tsx) — NÃO 'IvyOra Text',
              cujo @font-face em globals.css resolve só por local(): renderiza na
              máquina de quem tem a fonte instalada e cai em Georgia no visitante.
              Mesmo caminho de lib/utils.ts:146 e components/slides/Template01Slide.tsx.
-             Peso 700, não 500: o kit publica ivyora-text em 400 e 700 (normal e
-             italic) e NÃO tem Medium. Em 500 o navegador caía no 400 italic e o
-             título saía mais fino do que o pedido; em 700 a face existe, baixa e
-             o peso aparece sem depender de ninguém mexer no Adobe Fonts. */
+
+             O peso 500 é ESCOLHA, não engano — não "conserte" subindo pra 700.
+             O kit publica ivyora-text só em 400 e 700 e não tem Medium, então
+             HOJE o navegador renderiza o 400. O 700 chegou a ser testado e o
+             Rafael achou grosso demais. 500 é o valor certo pra quando o Medium
+             entrar no projeto do Adobe Fonts: aí passa a renderizar sozinho, sem
+             tocar em código. Nada de font-synthesis pra compensar. */
           style={{
             fontSize: 'clamp(38px, 5.4vw, 64px)',
             fontFamily: "'ivyora-text', 'T01Serif', Georgia, serif",
-            fontWeight: 700,
+            fontWeight: 500,
             fontStyle: 'italic',
           }}
         >
@@ -733,7 +736,6 @@ function Features() {
   const [paused, setPaused] = useState(false);
   const reducedMotion = useReducedMotion();
   const cardRef = useRef<HTMLDivElement>(null);
-  const f = FEATURES[active];
 
   // Rotação automática das abas.
   //
@@ -813,40 +815,84 @@ function Features() {
 
         {/* Feature card */}
         <FadeUp delay={0.15} className="mt-8">
-          <motion.div
-            key={active}
+          {/* A moldura preta NÃO tem key e NÃO remonta: ela é o container, e
+              antes trocava de key junto com a aba. Remontar o bloco inteiro a
+              cada 4,5s era o "pisca" — ele saía de opacity 0 e voltava, e de
+              quebra mudava de altura porque cada aba tem conteúdo de tamanho
+              diferente, fazendo o resto da página pular junto. */}
+          <div
             ref={cardRef}
-            /* É AQUI que `prefers-reduced-motion: reduce` age: sem fade e sem
-               deslocamento, a aba nova simplesmente aparece. A rotação em si
-               continua — ver o comentário do intervalo. */
-            initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             /* Pausa enquanto a pessoa está lendo o bloco. Pointer* em vez de
                mouse*: cobre toque e caneta, que o mouse* ignora. Um evento de
                saída perdido não trava nada — o tick reconfere o hover real. */
             onPointerEnter={() => setPaused(true)}
             onPointerLeave={() => setPaused(false)}
-            className="rounded-[36px] p-8 md:p-14 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center"
+            className="rounded-[36px] p-8 md:p-14"
             style={{ background: 'var(--lp-black)', color: '#fff' }}
           >
-            <div>
-              <span className="lp-badge on-dark">{f.tag}</span>
-              <h3 className="lp-h mt-6" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>{f.title}</h3>
-              <p className="mt-5 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{f.body}</p>
-              <ul className="mt-6 space-y-2.5">
-                {f.bullets.map((b) => (
-                  <li key={b} className="flex items-start gap-2.5 text-[14.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-white/50 shrink-0" />
-                    {b}
-                  </li>
-                ))}
-              </ul>
+            {/* TODAS as abas ficam montadas, empilhadas na MESMA célula deste
+                grid (todo mundo em `1 / 1`). Duas consequências, que são
+                exatamente o que se quer:
+                  · a altura do bloco é a do maior conteúdo e não muda nunca —
+                    sem salto, sem medir nada em JS;
+                  · o cross-fade é de verdade, porque a aba que sai e a que
+                    entra dividem o mesmo espaço em vez de se empurrarem.
+                As inativas ficam com opacity 0 + inert: somem da navegação por
+                teclado e do leitor de tela, não só da vista. */}
+            <div className="grid">
+              {FEATURES.map((feat, i) => {
+                const isActive = i === active;
+                return (
+                  <div
+                    key={feat.tab}
+                    className="grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center"
+                    /* Transição em CSS, não em JS. O framer anima por
+                       requestAnimationFrame, e além de ser mais peça para o
+                       mesmo efeito, o estado real ficava impossível de auditar:
+                       em documento em segundo plano o rAF congela e a opacidade
+                       nunca era escrita. Aqui o valor vive no style inline, então
+                       o HTML do servidor já sai com uma camada visível e cinco em
+                       zero — sem as seis empilhadas no primeiro paint — e o
+                       navegador faz a interpolação sozinho.
+
+                       Só opacidade: o `y: 12` de antes era o que mais endurecia a
+                       troca. A que entra é mais lenta e começa um pouco depois da
+                       que sai; sem essa defasagem as duas se somam no meio e o
+                       texto "engrossa" durante a transição.
+
+                       Com reduced-motion a troca é instantânea — mas continua
+                       acontecendo (a rotação não depende disto). */
+                    style={{
+                      gridArea: '1 / 1',
+                      opacity: isActive ? 1 : 0,
+                      transition: reducedMotion
+                        ? 'none'
+                        : `opacity ${isActive ? 650 : 350}ms cubic-bezier(0.33, 1, 0.68, 1) ${isActive ? 100 : 0}ms`,
+                    }}
+                    aria-hidden={!isActive}
+                    inert={!isActive}
+                  >
+                    <div>
+                      <span className="lp-badge on-dark">{feat.tag}</span>
+                      <h3 className="lp-h mt-6" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>{feat.title}</h3>
+                      <p className="mt-5 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{feat.body}</p>
+                      <ul className="mt-6 space-y-2.5">
+                        {feat.bullets.map((b) => (
+                          <li key={b} className="flex items-start gap-2.5 text-[14.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                            <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-white/50 shrink-0" />
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-[24px] bg-white min-h-[360px] md:min-h-[420px] grid place-items-center p-8">
+                      {feat.visual}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="rounded-[24px] bg-white min-h-[360px] md:min-h-[420px] grid place-items-center p-8">
-              {f.visual}
-            </div>
-          </motion.div>
+          </div>
         </FadeUp>
       </div>
     </section>
