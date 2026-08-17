@@ -118,19 +118,23 @@ export default async function ConfiguracoesAssinaturaPage() {
               <span className="font-medium">{fmtDate(credits?.period_end ?? null)}</span>
             </div>
             {/*
-              Custos vêm de CREDIT_COSTS (lib/credits.ts) interpolados, não
-              digitados: só o carrossel e a imagem consomem crédito, e a copy não
-              pode divergir do objeto numa próxima edição de texto.
+              O custo vem de CREDIT_COSTS (lib/credits.ts) interpolado, não
+              digitado, para a copy não divergir do objeto numa próxima edição.
+              Hoje só a IMAGEM consome crédito: carrossel é ilimitado para
+              assinante (CREDIT_COSTS.carousel = 0) e por isso não tem número
+              para interpolar — "custa 0 créditos" seria pior que dizer que não
+              consome. Se ele voltar a custar, volte a interpolar aqui; o teste
+              credits-copy-coherence cobra as duas pontas.
               Notícia não tem custo nem teto: o plano gratuito, único que tinha
-              limite diário, saiu do produto. "Thread do X" é estilo
-              de carrossel (FORMATO B em lib/openai.ts), não um item à parte.
+              limite diário, saiu do produto.
               Não há CTA de upgrade aqui: quem tem assinatura ativa leva 409
               `alreadySubscribed` no checkout (app/api/asaas/checkout/route.ts).
             */}
             <p className="text-xs text-[var(--ink-dim)]">
-              Carrossel com IA custa {CREDIT_COSTS.carousel} créditos — o mesmo nos 3 estilos,
-              incluindo Thread do X. Imagem com IA custa {CREDIT_COSTS.image}. Notícias e o editor
-              manual não consomem créditos. Os créditos recarregam todo mês.
+              Carrossel com IA não consome créditos: você gera quantos quiser enquanto a
+              assinatura estiver ativa. Crédito é da imagem com IA, que custa {CREDIT_COSTS.image} por
+              imagem gerada. Notícias e o editor manual também não consomem. Os créditos
+              recarregam todo mês.
             </p>
           </div>
         </section>

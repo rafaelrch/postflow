@@ -139,8 +139,16 @@ describe('copy de créditos x CREDIT_COSTS', () => {
 
   it('a aba de assinatura interpola CREDIT_COSTS em vez de digitar os números', () => {
     const conta = read('app/(app)/configuracoes/assinatura/page.tsx');
-    expect(conta).toContain('CREDIT_COSTS.carousel');
     expect(conta).toContain('CREDIT_COSTS.image');
+    // Carrossel virou grátis (custo 0), então não há número para interpolar e a
+    // copy precisa DIZER que não consome. Travar as duas pontas em vez de só
+    // exigir a interpolação: se ele voltar a custar, a frase "não consome" vira
+    // mentira e o teste cobra o número de volta.
+    if (CREDIT_COSTS.carousel > 0) {
+      expect(conta).toContain('CREDIT_COSTS.carousel');
+    } else {
+      expect(conta).toMatch(/carrossel[^.]*n[ãa]o consome cr[ée]ditos/i);
+    }
   });
 
   it('o comentário de lib/credits.ts não usa exemplo inexistente', () => {
