@@ -182,9 +182,11 @@ function Nav() {
       className="absolute top-0 left-0 right-0 z-50"
     >
       <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
+        {/* Só a logo, sem o nome escrito ao lado. Com o texto fora, o alt da
+            imagem é o ÚNICO nome acessível deste link — sem ele o leitor de tela
+            anunciaria "link" e mais nada. Não apague o alt. */}
+        <Link href="/" className="flex items-center">
           <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={30} height={30} className="object-contain" />
-          <span className="font-bold text-[17px] tracking-tight">creatools</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-[14.5px] font-medium" style={{ color: 'var(--lp-gray-2)' }}>
@@ -316,20 +318,19 @@ function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           className="lp-h tracking-tighter"
-          /* IvyOra Text Medium Italic. A família é `ivyora-text`, do projeto web
+          /* IvyOra Text em bold italic. A família é `ivyora-text`, do projeto web
              do Adobe Fonts (kit carregado em app/layout.tsx) — NÃO 'IvyOra Text',
              cujo @font-face em globals.css resolve só por local(): renderiza na
-             máquina do Rafael e cai em Georgia no visitante. Mesmo caminho de
-             lib/utils.ts:146 e components/slides/Template01Slide.tsx.
-             O peso 500 é intencional e olha pra frente: o kit hoje serve
-             ivyora-text só em 400/700, então o navegador usa o 400 italic; quando
-             o Medium entrar no projeto do Adobe Fonts, isto passa a renderizar
-             certo sem tocar em código. Nada de font-synthesis pra "compensar" —
-             peso falso é pior que o 400 real. */
+             máquina de quem tem a fonte instalada e cai em Georgia no visitante.
+             Mesmo caminho de lib/utils.ts:146 e components/slides/Template01Slide.tsx.
+             Peso 700, não 500: o kit publica ivyora-text em 400 e 700 (normal e
+             italic) e NÃO tem Medium. Em 500 o navegador caía no 400 italic e o
+             título saía mais fino do que o pedido; em 700 a face existe, baixa e
+             o peso aparece sem depender de ninguém mexer no Adobe Fonts. */
           style={{
             fontSize: 'clamp(38px, 5.4vw, 64px)',
             fontFamily: "'ivyora-text', 'T01Serif', Georgia, serif",
-            fontWeight: 500,
+            fontWeight: 700,
             fontStyle: 'italic',
           }}
         >
@@ -394,34 +395,31 @@ function Truth() {
   return (
     <section className="py-20 md:py-28 px-6" style={{ background: 'var(--lp-band)' }}>
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+        {/* A prova é o print da matéria, sozinho — o card preto com a citação
+            saiu daqui. A manchete do print já diz o que a citação dizia, e dois
+            blocos empilhados dobravam a altura desta coluna.
+            A imagem entra INTEIRA (717×857, o screenshot original sem recorte) e
+            sem corte no encaixe: `w-full h-auto` deixa o container assumir a
+            proporção dela, então não há `cover` cortando nem faixa vazia de
+            `contain`. */}
         <FadeUp>
-          <div
-            className="aspect-square rounded-[32px] p-8 md:p-12 flex flex-col justify-between"
-            style={{ background: 'var(--lp-black)', color: '#fff' }}
-          >
-            <div className="flex items-center gap-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              <span className="w-2 h-2 rounded-full bg-white/60" /> @mosseri
-            </div>
-            <p className="lp-h" style={{ fontSize: 'clamp(24px, 2.8vw, 36px)' }}>
-              “O algoritmo entrega carrosséis mais do que qualquer outro formato.”
-            </p>
-            <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>Adam Mosseri · CEO do Instagram</p>
-          </div>
-
-          {/* Prova da matéria de origem: sem isso a citação é só uma frase entre
-              aspas. O print é servido em largura natural (`w-full h-auto`), nunca
-              esticado nem cortado na manchete — ela é o ponto da prova. */}
-          <figure className="mt-5">
+          <figure>
+            {/* Nome novo, e não a substituição do arquivo antigo: o print
+                trocou de recorte mantendo o mesmo caminho e o otimizador
+                continuou servindo a versão velha do cache (mesma URL, conteúdo
+                diferente). Com `h-auto` quem manda na altura é o bitmap
+                decodificado, então a imagem antiga ressuscitava o recorte.
+                Conteúdo novo, caminho novo. */}
             <Image
-              src="/prova-mosseri-smt.png"
-              alt="Print da matéria do SocialMediaToday com a manchete “Chefe da IG recomenda publicação de carrosséis para melhorar o alcance.”, publicada em 17 de outubro de 2024 por André Hutchinson."
+              src="/prova-mosseri-smt-full.png"
+              alt="Print da matéria do SocialMediaToday com a manchete “Chefe da IG recomenda publicação de carrosséis para melhorar o alcance.”, publicada em 17 de outubro de 2024 por André Hutchinson. A matéria mostra um vídeo de Adam Mosseri, chefe do Instagram, recomendando carrosséis para aumentar o alcance."
               width={717}
-              height={460}
+              height={857}
               sizes="(max-width: 768px) 100vw, 45vw"
-              className="w-full h-auto rounded-[20px]"
+              className="w-full h-auto rounded-[32px]"
               style={{ border: '1px solid var(--lp-line)', background: '#fff' }}
             />
-            <figcaption className="mt-3 text-[12.5px]" style={{ color: 'var(--lp-gray-2)' }}>
+            <figcaption className="mt-4 text-[12.5px]" style={{ color: 'var(--lp-gray-2)' }}>
               SocialMediaToday · 17 de outubro de 2024 · André Hutchinson
             </figcaption>
           </figure>
@@ -731,22 +729,40 @@ function Features() {
   const [active, setActive] = useState(2);
   /** Clique do usuário: ele escolheu uma aba pra ler, a rotação acaba ali. */
   const [locked, setLocked] = useState(false);
-  /** Ponteiro (ou foco de teclado) dentro do bloco: pausa enquanto estiver lá. */
+  /** Ponteiro dentro do bloco: pausa enquanto estiver lá. */
   const [paused, setPaused] = useState(false);
   const reducedMotion = useReducedMotion();
+  const cardRef = useRef<HTMLDivElement>(null);
   const f = FEATURES[active];
 
-  // Rotação automática das abas. O efeito NÃO depende de `active` — quem avança
-  // é o updater funcional —, então o intervalo só é recriado quando muda uma
-  // condição de parada, e o cleanup mata o timer no unmount e a cada troca.
-  // Sem `prefers-reduced-motion: reduce`, sem hover e sem clique: só aí gira.
+  // Rotação automática das abas.
+  //
+  // `reducedMotion` NÃO entra aqui de propósito. Trocar de aba é troca de
+  // CONTEÚDO, não movimento — quem pediu menos animação quer o fade desligado
+  // (isso acontece no motion.div abaixo), não a seção congelada numa aba só.
+  // Com o guard aqui, quem tem "Reduzir movimento" ligado no sistema via a
+  // seção parada e precisava clicar pra ver qualquer outra aba.
+  //
+  // A pausa é resolvida NO TICK, consultando o hover real no DOM, em vez de
+  // confiar só no evento de saída: se o ponteiro entra e a pessoa rola a página
+  // sem mexer o mouse, o pointerleave pode nunca chegar e a rotação morria em
+  // silêncio para sempre. Aqui o pior caso é uma volta a mais.
+  //
+  // O efeito não depende de `active` — quem avança é o updater funcional —,
+  // então o intervalo não é recriado a cada troca, e o cleanup mata o timer no
+  // unmount e a cada mudança de condição.
   useEffect(() => {
-    if (locked || paused || reducedMotion) return;
+    if (locked) return;
     const id = setInterval(() => {
+      const el = cardRef.current;
+      if (paused && el?.matches(':hover')) return;
+      // Chegou aqui com `paused` ligado: o ponteiro já saiu e o evento se
+      // perdeu. Destrava em vez de ficar preso.
+      if (paused) setPaused(false);
       setActive((i) => (i + 1) % FEATURES.length);
     }, FEATURE_ROTATE_MS);
     return () => clearInterval(id);
-  }, [locked, paused, reducedMotion]);
+  }, [locked, paused]);
 
   return (
     <section id="recursos" className="py-16 md:py-24 px-6 bg-white">
@@ -786,7 +802,7 @@ function Features() {
                     layoutId="feature-tab-pill"
                     className="absolute inset-0 rounded-full"
                     style={{ background: 'var(--lp-black)' }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                    transition={reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
                   />
                 )}
                 <span className="relative z-10">{feat.tab}</span>
@@ -799,17 +815,18 @@ function Features() {
         <FadeUp delay={0.15} className="mt-8">
           <motion.div
             key={active}
+            ref={cardRef}
+            /* É AQUI que `prefers-reduced-motion: reduce` age: sem fade e sem
+               deslocamento, a aba nova simplesmente aparece. A rotação em si
+               continua — ver o comentário do intervalo. */
             initial={reducedMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            /* Pausa enquanto a pessoa está lendo o bloco — ponteiro dentro, ou
-               foco de teclado em algo aqui. onFocus/onBlur borbulham (ao
-               contrário de focusin/focusout nativos do DOM) e cobrem quem
-               navega por tab. */
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
-            onFocus={() => setPaused(true)}
-            onBlur={() => setPaused(false)}
+            transition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            /* Pausa enquanto a pessoa está lendo o bloco. Pointer* em vez de
+               mouse*: cobre toque e caneta, que o mouse* ignora. Um evento de
+               saída perdido não trava nada — o tick reconfere o hover real. */
+            onPointerEnter={() => setPaused(true)}
+            onPointerLeave={() => setPaused(false)}
             className="rounded-[36px] p-8 md:p-14 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center"
             style={{ background: 'var(--lp-black)', color: '#fff' }}
           >
@@ -1038,20 +1055,25 @@ function DoTheMath() {
 // fontes e formato são escolha do usuário no wizard — não venha escrever que a
 // IA gera "layout" ou "design".
 const PLAN_FEATURES = [
-  'Carrosséis gerados por IA: texto dos slides, legenda e hashtags',
-  // Sem nome de modelo nem de fornecedor: o motor troca sem aviso e não é ele
-  // que vende. Os 5 créditos são CREDIT_COSTS.image (lib/credits.ts).
-  'Imagens com IA: 5 créditos cada',
-  'Créditos de IA que renovam todo mês',
+  // "Ilimitados" só pôde entrar porque o PRODUTO mudou: CREDIT_COSTS.carousel
+  // virou 0 e gerar carrossel não debita mais nada (lib/credits.ts). Se o custo
+  // voltar a ser > 0, esta linha vira promessa falsa e tem que sair junto.
+  'Carrosséis ilimitados',
+  // Sem custo escrito aqui: o preço da imagem já aparece na faixa de créditos e
+  // no FAQ, e repetir número em três lugares é onde a copy diverge do código.
+  'Imagens com IA',
+  // O que a IA devolve de verdade: título, descrição, palavra de destaque e cor
+  // por slide, mais legenda e hashtags (types/index.ts). Ela NÃO gera layout nem
+  // design — não escreva "cria seu post" nem "monta o design".
+  'IA que escreve os textos, a legenda e as hashtags',
   // Calendário é PLANEJAMENTO: o produto não publica nem agenda no Instagram.
-  'Agenda de conteúdo para planejar o mês',
-  'Projetos ilimitados',
-  // "Drag & drop" aqui é só o que existe de verdade: arrastar card de slide
-  // reordena (reorderSlides via @hello-pangea/dnd em SlideCanvas.tsx) e soltar
-  // arquivo de imagem sobe a imagem (DropZone em EditorSidebar.tsx). NÃO é
-  // editor de arrastar elemento livre na tela — não escreva isso.
-  'Editor visual completo, slide a slide (arraste pra reordenar)',
-  'Export Full HD (PNG, ZIP e MP4), sem marca d’água',
+  'Agenda de conteúdo',
+  // "Drag & drop" aqui é só o que existe: arrastar card de slide reordena
+  // (reorderSlides via @hello-pangea/dnd em SlideCanvas.tsx) e soltar arquivo de
+  // imagem sobe a imagem (DropZone em EditorSidebar.tsx). NÃO é editor de
+  // arrastar elemento livre na tela.
+  'Editor Drag & Drop',
+  'Export Full HD',
 ];
 
 function Pricing() {
@@ -1061,32 +1083,37 @@ function Pricing() {
   // não vai direto ao checkout nem pula a captura de lead.
   const [modalInterval, setModalInterval] = useState<'month' | 'year' | null>(null);
 
+  // Altura é requisito aqui: a seção precisa caber numa viewport de desktop
+  // (~800px de altura útil) sem obrigar a rolar. Os paddings, o respiro da grade
+  // e o corpo do preço estão calibrados para isso — é a razão de eles serem
+  // menores que os das outras seções. No mobile pode rolar à vontade, então os
+  // valores base ficam confortáveis e só o md: aperta.
   return (
-    <section id="planos" className="py-12 md:py-16 px-6 bg-white">
+    <section id="planos" className="py-12 md:py-6 px-6 bg-white">
       <div className="max-w-5xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge soft">Comece agora</span>
-          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+          <h2 className="lp-h tracking-tighter mt-3" style={{ fontSize: 'clamp(30px, 3vw, 38px)' }}>
             Escolha a melhor opção
             <br />
             <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
           </h2>
-          <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
+          <p className="mt-2.5 text-[15px]" style={{ color: 'var(--lp-gray)' }}>
             Checkout seguro (cartão de crédito). Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 
         {/* Dois planos, não três: grade de 2 colunas e centrada. Manter
             md:grid-cols-3 deixaria um buraco de coluna vazia. */}
-        <div className="mt-14 grid md:grid-cols-2 gap-6 max-w-3xl mx-auto items-start">
+        <div className="mt-6 grid md:grid-cols-2 gap-5 max-w-3xl mx-auto items-start">
           {/* Mensal */}
           <FadeUp delay={0.05}>
-            <div className="rounded-[28px] p-8" style={{ background: 'var(--lp-band)' }}>
+            <div className="rounded-[28px] p-7" style={{ background: 'var(--lp-band)' }}>
               <span className="lp-badge" style={{ background: 'var(--lp-black)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
                 Plano Mensal
               </span>
               <div className="mt-5 flex items-baseline">
-                <span className="lp-h" style={{ fontSize: 56 }}>R$59</span>
+                <span className="lp-h" style={{ fontSize: 46 }}>R$59</span>
                 <span className="text-[22px] font-bold" style={{ color: 'var(--lp-gray)' }}>,50</span>
                 <span className="ml-2 text-[14px]" style={{ color: 'var(--lp-gray)' }}>/mês</span>
               </div>
@@ -1094,14 +1121,13 @@ function Pricing() {
                 Cobrado mês a mês. Sem fidelidade.
                 <br />Equivale a ~R$1,98/dia
               </p>
-              <div className="mt-6 -mx-8 px-8 py-3" style={{ background: '#EBEBE9' }}>
+              <div className="mt-4 -mx-7 px-7 py-2.5" style={{ background: '#EBEBE9' }}>
                 <p className="text-[13px] font-bold tracking-tight">200 CRÉDITOS TODO MÊS</p>
-                {/* Carrossel e imagem custam 5 créditos cada (CREDIT_COSTS) e
-                    saem do MESMO saldo: 200 ÷ 5 = 40 gerações, não 40
-                    carrosséis mais imagens à parte. */}
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 gerações: carrossel ou imagem</p>
+                {/* Com o carrossel grátis, crédito é só de imagem: 200 ÷ 5
+                    (CREDIT_COSTS.image) = 40 imagens. */}
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 imagens com IA</p>
               </div>
-              <ul className="mt-6 space-y-2.5">
+              <ul className="mt-4 space-y-1.5">
                 {PLAN_FEATURES.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'var(--lp-gray-2)' }}>
                     <Check className="w-4 h-4 mt-[2px] shrink-0" strokeWidth={3} style={{ color: 'var(--lp-black)' }} aria-hidden="true" />
@@ -1112,7 +1138,7 @@ function Pricing() {
               <button
                 type="button"
                 onClick={() => setModalInterval('month')}
-                className="lp-btn white w-full justify-between mt-8 !bg-white !rounded-full"
+                className="lp-btn white w-full justify-between mt-5 !bg-white !rounded-full"
               >
                 Assinar Plano Mensal <ArrowChip />
               </button>
@@ -1122,7 +1148,7 @@ function Pricing() {
           {/* Anual */}
           <FadeUp delay={0.1}>
             <div
-              className="rounded-[28px] p-8 relative"
+              className="rounded-[28px] p-7 relative"
               style={{ background: 'var(--lp-black)', color: '#fff', boxShadow: '0 0 0 2px #fff, 10px 10px 0 0 var(--lp-black)' }}
             >
               <div className="flex items-center gap-2 flex-wrap">
@@ -1134,26 +1160,29 @@ function Pricing() {
                     ficou de fora de propósito — é prova social, não temos base
                     pagante que sustente, e alegação de popularidade inventada
                     numa página que cobra é propaganda enganosa. */}
+                {/* Curto de propósito: com o texto longo os dois selos
+                    quebravam em duas linhas e a seção deixava de caber na tela.
+                    O "~30%" não se perdeu — está na conta logo abaixo. */}
                 <span className="lp-badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
-                  Economize ~30% · Melhor custo-benefício
+                  Melhor custo-benefício
                 </span>
               </div>
               <div className="mt-5 flex items-baseline gap-2.5 flex-wrap">
                 {/* 12 × R$59,50 = R$714. Preço cheio riscado é a conta do mesmo
                     período no plano mensal, não um "de/por" inventado. */}
                 <s className="text-[19px] font-bold" style={{ color: 'rgba(255,255,255,0.45)' }}>R$714</s>
-                <span className="lp-h" style={{ fontSize: 56 }}>R$499</span>
+                <span className="lp-h" style={{ fontSize: 46 }}>R$499</span>
                 <span className="text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>/ano</span>
               </div>
               <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                Equivale a ~R$41,58/mês, ~R$1,37/dia.
-                <br />12 meses no plano mensal sairiam R$714: você economiza R$215.
+                ~R$41,58/mês, ~R$1,37/dia. No mensal, 12 meses sairiam R$714:
+                você economiza R$215 (~30%).
               </p>
-              <div className="mt-6 -mx-8 px-8 py-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div className="mt-4 -mx-7 px-7 py-2.5" style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <p className="text-[13px] font-bold tracking-tight">300 CRÉDITOS TODO MÊS</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 gerações: carrossel ou imagem</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 imagens com IA</p>
               </div>
-              <ul className="mt-6 space-y-2.5">
+              <ul className="mt-4 space-y-1.5">
                 {PLAN_FEATURES.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
                     <Check className="w-4 h-4 mt-[2px] shrink-0 text-white" strokeWidth={3} aria-hidden="true" />
@@ -1164,7 +1193,7 @@ function Pricing() {
               <button
                 type="button"
                 onClick={() => setModalInterval('year')}
-                className="lp-btn white w-full justify-between mt-8 !rounded-full"
+                className="lp-btn white w-full justify-between mt-5 !rounded-full"
               >
                 Assinar Plano Anual <ArrowChip solid />
               </button>
@@ -1173,7 +1202,7 @@ function Pricing() {
         </div>
 
         <FadeUp delay={0.15}>
-          <p className="mt-12 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
+          <p className="mt-6 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
             Precisa de ajuda? Fale com a gente pelo e-mail <Canais />. Respondemos rápido.
           </p>
         </FadeUp>
