@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { AnimatePresence, motion, useInView } from 'framer-motion';
+import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
 import { ShootingStarsGrid } from '@/components/ui/shooting-stars-grid';
 import LeadCaptureModal from '@/components/billing/LeadCaptureModal';
 import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2 } from 'lucide-react';
@@ -100,6 +100,30 @@ const LP_CSS = `
   }
   .lp-btn.white:hover { transform: translateY(-1px); }
   .lp-btn:disabled { opacity: 0.55; pointer-events: none; }
+
+  /* CTA principal do hero: uma segunda camada BRANCA atrás do botão preto,
+     deslocada pra baixo/direita, com borda preta fina e sombra dura (sem blur).
+     A camada é decorativa e fica FORA do <a> — o alvo de clique e o foco de
+     teclado continuam sendo só o botão. Por isso ela também é pointer-events:
+     none: nem rouba clique nas bordas nem gera hover fantasma.
+     O botão perde aqui a própria sombra offset preta (.lp-btn.black) porque
+     quem faz esse papel agora é o shape; o anel branco de 2px continua, é ele
+     que separa o preto do botão da borda preta do shape. */
+  .lp-cta-stack { position: relative; display: inline-flex; }
+  .lp-cta-stack > .lp-btn { position: relative; z-index: 1; }
+  .lp-cta-stack > .lp-btn.black { box-shadow: 0 0 0 2px #fff; }
+  .lp-cta-shape {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: #fff;
+    border: 2px solid var(--lp-black);
+    border-radius: 15px;
+    transform: translate(5px, 5px);
+    box-shadow: 5px 5px 0 0 var(--lp-black);
+  }
+  /* O shape fica parado e o botão é que anda: no hover encosta e no :active
+     assenta exatamente sobre ele (translate 5px = o offset do shape). */
+  .lp-cta-stack > .lp-btn.black:hover { box-shadow: 0 0 0 2px #fff; }
+  .lp-cta-stack > .lp-btn.black:active { box-shadow: 0 0 0 2px #fff; }
 
   .lp-arrow { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; }
   .lp-arrow.on-black { background: rgba(255,255,255,0.16); color: #fff; }
@@ -292,7 +316,22 @@ function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           className="lp-h tracking-tighter"
-          style={{ fontSize: 'clamp(38px, 5.4vw, 64px)' }}
+          /* IvyOra Text Medium Italic. A família é `ivyora-text`, do projeto web
+             do Adobe Fonts (kit carregado em app/layout.tsx) — NÃO 'IvyOra Text',
+             cujo @font-face em globals.css resolve só por local(): renderiza na
+             máquina do Rafael e cai em Georgia no visitante. Mesmo caminho de
+             lib/utils.ts:146 e components/slides/Template01Slide.tsx.
+             O peso 500 é intencional e olha pra frente: o kit hoje serve
+             ivyora-text só em 400/700, então o navegador usa o 400 italic; quando
+             o Medium entrar no projeto do Adobe Fonts, isto passa a renderizar
+             certo sem tocar em código. Nada de font-synthesis pra "compensar" —
+             peso falso é pior que o 400 real. */
+          style={{
+            fontSize: 'clamp(38px, 5.4vw, 64px)',
+            fontFamily: "'ivyora-text', 'T01Serif', Georgia, serif",
+            fontWeight: 500,
+            fontStyle: 'italic',
+          }}
         >
           <span style={{ color: 'var(--lp-gray)' }}>Seu conteúdo do Instagram</span>
           <br />
@@ -316,9 +355,12 @@ function Hero() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <a href="#planos" className="lp-btn black">
-            Quero criar meu primeiro carrossel <ArrowChip dark />
-          </a>
+          <span className="lp-cta-stack">
+            <span className="lp-cta-shape" aria-hidden="true" />
+            <a href="#planos" className="lp-btn black">
+              Quero criar meu primeiro carrossel <ArrowChip dark />
+            </a>
+          </span>
           <a href="#como-funciona" className="lp-btn light">Ver como funciona</a>
         </motion.div>
 
@@ -365,6 +407,24 @@ function Truth() {
             </p>
             <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>Adam Mosseri · CEO do Instagram</p>
           </div>
+
+          {/* Prova da matéria de origem: sem isso a citação é só uma frase entre
+              aspas. O print é servido em largura natural (`w-full h-auto`), nunca
+              esticado nem cortado na manchete — ela é o ponto da prova. */}
+          <figure className="mt-5">
+            <Image
+              src="/prova-mosseri-smt.png"
+              alt="Print da matéria do SocialMediaToday com a manchete “Chefe da IG recomenda publicação de carrosséis para melhorar o alcance.”, publicada em 17 de outubro de 2024 por André Hutchinson."
+              width={717}
+              height={460}
+              sizes="(max-width: 768px) 100vw, 45vw"
+              className="w-full h-auto rounded-[20px]"
+              style={{ border: '1px solid var(--lp-line)', background: '#fff' }}
+            />
+            <figcaption className="mt-3 text-[12.5px]" style={{ color: 'var(--lp-gray-2)' }}>
+              SocialMediaToday · 17 de outubro de 2024 · André Hutchinson
+            </figcaption>
+          </figure>
         </FadeUp>
 
         <FadeUp delay={0.12}>
@@ -497,39 +557,51 @@ function MockNews() {
   );
 }
 
+/**
+ * Os QUATRO templates que o wizard realmente oferece, na ordem do grid 2×2 de
+ * components/editor/CreateWizard.tsx (`TEMPLATES`). O estilo `minimalist` segue
+ * existindo no editor, mas não é oferecido na criação — por isso ele não
+ * aparece aqui nem na copy. Os números de fonte saem de `FONT_PAIRS` no mesmo
+ * arquivo: 7 pares, 13 fontes distintas (Inter se repete em dois pares).
+ */
 function MockTemplates() {
-  const pairs = [
-    ['SF Display', 'IvyOra'],
-    ['Space Grotesk', 'Inter'],
-    ['Playfair', 'Lato'],
-    ['Bebas', 'Inter'],
-  ];
+  const templates = ['Profile', 'Editorial', 'Template 1', 'Template 2'];
   return (
-    <div className="grid grid-cols-2 gap-3 w-full max-w-[260px]">
-      {pairs.map(([a, b], i) => (
-        <div key={i} className="rounded-2xl p-4 bg-white text-left" style={{ border: '1px solid #ECECEA' }}>
-          <p style={{ fontSize: 24, fontWeight: 700, lineHeight: 1, color: '#0A0A0A' }}>Aa</p>
-          <p className="text-[10px] mt-2" style={{ color: '#9A9A96' }}>{a} · {b}</p>
-        </div>
-      ))}
+    <div className="w-full max-w-[260px]">
+      <div className="grid grid-cols-2 gap-3">
+        {templates.map((t) => (
+          <div key={t} className="rounded-2xl p-4 bg-white text-left" style={{ border: '1px solid #ECECEA' }}>
+            <p style={{ fontSize: 24, fontWeight: 700, lineHeight: 1, color: '#0A0A0A' }}>Aa</p>
+            <p className="text-[10.5px] font-semibold mt-2" style={{ color: '#0A0A0A' }}>{t}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10.5px] mt-3.5 text-center" style={{ color: '#9A9A96' }}>
+        <b style={{ color: '#0A0A0A' }}>13 fontes</b> em 7 pares calibrados
+      </p>
     </div>
   );
 }
 
+/**
+ * Calendário de PLANEJAMENTO. O produto não publica nem agenda post no
+ * Instagram — os dias marcados são o que a pessoa planejou postar, e nada aqui
+ * (nem o rótulo) pode sugerir automação.
+ */
 function MockAgenda() {
-  const scheduled = [3, 7, 10, 14, 17, 21, 24, 27];
+  const planned = [3, 7, 10, 14, 17, 21, 24, 27];
   return (
     <div className="w-full max-w-[260px] rounded-2xl bg-white p-5 text-left" style={{ border: '1px solid #ECECEA' }}>
       <div className="flex items-center justify-between">
         <p className="text-[13px] font-bold">Julho 2026</p>
-        <p className="text-[10px]" style={{ color: '#9A9A96' }}>8 posts</p>
+        <p className="text-[10px]" style={{ color: '#9A9A96' }}>8 planejados</p>
       </div>
       <div className="grid grid-cols-7 gap-1.5 mt-4">
         {Array.from({ length: 28 }, (_, i) => (
           <div
             key={i}
             className="aspect-square rounded-md grid place-items-center text-[8px]"
-            style={{ background: scheduled.includes(i) ? '#0A0A0A' : '#F4F4F2', color: scheduled.includes(i) ? '#fff' : '#B5B5B0' }}
+            style={{ background: planned.includes(i) ? '#0A0A0A' : '#F4F4F2', color: planned.includes(i) ? '#fff' : '#B5B5B0' }}
           >
             {i + 1}
           </div>
@@ -559,7 +631,10 @@ function MockAiImages() {
     <div className="w-full max-w-[240px] text-left">
       <div className="aspect-[4/5] rounded-2xl" style={{ background: 'conic-gradient(from 210deg at 50% 40%, #232323, #4a4a46, #17171a, #2e2e2a, #232323)' }} />
       <div className="flex items-center justify-between mt-3">
-        <span className="text-[10px] font-semibold tracking-[0.14em] uppercase" style={{ color: '#9A9A96' }}>OpenAI · gpt-image-2</span>
+        {/* Nada de modelo nem de fornecedor no selo — isso muda sem aviso e não
+            é o que vende. O "5 créditos" fica: é preço, e bate com
+            CREDIT_COSTS.image em lib/credits.ts. */}
+        <span className="text-[10px] font-semibold tracking-[0.14em] uppercase" style={{ color: '#9A9A96' }}>Feita pro seu slide</span>
         <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: '#0A0A0A', color: '#fff' }}>5 créditos</span>
       </div>
     </div>
@@ -594,24 +669,27 @@ const FEATURES: Feature[] = [
   {
     tab: 'Templates',
     tag: 'Escala com padrão',
-    title: (<>Estilos prontos, <span style={{ color: '#8B8B87' }}>identidade sempre igual</span></>),
-    body: 'Escolha entre os estilos do Creatools e 7 combinações profissionais de tipografia. Todo post sai com a mesma cara: consistência visual de quem está crescendo de verdade.',
+    title: (<>Templates prontos, <span style={{ color: '#8B8B87' }}>identidade sempre igual</span></>),
+    body: 'Quatro templates pra escolher e 13 fontes em 7 pares calibrados. Todo post sai com a mesma cara: consistência visual de quem está crescendo de verdade.',
     bullets: [
-      'Editorial, Minimalista e formato thread do X',
-      '7 pares de fontes calibrados por designers',
+      'Profile, Editorial, Template 1 e Template 2',
+      '13 fontes em 7 pares calibrados por designers',
       'Mesmo padrão em todos os posts, sem esforço',
     ],
     visual: <MockTemplates />,
   },
   {
     tab: 'Agenda de conteúdo',
-    tag: 'Nunca mais sem postar',
+    tag: 'Nunca mais sem saber o que postar',
     title: (<>Seu mês inteiro organizado <span style={{ color: '#8B8B87' }}>num calendário</span></>),
-    body: 'Planeje carrosséis e news cards num único calendário. Clique no dia, agende o post, veja o mês inteiro de uma vez. Acabou o “o que eu posto hoje?”.',
+    // O Creatools NÃO publica nem agenda no Instagram: aqui é planejamento.
+    // Nada nesta entrada pode sugerir automação — nem "agende", nem "publique
+    // por você".
+    body: 'Planeje carrosséis e news cards num único calendário. Escolha o dia de cada post e veja o mês inteiro de uma vez: você chega no dia já sabendo o que vai publicar. Acabou o “o que eu posto hoje?”.',
     bullets: [
-      'Visão do mês com todos os posts planejados',
-      'Agende em qualquer dia com um clique',
+      'Visão do mês inteiro com tudo que você planejou',
       'Carrosséis e news cards no mesmo lugar',
+      'Organiza a sua agenda de postagens — publicar continua com você',
     ],
     visual: <MockAgenda />,
   },
@@ -631,19 +709,41 @@ const FEATURES: Feature[] = [
     tab: 'Imagens com IA',
     tag: 'Sem banco de imagem genérico',
     title: (<>Imagens geradas por IA <span style={{ color: '#8B8B87' }}>sob medida pro seu slide</span></>),
-    body: 'Gere imagens exclusivas pros seus slides com o gpt-image-2, o modelo de imagem mais recente da OpenAI. Cada imagem custa 5 créditos do seu plano.',
+    // Sem nome de modelo e sem fornecedor: motor troca, a promessa não. O custo
+    // de 5 créditos é CREDIT_COSTS.image (lib/credits.ts) — conferido.
+    body: 'Você diz o assunto e a imagem sai pronta pro slide. Sem mega prompt, sem precisar saber “falar com IA”: cada imagem nasce sob medida pro contexto daquele slide, exclusiva sua. Cada imagem custa 5 créditos do seu plano.',
     bullets: [
-      'Motor de imagem OpenAI gpt-image-2',
-      'Imagem sob medida pro contexto do slide',
+      'Sem prompt complicado: você diz o assunto, a imagem sai pronta',
+      'Feita pro feed, com alto potencial de viralizar — não é banco de imagem',
       '5 créditos por imagem gerada',
     ],
     visual: <MockAiImages />,
   },
 ];
 
+/** Tempo de leitura de uma aba antes de passar pra próxima. */
+const FEATURE_ROTATE_MS = 4500;
+
 function Features() {
   const [active, setActive] = useState(2);
+  /** Clique do usuário: ele escolheu uma aba pra ler, a rotação acaba ali. */
+  const [locked, setLocked] = useState(false);
+  /** Ponteiro (ou foco de teclado) dentro do bloco: pausa enquanto estiver lá. */
+  const [paused, setPaused] = useState(false);
+  const reducedMotion = useReducedMotion();
   const f = FEATURES[active];
+
+  // Rotação automática das abas. O efeito NÃO depende de `active` — quem avança
+  // é o updater funcional —, então o intervalo só é recriado quando muda uma
+  // condição de parada, e o cleanup mata o timer no unmount e a cada troca.
+  // Sem `prefers-reduced-motion: reduce`, sem hover e sem clique: só aí gira.
+  useEffect(() => {
+    if (locked || paused || reducedMotion) return;
+    const id = setInterval(() => {
+      setActive((i) => (i + 1) % FEATURES.length);
+    }, FEATURE_ROTATE_MS);
+    return () => clearInterval(id);
+  }, [locked, paused, reducedMotion]);
 
   return (
     <section id="recursos" className="py-16 md:py-24 px-6 bg-white">
@@ -670,7 +770,11 @@ function Features() {
               <button
                 key={feat.tab}
                 type="button"
-                onClick={() => setActive(i)}
+                onClick={() => {
+                  setActive(i);
+                  setLocked(true);
+                }}
+                aria-pressed={i === active}
                 className="relative px-4 md:px-5 py-2.5 rounded-full text-[11.5px] md:text-[12.5px] font-semibold uppercase tracking-[0.04em]"
                 style={{ color: i === active ? '#fff' : 'var(--lp-gray-2)', transition: 'color 250ms ease' }}
               >
@@ -692,9 +796,17 @@ function Features() {
         <FadeUp delay={0.15} className="mt-8">
           <motion.div
             key={active}
-            initial={{ opacity: 0, y: 12 }}
+            initial={reducedMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            /* Pausa enquanto a pessoa está lendo o bloco — ponteiro dentro, ou
+               foco de teclado em algo aqui. onFocus/onBlur borbulham (ao
+               contrário de focusin/focusout nativos do DOM) e cobrem quem
+               navega por tab. */
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+            onFocus={() => setPaused(true)}
+            onBlur={() => setPaused(false)}
             className="rounded-[36px] p-8 md:p-14 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center"
             style={{ background: 'var(--lp-black)', color: '#fff' }}
           >
