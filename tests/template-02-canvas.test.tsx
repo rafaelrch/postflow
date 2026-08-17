@@ -132,7 +132,8 @@ describe('TEMPLATE 2 — popup de modelo', () => {
 
   it('o rótulo do estilo aparece na barra de status', () => {
     montaDeck(TEMPLATE_02_DEFAULT_MODELS);
-    expect(screen.getByText(/Template 2/)).toBeTruthy();
+    // Nome EXIBIDO do estilo `template02` (STYLE_LABEL em SlideCanvas.tsx).
+    expect(screen.getByText(/Radar/)).toBeTruthy();
   });
 });
 

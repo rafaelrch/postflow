@@ -117,7 +117,9 @@ describe('barra de status', () => {
     expect(screen.getByTestId('status-slide').textContent).toBe('Slide 1/6');
     // × de multiplicação, não a letra x, e o "px" colado no número.
     expect(screen.getByTestId('status-format').textContent).toBe('1080 × 1350px');
-    expect(screen.getByTestId('status-template').textContent).toBe('Editorial');
+    // Nome EXIBIDO do estilo `editorial` (STYLE_LABEL em SlideCanvas.tsx). O
+    // valor interno continua 'editorial' — quem foi renomeado foi o rótulo.
+    expect(screen.getByTestId('status-template').textContent).toBe('Atelier');
   });
 
   it('acompanha o slide ativo', () => {
