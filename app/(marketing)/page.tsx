@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
 import { ShootingStarsGrid } from '@/components/ui/shooting-stars-grid';
 import LeadCaptureModal from '@/components/billing/LeadCaptureModal';
-import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2 } from 'lucide-react';
+import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2, Check } from 'lucide-react';
 
 /* ────────────────────────────────────────────────────────────────
    CREATOOLS · LANDING PAGE
@@ -464,7 +464,7 @@ const STEPS = [
     // Os quatro nomes são os do wizard (TEMPLATES em CreateWizard.tsx). O
     // `minimalist` existe no editor mas NÃO é oferecido na criação — não pode
     // aparecer aqui como opção.
-    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o template: Profile, Editorial, Template 1 ou Template 2.',
+    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o template: Profile, Atelier, Manifesto ou Radar.',
   },
   {
     title: 'A IA monta tudo',
@@ -568,7 +568,7 @@ function MockNews() {
  * arquivo: 7 pares, 13 fontes distintas (Inter se repete em dois pares).
  */
 function MockTemplates() {
-  const templates = ['Profile', 'Editorial', 'Template 1', 'Template 2'];
+  const templates = ['Profile', 'Atelier', 'Manifesto', 'Radar'];
   return (
     <div className="w-full max-w-[260px]">
       <div className="grid grid-cols-2 gap-3">
@@ -651,7 +651,7 @@ const FEATURES: Feature[] = [
     title: (<>Carrosséis completos <span style={{ color: '#8B8B87' }}>a partir de uma frase</span></>),
     body: 'Você digita o tema, a IA escreve título, subtítulo e o texto de cada slide, com gancho de abertura e CTA de fechamento. Tudo editável num editor visual, slide por slide.',
     bullets: [
-      '4 templates prontos: Profile (cara de thread do X), Editorial, Template 1 e Template 2',
+      '4 templates prontos: Profile (cara de thread do X), Atelier, Manifesto e Radar',
       'Gancho, desenvolvimento e CTA escritos pela IA',
       'Editor visual completo pra ajustar tudo antes de exportar',
     ],
@@ -675,7 +675,7 @@ const FEATURES: Feature[] = [
     title: (<>Templates prontos, <span style={{ color: '#8B8B87' }}>identidade sempre igual</span></>),
     body: 'Quatro templates pra escolher e 13 fontes em 7 pares calibrados. Todo post sai com a mesma cara: consistência visual de quem está crescendo de verdade.',
     bullets: [
-      'Profile, Editorial, Template 1 e Template 2',
+      'Profile, Atelier, Manifesto e Radar',
       '13 fontes em 7 pares calibrados por designers',
       'Mesmo padrão em todos os posts, sem esforço',
     ],
@@ -896,23 +896,23 @@ function Results() {
         </FadeUp>
 
         <div className="mt-14 grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-          {/* Editorial */}
+          {/* Atelier */}
           <FadeUp delay={0}>
             <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#0A0A0A', color: '#fff' }}>
-              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase opacity-45">Editorial</span>
+              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase opacity-45">Atelier</span>
               <p className="lp-h text-[19px] md:text-[22px]">5 erros que travam seu crescimento</p>
               <span className="text-[10px] opacity-35">@orafaelrocha_</span>
             </div>
           </FadeUp>
-          {/* Template 2. A seção promete "o tipo de post que você VAI criar", então
-              todo rótulo aqui tem que ser um template que o wizard oferece — o
-              `minimalist` não é. Dos quatro reais, este card é o Template 2: o creme
-              é o token `paper` do spec (#EEE5D9, fundo dos slides internos), e é o
-              único creme entre os templates de verdade. Editorial já é o card ao
-              lado e o Profile é o card de thread, à direita. */}
+          {/* Radar (valor interno `template02`). A seção promete "o tipo de post que
+              você VAI criar", então todo rótulo aqui tem que ser um template que o
+              wizard oferece — o `minimalist` não é. Dos quatro reais, este card é o
+              Radar: o creme é o token `paper` do spec (#EEE5D9, fundo dos slides
+              internos), e é o único creme entre os templates de verdade. O Atelier
+              já é o card ao lado e o Profile é o card de thread, à direita. */}
           <FadeUp delay={0.07}>
             <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#EEE5D9' }}>
-              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: '#B5B5B0' }}>Template 2</span>
+              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: '#B5B5B0' }}>Radar</span>
               <p className="lp-h text-[19px] md:text-[22px]">Rotina de conteúdo em 30 min por dia</p>
               <span className="text-[10px]" style={{ color: '#B5B5B0' }}>@orafaelrocha_</span>
             </div>
@@ -1043,9 +1043,14 @@ const PLAN_FEATURES = [
   // que vende. Os 5 créditos são CREDIT_COSTS.image (lib/credits.ts).
   'Imagens com IA: 5 créditos cada',
   'Créditos de IA que renovam todo mês',
-  'Agenda de conteúdo',
+  // Calendário é PLANEJAMENTO: o produto não publica nem agenda no Instagram.
+  'Agenda de conteúdo para planejar o mês',
   'Projetos ilimitados',
-  'Editor visual completo, slide a slide',
+  // "Drag & drop" aqui é só o que existe de verdade: arrastar card de slide
+  // reordena (reorderSlides via @hello-pangea/dnd em SlideCanvas.tsx) e soltar
+  // arquivo de imagem sobe a imagem (DropZone em EditorSidebar.tsx). NÃO é
+  // editor de arrastar elemento livre na tela — não escreva isso.
+  'Editor visual completo, slide a slide (arraste pra reordenar)',
   'Export Full HD (PNG, ZIP e MP4), sem marca d’água',
 ];
 
@@ -1091,12 +1096,15 @@ function Pricing() {
               </p>
               <div className="mt-6 -mx-8 px-8 py-3" style={{ background: '#EBEBE9' }}>
                 <p className="text-[13px] font-bold tracking-tight">200 CRÉDITOS TODO MÊS</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 carrosséis por mês</p>
+                {/* Carrossel e imagem custam 5 créditos cada (CREDIT_COSTS) e
+                    saem do MESMO saldo: 200 ÷ 5 = 40 gerações, não 40
+                    carrosséis mais imagens à parte. */}
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--lp-gray-2)' }}>Até 40 gerações: carrossel ou imagem</p>
               </div>
               <ul className="mt-6 space-y-2.5">
                 {PLAN_FEATURES.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'var(--lp-gray-2)' }}>
-                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#C5C5C0' }} />
+                    <Check className="w-4 h-4 mt-[2px] shrink-0" strokeWidth={3} style={{ color: 'var(--lp-black)' }} aria-hidden="true" />
                     {perk}
                   </li>
                 ))}
@@ -1121,26 +1129,34 @@ function Pricing() {
                 <span className="lp-badge" style={{ background: '#fff', color: 'var(--lp-black)', fontSize: 11, padding: '7px 14px' }}>
                   Plano Anual
                 </span>
+                {/* "Melhor custo-benefício" é conta: 499 contra 714 por ano.
+                    O selo da referência trazia junto "MAIS ESCOLHIDO" e isso
+                    ficou de fora de propósito — é prova social, não temos base
+                    pagante que sustente, e alegação de popularidade inventada
+                    numa página que cobra é propaganda enganosa. */}
                 <span className="lp-badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 11, padding: '7px 14px' }}>
-                  Economize ~30%
+                  Economize ~30% · Melhor custo-benefício
                 </span>
               </div>
-              <div className="mt-5 flex items-baseline">
+              <div className="mt-5 flex items-baseline gap-2.5 flex-wrap">
+                {/* 12 × R$59,50 = R$714. Preço cheio riscado é a conta do mesmo
+                    período no plano mensal, não um "de/por" inventado. */}
+                <s className="text-[19px] font-bold" style={{ color: 'rgba(255,255,255,0.45)' }}>R$714</s>
                 <span className="lp-h" style={{ fontSize: 56 }}>R$499</span>
-                <span className="ml-2 text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>/ano</span>
+                <span className="text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>/ano</span>
               </div>
               <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                Equivale a ~R$41,58/mês. Economize ~30%.
-                <br />O plano mais escolhido.
+                Equivale a ~R$41,58/mês, ~R$1,37/dia.
+                <br />12 meses no plano mensal sairiam R$714: você economiza R$215.
               </p>
               <div className="mt-6 -mx-8 px-8 py-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <p className="text-[13px] font-bold tracking-tight">300 CRÉDITOS TODO MÊS</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 carrosséis por mês</p>
+                <p className="text-[11.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Até 60 gerações: carrossel ou imagem</p>
               </div>
               <ul className="mt-6 space-y-2.5">
                 {PLAN_FEATURES.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5 text-[13.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
+                    <Check className="w-4 h-4 mt-[2px] shrink-0 text-white" strokeWidth={3} aria-hidden="true" />
                     {perk}
                   </li>
                 ))}
