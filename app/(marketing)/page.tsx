@@ -101,6 +101,18 @@ const LP_CSS = `
   .lp-btn.white:hover { transform: translateY(-1px); }
   .lp-btn:disabled { opacity: 0.55; pointer-events: none; }
 
+  /* Login some no mobile para a marca caber na barra (decisão do Rafael: quem
+     já é cliente entra pelo CTA ou digitando /login). É display:none, então ele
+     sai também do tab e do leitor de tela — esconder só na vista deixaria um
+     botão invisível recebendo foco.
+     A regra mora AQUI, e não numa classe .hidden do Tailwind, porque este
+     style é injetado no body, DEPOIS da folha do Tailwind: com a mesma
+     especificidade quem vem por último ganha, e o display:inline-flex de
+     .lp-btn venceria o .hidden. Na mesma folha a ordem é minha e o resultado é
+     determinístico. */
+  .lp-nav-login { display: none; }
+  @media (min-width: 640px) { .lp-nav-login { display: inline-flex; } }
+
   /* CTA principal do hero: uma segunda camada BRANCA atrás do botão preto,
      deslocada pra baixo/direita, com borda preta fina e sombra dura (sem blur).
      A camada é decorativa e fica FORA do <a> — o alvo de clique e o foco de
@@ -201,16 +213,17 @@ function Nav() {
             manda agora (`h-*` + `w-auto`), e os atributos vão no tamanho grande
             para o Next servir arquivo com resolução de sobra em tela retina.
 
-            A altura é responsiva por necessidade, não por gosto: em 375px os
-            dois botões (Login + Começar agora) ocupam 268 dos 317px úteis da
-            barra, então a marca grande do desktop não caberia sem colidir. */}
+            A altura ainda é responsiva, mas o aperto diminuiu: o Login sai da
+            barra abaixo de 640px (.lp-nav-login), o que devolveu ~88px e deixou
+            a marca subir de 12 para 32px no celular. 44px continua só no
+            desktop, onde sobra espaço. */}
         <Link href="/" className="flex items-center">
           <Image
             src="/LOGO_SEMFUNDO.png"
             alt="Creatools"
             width={157}
             height={44}
-            className="object-contain h-3 w-auto sm:h-8 md:h-11"
+            className="object-contain h-8 w-auto md:h-11"
           />
         </Link>
 
@@ -221,7 +234,7 @@ function Nav() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/login" className="lp-btn light !py-[13px] !px-6 text-[14px]">Login</Link>
+          <Link href="/login" className="lp-btn light lp-nav-login !py-[13px] !px-6 text-[14px]">Login</Link>
           <Link href="/cadastro" className="lp-btn black !text-[14px] !pl-5 !py-[7px]">
             Começar agora <ArrowChip dark />
           </Link>
@@ -1463,7 +1476,11 @@ function Footer() {
           <div className="grid md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-10">
             <div>
               <div className="flex items-center gap-2.5">
-                <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={134} height={134} className="object-contain" />
+                {/* Mesmo caso da navbar: o arquivo é 7644×2144 (~3.57:1) e estava
+                    num quadrado 134×134, então `object-contain` encaixava a marca
+                    e o resto da caixa era ar — 96px de altura morta empurrando o
+                    texto abaixo. Agora a caixa TEM a proporção da marca. */}
+                <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={161} height={45} className="object-contain h-auto w-[161px]" />
               </div>
               <p className="mt-3 text-[14px] leading-relaxed max-w-[220px]" style={{ color: 'var(--lp-gray)' }}>
                 IA para creators que levam conteúdo a sério.
