@@ -661,9 +661,13 @@ function MockPalette() {
   return (
     <div className="w-full max-w-[260px] rounded-2xl bg-white p-6 text-left" style={{ border: '1px solid #ECECEA' }}>
       <p className="text-[12px] font-bold">Paleta da marca</p>
-      <div className="flex gap-2.5 mt-4">
+      {/* As bolinhas ENCOLHEM: com `w-9` fixo os cinco discos mais os vãos davam
+          280px de largura mínima e estouravam a moldura no celular. Agora
+          dividem o espaço disponível (flex-1) e o `max-w-9` mantém os 36px de
+          sempre onde couber — no desktop nada muda. */}
+      <div className="flex gap-2.5 mt-4 min-w-0">
         {colors.map((c) => (
-          <div key={c} className="w-9 h-9 rounded-full" style={{ background: c, border: '1px solid #ECECEA' }} />
+          <div key={c} className="flex-1 min-w-0 max-w-9 aspect-square rounded-full" style={{ background: c, border: '1px solid #ECECEA' }} />
         ))}
       </div>
       <p className="text-[10px] mt-4" style={{ color: '#9A9A96' }}>Aplicada automaticamente em cada geração</p>
@@ -880,13 +884,13 @@ function Features() {
                     entra dividem o mesmo espaço em vez de se empurrarem.
                 As inativas ficam com opacity 0 + inert: somem da navegação por
                 teclado e do leitor de tela, não só da vista. */}
-            <div className="grid">
+            <div className="grid min-w-0">
               {FEATURES.map((feat, i) => {
                 const isActive = i === active;
                 return (
                   <div
                     key={feat.tab}
-                    className="grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center"
+                    className="grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center min-w-0"
                     /* Transição em CSS, não em JS. O framer anima por
                        requestAnimationFrame, e além de ser mais peça para o
                        mesmo efeito, o estado real ficava impossível de auditar:
@@ -913,7 +917,7 @@ function Features() {
                     aria-hidden={!isActive}
                     inert={!isActive}
                   >
-                    <div>
+                    <div className="min-w-0">
                       <span className="lp-badge on-dark">{feat.tag}</span>
                       <h3 className="lp-h mt-6" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>{feat.title}</h3>
                       <p className="mt-5 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{feat.body}</p>
@@ -926,7 +930,7 @@ function Features() {
                         ))}
                       </ul>
                     </div>
-                    <div className="rounded-[24px] bg-white min-h-[360px] md:min-h-[420px] grid place-items-center p-8">
+                    <div className="rounded-[24px] bg-white min-h-[360px] md:min-h-[420px] grid place-items-center min-w-0 p-5 sm:p-8">
                       {feat.visual}
                     </div>
                   </div>
