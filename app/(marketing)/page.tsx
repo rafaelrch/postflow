@@ -108,7 +108,13 @@ const LP_CSS = `
      none: nem rouba clique nas bordas nem gera hover fantasma.
      O botão perde aqui a própria sombra offset preta (.lp-btn.black) porque
      quem faz esse papel agora é o shape; o anel branco de 2px continua, é ele
-     que separa o preto do botão da borda preta do shape. */
+     que separa o preto do botão da borda preta do shape.
+
+     SÃO DUAS CAMADAS, não três: o botão preto e, atrás, a forma branca
+     contornada. O que parece sombra preta na referência é a BORDA do shape.
+     O shape já teve um box-shadow preto aqui e ele empilhava uma terceira
+     camada 5px além da segunda — era o "aplicou por baixo" em vez de
+     substituir. Não devolva essa sombra. */
   .lp-cta-stack { position: relative; display: inline-flex; }
   .lp-cta-stack > .lp-btn { position: relative; z-index: 1; }
   .lp-cta-stack > .lp-btn.black { box-shadow: 0 0 0 2px #fff; }
@@ -117,13 +123,15 @@ const LP_CSS = `
     background: #fff;
     border: 2px solid var(--lp-black);
     border-radius: 15px;
-    transform: translate(5px, 5px);
-    box-shadow: 5px 5px 0 0 var(--lp-black);
+    transform: translate(6px, 6px);
   }
   /* O shape fica parado e o botão é que anda: no hover encosta e no :active
-     assenta exatamente sobre ele (translate 5px = o offset do shape). */
+     assenta exatamente sobre ele (o translate do :active tem que ser igual ao
+     offset do shape — hoje 6px nos dois). */
   .lp-cta-stack > .lp-btn.black:hover { box-shadow: 0 0 0 2px #fff; }
-  .lp-cta-stack > .lp-btn.black:active { box-shadow: 0 0 0 2px #fff; }
+  /* O translate do :active global é 5px (casava com a sombra de 6px do botão
+     solto). Aqui ele passa a 6px para assentar exatamente sobre o shape. */
+  .lp-cta-stack > .lp-btn.black:active { transform: translate(6px, 6px); box-shadow: 0 0 0 2px #fff; }
 
   .lp-arrow { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; }
   .lp-arrow.on-black { background: rgba(255,255,255,0.16); color: #fff; }
@@ -184,9 +192,26 @@ function Nav() {
       <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
         {/* Só a logo, sem o nome escrito ao lado. Com o texto fora, o alt da
             imagem é o ÚNICO nome acessível deste link — sem ele o leitor de tela
-            anunciaria "link" e mais nada. Não apague o alt. */}
+            anunciaria "link" e mais nada. Não apague o alt.
+
+            width/height seguem a proporção REAL do arquivo (7644×2144 ≈ 3.57:1).
+            Antes eram 30×30: a marca é deitada, então dentro de uma caixa
+            quadrada com object-contain ela era "encaixada" e sobrava só 30×8px
+            de logo visível — daí a sensação de logo minúscula. A altura é quem
+            manda agora (`h-*` + `w-auto`), e os atributos vão no tamanho grande
+            para o Next servir arquivo com resolução de sobra em tela retina.
+
+            A altura é responsiva por necessidade, não por gosto: em 375px os
+            dois botões (Login + Começar agora) ocupam 268 dos 317px úteis da
+            barra, então a marca grande do desktop não caberia sem colidir. */}
         <Link href="/" className="flex items-center">
-          <Image src="/LOGO_SEMFUNDO.png" alt="Creatools" width={30} height={30} className="object-contain" />
+          <Image
+            src="/LOGO_SEMFUNDO.png"
+            alt="Creatools"
+            width={157}
+            height={44}
+            className="object-contain h-3 w-auto sm:h-8 md:h-11"
+          />
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-[14.5px] font-medium" style={{ color: 'var(--lp-gray-2)' }}>
@@ -324,16 +349,19 @@ function Hero() {
              máquina de quem tem a fonte instalada e cai em Georgia no visitante.
              Mesmo caminho de lib/utils.ts:146 e components/slides/Template01Slide.tsx.
 
-             O peso 500 é ESCOLHA, não engano — não "conserte" subindo pra 700.
-             O kit publica ivyora-text só em 400 e 700 e não tem Medium, então
-             HOJE o navegador renderiza o 400. O 700 chegou a ser testado e o
-             Rafael achou grosso demais. 500 é o valor certo pra quando o Medium
-             entrar no projeto do Adobe Fonts: aí passa a renderizar sozinho, sem
-             tocar em código. Nada de font-synthesis pra compensar. */
+             SOBRE O PESO — leia antes de "ajustar", já mudou três vezes.
+             O kit publica ivyora-text em DOIS pesos: 400 e 700. Não há Medium
+             nem SemiBold. Pelo font matching do CSS, pedido abaixo de 500 procura
+             primeiro os pesos menores e pedido acima de 500 procura primeiro os
+             maiores — na prática, aqui: 500 renderiza 400, e 600 e 700 renderizam
+             700. São dois resultados possíveis, não três, então mudar de 600 pra
+             700 (ou de 500 pra 400) não altera um pixel.
+             600 é o valor pedido e é o que passa a valer sozinho no dia em que o
+             Medium entrar no projeto do Adobe Fonts. Nada de font-synthesis. */
           style={{
             fontSize: 'clamp(38px, 5.4vw, 64px)',
             fontFamily: "'ivyora-text', 'T01Serif', Georgia, serif",
-            fontWeight: 500,
+            fontWeight: 600,
             fontStyle: 'italic',
           }}
         >
