@@ -156,6 +156,33 @@ const LP_CSS = `
   }
   .lp-marquee-track { display: flex; width: max-content; animation: lp-marquee 38s linear infinite; }
   .lp-marquee:hover .lp-marquee-track { animation-play-state: paused; }
+
+  /* Aba "Seu rosto no carrossel": a imagem gerada nasce borrada, como se
+     estivesse renderizando, e revela nítida. Em loop.
+
+     O desfoque é filter sobre a imagem JA carregada — nada de trocar de arquivo
+     no meio, que piscaria e dependeria da rede. E a animacao e CSS, nao
+     requestAnimationFrame: rAF congela em documento de segundo plano, foi por
+     isso que o cross-fade das abas tambem virou CSS. */
+  @keyframes lp-render-reveal {
+    0%, 10%   { filter: blur(12px) saturate(0.85); transform: scale(1.04); }
+    45%, 90%  { filter: blur(0) saturate(1);       transform: scale(1); }
+    100%      { filter: blur(12px) saturate(0.85); transform: scale(1.04); }
+  }
+  @keyframes lp-render-badge {
+    0%, 32%  { opacity: 1; }
+    45%, 95% { opacity: 0; }
+    100%     { opacity: 1; }
+  }
+  .lp-render-img   { animation: lp-render-reveal 5.5s ease-in-out infinite; }
+  .lp-render-badge { animation: lp-render-badge 5.5s ease-in-out infinite; }
+
+  /* Quem pediu menos movimento ve o resultado final, parado: imagem nitida e
+     sem o selo de "gerando". */
+  @media (prefers-reduced-motion: reduce) {
+    .lp-render-img   { animation: none; filter: none; transform: none; }
+    .lp-render-badge { animation: none; opacity: 0; }
+  }
 `;
 
 /* ─── Motion helpers ─────────────────────────────────────────── */
@@ -592,10 +619,23 @@ function MockCarousel() {
 function MockNews() {
   return (
     <div className="w-full max-w-[240px] rounded-2xl overflow-hidden text-left" style={{ border: '1px solid #ECECEA' }}>
-      <div className="h-28" style={{ background: 'linear-gradient(135deg, #1a1a1a, #3a3a38)' }} />
+      {/* News card de verdade, saído do produto — no lugar do retângulo chapado
+          que estava aqui. A área é 4:5 igual ao arquivo, então a imagem entra
+          inteira: nada de `cover` cortando a manchete, que é o conteúdo.
+          A manchete inventada que existia embaixo ("IA generativa muda o jogo…")
+          saiu junto: a imagem traz a manchete real dela, e duas manchetes
+          diferentes no mesmo card se contradiziam. A tarja e a legenda ficam. */}
+      <div className="relative aspect-[4/5] bg-[#1a1a1a]">
+        <Image
+          src="/news-card-exemplo.webp"
+          alt="News card gerado no Creatools: matéria de Tecnologia com a manchete “Anthropic pode alcançar avaliação trilionária em um dos maiores IPOs da história”."
+          fill
+          sizes="240px"
+          className="object-cover"
+        />
+      </div>
       <div className="p-4 bg-white">
         <span className="inline-block text-[9px] font-bold tracking-[0.16em] uppercase px-2 py-1 rounded bg-red-600 text-white">Notícia</span>
-        <p className="text-[14px] font-bold tracking-tight mt-2 leading-snug">IA generativa muda o jogo do marketing em 2026</p>
         <p className="text-[10px] mt-2" style={{ color: '#9A9A96' }}>Formato do feed · 1080×1350</p>
       </div>
     </div>
@@ -690,6 +730,57 @@ function MockAiImages() {
   );
 }
 
+/** Cantos de mira do cartao de entrada — puro enfeite, fora do leitor de tela. */
+function MiraCorners() {
+  const base = 'absolute w-3 h-3 border-white/70';
+  return (
+    <>
+      <span className={`${base} top-1.5 left-1.5 border-t-2 border-l-2`} />
+      <span className={`${base} top-1.5 right-1.5 border-t-2 border-r-2`} />
+      <span className={`${base} bottom-1.5 left-1.5 border-b-2 border-l-2`} />
+      <span className={`${base} bottom-1.5 right-1.5 border-b-2 border-r-2`} />
+    </>
+  );
+}
+
+/**
+ * Entrada (a foto de referencia) → saida (a imagem gerada a partir dela).
+ * A direita nasce borrada e revela nitida, em loop, por CSS — ver
+ * lp-render-reveal no LP_CSS.
+ */
+function MockFaceSwap() {
+  return (
+    <div className="w-full max-w-[260px] flex items-center gap-1.5">
+      <figure className="flex-1 min-w-0">
+        <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-[#111]">
+          <Image src="/rosto-referencia.webp" alt="Foto de referencia enviada por quem cria o carrossel" fill sizes="130px" className="object-cover" />
+          <MiraCorners />
+        </div>
+        <figcaption className="mt-1.5 text-[8px] font-bold tracking-[0.14em] uppercase text-center" style={{ color: '#9A9A96' }}>
+          Analisado
+        </figcaption>
+      </figure>
+
+      <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={2.5} style={{ color: '#B5B5B0' }} aria-hidden="true" />
+
+      <figure className="flex-1 min-w-0">
+        <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-[#111]">
+          <Image src="/rosto-gerado.webp" alt="Imagem gerada pela IA com o mesmo rosto, em outro cenario" fill sizes="130px" className="object-cover lp-render-img" />
+          <span
+            className="lp-render-badge absolute inset-x-1 bottom-1 text-[7px] font-bold tracking-[0.1em] uppercase text-white text-center rounded px-1 py-0.5"
+            style={{ background: 'rgba(0,0,0,0.62)' }}
+          >
+            Gerando imagem…
+          </span>
+        </div>
+        <figcaption className="mt-1.5 text-[8px] font-bold tracking-[0.14em] uppercase text-center" style={{ color: '#0A0A0A' }}>
+          No seu slide
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
+
 const FEATURES: Feature[] = [
   {
     tab: 'Carrossel',
@@ -767,6 +858,25 @@ const FEATURES: Feature[] = [
       '5 créditos por imagem gerada',
     ],
     visual: <MockAiImages />,
+  },
+  {
+    tab: 'Seu rosto no carrossel',
+    tag: 'Geração com referência',
+    title: (<>Seu rosto <span style={{ color: '#8B8B87' }}>dentro do carrossel</span></>),
+    // CONFERIDO NO CÓDIGO antes de escrever: a referência existe de verdade —
+    // AiGenPanel envia `referenceImageUrl`, a rota app/api/generate-image chama
+    // openai.images.edit com o arquivo baixado por downloadReferenceImage, e o
+    // evento sai como generationType 'edit'. É uma imagem de referência
+    // OPCIONAL, anexada a cada geração; o produto não tem trava de identidade
+    // nem repete o rosto sozinho pelos slides. A copy fala do que existe: você
+    // anexa a foto, a IA gera a partir dela, e repetir a referência é ação sua.
+    body: 'Anexe uma foto na hora de gerar a imagem do slide e a IA cria a cena a partir dela: você em outro cenário, com outra roupa, sem marcar sessão de fotos. Serve pra sua foto ou pra do seu cliente.',
+    bullets: [
+      'Anexe a foto de referência na hora de gerar',
+      'Use a mesma referência slide a slide pra manter a pessoa no carrossel',
+      '5 créditos por imagem, como qualquer geração',
+    ],
+    visual: <MockFaceSwap />,
   },
 ];
 
@@ -946,22 +1056,41 @@ function Features() {
 
 /* ─── Marquee ─────────────────────────────────────────────────── */
 
+/**
+ * Clientes reais, com a foto e o @ de cada um. O mapeamento foto→@ veio fechado
+ * do Rafael e NÃO deve ser reordenado por conveniência de layout: cada rosto é
+ * de uma pessoa e trocar o @ de lugar atribui a fala errada a alguém.
+ *
+ * São 11. A lista de @s tinha 12 — @viniciusramos_ ficou sem foto e por isso
+ * está de fora de propósito. Não repita ninguém nem invente um 12º rosto para
+ * "fechar" a conta.
+ */
 const MARQUEE_ITEMS = [
-  { ring: '#B5B5B0', emoji: '🧴' },
-  { ring: '#3B82F6', emoji: '💧' },
-  { ring: '#65A30D', emoji: '🌿' },
-  { ring: '#EA580C', emoji: '🍊' },
-  { ring: '#EC4899', emoji: '💗' },
-  { ring: '#8B5CF6', emoji: '💜' },
-  { ring: '#CA8A04', emoji: '✨' },
-  { ring: '#EF4444', emoji: '🍒' },
+  { src: '/clientes/cliente-01.webp', handle: '@marianacosta_' },
+  { src: '/clientes/cliente-02.webp', handle: '@gabriel.monteiro' },
+  { src: '/clientes/cliente-03.webp', handle: '@lucasvieiraa' },
+  { src: '/clientes/cliente-04.webp', handle: '@carolalmeida_' },
+  { src: '/clientes/cliente-05.webp', handle: '@isabellamoraes' },
+  { src: '/clientes/cliente-06.webp', handle: '@andrehsilva' },
+  { src: '/clientes/cliente-07.webp', handle: '@lari.freitas' },
+  { src: '/clientes/cliente-08.webp', handle: '@ricardo.mattos' },
+  { src: '/clientes/cliente-09.webp', handle: '@thiagolimaa' },
+  { src: '/clientes/cliente-10.webp', handle: '@nathsouza_' },
+  { src: '/clientes/cliente-11.webp', handle: '@biancamartins_' },
 ];
 
+/**
+ * Repetições do conjunto na faixa. Tem que ser PAR: a animação desloca a trilha
+ * em -50%, então a metade precisa cair exatamente sobre um número inteiro de
+ * conjuntos — senão a emenda salta no fim do ciclo. E a metade precisa ser mais
+ * larga que a tela, senão sobra vão em branco na direita.
+ * 6 × 11 itens = 66; a metade são 33 itens × 96px = 3168px, o que cobre com
+ * folga qualquer monitor comum.
+ */
+const MARQUEE_REPEATS = 6;
+
 function Marquee() {
-  // The keyframe slides the track by -50%, so the track must hold an even
-  // number of item sets AND its half-width must exceed the widest viewport —
-  // otherwise the strip runs out of content and the right side shows blank.
-  const items = Array.from({ length: 8 }, () => MARQUEE_ITEMS).flat();
+  const items = Array.from({ length: MARQUEE_REPEATS }, () => MARQUEE_ITEMS).flat();
   return (
     <section className="lp-marquee py-4 overflow-hidden bg-[#F7F7F7]">
       <div
@@ -973,13 +1102,23 @@ function Marquee() {
       >
         {items.map((item, i) => (
           <div key={i} className="flex flex-col items-center gap-2 mx-2 shrink-0">
-            <div
-              className="w-20 h-20 rounded-full grid place-items-center text-[40px] bg-white"
-              style={{ border: `3px solid ${item.ring}` }}
-            >
-              {item.emoji}
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-white" style={{ border: '3px solid #fff', boxShadow: '0 2px 10px -2px rgba(0,0,0,0.18)' }}>
+              {/* Tirei o anel colorido dos emojis: com rostos de verdade, uma cor
+                  por pessoa não quer dizer nada e só polui. O aro branco separa a
+                  foto do fundo cinza da faixa.
+                  `alt` com o @ porque são pessoas — alt vazio aqui apagaria 11
+                  clientes do leitor de tela. As repetições da trilha são
+                  decorativas, então só o primeiro conjunto é anunciado. */}
+              <Image
+                src={item.src}
+                alt={i < MARQUEE_ITEMS.length ? `Cliente ${item.handle}` : ''}
+                aria-hidden={i >= MARQUEE_ITEMS.length}
+                width={160}
+                height={160}
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="text-[13px]" style={{ color: 'var(--lp-gray)' }}>@orafaelrocha_</span>
+            <span className="text-[13px]" style={{ color: 'var(--lp-gray)' }}>{item.handle}</span>
           </div>
         ))}
       </div>
