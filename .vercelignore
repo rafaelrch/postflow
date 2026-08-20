@@ -1,0 +1,8 @@
+.claude
+.next
+.next_root_owned_backup
+node_modules
+.git
+.maestri
+graphify-out
+*.log
