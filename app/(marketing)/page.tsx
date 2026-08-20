@@ -164,18 +164,24 @@ const LP_CSS = `
      no meio, que piscaria e dependeria da rede. E a animacao e CSS, nao
      requestAnimationFrame: rAF congela em documento de segundo plano, foi por
      isso que o cross-fade das abas tambem virou CSS. */
+  /* Ciclo de 9s com DOIS patamares longos, nao um pulso: ~3,6s borrada com o
+     selo, ~1s de transicao, ~3,7s nitida e sem selo, e o resto voltando.
+     O selo comeca a sumir em 40% e ja esta em zero em 50%, ANTES de a imagem
+     ficar nitida em 52% — assim ele nunca aparece por cima da imagem pronta.
+     As duas keyframes tem que ficar na MESMA duracao, senao elas defasam e o
+     selo passa a piscar no meio do patamar nitido. */
   @keyframes lp-render-reveal {
-    0%, 10%   { filter: blur(12px) saturate(0.85); transform: scale(1.04); }
-    45%, 90%  { filter: blur(0) saturate(1);       transform: scale(1); }
+    0%, 40%   { filter: blur(12px) saturate(0.85); transform: scale(1.04); }
+    52%, 92%  { filter: blur(0) saturate(1);       transform: scale(1); }
     100%      { filter: blur(12px) saturate(0.85); transform: scale(1.04); }
   }
   @keyframes lp-render-badge {
-    0%, 32%  { opacity: 1; }
-    45%, 95% { opacity: 0; }
+    0%, 40%  { opacity: 1; }
+    50%, 94% { opacity: 0; }
     100%     { opacity: 1; }
   }
-  .lp-render-img   { animation: lp-render-reveal 5.5s ease-in-out infinite; }
-  .lp-render-badge { animation: lp-render-badge 5.5s ease-in-out infinite; }
+  .lp-render-img   { animation: lp-render-reveal 9s ease-in-out infinite; }
+  .lp-render-badge { animation: lp-render-badge 9s ease-in-out infinite; }
 
   /* Quem pediu menos movimento ve o resultado final, parado: imagem nitida e
      sem o selo de "gerando". */
@@ -383,27 +389,7 @@ function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           className="lp-h tracking-tighter"
-          /* IvyOra Text em itálico. A família é `ivyora-text`, do projeto web do
-             Adobe Fonts (kit carregado em app/layout.tsx) — NÃO 'IvyOra Text',
-             cujo @font-face em globals.css resolve só por local(): renderiza na
-             máquina de quem tem a fonte instalada e cai em Georgia no visitante.
-             Mesmo caminho de lib/utils.ts:146 e components/slides/Template01Slide.tsx.
-
-             SOBRE O PESO — leia antes de "ajustar", já mudou três vezes.
-             O kit publica ivyora-text em DOIS pesos: 400 e 700. Não há Medium
-             nem SemiBold. Pelo font matching do CSS, pedido abaixo de 500 procura
-             primeiro os pesos menores e pedido acima de 500 procura primeiro os
-             maiores — na prática, aqui: 500 renderiza 400, e 600 e 700 renderizam
-             700. São dois resultados possíveis, não três, então mudar de 600 pra
-             700 (ou de 500 pra 400) não altera um pixel.
-             600 é o valor pedido e é o que passa a valer sozinho no dia em que o
-             Medium entrar no projeto do Adobe Fonts. Nada de font-synthesis. */
-          style={{
-            fontSize: 'clamp(38px, 5.4vw, 64px)',
-            fontFamily: "'ivyora-text', 'T01Serif', Georgia, serif",
-            fontWeight: 600,
-            fontStyle: 'italic',
-          }}
+          style={{ fontSize: 'clamp(38px, 5.4vw, 64px)' }}
         >
           <span style={{ color: 'var(--lp-gray)' }}>Seu conteúdo do Instagram</span>
           <br />
@@ -732,13 +718,13 @@ function MockAiImages() {
 
 /** Cantos de mira do cartao de entrada — puro enfeite, fora do leitor de tela. */
 function MiraCorners() {
-  const base = 'absolute w-3 h-3 border-white/70';
+  const base = 'absolute w-4 h-4 border-white/70';
   return (
     <>
-      <span className={`${base} top-1.5 left-1.5 border-t-2 border-l-2`} />
-      <span className={`${base} top-1.5 right-1.5 border-t-2 border-r-2`} />
-      <span className={`${base} bottom-1.5 left-1.5 border-b-2 border-l-2`} />
-      <span className={`${base} bottom-1.5 right-1.5 border-b-2 border-r-2`} />
+      <span className={`${base} top-2 left-2 border-t-2 border-l-2`} />
+      <span className={`${base} top-2 right-2 border-t-2 border-r-2`} />
+      <span className={`${base} bottom-2 left-2 border-b-2 border-l-2`} />
+      <span className={`${base} bottom-2 right-2 border-b-2 border-r-2`} />
     </>
   );
 }
@@ -750,30 +736,50 @@ function MiraCorners() {
  */
 function MockFaceSwap() {
   return (
-    <div className="w-full max-w-[260px] flex items-center gap-1.5">
-      <figure className="flex-1 min-w-0">
+    /* A hierarquia e por flex-grow, nao por largura fixa: com basis 0, os dois
+       cartoes dividem o espaco livre em 40/60, entao a direita (o resultado)
+       nasce maior e a esquerda (a referencia) menor, em qualquer largura. A
+       diferenca de altura vem sozinha do aspect-ratio, e `items-center` deixa
+       as duas centradas na mesma linha.
+       `min-w-0` nos dois e obrigatorio: item de flex nasce com min-width auto e
+       sem isso eles se recusam a encolher no mobile, que foi exatamente o bug
+       de overflow horizontal que o 2317b0e corrigiu nesta secao. */
+    <div className="w-full max-w-[360px] flex items-center gap-2">
+      <figure className="flex-[4] min-w-0">
         <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-[#111]">
-          <Image src="/rosto-referencia.webp" alt="Foto de referencia enviada por quem cria o carrossel" fill sizes="130px" className="object-cover" />
+          <Image
+            src="/rosto-referencia.webp"
+            alt="Foto de referencia enviada por quem cria o carrossel"
+            fill
+            sizes="(max-width: 768px) 75px, 130px"
+            className="object-cover"
+          />
           <MiraCorners />
         </div>
-        <figcaption className="mt-1.5 text-[8px] font-bold tracking-[0.14em] uppercase text-center" style={{ color: '#9A9A96' }}>
+        <figcaption className="mt-2 text-[10px] font-bold tracking-[0.14em] uppercase text-center" style={{ color: '#9A9A96' }}>
           Analisado
         </figcaption>
       </figure>
 
-      <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={2.5} style={{ color: '#B5B5B0' }} aria-hidden="true" />
+      <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={2.5} style={{ color: '#B5B5B0' }} aria-hidden="true" />
 
-      <figure className="flex-1 min-w-0">
+      <figure className="flex-[6] min-w-0">
         <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-[#111]">
-          <Image src="/rosto-gerado.webp" alt="Imagem gerada pela IA com o mesmo rosto, em outro cenario" fill sizes="130px" className="object-cover lp-render-img" />
+          <Image
+            src="/rosto-gerado.webp"
+            alt="Imagem gerada pela IA com o mesmo rosto, em outro cenario"
+            fill
+            sizes="(max-width: 768px) 110px, 200px"
+            className="object-cover lp-render-img"
+          />
           <span
-            className="lp-render-badge absolute inset-x-1 bottom-1 text-[7px] font-bold tracking-[0.1em] uppercase text-white text-center rounded px-1 py-0.5"
+            className="lp-render-badge absolute inset-x-1.5 bottom-1.5 text-[7px] sm:text-[9px] font-bold tracking-[0.06em] sm:tracking-[0.1em] uppercase text-white text-center rounded px-1 py-0.5 sm:py-1"
             style={{ background: 'rgba(0,0,0,0.62)' }}
           >
             Gerando imagem…
           </span>
         </div>
-        <figcaption className="mt-1.5 text-[8px] font-bold tracking-[0.14em] uppercase text-center" style={{ color: '#0A0A0A' }}>
+        <figcaption className="mt-2 text-[10px] font-bold tracking-[0.14em] uppercase text-center" style={{ color: '#0A0A0A' }}>
           No seu slide
         </figcaption>
       </figure>
