@@ -4,6 +4,29 @@ export type ContentLayout = 'cover' | 'text-image-text' | 'text-text-image' | 'i
 // dimensões e labels vivem em lib/formats.ts. Ausência => '4:5' (legado).
 export type SlideFormat = '4:5' | '1:1' | '9:16';
 
+/**
+ * Formato do lugar onde uma imagem gerada vai cair no slide.
+ *
+ * `full-bleed`      — ocupa o slide inteiro (1080x1350), e o texto entra por cima.
+ * `inset-block`     — um bloco entre os textos, bem mais estreito que o slide (no
+ *                     T2 são 380x1089, quase 1:3).
+ * `inset-landscape` — uma caixa de mídia embutida e HORIZONTAL: a mídia do post
+ *                     no Perfil, 864x510 (~1.69:1). É o único formato deitado, e
+ *                     por isso o primeiro que muda o tamanho pedido à OpenAI
+ *                     (ver `imageSizeForShape`).
+ *
+ * A geração precisa saber disso: a mesma foto que enquadra bem no fundo chega
+ * decapitada no bloco estreito. Quem decide o formato de um slide é
+ * `imageShape` em hooks/useGenerateCarouselImages.
+ *
+ * Mora AQUI, e não junto do hook, porque o servidor precisa dele: `lib/openai`
+ * e a rota de geração são os dois consumidores, e apontar para um módulo
+ * 'use client' é dependência na direção errada — no dia em que alguém precisar
+ * de um valor daquele arquivo, o import deixa de ser apagado e arrasta o hook
+ * inteiro para dentro do servidor.
+ */
+export type ImageShape = 'full-bleed' | 'inset-block' | 'inset-landscape';
+
 export interface TextHighlight {
   text: string;
   color: string;

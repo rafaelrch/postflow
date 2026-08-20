@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { toFile } from 'openai';
-import { openai, buildImagePrompt } from '@/lib/openai';
+import { openai, buildImagePrompt, imageSizeForShape } from '@/lib/openai';
+import type { ImageShape } from '@/types';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { requireCredits, refundCredits } from '@/lib/subscription';
 import { CREDIT_COSTS } from '@/lib/credits';
@@ -21,6 +22,8 @@ interface GenerateImageBody {
   isCover?: boolean;
   isFinal?: boolean;
   quality?: 'low' | 'medium' | 'high' | 'auto';
+  /** Formato do destino da imagem no slide — ver `imageShape` no hook. */
+  shape?: string;
   /** Direção livre digitada no painel de IA. */
   userPrompt?: string;
   /** URL de imagem de referência: dispara images.edit em vez de generate. */
@@ -40,6 +43,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { slideId, title, description, isCover, isFinal, quality = 'medium', userPrompt, referenceImageUrl } = body;
+  // O corpo do POST vem do cliente: shape desconhecido cai no padrão de hoje.
+  const SHAPES: readonly ImageShape[] = ['full-bleed', 'inset-block', 'inset-landscape'];
+  const shape: ImageShape = SHAPES.find((s) => s === body.shape) ?? 'full-bleed';
   if (!slideId || !title) {
     return NextResponse.json({ error: 'slideId e title são obrigatórios' }, { status: 400 });
   }
@@ -55,7 +61,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = await createServerSupabaseClient();
-    const prompt = buildImagePrompt({ title, description, isCover, isFinal, userPrompt });
+    const prompt = buildImagePrompt({ title, description, isCover, isFinal, shape, userPrompt });
+    const size = imageSizeForShape(shape);
     let b64: string | undefined;
     let inputTokens: number | undefined;
     let outputTokens: number | undefined;
@@ -71,7 +78,7 @@ export async function POST(req: NextRequest) {
         model: 'gpt-image-2',
         image: refFile,
         prompt,
-        size: '1024x1536',
+        size,
         quality,
         n: 1,
       });
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest) {
       const response = await openai.images.generate({
         model: 'gpt-image-2',
         prompt,
-        size: '1024x1536',
+        size,
         quality,
         n: 1,
       });

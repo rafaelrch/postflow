@@ -1,13 +1,13 @@
 'use client';
 
 import { ReactNode, useRef } from 'react';
-import { Download, Archive, Upload, Image, Underline, Sparkles, RotateCcw, ArrowLeft } from 'lucide-react';
+import { Download, Archive, Upload, Image, Underline, RotateCcw, ArrowLeft } from 'lucide-react';
 // `Image` já é o ícone do lucide neste arquivo — o componente do Next entra
 // com outro nome em vez de renomear as ~10 chamadas do ícone.
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { useEditorStore } from '@/hooks/useEditorStore';
-import { useGenerateCarouselImages, isEditorialCoverSlide } from '@/hooks/useGenerateCarouselImages';
+import { useGenerateCarouselImages, isEditorialCoverSlide, batchTargets, type ImageTarget } from '@/hooks/useGenerateCarouselImages';
 import Slider from './Slider';
 import Template01Slots from './Template01Slots';
 import Template02Slots from './Template02Slots';
@@ -28,7 +28,7 @@ import {
   panelLabel,
   visiblePanels,
 } from './sidebar/panels';
-import { cn } from '@/lib/utils';
+import { cn, MIN_IMAGE_ZOOM } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
 import {
@@ -168,7 +168,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const t01ImageRef = useRef<HTMLInputElement>(null);
   const t02ImageRef = useRef<HTMLInputElement>(null);
 
-  const { generateAll, generateOne, generating, progress } = useGenerateCarouselImages();
+  const { generateAll, generateOne, generating } = useGenerateCarouselImages();
 
   if (!slide) return null;
 
@@ -181,7 +181,31 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
    * fundo continua valendo em qualquer slide.
    */
   const bgImageIsLive = style !== 'editorial' || isEditorialCover;
-  const contentSlidesCount = slides.filter((s, i) => !isEditorialCoverSlide(style, s, i)).length;
+  /**
+   * O painel "Fundo do slide" ainda desenha os controles de IMAGEM de fundo?
+   *
+   * Na capa do Editorial não: lá eles vivem no painel "Imagem", junto da IA.
+   * `bgImageIsLive` continua respondendo outra pergunta — se o fundo de imagem
+   * é RENDERIZADO neste slide —, e é ela que decide o aviso de dado legado logo
+   * abaixo. Duas perguntas, duas flags.
+   */
+  const bgControlsHere = bgImageIsLive && !isEditorialCover;
+  /**
+   * O que o painel de IA mostra no modo lote — e de onde sai a contagem do
+   * rótulo do botão.
+   *
+   * Sai de `batchTargets`, a MESMA função que o `generateAll` usa para decidir
+   * quem gera. Antes a contagem era refeita aqui (`slides.length` ou um filtro
+   * próprio) e podia divergir do lote sem ninguém perceber; a lista de textos
+   * seria uma terceira conta da mesma pergunta.
+   */
+  const batchContentsFor = (target: ImageTarget) =>
+    batchTargets(slides, style, target, activeSlideIndex).map(({ slide: s, index }) => ({
+      index,
+      // O título é o que identifica o slide na lista; a descrição só entra
+      // quando não há título, para a linha não ficar vazia.
+      text: s.title?.trim() || s.description?.trim() || 'Slide sem texto',
+    }));
 
   // ── TEMPLATE 1 ────────────────────────────────────────────────────────────
   // Tudo do template segue o MODELO do slide, nunca a posição: com modelo
@@ -481,6 +505,10 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           slideTitle={slide.title}
           slideDescription={slide.description || ''}
           onGenerate={(opts) => generateOne(activeSlideIndex, t02IsCover ? 'background' : 'content', opts)}
+          // Nos templates o `target` não decide nada: quem escolhe o destino da
+          // imagem é o modelo do slide (ver `imagePatch`).
+          onGenerateAll={(opts) => generateAll('background', activeSlideIndex, opts)}
+          batchContents={batchContentsFor('background')}
         />
         {t02ImageUrl && (
           <>
@@ -496,7 +524,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
                 <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
                   onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
-                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.imagePosition.zoom)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
                   onChange={(v) => setT02({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
               </>
             ) : (
@@ -505,7 +533,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ x: v }) }, 'contentImagePosition')} />
                 <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
                   onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ y: v }) }, 'contentImagePosition')} />
-                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.contentImagePosition?.zoom ?? 100)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
                   onChange={(v) => setT02({ contentImagePosition: withContentImagePosition({ zoom: v }) }, 'contentImagePosition')} />
               </>
             )}
@@ -530,6 +558,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           onGenerate={(opts) =>
             generateOne(activeSlideIndex, t01Media.background ? 'background' : 'content', opts)
           }
+          onGenerateAll={(opts) => generateAll('background', activeSlideIndex, opts)}
+          batchContents={batchContentsFor('background')}
         />
         {t01ImageUrl && (
           <>
@@ -545,7 +575,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
                 <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
                   onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
-                <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+                <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.imagePosition.zoom)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
                   onChange={(v) => setT01({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
               </>
             ) : (
@@ -554,14 +584,64 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
                   onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ x: v }) }, 'contentImagePosition')} />
                 <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
                   onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ y: v }) }, 'contentImagePosition')} />
-                <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+                <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.contentImagePosition?.zoom ?? 100)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
                   onChange={(v) => setT01({ contentImagePosition: withContentImagePosition({ zoom: v }) }, 'contentImagePosition')} />
               </>
             )}
           </>
         )}
       </>
+    ) : isEditorialCover ? (
+      /* CAPA DO EDITORIAL: a imagem dela vai no FUNDO do slide (não há shape de
+         conteúdo na capa). Este painel antes não existia e a geração por IA da
+         capa morava dentro de "Fundo do slide" — escondida. Os controles são os
+         mesmos do fundo: upload, IA e posição/zoom. */
+      <>
+        <DropZone label="Clique ou arraste uma imagem de fundo" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
+        <AiGenPanel
+          key={`cover-bg-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          // SEM lote aqui, de propósito: no Editorial só a CAPA usa imagem de
+          // fundo (`bgImageIsLive`). Um `generateAll('background')` gravaria
+          // fundo nos internos, onde a imagem vai no card — imagem invisível,
+          // crédito queimado. É a mesma regra que a capa já tinha antes.
+          onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+        />
+        {(slide.backgroundImageUrl || slide.gridImageUrl) && (
+          <>
+            <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
+              onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
+            {/* A opacidade veio junto do resto: ela era o único controle de
+                imagem que tinha ficado em "Fundo do slide" na mudança. */}
+            <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ backgroundImageOpacity: v })} />
+            <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} />
+            <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} />
+            <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.imagePosition.zoom)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
+              onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} />
+          </>
+        )}
+      </>
     ) : style === 'profile' ? (
+      // O `target: 'background'` fica: ele é quem manda a imagem ser GRAVADA em
+      // `backgroundImageUrl`/`gridImageUrl`, que é o par que o ProfileSlide lê.
+      // O que ele NÃO decide é o formato pedido à OpenAI — o destino na tela é
+      // a caixa de mídia do post, deitada, e quem diz isso é o `shape` de
+      // `imageDestination` (`inset-landscape`).
+      //
+      // Posição X, Posição Y e Zoom existem aqui para a foto que o usuário
+      // envia na mão, que quase nunca chega no enquadramento certo. Eles valem
+      // porque a mídia do Perfil é uma caixa fixa: a camada entra em `contain`,
+      // então no zoom 100 a imagem está INTEIRA e o que X e Y podem fazer é
+      // deslocá-la dentro da sobra da caixa — nada é cortado. É subindo o zoom
+      // que ela transborda e os dois eixos passam a escolher o enquadramento de
+      // verdade. Piso do zoom continua `MIN_IMAGE_ZOOM`: abaixo de 100 a camada
+      // deixaria de cobrir a caixa (ver `getImageLayerStyle`).
       <>
         <DropZone label="Arraste ou clique para adicionar" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
         <AiGenPanel
@@ -571,14 +651,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           slideTitle={slide.title}
           slideDescription={slide.description || ''}
           onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+          onGenerateAll={(opts) => generateAll('background', activeSlideIndex, opts)}
+          batchContents={batchContentsFor('background')}
         />
-        <button onClick={() => generateAll()} disabled={generating}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--line)] text-[11px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-          <Sparkles className="w-3.5 h-3.5" />
-          {generating && progress.total > 1
-            ? `Gerando ${progress.done}/${progress.total}…`
-            : `Gerar para todos os ${slides.length} slides`}
-        </button>
         {(slide.backgroundImageUrl || slide.gridImageUrl) && (
           <>
             <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
@@ -587,7 +662,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} />
             <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
               onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} />
-            <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+            <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.imagePosition.zoom)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
               onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} />
           </>
         )}
@@ -602,14 +677,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           slideTitle={slide.title}
           slideDescription={slide.description || ''}
           onGenerate={(opts) => generateOne(activeSlideIndex, 'content', opts)}
+          onGenerateAll={(opts) => generateAll('content', activeSlideIndex, opts)}
+          batchContents={batchContentsFor('content')}
         />
-        <button onClick={() => generateAll('content')} disabled={generating}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--line)] text-[11px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] hover:border-[var(--ink)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-          <Sparkles className="w-3.5 h-3.5" />
-          {generating && progress.total > 1
-            ? `Gerando ${progress.done}/${progress.total}…`
-            : `Gerar para os ${contentSlidesCount} slides`}
-        </button>
         {slide.contentImageUrl && (
           <ImageThumb url={slide.contentImageUrl} onRemove={() => updateActiveSlide({ contentImageUrl: '' })} />
         )}
@@ -617,7 +687,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ x: v }) })} />
         <Slider label="Posição Y" value={slide.contentImagePosition?.y ?? 50} min={0} max={100} unit="%"
           onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ y: v }) })} />
-        <Slider label="Zoom" value={slide.contentImagePosition?.zoom ?? 100} min={50} max={300} unit="%"
+        <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.contentImagePosition?.zoom ?? 100)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
           onChange={(v) => updateActiveSlide({ contentImagePosition: withContentImagePosition({ zoom: v }) })} />
       </>
     ),
@@ -980,19 +1050,14 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         {/* No EDITORIAL a imagem de fundo só existe na CAPA: nos internos ela
             vai no card (F4), e o upload aqui virou controle órfão — aceitava
             arquivo que não entrava em slide nenhum. O Minimalista continua
-            usando fundo de imagem em qualquer slide, então mantém tudo. */}
-        {bgImageIsLive && (
+            usando fundo de imagem em qualquer slide, então mantém tudo.
+
+            E na capa do Editorial o upload também não fica aqui: ele mora no
+            painel "Imagem", junto da geração por IA. Ter os dois em painéis
+            diferentes gravando no MESMO campo é o bug que o comentário do bloco
+            `imagem:` conta — um vencia o outro no render sem avisar ninguém. */}
+        {bgControlsHere && (
           <DropZone label="Clique ou arraste uma imagem de fundo" onClick={() => bgImageRef.current?.click()} onFile={handleBackgroundFile} />
-        )}
-        {isEditorialCover && (
-          <AiGenPanel
-            key={`cover-bg-${activeSlideIndex}`}
-            buttonLabel="Gerar imagem com IA (capa)"
-            generating={generating}
-            slideTitle={slide.title}
-            slideDescription={slide.description || ''}
-            onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
-          />
         )}
         {/* Carrossel editorial antigo pode ter fundo gravado num slide interno.
             O dado NÃO é apagado sozinho — mas sem nenhum controle viraria lixo
@@ -1013,7 +1078,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             </button>
           </div>
         )}
-        {bgImageIsLive && (slide.backgroundImageUrl || slide.gridImageUrl) && (
+        {bgControlsHere && (slide.backgroundImageUrl || slide.gridImageUrl) && (
           <>
             <ImageThumb url={slide.backgroundImageUrl || slide.gridImageUrl || ''}
               onRemove={() => updateActiveSlide({ backgroundImageUrl: '', gridImageUrl: '' })} />
@@ -1023,7 +1088,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
               onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, x: v } })} />
             <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
               onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, y: v } })} />
-            <Slider label="Zoom" value={slide.imagePosition.zoom} min={50} max={300} unit="%"
+            <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.imagePosition.zoom)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
               onChange={(v) => updateActiveSlide({ imagePosition: { ...slide.imagePosition, zoom: v } })} />
           </>
         )}

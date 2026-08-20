@@ -42,6 +42,7 @@ vi.mock('@/lib/openai', () => ({
   TWITTER_CAROUSEL_SYSTEM_PROMPT: 'SYSTEM_TWITTER',
   WEB_SEARCH_PROMPT_ADDENDUM: 'ADDENDUM',
   buildImagePrompt: () => 'image prompt',
+  imageSizeForShape: () => '1024x1536',
 }));
 
 vi.mock('@/lib/supabase-server', () => ({

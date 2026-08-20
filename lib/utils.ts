@@ -71,27 +71,75 @@ export function getShadowOverlayGradient(opacity: number, color?: string, size?:
   )`;
 }
 
+/** Piso do zoom. Ver `getImageLayerStyle` para o porquê de ser 100 e não 50. */
+export const MIN_IMAGE_ZOOM = 100;
+
 /**
  * Estilo de background para as imagens do slide (fundo full-bleed e imagem de
- * conteúdo). Centraliza o handling de object-fit + posição + zoom para preview e
- * export renderizarem igual.
+ * conteúdo). Centraliza object-fit + posição + zoom para preview e export
+ * renderizarem igual — é a MESMA função nos cinco estilos e na exportação.
  * - objectFit 'cover' ou ausente → preenche a moldura (pode cortar).
  * - objectFit 'contain' → encaixa a imagem inteira (pode sobrar espaço).
- * O zoom é uma escala relativa à base acima: 100 mantém o fit, 175 amplia 1,75x.
  * A moldura consumidora deve recortar esta camada com overflow hidden.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DOIS BUGS QUE ESTA FUNÇÃO TINHA (achados pelo Rafael testando):
+ *
+ * 1. O slider X não fazia NADA. Uma `background-position` em porcentagem só
+ *    desloca a imagem no eixo em que ela TRANSBORDA a caixa. Com `cover` e uma
+ *    imagem mais estreita que o slot — 1024x1536 numa moldura 1080x1350, que é
+ *    o caso de toda imagem gerada — o encaixe é pela largura e o transbordo é
+ *    só vertical. Folga horizontal zero, `x%` sem para onde ir.
+ *
+ * 2. Zoom < 100 CORTAVA a imagem. O `scale()` encolhe a CAMADA (um div
+ *    `inset: 0`), não o conteúdo dela: abaixo de 1 a camada deixava de cobrir o
+ *    slot e aparecia o fundo atrás.
+ *
+ * A CORREÇÃO, em CSS puro — sem medir a imagem, porque este mesmo estilo
+ * alimenta o html-to-image da exportação:
+ *
+ * - **Piso de zoom em 100** (`MIN_IMAGE_ZOOM`), aplicado AQUI, na leitura. Com
+ *   escala < 1 é impossível cobrir o slot; e normalizar no render conserta de
+ *   uma vez todo carrossel já salvo com zoom menor, sem migration.
+ * - **A panorâmica vira `translate`, não `background-position`.** Com
+ *   `scale(k >= 1)` a camada passa a transbordar o slot em `(k-1)/2` de cada
+ *   lado, NOS DOIS EIXOS, independente da proporção da imagem. É essa folga que
+ *   o x/y percorre. Como `scale(k) translate(t)` desloca `k·t` na tela, o `t`
+ *   que encosta exatamente na borda é `(k-1)/(2k)` — por construção o x/y NUNCA
+ *   revela vazio: em 0 e em 100 a camada toca a borda do slot e para.
+ *
+ * O `background-position: x% y%` continua junto, e de propósito: ele é quem
+ * aproveita o transbordo NATURAL do `cover`, aquele que depende da proporção da
+ * imagem e que o CSS calcula sozinho. Os dois mecanismos empurram para o mesmo
+ * lado, cada um dentro do próprio limite, então somam sem nunca abrir buraco.
+ *
+ * 🔴 Em zoom exatamente 100 a folga é SÓ a natural do `cover`. Para a imagem
+ * estreita de sempre isso significa Y com curso e X parado — e isso está
+ * CERTO, não é o bug 1 voltando: não existe para onde deslocar. Saber qual eixo
+ * tem folga em zoom 100 exigiria conhecer a proporção real do arquivo, ou seja,
+ * medir a imagem em JS — que é justamente o que não pode entrar aqui.
  */
 export function getImageLayerStyle(
   pos?: { x?: number; y?: number; zoom?: number; objectFit?: 'cover' | 'contain' } | null
 ): React.CSSProperties {
-  const x = pos?.x ?? 50;
-  const y = pos?.y ?? 50;
-  const zoom = pos?.zoom ?? 100;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  const x = clamp(pos?.x ?? 50, 0, 100);
+  const y = clamp(pos?.y ?? 50, 0, 100);
+  const k = Math.max(MIN_IMAGE_ZOOM, pos?.zoom ?? 100) / 100;
   const fit = pos?.objectFit;
+
+  // Deslocamento máximo em % do próprio elemento — `scale` multiplica por `k`,
+  // então `(k-1)/(2k)` na tela vale exatamente a metade do transbordo.
+  const curso = k > 1 ? ((k - 1) / (2 * k)) * 100 : 0;
+  // x=50 → centro; x=0 → camada toda para a direita, revelando a borda esquerda.
+  const tx = curso * (1 - x / 50);
+  const ty = curso * (1 - y / 50);
+
   return {
     backgroundSize: fit === 'contain' ? 'contain' : 'cover',
     backgroundPosition: `${x}% ${y}%`,
     backgroundRepeat: 'no-repeat',
-    transform: `scale(${zoom / 100})`,
+    transform: `scale(${k}) translate(${tx}%, ${ty}%)`,
   };
 }
 
