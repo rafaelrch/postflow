@@ -44,8 +44,8 @@ afterEach(cleanup);
 describe('TEMPLATE 2 no wizard', () => {
   it('o card aparece ao lado dos outros estilos', () => {
     abreWizard();
-    expect(screen.getByText('Template 1')).toBeTruthy();
-    expect(screen.getByText('Template 2')).toBeTruthy();
+    expect(screen.getByText('Manifesto')).toBeTruthy();
+    expect(screen.getByText('Radar')).toBeTruthy();
   });
 
   it('o card promete deck aberto, não fechado', () => {
@@ -61,7 +61,7 @@ describe('TEMPLATE 2 no wizard', () => {
 
   it('escolher o Template 2 MANTÉM o controle de quantidade', () => {
     abreWizard();
-    fireEvent.click(screen.getByText('Template 2'));
+    fireEvent.click(screen.getByText('Radar'));
     avanca();
     // O controle existe (o T1 esconde o dele) e abre no padrão do spec.
     const grade = pillsDeQuantidade();
@@ -73,7 +73,7 @@ describe('TEMPLATE 2 no wizard', () => {
   it('o Template 1 continua sem controle de quantidade — o deck dele é fechado', () => {
     // A generalização não pode ter afrouxado a regra do T1.
     abreWizard();
-    fireEvent.click(screen.getByText('Template 1'));
+    fireEvent.click(screen.getByText('Manifesto'));
     avanca();
     expect(pillsDeQuantidade()).toBeNull();
     expect(screen.getByText(/Deck fixo de 6 slides/)).toBeTruthy();
@@ -86,7 +86,7 @@ describe('TEMPLATE 2 no wizard', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     abreWizard();
-    fireEvent.click(screen.getByText('Template 2'));
+    fireEvent.click(screen.getByText('Radar'));
     avanca();
     fireEvent.change(screen.getByDisplayValue('Criar com IA'), { target: { value: 'manual' } });
     // O T2 não tem passo de identidade visual: o conteúdo já é o último.

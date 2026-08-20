@@ -231,19 +231,19 @@ const TEMPLATES: {
   },
   {
     value: 'editorial',
-    label: 'Editorial',
+    label: 'Atelier',
     short: 'Revista para creators',
     detail: 'Revista: metadados no topo, imagem e texto. Fontes e cores são suas.',
   },
   {
     value: 'template01',
-    label: 'Template 1',
+    label: 'Manifesto',
     short: 'Deck fechado de 6 slides',
     detail: `Forma fixa do Figma, ${TEMPLATE_01_SLIDE_COUNT} slides. Você troca só texto e imagens.`,
   },
   {
     value: 'template02',
-    label: 'Template 2',
+    label: 'Radar',
     short: 'Deck aberto: quantos slides você quiser',
     detail: 'Forma fixa do Figma, deck aberto: os 3 modelos se alternam.',
   },

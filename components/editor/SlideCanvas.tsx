@@ -77,9 +77,9 @@ const SEG_BTN =
 const STYLE_LABEL: Record<string, string> = {
   minimalist: 'Minimalista',
   profile: 'Profile',
-  editorial: 'Editorial',
-  template01: 'Template 1',
-  template02: 'Template 2',
+  editorial: 'Atelier',
+  template01: 'Manifesto',
+  template02: 'Radar',
 };
 
 interface SlideCanvasProps {

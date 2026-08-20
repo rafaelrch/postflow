@@ -101,7 +101,7 @@ describe('CreateWizard — 4 etapas', () => {
     render(<CreateWizard onClose={vi.fn()} />);
     fireEvent.click(primario());
 
-    for (const label of ['Profile', 'Editorial', 'Template 1', 'Template 2']) {
+    for (const label of ['Profile', 'Atelier', 'Manifesto', 'Radar']) {
       expect(screen.getByText(label), `template ${label} ausente`).toBeTruthy();
     }
     // O Minimalista foi retirado do wizard de propósito.
@@ -109,7 +109,7 @@ describe('CreateWizard — 4 etapas', () => {
 
     // A faixa de detalhe acompanha o selecionado (profile é o padrão).
     expect(screen.getByText(/Estética de post no Twitter\/X/i)).toBeTruthy();
-    fireEvent.click(screen.getByText('Template 2'));
+    fireEvent.click(screen.getByText('Radar'));
     expect(screen.getByText(/os 3 modelos se alternam/i)).toBeTruthy();
   });
 
@@ -132,12 +132,12 @@ describe('CreateWizard — 4 etapas', () => {
   it('o denominador do contador troca por um nó novo, para poder animar', () => {
     // A key no span do total é o que faz o 4 → 3 entrar com fade em vez de
     // saltar. Sem nó próprio, não há o que animar.
-    vaiParaConteudo('Editorial');
+    vaiParaConteudo('Atelier');
     const antes = screen.getByTestId('wizard-progress').querySelector('.cw-total-swap');
     expect(antes?.textContent).toBe('4');
 
     fireEvent.click(screen.getByText('Voltar'));
-    fireEvent.click(screen.getByText('Template 1'));
+    fireEvent.click(screen.getByText('Manifesto'));
 
     const depois = screen.getByTestId('wizard-progress').querySelector('.cw-total-swap');
     expect(depois?.textContent).toBe('3');
@@ -145,7 +145,7 @@ describe('CreateWizard — 4 etapas', () => {
   });
 
   it('o botão de web search declara o estado de toggle', () => {
-    vaiParaConteudo('Editorial');
+    vaiParaConteudo('Atelier');
     const botao = screen.getByTitle(/busca fatos e notícias atuais/i);
 
     // aria-pressed alimenta o hover do :not([aria-pressed='true']) e é o que
@@ -175,7 +175,7 @@ describe('CreateWizard — 4 etapas', () => {
   }
 
   it('os campos manuais são os SLOTS do template de spec, por slide', () => {
-    vaiParaConteudo('Template 1');
+    vaiParaConteudo('Manifesto');
     fireEvent.change(screen.getByDisplayValue('Criar com IA'), { target: { value: 'manual' } });
 
     // Deck fechado: 6 slides, paginados um a um.
@@ -191,7 +191,7 @@ describe('CreateWizard — 4 etapas', () => {
   });
 
   it('o Template 2 pede os slots do modelo daquela posição', () => {
-    vaiParaConteudo('Template 2');
+    vaiParaConteudo('Radar');
     fireEvent.change(screen.getByDisplayValue('Criar com IA'), { target: { value: 'manual' } });
 
     // Modelo 1 (capa) tem Destaque e Chamada; o modelo 2 tem Descrição.
@@ -204,7 +204,7 @@ describe('CreateWizard — 4 etapas', () => {
   });
 
   it('a grade de slides vai de 1 a 20, com 5 como padrão', () => {
-    vaiParaConteudo('Editorial');
+    vaiParaConteudo('Atelier');
     const grade = screen.getByRole('group', { name: 'Número de slides' });
     const pills = Array.from(grade.querySelectorAll('button'));
     expect(pills.length).toBe(20);
@@ -215,7 +215,7 @@ describe('CreateWizard — 4 etapas', () => {
   });
 
   it('o JSON é validado contra o template escolhido, com erro claro', () => {
-    vaiParaConteudo('Template 1');
+    vaiParaConteudo('Manifesto');
     fireEvent.change(screen.getByDisplayValue('Criar com IA'), { target: { value: 'json' } });
 
     const caixa = screen.getByPlaceholderText(/s1\.headline/);
@@ -224,7 +224,7 @@ describe('CreateWizard — 4 etapas', () => {
     fireEvent.click(primario());
 
     const erro = screen.getByRole('alert');
-    expect(erro.textContent).toMatch(/nenhum campo do Template 1 reconhecido/i);
+    expect(erro.textContent).toMatch(/nenhum campo do Manifesto reconhecido/i);
     expect(erro.textContent).toMatch(/s1\.headline/);
     // Não avançou.
     expect(screen.getByRole('heading', { name: 'Conteúdo' })).toBeTruthy();
@@ -236,7 +236,7 @@ describe('CreateWizard — 4 etapas', () => {
   });
 
   it('Template 1 e 2 encerram no conteúdo: 3 passos, sem identidade visual', () => {
-    for (const template of ['Template 1', 'Template 2']) {
+    for (const template of ['Manifesto', 'Radar']) {
       vaiParaConteudo(template);
       expect(contador(), `${template} deveria ter 3 passos`).toBe('3 / 3');
       expect(screen.getByText('Gerar')).toBeTruthy();
@@ -245,7 +245,7 @@ describe('CreateWizard — 4 etapas', () => {
     }
 
     // Os estilos de forma livre continuam com os 4.
-    vaiParaConteudo('Editorial');
+    vaiParaConteudo('Atelier');
     expect(contador()).toBe('3 / 4');
     expect(screen.getByText('Continuar')).toBeTruthy();
   });
@@ -253,12 +253,12 @@ describe('CreateWizard — 4 etapas', () => {
   it('voltar ao template e escolher um de 3 passos não deixa o wizard num passo morto', () => {
     // Editorial vai até o passo 4; trocar para Template 2 lá atrás precisa
     // trazer o usuário de volta para um passo que ainda existe.
-    vaiParaVisual('Editorial');
+    vaiParaVisual('Atelier');
     expect(contador()).toBe('4 / 4');
 
     fireEvent.click(screen.getByText('Voltar'));
     fireEvent.click(screen.getByText('Voltar'));
-    fireEvent.click(screen.getByText('Template 2'));
+    fireEvent.click(screen.getByText('Radar'));
     expect(contador()).toBe('2 / 3');
 
     fireEvent.click(screen.getByText('Continuar'));
@@ -272,7 +272,7 @@ describe('CreateWizard — 4 etapas', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    vaiParaConteudo('Editorial');
+    vaiParaConteudo('Atelier');
     // O controle de "conteúdo exato" saiu da interface.
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByText(/conteúdo exato/i)).toBeNull();
@@ -305,7 +305,7 @@ describe('CreateWizard — 4 etapas', () => {
   }
 
   it('ID visual: o estilo livre expõe identidade da marca, cores e tipografia', () => {
-    vaiParaVisual('Editorial');
+    vaiParaVisual('Atelier');
 
     expect(screen.getByText('Minha identidade visual')).toBeTruthy();
     expect(screen.getByText('Definir manualmente')).toBeTruthy();
@@ -338,7 +338,7 @@ describe('CreateWizard — 4 etapas', () => {
   });
 
   it('as cores manuais chegam ao carrossel gerado', async () => {
-    vaiParaVisual('Editorial');
+    vaiParaVisual('Atelier');
 
     fireEvent.change(screen.getByLabelText('Cor de destaque'), { target: { value: '#ff0000' } });
     fireEvent.click(screen.getByText('Gerar'));
