@@ -30,15 +30,25 @@ import Template01Slide from '@/components/slides/Template01Slide';
  * UI tem de avisar — e isso também está travado aqui.
  */
 
-vi.mock('@/hooks/useGenerateCarouselImages', () => ({
-  useGenerateCarouselImages: () => ({
-    generateAll: vi.fn(),
-    generateOne: vi.fn(),
-    generating: false,
-    progress: null,
-  }),
-  isEditorialCoverSlide: () => false,
-}));
+vi.mock('@/hooks/useGenerateCarouselImages', async () => {
+  // Spread do módulo real: a barra lateral também usa `batchTargets` daqui, e
+  // um mock que lista export por export quebra a cada função nova. Só o hook e
+  // o `isEditorialCoverSlide` são substituídos, que é o que estes testes querem
+  // controlar.
+  const real = await vi.importActual<typeof import('@/hooks/useGenerateCarouselImages')>(
+    '@/hooks/useGenerateCarouselImages'
+  );
+  return {
+    ...real,
+    useGenerateCarouselImages: () => ({
+      generateAll: vi.fn(),
+      generateOne: vi.fn(),
+      generating: false,
+      progress: null,
+    }),
+    isEditorialCoverSlide: () => false,
+  };
+});
 
 vi.mock('@/lib/upload-image', () => ({ uploadImageFile: vi.fn(async () => 'https://x/y.png') }));
 

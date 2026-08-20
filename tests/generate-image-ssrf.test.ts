@@ -42,6 +42,8 @@ vi.mock('openai', () => ({ toFile: mockToFile }));
 vi.mock('@/lib/openai', () => ({
   openai: { images: { generate: mockGenerate, edit: mockEdit } },
   buildImagePrompt: () => 'prompt seguro',
+  // A rota mapeia o shape para o tamanho suportado antes de chamar a OpenAI.
+  imageSizeForShape: () => '1024x1536',
 }));
 vi.mock('@/lib/subscription', () => ({
   requireCredits: mockRequireCredits,

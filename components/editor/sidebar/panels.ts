@@ -175,8 +175,11 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
     {
       scope: 'slide',
       panels: [
-        // Na capa a imagem vai no fundo do slide, não num shape de conteúdo.
-        { id: 'imagem', when: (c) => !c.isEditorialCover },
+        // Na CAPA a imagem vai no fundo do slide, e nos internos num shape de
+        // conteúdo — mas o painel é o mesmo nos dois. Antes a capa não tinha
+        // "Imagem" e a geração por IA dela morava escondida dentro de "Fundo do
+        // slide": ninguém achava.
+        'imagem',
         'textoDoSlide',
         'layoutDoSlide',
         'sombraOverlay',

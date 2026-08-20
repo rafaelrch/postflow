@@ -5,9 +5,48 @@ import { useEditorStore } from './useEditorStore';
 import { getFormat } from '@/lib/formats';
 import toast from 'react-hot-toast';
 import { trackProductEvent } from '@/lib/product-events';
+import {
+  ExportImageError,
+  applyEmbeddedImages,
+  preloadExportImages,
+  slideImageUrls,
+} from '@/lib/export-images';
+
+/**
+ * Opções do html-to-image para rasterizar um slide.
+ *
+ * 🔴 `cacheBust` NÃO entra aqui, e isso é uma decisão, não esquecimento.
+ *
+ * A lib, com `cacheBust`, gruda `?<timestamp>` na URL antes de baixar cada
+ * imagem. Duas consequências, as duas ruins para nós:
+ *
+ * 1. **Não serve para nada neste app.** `cacheBust` existe para não pegar
+ *    imagem velha — mas aqui URL de imagem nunca muda de conteúdo: a geração
+ *    grava em `<slideId>-<timestamp>.png` e o upload em
+ *    `<timestamp>-<random>.<ext>`, os dois com `upsert: false`. Imagem nova é
+ *    URL nova, sempre.
+ * 2. **Alarga a janela de falha.** Com a query nova a cada exportação, toda
+ *    imagem de todo slide é rebaixada da rede em toda exportação, ignorando o
+ *    cache do browser — e uma falha só é fatal, ver abaixo.
+ *
+ * A parte fatal, que foi o que quebrou a exportação: o cache interno do
+ * html-to-image (`lib/dataurl.js`) guarda também o FRACASSO. Se um download de
+ * imagem falha, ele grava string vazia para aquela URL e devolve essa string
+ * em toda chamada seguinte — a camada vira `background-image: url("")` e o PNG
+ * sai sem imagem, **sem nenhum aviso no console**, porque o `console.warn` da
+ * lib só acontece na primeira tentativa. A partir daí, toda exportação daquela
+ * aba sai quebrada até um reload. E o cache é chaveado pela URL SEM a query,
+ * então `cacheBust` nem sequer escapa do fracasso gravado.
+ *
+ * Ou seja: `cacheBust` só aumentava a chance de cair no fracasso que fica
+ * grudado. Sem ele o browser reusa a imagem que o preview já baixou.
+ */
+export const EXPORT_IMAGE_OPTIONS = {
+  pixelRatio: 2,
+} as const;
 
 export function useExport() {
-  const { slides, activeSlideIndex, globalSettings } = useEditorStore();
+  const { slides, activeSlideIndex, globalSettings, style } = useEditorStore();
 
   // Exporta EXATAMENTE no formato selecionado (largura 1080 fixa; altura varia).
   const { width: exportWidth, height: exportHeight } = getFormat(globalSettings.format);
@@ -19,7 +58,17 @@ export function useExport() {
     else exportRef.current.delete(id);
   }, []);
 
-  const captureSlide = useCallback(async (el: HTMLDivElement): Promise<HTMLCanvasElement> => {
+  /**
+   * Baixa as imagens dos slides antes de rasterizar. Estoura se alguma faltar —
+   * quem chama transforma isso em toast e NÃO entrega arquivo.
+   */
+  const preloadImages = useCallback(
+    (somenteIndice?: number) =>
+      preloadExportImages(slideImageUrls(slides, style, globalSettings, somenteIndice)),
+    [slides, style, globalSettings]
+  );
+
+  const rasterize = useCallback(async (el: HTMLDivElement): Promise<HTMLCanvasElement> => {
     // html-to-image rasteriza via SVG foreignObject — o próprio browser desenha,
     // então o PNG sai idêntico ao preview (html2canvas desloca texto de fontes
     // customizadas alguns px para baixo). html2canvas fica como fallback.
@@ -35,10 +84,9 @@ export function useExport() {
         // deixa a própria lib embutir as fontes
       }
       return await toCanvas(el, {
-        pixelRatio: 2,
+        ...EXPORT_IMAGE_OPTIONS,
         width: exportWidth,
         height: exportHeight,
-        cacheBust: true,
         fontEmbedCSS,
       });
     } catch (err) {
@@ -55,6 +103,19 @@ export function useExport() {
     }
   }, [exportWidth, exportHeight]);
 
+  const captureSlide = useCallback(async (el: HTMLDivElement, imagens: Map<string, string>): Promise<HTMLCanvasElement> => {
+    // As imagens entram como data URL ANTES da lib olhar o nó: assim ela pula o
+    // download (e o cache que guarda fracasso) por completo. O restore é
+    // garantido, mesmo se a rasterização estourar.
+    const restaurar = applyEmbeddedImages(el, imagens);
+    try {
+      return await rasterize(el);
+    } finally {
+      restaurar();
+    }
+  }, [rasterize]);
+
+
   const downloadSlide = useCallback(async (index?: number) => {
     const idx = index ?? activeSlideIndex;
     const slide = slides[idx];
@@ -68,7 +129,8 @@ export function useExport() {
 
     try {
       toast.loading('Gerando imagem...', { id: 'export' });
-      const canvas = await captureSlide(el);
+      const imagens = await preloadImages(idx);
+      const canvas = await captureSlide(el, imagens);
       const link = document.createElement('a');
       link.download = `slide-${idx + 1}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -80,9 +142,16 @@ export function useExport() {
       toast.success('Slide baixado!', { id: 'export' });
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao exportar slide', { id: 'export' });
+      // Imagem que não baixou tem mensagem própria: o ponto da blindagem é o
+      // usuário saber POR QUE não saiu, em vez de descobrir abrindo o PNG.
+      toast.error(
+        err instanceof ExportImageError
+          ? 'A exportação não saiu: uma imagem do carrossel não pôde ser carregada. Tente de novo.'
+          : 'Erro ao exportar slide',
+        { id: 'export', duration: 6000 }
+      );
     }
-  }, [slides, activeSlideIndex, captureSlide]);
+  }, [slides, activeSlideIndex, captureSlide, preloadImages]);
 
   const downloadAll = useCallback(async () => {
     toast.loading('Gerando ZIP...', { id: 'zip' });
@@ -90,12 +159,16 @@ export function useExport() {
       const { default: JSZip } = await import('jszip');
       const { saveAs } = await import('file-saver');
       const zip = new JSZip();
+      // Baixa TUDO antes do primeiro slide: se faltar imagem, o ZIP nem começa
+      // a ser montado. E o mapa é o mesmo para os N slides — a imagem que se
+      // repete entre eles é baixada uma vez só.
+      const imagens = await preloadImages();
 
       for (let i = 0; i < slides.length; i++) {
         const slide = slides[i];
         const el = exportRef.current.get(slide.id);
         if (!el) continue;
-        const canvas = await captureSlide(el);
+        const canvas = await captureSlide(el, imagens);
         const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
         zip.file(`slide-${i + 1}.png`, blob);
         toast.loading(`Processando slide ${i + 1} de ${slides.length}...`, { id: 'zip' });
@@ -110,9 +183,14 @@ export function useExport() {
       toast.success('ZIP baixado!', { id: 'zip' });
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao gerar ZIP', { id: 'zip' });
+      toast.error(
+        err instanceof ExportImageError
+          ? 'O ZIP não saiu: uma imagem do carrossel não pôde ser carregada. Tente de novo.'
+          : 'Erro ao gerar ZIP',
+        { id: 'zip', duration: 6000 }
+      );
     }
-  }, [slides, captureSlide]);
+  }, [slides, captureSlide, preloadImages]);
 
   return { registerSlideRef, downloadSlide, downloadAll };
 }

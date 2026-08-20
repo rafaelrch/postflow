@@ -4,6 +4,7 @@ import React, { useRef } from 'react';
 import { Slide, GlobalSettings } from '@/types';
 import { getFormat } from '@/lib/formats';
 import { renderTextWithHighlights } from '@/lib/text-highlights';
+import { getImageLayerStyle } from '@/lib/utils';
 
 export interface ProfileSlideProps {
   slide: Slide;
@@ -286,31 +287,47 @@ export default function ProfileSlide({
           )}
         </div>
 
-        {/* Mídia — a imagem entra INTEIRA, na proporção original.
-            Antes era uma caixa de 510 px de altura com `background-size:
-            cover`: qualquer foto que não fosse 864x510 perdia as bordas, que é
-            o corte que o Rafael viu. Agora quem manda na altura é a imagem, e o
-            `MEDIA_HEIGHT` vira só o teto para retrato muito alto não empurrar o
-            resto do post para fora do slide. Sem `object-fit` de propósito —
-            é ele que recortaria, e sem ele o html2canvas desenha o <img>
-            simples sem divergir do preview. */}
+        {/* Mídia — caixa FIXA de 864x510, e a imagem entra INTEIRA no zoom 100.
+            Este bloco já foi as duas coisas, e nenhuma das duas servia sozinha:
+            - caixa fixa com `cover`: cortava toda foto que não fosse 864x510, e
+              o Rafael reclamou do corte;
+            - `<img>` de proporção livre: nunca cortava, mas uma imagem em pé
+              virava uma tira estreita dentro de uma caixa larga — e não havia
+              nada para os sliders X/Y/zoom ajustarem, porque não existe folga
+              numa imagem que cabe inteira por definição.
+            O modelo que atende as duas exigências é a caixa fixa com a camada
+            em `contain`: no zoom 100 a imagem aparece INTEIRA, na proporção
+            original, com o `C.mediaBg` aparecendo em volta do que sobra — o
+            corte que o Rafael recusou continua não acontecendo. Acima de 100 a
+            camada cresce, passa a transbordar a caixa, e aí X e Y têm folga
+            para escolher o enquadramento: é o ajuste que a foto enviada na mão
+            precisa.
+            🔴 A linha que não pode cair: no zoom 100 nada é cortado.
+            O posicionamento é o `getImageLayerStyle` dos outros quatro estilos,
+            que já aceitava `objectFit: 'contain'` — ninguém tinha ligado aqui.
+            Não escreva uma terceira maneira de posicionar imagem. */}
         {hasMedia && <div style={{ height: 54 }} />}
         {hasMedia && imageUrl && (
-          <img
-            src={imageUrl}
-            alt=""
-            crossOrigin="anonymous"
+          <div
+            data-profile-media
             style={{
-              display: 'block',
-              maxWidth: '100%',
-              width: 'auto',
-              height: 'auto',
-              maxHeight: MEDIA_HEIGHT,
-              margin: '0 auto',
+              position: 'relative',
+              width: CONTENT_WIDTH,
+              height: MEDIA_HEIGHT,
+              overflow: 'hidden',
               borderRadius: 34,
               backgroundColor: C.mediaBg,
             }}
-          />
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url(${imageUrl})`,
+                ...getImageLayerStyle({ ...slide.imagePosition, objectFit: 'contain' }),
+              }}
+            />
+          </div>
         )}
       </div>
     </div>

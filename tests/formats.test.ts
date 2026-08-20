@@ -50,7 +50,9 @@ describe('zoom das imagens', () => {
     expect(getImageLayerStyle(DEFAULT_IMAGE_POSITION)).toMatchObject({
       backgroundSize: 'cover',
       backgroundPosition: '50% 50%',
-      transform: 'scale(1)',
+      // Centrado em zoom 1 = nenhum deslocamento. O `translate` é o mecanismo
+      // novo da panorâmica (ver `getImageLayerStyle`); aqui ele é zerado.
+      transform: 'scale(1) translate(0%, 0%)',
     });
   });
 
@@ -58,12 +60,16 @@ describe('zoom das imagens', () => {
     expect(getImageLayerStyle({ x: 25, y: 75, zoom: 100 })).toMatchObject({
       backgroundSize: 'cover',
       backgroundPosition: '25% 75%',
-      transform: 'scale(1)',
+      transform: 'scale(1) translate(0%, 0%)',
     });
-    expect(getImageLayerStyle({ x: 25, y: 75, zoom: 175 })).toMatchObject({
+    // A expectativa antiga aqui era `scale(1.75)` seco — e era o BUG: com o
+    // zoom acima de 100 a camada transborda o slot e o x/y precisam percorrer
+    // essa folga. Sem o translate, mover o X não fazia nada.
+    const ampliado = getImageLayerStyle({ x: 25, y: 75, zoom: 175 });
+    expect(ampliado).toMatchObject({
       backgroundSize: 'cover',
       backgroundPosition: '25% 75%',
-      transform: 'scale(1.75)',
     });
+    expect(ampliado.transform).toMatch(/^scale\(1\.75\) translate\(/);
   });
 });

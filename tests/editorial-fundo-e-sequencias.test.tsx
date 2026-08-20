@@ -172,12 +172,23 @@ describe('1 — o upload órfão sai da aba "Fundo do Slide" do Editorial', () =
     expect(within(painel).getByText('Cor')).toBeTruthy();
   });
 
-  it('a CAPA mantém o upload — é o único lugar onde a imagem de fundo entra', () => {
+  it('na CAPA o upload saiu daqui e foi para o painel "Imagem"', () => {
+    // A capa continua sendo o único slide do Editorial onde a imagem de fundo
+    // entra — o que mudou é ONDE se põe. A geração por IA já tinha ido para o
+    // painel "Imagem"; o upload tinha ficado para trás, e os dois gravavam no
+    // MESMO campo a partir de painéis diferentes.
     const painel = montaEditorial(
       slideEditorial({ id: 'capa2', position: 0, contentLayout: 'cover' }),
       0,
     );
-    expect(within(painel).getByText(/arraste uma imagem de fundo/i)).toBeTruthy();
+    expect(within(painel).queryByText(/arraste uma imagem de fundo/i)).toBeNull();
+    expect(within(painel).getByText('Cor')).toBeTruthy();
+
+    const imagem = document.querySelector('[data-panel="imagem"]') as HTMLElement;
+    expect(imagem, 'a capa precisa do painel "Imagem"').toBeTruthy();
+    const abrir = within(imagem).queryByRole('button', { expanded: false });
+    if (abrir) fireEvent.click(abrir);
+    expect(within(imagem).getByText(/arraste uma imagem de fundo/i)).toBeTruthy();
   });
 
   it('carrossel antigo com fundo salvo: o dado não é apagado, mas dá para remover', () => {
