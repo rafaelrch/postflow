@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const { mockToastError, mockToastSuccess, mockRefresh } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
@@ -770,5 +772,150 @@ describe('roadmap — o like é só coração e número', () => {
   it('não sobrou chevron nenhum no card', () => {
     const { container } = render(<RoadmapClient initialColumns={board([card()])} />);
     expect(container.querySelector('.lucide-chevron-up')).toBeNull();
+  });
+});
+
+// ───────────────────────────────────────── fundo do diálogo (blur)
+
+/**
+ * O escurecer + desfocar do fundo é da CASCA, não de cada chamador: os dois
+ * diálogos do roadmap são o mesmo objeto para o olho.
+ */
+describe('roadmap — o fundo desfoca quando o diálogo abre', () => {
+  const GLOBALS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
+
+  it('o popup de Criar task e o de detalhe usam O MESMO overlay', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+
+    fireEvent.click(screen.getByTestId('criar-task'));
+    expect(screen.getByRole('dialog').className).toContain('roadmap-dialog-overlay');
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    expect(screen.getByTestId('detalhe-popup').className).toContain('roadmap-dialog-overlay');
+  });
+
+  /** O blur está na regra, e é a receita que o produto já usa (blur(8px)). */
+  it('a classe do overlay declara escurecido E backdrop-filter', () => {
+    const bloco = GLOBALS.slice(
+      GLOBALS.indexOf('.roadmap-dialog-overlay {'),
+      GLOBALS.indexOf('}', GLOBALS.indexOf('.roadmap-dialog-overlay {')),
+    );
+    expect(bloco).toContain('rgba(0, 0, 0, 0.7)');
+    expect(bloco).toMatch(/^\s*-webkit-backdrop-filter: blur\(8px\);$/m);
+    expect(bloco).toMatch(/^\s*backdrop-filter: blur\(8px\);$/m);
+  });
+
+  /**
+   * ⚠️ A ORDEM DAS DUAS LINHAS É A REGRA, não estilo. O Lightning CSS (o
+   * minificador do Next) trata as duas como a mesma propriedade e DESCARTA a
+   * versão padrão quando ela vem ANTES da `-webkit-` — é o que acontece com o
+   * `.glass` no CSS compilado hoje. O Firefox só entende a versão sem prefixo,
+   * então nessa ordem invertida o blur sumiria lá, e nenhum teste de DOM veria.
+   */
+  it('o -webkit- vem ANTES da versão padrão, para as duas sobreviverem ao build', () => {
+    const bloco = GLOBALS.slice(
+      GLOBALS.indexOf('.roadmap-dialog-overlay {'),
+      GLOBALS.indexOf('}', GLOBALS.indexOf('.roadmap-dialog-overlay {')),
+    );
+    const prefixado = bloco.indexOf('-webkit-backdrop-filter:');
+    const padrao = bloco.search(/(^|\n)\s*backdrop-filter:/);
+    expect(prefixado).toBeGreaterThan(-1);
+    expect(padrao).toBeGreaterThan(prefixado);
+  });
+
+  /**
+   * Um `bg-black/…` no chamador voltaria a pintar o fundo por fora da casca — e
+   * é assim que um dos dois diálogos perderia o blur de novo.
+   */
+  it('nenhum dos dois chamadores pinta o próprio fundo', () => {
+    const fonte = readFileSync(join(process.cwd(), 'app/(app)/roadmap/RoadmapClient.tsx'), 'utf8');
+    for (const linha of fonte.split('\n').filter((l) => l.includes('overlayClassName='))) {
+      expect(linha).not.toMatch(/bg-black/);
+    }
+  });
+
+  /** O painel continua nítido: o blur é do fundo, não do conteúdo. */
+  it('o painel não recebe blur', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    const painel = screen.getByTestId('detalhe-titulo').closest('div')?.parentElement;
+    expect(painel?.className ?? '').not.toMatch(/blur/);
+  });
+});
+
+// ───────────────────────────────────────── quebra de palavra longa
+
+/**
+ * 🔴 O DEFEITO: uma descrição longa SEM ESPAÇO saía numa linha só, estourava a
+ * largura e aparecia barra de rolagem HORIZONTAL. `white-space: pre-wrap`
+ * preserva quebras, mas não quebra uma palavra que não tem onde quebrar.
+ *
+ * Pixel não se mede em vitest — o que estes testes travam é a REGRA.
+ */
+describe('roadmap — texto longo sem espaço quebra em vez de transbordar', () => {
+  const SEM_ESPACO = 'ahdbnsajhbasjhbashjfbasdhjbfasa'.repeat(8);
+
+  it('a descrição do CARD autoriza a quebra dentro da palavra', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: SEM_ESPACO })])} />);
+    const estilo = screen.getByTestId('card-desc-c1').getAttribute('style') ?? '';
+    expect(estilo).toContain('overflow-wrap: anywhere');
+    // O corte por altura continua: as duas regras resolvem coisas diferentes.
+    expect(estilo).toContain('-webkit-line-clamp: 3');
+  });
+
+  it('o TÍTULO do card também quebra', () => {
+    render(<RoadmapClient initialColumns={board([card({ title: SEM_ESPACO })])} />);
+    expect(screen.getByTestId('abrir-detalhe-c1').getAttribute('style') ?? '').toContain(
+      'overflow-wrap: anywhere',
+    );
+  });
+
+  it('no DIÁLOGO, título e descrição quebram', () => {
+    render(
+      <RoadmapClient initialColumns={board([card({ title: SEM_ESPACO, description: SEM_ESPACO })])} />,
+    );
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+
+    expect(screen.getByTestId('detalhe-titulo').getAttribute('style') ?? '').toContain(
+      'overflow-wrap: anywhere',
+    );
+    expect(screen.getByTestId('detalhe-descricao').getAttribute('style') ?? '').toContain(
+      'overflow-wrap: anywhere',
+    );
+  });
+
+  /**
+   * ⚠️ `overflow-y: auto` com `overflow-x: visible` computa o eixo X como `auto`
+   * sozinho — era daí que saía a barra horizontal. O eixo X é declarado.
+   */
+  it('o corpo do diálogo rola só na VERTICAL', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: SEM_ESPACO })])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+
+    const desc = screen.getByTestId('detalhe-descricao');
+    expect(desc.getAttribute('style') ?? '').toContain('overflow-x: hidden');
+    expect(desc.className).toContain('overflow-y-auto');
+  });
+
+  /**
+   * NÃO trocar `pre-wrap` por `normal`: isso apagaria os parágrafos que a pessoa
+   * escreveu. Quebrar palavra e preservar quebra de linha convivem.
+   */
+  it('as quebras de linha reais continuam preservadas', () => {
+    const COM_PARAGRAFO = `${SEM_ESPACO}\n\nsegundo parágrafo`;
+    render(<RoadmapClient initialColumns={board([card({ description: COM_PARAGRAFO })])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+
+    const desc = screen.getByTestId('detalhe-descricao');
+    expect(desc.className).toContain('whitespace-pre-wrap');
+    expect(desc.textContent).toBe(COM_PARAGRAFO);
+  });
+
+  /** O texto continua INTEIRO: quem quebra é o navegador, não o componente. */
+  it('nada é cortado no caminho', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: SEM_ESPACO })])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    expect(screen.getByTestId('detalhe-descricao').textContent).toBe(SEM_ESPACO);
   });
 });

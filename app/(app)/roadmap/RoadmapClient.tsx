@@ -208,6 +208,9 @@ function Card({
           onClick={() => onAbrirDetalhe(card)}
           data-testid={`abrir-detalhe-${card.id}`}
           className="w-full rounded-sm text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
+          /* Um título longo SEM ESPAÇO quebra dentro da palavra em vez de
+             estourar a largura do card. Mesma regra da descrição, logo abaixo. */
+          style={{ overflowWrap: 'anywhere' }}
         >
           {card.title}
         </button>
@@ -218,12 +221,20 @@ function Card({
           className="mt-1 text-[12px] leading-relaxed text-[var(--ink-dim)]"
           /* Truncar em 3 linhas com reticências. Inline e não classe utilitária:
              o corte é regra de layout deste card e não pode depender de um
-             plugin do Tailwind estar ligado. */
+             plugin do Tailwind estar ligado.
+
+             ⚠️ `overflowWrap: anywhere` é o que impede o transbordo horizontal.
+             O line-clamp corta por ALTURA; ele não quebra palavra nenhuma, então
+             uma string longa sem espaço sairia numa linha só e passaria da
+             largura do card. `anywhere` (e não `break-word`) porque ele também
+             conta na largura mínima do elemento — é o que garante que a palavra
+             não empurre a coluna. */
           style={{
             display: '-webkit-box',
             WebkitLineClamp: 3,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
+            overflowWrap: 'anywhere',
           }}
         >
           {card.description}
@@ -334,15 +345,18 @@ function CardDetailModal({ card, onClose }: { card: RoadmapCard; onClose: () => 
       labelledBy="roadmap-detalhe-titulo"
       onClose={onClose}
       testId="detalhe-popup"
-      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4"
       panelClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
     >
       <div className="flex items-start gap-2 border-b border-[var(--line)] bg-[var(--paper-2)] px-4 py-3">
-        {/* Título COMPLETO: sem truncar, porque é para isto que se abriu. */}
+        {/* Título COMPLETO: sem truncar, porque é para isto que se abriu.
+            `min-w-0` + `overflowWrap` para um título longo sem espaço quebrar em
+            vez de empurrar o X para fora do cabeçalho. */}
         <h2
           id="roadmap-detalhe-titulo"
           data-testid="detalhe-titulo"
-          className="text-[15px] font-bold leading-snug text-[var(--ink)]"
+          className="min-w-0 text-[15px] font-bold leading-snug text-[var(--ink)]"
+          style={{ overflowWrap: 'anywhere' }}
         >
           {card.title}
         </h2>
@@ -362,6 +376,17 @@ function CardDetailModal({ card, onClose }: { card: RoadmapCard; onClose: () => 
           <p
             data-testid="detalhe-descricao"
             className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink-dim)]"
+            /* ⚠️ `pre-wrap` preserva as quebras que a pessoa escreveu, mas NÃO
+               quebra uma palavra que não tem onde quebrar: uma string longa sem
+               espaço saía numa linha só e transbordava na horizontal.
+               `overflowWrap: anywhere` autoriza a quebra DENTRO da palavra, e o
+               `pre-wrap` continua — os parágrafos dele não se perdem.
+
+               `overflowX: hidden` é explícito e obrigatório: pela regra do CSS,
+               `overflow-y: auto` com `overflow-x: visible` computa o eixo X como
+               `auto` sozinho, e era daí que vinha a barra horizontal. A rolagem
+               deste corpo é VERTICAL e só. */
+            style={{ overflowWrap: 'anywhere', overflowX: 'hidden' }}
           >
             {card.description}
           </p>
@@ -454,7 +479,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
       /* O foco entra no diálogo pelo campo que a pessoa veio preencher — e não
          no primeiro focável, que é a seta de voltar. */
       initialFocusSelector="#roadmap-titulo"
-      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4"
       panelClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
     >
       <>

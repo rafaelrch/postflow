@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
 
 /**
  * A CASCA de diálogo do roadmap — o comportamento, não a aparência.
@@ -17,6 +18,17 @@ import { useEffect, useRef } from 'react';
  * que trouxesse classe própria obrigaria um dos dois a herdar o tema do outro.
  * Por isso overlay e painel recebem `className` de quem usa: esta casca cuida do
  * foco, o chamador cuida do desenho.
+ *
+ * ── A ÚNICA EXCEÇÃO: O FUNDO ────────────────────────────────────────────────
+ * O escurecer + desfocar do overlay é aplicado AQUI, sem condição, via
+ * `.roadmap-dialog-overlay` (definida em `app/globals.css`). É a única coisa que
+ * a casca desenha, e é de propósito: escurecer o fundo é o que separa "diálogo
+ * modal" de "caixa flutuante", ou seja, é comportamento visível da modalidade —
+ * a mesma coisa que o foco preso comunica ao teclado. Deixar isso a cargo do
+ * chamador é o caminho para um diálogo com blur e outro sem.
+ * A regra é preto com alfa + blur: nenhum token de tema entra nela, então ela
+ * serve ao produto e ao painel sem misturar as duas paletas. Cor de painel,
+ * raio, sombra e largura continuam vindo do `className` de quem chama.
  */
 
 /**
@@ -118,7 +130,10 @@ export default function RoadmapDialog({
       aria-modal="true"
       aria-labelledby={labelledBy}
       data-testid={testId}
-      className={overlayClassName}
+      /* `roadmap-dialog-overlay` vem PRIMEIRO e não é opcional — ver o ⚠️ do
+         topo. O `className` do chamador segue trazendo posição, z-index e
+         espaçamento, que são do desenho de cada tela. */
+      className={cn('roadmap-dialog-overlay', overlayClassName)}
       onClick={onClose}
     >
       <div ref={painelRef} onClick={(e) => e.stopPropagation()} className={panelClassName}>

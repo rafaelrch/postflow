@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
@@ -529,5 +531,92 @@ describe('admin/roadmap — o contador de votos não é um like', () => {
   it('a contagem continua na tela', () => {
     render(<RoadmapAdminClient initialBoard={board([card({ voteCount: 12 })])} />);
     expect(screen.getByTestId('admin-votos-c1').textContent).toContain('12');
+  });
+});
+
+// ───────────────────────────────────────── fundo do diálogo (blur)
+
+const ADMIN_CSS = readFileSync(join(process.cwd(), 'app/admin/admin.css'), 'utf8');
+
+/** O corpo de UMA regra do admin.css, pelo seletor exato. */
+function regraAdmin(seletor: string): string {
+  const inicio = ADMIN_CSS.indexOf(`${seletor} {`);
+  if (inicio === -1) throw new Error(`seletor não encontrado em admin.css: ${seletor}`);
+  const abre = ADMIN_CSS.indexOf('{', inicio);
+  return ADMIN_CSS.slice(abre + 1, ADMIN_CSS.indexOf('}', abre));
+}
+
+describe('admin/roadmap — o fundo desfoca quando o diálogo abre', () => {
+  it('o overlay usa a MESMA classe do quadro público, junto com a do painel', () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+
+    const overlay = screen.getByTestId('admin-detalhe-popup');
+    expect(overlay.className).toContain('roadmap-dialog-overlay');
+    // A classe do painel continua: dela vêm posição, z-index e espaçamento.
+    expect(overlay.className).toContain('admin-roadmap-detalhe-overlay');
+  });
+
+  /**
+   * O escurecido mora numa regra só (`.roadmap-dialog-overlay`, em globals.css).
+   * Um `background` aqui voltaria a pintar por cima e desalinharia os dois lados.
+   */
+  it('o admin.css não pinta o próprio fundo do overlay', () => {
+    expect(regraAdmin('.admin-roadmap-detalhe-overlay')).not.toContain('background');
+  });
+});
+
+// ───────────────────────────────────────── quebra de palavra longa
+
+/**
+ * 🔴 O DEFEITO DA CAPTURA. Descrição longa SEM ESPAÇO saía numa linha só,
+ * estourava a largura do painel e gerava barra de rolagem HORIZONTAL.
+ */
+describe('admin/roadmap — texto longo sem espaço quebra em vez de transbordar', () => {
+  const SEM_ESPACO = 'ahdbnsajhbasjhbashjfbasdhjbfasa'.repeat(8);
+
+  it('a descrição do DIÁLOGO quebra dentro da palavra e rola só na vertical', () => {
+    const regra = regraAdmin('.admin-roadmap-detalhe-desc');
+    expect(regra).toContain('overflow-wrap: anywhere');
+    expect(regra).toContain('overflow-x: hidden');
+    expect(regra).toContain('overflow-y: auto');
+  });
+
+  /** Não trocar `pre-wrap` por `normal`: os parágrafos dele se perderiam. */
+  it('a descrição do diálogo continua preservando as quebras de linha', () => {
+    expect(regraAdmin('.admin-roadmap-detalhe-desc')).toContain('white-space: pre-wrap');
+  });
+
+  it('a prévia do CARD também quebra, sem perder o corte de 3 linhas', () => {
+    const regra = regraAdmin('.admin-roadmap-desc');
+    expect(regra).toContain('overflow-wrap: anywhere');
+    expect(regra).toContain('-webkit-line-clamp: 3');
+  });
+
+  it('os TÍTULOS quebram, no card e no cabeçalho do diálogo', () => {
+    expect(regraAdmin('.admin-roadmap-card h3')).toContain('overflow-wrap: anywhere');
+    expect(regraAdmin('.admin-roadmap-title-btn')).toContain('overflow-wrap: anywhere');
+    expect(regraAdmin('.admin-roadmap-detalhe h2')).toContain('overflow-wrap: anywhere');
+  });
+
+  /** Os elementos que carregam texto do usuário são os que têm as classes acima. */
+  it('os elementos de texto carregam as classes que quebram', () => {
+    render(
+      <RoadmapAdminClient
+        initialBoard={board([card({ title: SEM_ESPACO, description: SEM_ESPACO })])}
+      />,
+    );
+    expect(screen.getByTestId('admin-abrir-detalhe-c1').className).toContain('admin-roadmap-title-btn');
+    expect(screen.getByTestId('admin-card-c1').querySelector('.admin-roadmap-desc')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+    expect(screen.getByTestId('admin-detalhe-descricao').className).toContain('admin-roadmap-detalhe-desc');
+  });
+
+  /** O texto continua INTEIRO: quem quebra é o navegador, não o componente. */
+  it('nada é cortado no caminho', () => {
+    render(<RoadmapAdminClient initialBoard={board([card({ description: SEM_ESPACO })])} />);
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+    expect(screen.getByTestId('admin-detalhe-descricao').textContent).toBe(SEM_ESPACO);
   });
 });

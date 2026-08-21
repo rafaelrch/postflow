@@ -626,6 +626,37 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* ─── Overlay dos diálogos do roadmap ────────────────────────────
+   O escurecer + desfocar do fundo, num lugar só.
+
+   ⚠️ MORA AQUI, E NÃO EM CADA CHAMADOR, porque quem aplica é a casca
+   (`components/roadmap/RoadmapDialog.tsx`), sem condição nenhuma: os dois
+   diálogos do roadmap são o mesmo objeto para o olho, e blur num e não no
+   outro é a inconsistência que ninguém defende depois. Um terceiro diálogo
+   que use a casca nasce com o fundo certo sem ninguém lembrar disso.
+
+   A RECEITA É A QUE JÁ EXISTE NO PRODUTO — `components/editor/ScheduleModal.tsx`
+   usa `bg-black/70 backdrop-blur-sm`, e `backdrop-blur-sm` é `blur(8px)` no
+   Tailwind 4. Aqui está em CSS puro de propósito: o overlay do /admin é
+   `admin.css`, e cravar utilitário do Tailwind dentro da casca obrigaria o
+   painel a herdar o sistema de classes do produto. Preto com alfa não é token
+   de tema nenhum, então esta regra serve aos dois lados sem misturar paletas.
+
+   `-webkit-backdrop-filter` acompanha o padrão do `.glass` logo abaixo (Safari).
+   Sem suporte a backdrop-filter, sobra o escurecido — que já é o pedido.
+   ──────────────────────────────────────────────────────────── */
+.roadmap-dialog-overlay {
+  background: rgba(0, 0, 0, 0.7);
+  /* ⚠️ O `-webkit-` VEM PRIMEIRO, e a ordem não é estilo: o Lightning CSS (o
+     minificador do Next) trata os dois como a mesma propriedade e, quando a
+     versão padrão vem antes, ele DESCARTA a padrão e deixa só a `-webkit-`.
+     É o que acontece hoje com o `.glass` logo abaixo — e o Firefox só entende
+     a versão SEM prefixo, então lá o blur sumiria. Nesta ordem as duas
+     sobrevivem à compilação (conferido no CSS gerado por `npm run build`). */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
 /* ─── Glass (kept for any legacy uses; rebranded to paper-glass) ── */
 .glass {
   background: color-mix(in srgb, var(--paper) 82%, transparent);
