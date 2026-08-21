@@ -245,3 +245,14 @@ export function imageSizeForShape(shape: ImageShape): '1024x1024' | '1024x1536' 
  */
 export { buildImagePrompt } from '@/lib/image-prompt';
 export type { ImagePromptInput, ImageSeries } from '@/lib/image-prompt';
+
+/**
+ * O prompt de REFINAR TEXTO mora em `lib/refine-text.ts` pela mesma razão do
+ * de imagem: o módulo é PURO, então o prompt, a validação do corpo e o merge
+ * são afirmáveis em teste de node, sem chave de API.
+ *
+ * Re-exportado daqui só o que a rota consome, para o system prompt ficar
+ * junto dos outros (CAROUSEL_SYSTEM_PROMPT, TWITTER_CAROUSEL_SYSTEM_PROMPT).
+ */
+export { REFINE_SYSTEM_PROMPT } from '@/lib/refine-text';
+export type { RefineScope, RefineSlide, RefineRequest } from '@/lib/refine-text';

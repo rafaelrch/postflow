@@ -379,6 +379,9 @@ describe('TEMPLATE 2 — painéis', () => {
       const slideGroup = grupos.find((g) => g.scope === 'slide')!;
       expect(slideGroup.ids).toEqual([
         'conteudoSlide',
+        // Refinar o texto entra logo depois do painel de conteúdo: é o mesmo
+        // assunto, e o usuário decide refinar olhando o texto que acabou de ler.
+        'refinarTexto',
         'imagem',
         'estiloDoTexto',
         'fundoDoSlide',

@@ -8,6 +8,8 @@ import NextImage from 'next/image';
 import Link from 'next/link';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useGenerateCarouselImages, isEditorialCoverSlide, batchTargets, type ImageTarget } from '@/hooks/useGenerateCarouselImages';
+import { useRefineText } from '@/hooks/useRefineText';
+import { refinableFields } from '@/lib/refine-fields';
 import Slider from './Slider';
 import Template01Slots from './Template01Slots';
 import Template02Slots from './Template02Slots';
@@ -18,6 +20,7 @@ import ElementFontPicker from './sidebar/ElementFontPicker';
 import CornersPanel from './sidebar/CornersPanel';
 import WordHighlightPicker from './sidebar/WordHighlightPicker';
 import AiGenPanel from './sidebar/AiGenPanel';
+import RefineTextPanel from './sidebar/RefineTextPanel';
 import ImageThumb from './sidebar/ImageThumb';
 import { inputCls, labelCls, numericCls } from './sidebar/tokens';
 import {
@@ -169,6 +172,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const t02ImageRef = useRef<HTMLInputElement>(null);
 
   const { generateAll, generateOne, generating } = useGenerateCarouselImages();
+  const refine = useRefineText();
 
   if (!slide) return null;
 
@@ -410,6 +414,27 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
   /* ── Conteúdo de cada painel ─────────────────────────────────────────── */
   const content: Record<PanelId, ReactNode> = {
+    /**
+     * Refinar o TEXTO que já existe, nos três escopos. O painel não escreve no
+     * store: mostra a sugestão e espera o "Aplicar" (ver RefineTextPanel).
+     *
+     * 🔴 `key` com o índice do slide: a direção escrita e o escopo são estado
+     * LOCAL do painel, e sem remontar ao trocar de slide o texto escrito para o
+     * slide 1 continuaria na tela no slide 2. Mesmo cuidado do AiGenPanel.
+     */
+    refinarTexto: (
+      <RefineTextPanel
+        key={`refine-${activeSlideIndex}`}
+        slideNumber={activeSlideIndex + 1}
+        fields={refinableFields(slide, style, activeSlideIndex)}
+        loading={refine.loading}
+        preview={refine.preview}
+        onRefine={(params) => refine.refinar({ ...params, slideIndex: activeSlideIndex })}
+        onApply={refine.aplicar}
+        onDiscard={refine.descartar}
+      />
+    ),
+
     perfil: (
       <>
         <div className="flex items-center gap-2">

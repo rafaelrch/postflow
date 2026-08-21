@@ -10,6 +10,7 @@ import {
   RotateCcw,
   SunMoon,
   Type,
+  Wand2,
   type LucideIcon,
 } from 'lucide-react';
 import { GlobalSettings, Slide, SlideStyle } from '@/types';
@@ -32,6 +33,7 @@ export type PanelScope = 'post' | 'slide' | 'global';
 
 export type PanelId =
   | 'perfil'
+  | 'refinarTexto'
   | 'tema'
   | 'conteudoSlide'
   | 'imagem'
@@ -78,6 +80,10 @@ export interface PanelDef {
 
 export const PANEL_REGISTRY: Record<PanelId, PanelDef> = {
   perfil:            { id: 'perfil',            scope: 'post',   icon: CircleUser,       label: 'Perfil' },
+  // Escopo `slide` porque é do grupo do slide que ele nasce — mas o painel
+  // oferece os TRÊS escopos por dentro (carrossel, slide, campo). O escopo do
+  // registry diz onde o painel MORA na barra, não o alcance do que ele faz.
+  refinarTexto:      { id: 'refinarTexto',      scope: 'slide',  icon: Wand2,            label: 'Refinar texto com IA' },
   // Escreve `globalSettings.theme` — vale para o carrossel inteiro. O rótulo
   // antigo ("Tema do slide") dizia o contrário do que o controle faz.
   tema:              { id: 'tema',              scope: 'post',   icon: SunMoon,          label: 'Tema do carrossel' },
@@ -134,6 +140,7 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
       scope: 'slide',
       panels: [
         'conteudoSlide',
+        'refinarTexto',
         // O modelo 6 não tem imagem nenhuma no desenho — e slider de posição
         // sobre nada não mexe em coisa alguma.
         { id: 'imagem', when: (c) => c.template01Model != null && c.template01Model !== 6 },
@@ -154,6 +161,7 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
       scope: 'slide',
       panels: [
         'conteudoSlide',
+        'refinarTexto',
         // Todo modelo do T2 tem imagem: o fundo da capa, ou o bloco 380x1089
         // dos internos. Não há o caso "modelo sem imagem" do T1.
         'imagem',
@@ -168,7 +176,7 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
 
   profile: [
     { scope: 'post', panels: ['perfil', 'tema'] },
-    { scope: 'slide', panels: ['conteudoSlide', 'destaquesDoTexto', 'imagem'] },
+    { scope: 'slide', panels: ['conteudoSlide', 'refinarTexto', 'destaquesDoTexto', 'imagem'] },
   ],
 
   editorial: [
@@ -181,6 +189,7 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
         // slide": ninguém achava.
         'imagem',
         'textoDoSlide',
+        'refinarTexto',
         'layoutDoSlide',
         'sombraOverlay',
         'fundoDoSlide',
@@ -190,7 +199,7 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
   ],
 
   minimalist: [
-    { scope: 'slide', panels: ['imagem', 'textoDoSlide', 'sombraOverlay', 'fundoDoSlide'] },
+    { scope: 'slide', panels: ['imagem', 'textoDoSlide', 'refinarTexto', 'sombraOverlay', 'fundoDoSlide'] },
     { scope: 'global', panels: ['cantos'] },
   ],
 };
