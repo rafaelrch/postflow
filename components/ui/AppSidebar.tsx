@@ -9,6 +9,7 @@ import {
   Newspaper,
   Clapperboard,
   Calendar,
+  Map,
   Palette,
   Settings,
   Sun,
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
     ? [{ href: '/reels', label: 'Reels', icon: Clapperboard } as NavItem]
     : []),
   { href: '/agenda',     label: 'Agenda',       icon: Calendar },
+  { href: '/roadmap',    label: 'Roadmap',      icon: Map },
   { href: '/onboarding', label: 'Onboarding',   icon: Palette },
   // `match: ['/conta']` mantém o item aceso no instante entre clicar num link
   // antigo de /conta e o redirect levar para /configuracoes/assinatura.
