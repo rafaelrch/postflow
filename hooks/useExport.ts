@@ -3,6 +3,7 @@
 import { useRef, useCallback } from 'react';
 import { useEditorStore } from './useEditorStore';
 import { getFormat } from '@/lib/formats';
+import { nomeDoSlideDoCarrossel, nomeDoZipDoCarrossel } from '@/lib/export-filename';
 import toast from 'react-hot-toast';
 import { trackProductEvent } from '@/lib/product-events';
 import {
@@ -46,7 +47,7 @@ export const EXPORT_IMAGE_OPTIONS = {
 } as const;
 
 export function useExport() {
-  const { slides, activeSlideIndex, globalSettings, style } = useEditorStore();
+  const { slides, activeSlideIndex, globalSettings, style, carouselTitle } = useEditorStore();
 
   // Exporta EXATAMENTE no formato selecionado (largura 1080 fixa; altura varia).
   const { width: exportWidth, height: exportHeight } = getFormat(globalSettings.format);
@@ -132,7 +133,10 @@ export function useExport() {
       const imagens = await preloadImages(idx);
       const canvas = await captureSlide(el, imagens);
       const link = document.createElement('a');
-      link.download = `slide-${idx + 1}.png`;
+      // Nome pela fonte única (lib/export-filename.ts): o slide avulso e a
+      // entrada do ZIP saem com o MESMO nome, numerado — sem o número, dois
+      // slides baixariam com nome idêntico e um sobrescreveria o outro.
+      link.download = nomeDoSlideDoCarrossel(carouselTitle, idx + 1);
       link.href = canvas.toDataURL('image/png');
       link.click();
       trackProductEvent('carousel_exported_single', {
@@ -151,7 +155,7 @@ export function useExport() {
         { id: 'export', duration: 6000 }
       );
     }
-  }, [slides, activeSlideIndex, captureSlide, preloadImages]);
+  }, [slides, activeSlideIndex, captureSlide, preloadImages, carouselTitle]);
 
   const downloadAll = useCallback(async () => {
     toast.loading('Gerando ZIP...', { id: 'zip' });
@@ -170,12 +174,12 @@ export function useExport() {
         if (!el) continue;
         const canvas = await captureSlide(el, imagens);
         const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
-        zip.file(`slide-${i + 1}.png`, blob);
+        zip.file(nomeDoSlideDoCarrossel(carouselTitle, i + 1), blob);
         toast.loading(`Processando slide ${i + 1} de ${slides.length}...`, { id: 'zip' });
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      saveAs(zipBlob, 'carrossel-postflow.zip');
+      saveAs(zipBlob, nomeDoZipDoCarrossel(carouselTitle));
       trackProductEvent('carousel_exported_all', {
         export_format: 'zip',
         slide_count: slides.length,
@@ -190,7 +194,7 @@ export function useExport() {
         { id: 'zip', duration: 6000 }
       );
     }
-  }, [slides, captureSlide, preloadImages]);
+  }, [slides, captureSlide, preloadImages, carouselTitle]);
 
   return { registerSlideRef, downloadSlide, downloadAll };
 }

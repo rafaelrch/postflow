@@ -26,6 +26,7 @@ import {
   paginarLotes,
   type ChaveDeLote,
 } from '@/lib/news-batches';
+import { nomeDaNoticiaAvulsa, nomeDoCardDoLote, nomeDoZipDeNoticias } from '@/lib/export-filename';
 import Pagination from '@/components/ui/Pagination';
 import { trackProductEvent } from '@/lib/product-events';
 
@@ -683,6 +684,13 @@ export default function NewsPage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
   const saveTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const currentBatchIdRef = useRef<string | null>(null);
+  /**
+   * `created_at` do lote aberto — é a DATA que dá nome ao ZIP e a cada card
+   * dentro dele. Mesma fonte que a lista de lotes já mostra na tela
+   * (`batch.createdAt`), para o arquivo bater com o card de onde saiu.
+   * `null` = lote sendo criado agora, e a data dele é hoje.
+   */
+  const currentBatchCreatedAtRef = useRef<string | null>(null);
   const [savedBatches, setSavedBatches] = useState<SavedNewsBatch[]>([]);
   // Mesma regra do dashboard: 10 por página. O produto não precisa de dois
   // comportamentos, e o usuário não precisa aprender dois.
@@ -732,6 +740,7 @@ export default function NewsPage() {
         return built;
       }
       currentBatchIdRef.current = batchId;
+      currentBatchCreatedAtRef.current = null; // lote novo: a data é hoje
       trackProductEvent('news_batch_created', { item_count: built.length });
       return built.map((it, i) => ({ ...it, dbId: (data[i] as { id: string } | undefined)?.id }));
     } catch (err) {
@@ -953,7 +962,9 @@ export default function NewsPage() {
       if (!blob) throw new Error('Falha ao gerar imagem');
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `arke-news-${String(item.numero).padStart(2, '0')}.png`;
+      // Card baixado sozinho leva o TÍTULO, não a data: quem baixa um card só
+      // está atrás daquela notícia, e a data não diz qual é.
+      link.download = nomeDaNoticiaAvulsa(item.titulo_card);
       link.href = url;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -979,7 +990,7 @@ export default function NewsPage() {
           const canvas = await captureCard(item);
           const blob: Blob | null = await new Promise(res => canvas.toBlob(res, 'image/png'));
           if (!blob) throw new Error('toBlob retornou null');
-          zip.file(`arke-news-${String(item.numero).padStart(2, '0')}.png`, blob);
+          zip.file(nomeDoCardDoLote(currentBatchCreatedAtRef.current, item.numero), blob);
           added++;
         } catch (cardErr) {
           console.error(`Card ${item.numero} falhou:`, cardErr);
@@ -990,7 +1001,7 @@ export default function NewsPage() {
       if (added === 0) throw new Error('Nenhum card foi gerado');
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      saveAs(zipBlob, 'arke-news-cards.zip');
+      saveAs(zipBlob, nomeDoZipDeNoticias(currentBatchCreatedAtRef.current));
       const skipped = items.length - added;
       toast.success(
         skipped > 0
@@ -1119,6 +1130,7 @@ export default function NewsPage() {
       setSelectedIdx(0);
       setLocalImages({});
       currentBatchIdRef.current = batch.batchId;
+      currentBatchCreatedAtRef.current = batch.createdAt;
       setStep('editor');
     };
 
