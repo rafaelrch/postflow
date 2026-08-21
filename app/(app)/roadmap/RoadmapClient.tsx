@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { ChevronUp, Plus, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ChevronUp, Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import {
   DESCRIPTION_MAX,
-  DESCRIPTION_MIN,
   ROADMAP_STATUSES,
   ROADMAP_STATUS_LABELS,
   TITLE_MAX,
@@ -56,18 +56,24 @@ const COLUMN_ACCENT: Record<RoadmapStatus, string> = {
 };
 
 /**
- * Frase de coluna vazia, uma por coluna.
+ * ⚠️ COLUNA VAZIA FICA VAZIA. Havia aqui uma frase por coluna ("Nada no backlog
+ * ainda…"); o Rafael mandou tirar (21/08). O contador do cabeçalho continua
+ * dizendo quantos são, e no Backlog o cartão "Adicionar task" continua sendo o
+ * convite — a caixa tracejada de texto era ruído em cima dos dois.
  *
- * "0 itens" é um número, não uma informação: não diz se aquilo é normal, nem o
- * que aconteceria para mudar. Cada coluna vazia significa uma coisa diferente —
- * "Pronto" vazio é começo de projeto, "Backlog" vazio é convite a sugerir.
+ * Isto vale só para o vazio de SUCESSO. As mensagens de CARREGANDO e de ERRO
+ * ficam: quadro vazio por erro de carga diria "não há nada" quando a verdade é
+ * "não carregou".
  */
-const EMPTY_COPY: Record<RoadmapStatus, string> = {
-  backlog: 'Nada no backlog ainda. Sua sugestão pode ser a primeira.',
-  faremos: 'Nada decidido para os próximos ciclos por enquanto.',
-  cozinhando: 'Nada em produção neste momento.',
-  pronto: 'Assim que a primeira entrega sair, ela aparece aqui.',
-};
+
+/**
+ * O quadro como o servidor mandou — ou as 4 colunas vazias, se ele não mandou
+ * nada. Uma função só, usada na montagem E na ressincronização: duas cópias
+ * desta linha divergiriam no primeiro ajuste.
+ */
+function doServidor(colunas: RoadmapColumn[]): RoadmapColumn[] {
+  return colunas.length > 0 ? colunas : emptyColumns();
+}
 
 /** As 4 colunas vazias — usado pelo estado de carregando e pelo de erro. */
 export function emptyColumns(): RoadmapColumn[] {
@@ -235,15 +241,6 @@ function Column({
           column.cards.map((card) => (
             <Card key={card.id} card={card} onToggle={onToggle} pending={pendingId === card.id} />
           ))}
-
-        {state === 'ready' && column.cards.length === 0 && (
-          <p
-            data-testid={`column-empty-${column.status}`}
-            className="rounded-lg border border-dashed border-[var(--line-strong)] p-3 text-[12px] text-[var(--ink-dim)]"
-          >
-            {EMPTY_COPY[column.status]}
-          </p>
-        )}
       </div>
     </section>
   );
@@ -256,14 +253,66 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<{ title?: string; description?: string }>({});
   const [sending, setSending] = useState(false);
+  const painelRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * MESMA função que a rota usa, também para decidir se o primário está
+   * habilitado. O botão fica apagado enquanto o TÍTULO não vale — é o que a
+   * referência mostra. Descrição não entra nesta conta: ela é opcional, e um
+   * "Criar" apagado por causa dela seria um bloqueio sem explicação na tela.
+   */
+  const check = validateSuggestion({ title, description });
+  const tituloInvalido = !check.ok && !!check.fields.title;
+
+  /**
+   * ESC fecha e o Tab não sai do diálogo.
+   *
+   * `aria-modal` só PROMETE isso ao leitor de tela; quem cumpre é este handler.
+   * Sem ele, o Tab passeia pelos botões do quadro atrás do overlay — que o mouse
+   * não alcança, porque o overlay os cobre.
+   */
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const painel = painelRef.current;
+      if (!painel) return;
+      const focaveis = painel.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input, textarea, [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (focaveis.length === 0) return;
+      const primeiro = focaveis[0];
+      const ultimo = focaveis[focaveis.length - 1];
+      const ativo = document.activeElement;
+
+      if (e.shiftKey && (ativo === primeiro || !painel.contains(ativo))) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && ativo === ultimo) {
+        e.preventDefault();
+        primeiro.focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  /** O foco entra no diálogo pelo campo que a pessoa veio preencher. */
+  useEffect(() => {
+    painelRef.current?.querySelector<HTMLElement>('#roadmap-titulo')?.focus();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // MESMA função que a rota usa (`lib/roadmap.validateSuggestion`), não uma
-    // segunda cópia das regras. Duas validações escritas à mão divergem no
-    // primeiro ajuste de limite, e aí o usuário passa no cliente e leva 400.
-    const check = validateSuggestion({ title, description });
+    // A validação COMPLETA continua aqui: o botão habilitado só garante título
+    // válido, e a descrição ainda pode estourar o teto ou trazer marcação.
     if (!check.ok) {
       setErrors(check.fields);
       return;
@@ -277,13 +326,13 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
         body: JSON.stringify(check.value),
       });
       if (!res.ok) {
-        toast.error(await errorMessage(res, 'Não foi possível enviar sua sugestão.'));
+        toast.error(await errorMessage(res, 'Não foi possível criar a task.'));
         return;
       }
-      toast.success('Sugestão enviada! Ela entra no quadro depois da revisão.');
+      toast.success('Task criada! Ela já está no Backlog.');
       onCreated();
     } catch {
-      toast.error('Não foi possível enviar sua sugestão.');
+      toast.error('Não foi possível criar a task.');
     } finally {
       setSending(false);
     }
@@ -301,113 +350,120 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
       onClick={onClose}
     >
       <div
+        ref={painelRef}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl bg-[var(--paper)] p-5 shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
-        <div className="flex items-start justify-between">
+        {/* Faixa clara do cabeçalho: seta de voltar, título, X. A seta e o X
+            fazem a MESMA coisa — fechar. Não há passo anterior neste fluxo, e
+            uma seta que levasse a outro lugar prometeria um que não existe. */}
+        <div className="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--paper-2)] px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Voltar"
+            data-testid="voltar-popup"
+            className="rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
           <h2 id="criar-task-titulo" className="text-[15px] font-bold text-[var(--ink)]">
-            Sugerir uma ideia
+            Criar task
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            data-testid="fechar-popup"
+            className="ml-auto rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/*
-          O aviso vem ANTES dos campos, não depois de enviar. Quem manda uma
-          sugestão e não a encontra no Backlog conclui que o envio falhou e manda
-          de novo — é assim que a fila de moderação vira fila de duplicatas.
-        */}
-        <p
-          data-testid="aviso-aprovacao"
-          className="mt-3 rounded-lg border border-[var(--line-strong)] bg-[var(--paper-2)] p-2.5 text-[12px] text-[var(--ink-dim)]"
-        >
-          Sua sugestão passa por aprovação antes de aparecer no quadro — ela não entra no Backlog na hora.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4" noValidate>
-          <div>
-            <div className="flex items-baseline justify-between">
-              <label htmlFor="roadmap-titulo" className="text-[12px] font-semibold text-[var(--ink)]">
-                Título
-              </label>
-              <span
-                data-testid="contador-titulo"
-                className={cn(
-                  'text-[11px] tabular-nums',
-                  tituloLen > TITLE_MAX ? 'font-semibold text-[var(--danger)]' : 'text-[var(--ink-muted)]',
-                )}
-              >
-                {tituloLen}/{TITLE_MAX}
-              </span>
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="space-y-4 px-4 py-4">
+            <div>
+              <div className="flex items-baseline justify-between">
+                <label htmlFor="roadmap-titulo" className="text-[12px] font-semibold text-[var(--ink)]">
+                  Título
+                </label>
+                <span
+                  data-testid="contador-titulo"
+                  className={cn(
+                    'text-[11px] tabular-nums',
+                    tituloLen > TITLE_MAX ? 'font-semibold text-[var(--danger)]' : 'text-[var(--ink-muted)]',
+                  )}
+                >
+                  {tituloLen}/{TITLE_MAX}
+                </span>
+              </div>
+              <input
+                id="roadmap-titulo"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Título da task"
+                aria-invalid={!!errors.title}
+                className="mt-1 w-full rounded-lg border border-[var(--line-strong)] bg-white px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
+              />
+              {errors.title && (
+                <p data-testid="erro-titulo" className="mt-1 text-[11px] text-[var(--danger)]">
+                  {errors.title}
+                </p>
+              )}
             </div>
-            <input
-              id="roadmap-titulo"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Exportar o carrossel em PDF"
-              aria-invalid={!!errors.title}
-              className="mt-1 w-full rounded-lg border border-[var(--line-strong)] bg-white px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            />
-            {errors.title && (
-              <p data-testid="erro-titulo" className="mt-1 text-[11px] text-[var(--danger)]">
-                {errors.title}
-              </p>
-            )}
+
+            <div>
+              <div className="flex items-baseline justify-between">
+                <label htmlFor="roadmap-descricao" className="text-[12px] font-semibold text-[var(--ink)]">
+                  Descrição
+                </label>
+                <span
+                  data-testid="contador-descricao"
+                  className={cn(
+                    'text-[11px] tabular-nums',
+                    descLen > DESCRIPTION_MAX ? 'font-semibold text-[var(--danger)]' : 'text-[var(--ink-muted)]',
+                  )}
+                >
+                  {descLen}/{DESCRIPTION_MAX}
+                </span>
+              </div>
+              {/* `resize-y` é a alça do canto que a referência mostra: 5 linhas
+                  bastam para a maioria, e quem escrever mais estica. */}
+              <textarea
+                id="roadmap-descricao"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={5}
+                placeholder="Descrição (opcional)"
+                aria-invalid={!!errors.description}
+                className="mt-1 w-full resize-y rounded-lg border border-[var(--line-strong)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
+              />
+              {errors.description && (
+                <p data-testid="erro-descricao" className="mt-1 text-[11px] text-[var(--danger)]">
+                  {errors.description}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div>
-            <div className="flex items-baseline justify-between">
-              <label htmlFor="roadmap-descricao" className="text-[12px] font-semibold text-[var(--ink)]">
-                Descrição
-              </label>
-              <span
-                data-testid="contador-descricao"
-                className={cn(
-                  'text-[11px] tabular-nums',
-                  descLen > DESCRIPTION_MAX ? 'font-semibold text-[var(--danger)]' : 'text-[var(--ink-muted)]',
-                )}
-              >
-                {descLen}/{DESCRIPTION_MAX}
-              </span>
-            </div>
-            <textarea
-              id="roadmap-descricao"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={5}
-              placeholder={`Conte o que você faria com isso. Mínimo de ${DESCRIPTION_MIN} caracteres.`}
-              aria-invalid={!!errors.description}
-              className="mt-1 w-full resize-y rounded-lg border border-[var(--line-strong)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            />
-            {errors.description && (
-              <p data-testid="erro-descricao" className="mt-1 text-[11px] text-[var(--danger)]">
-                {errors.description}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex justify-end gap-2 border-t border-[var(--line)] px-4 py-3">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[var(--line-strong)] px-4 py-2 text-[12px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              data-testid="cancelar-task"
+              className="rounded-lg border border-[var(--line-strong)] px-4 py-2 text-[12px] font-medium text-[var(--ink-dim)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={sending}
+              disabled={sending || tituloInvalido}
               data-testid="enviar-sugestao"
-              className="rounded-lg px-4 py-2 text-[12px] font-semibold text-white shadow-sm transition-opacity disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--success)]"
-              style={{ background: 'var(--success)' }}
+              className="rounded-lg px-4 py-2 text-[12px] font-semibold shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--ink)]"
+              style={{ background: 'var(--ink)', color: 'var(--paper)' }}
             >
-              {sending ? 'Enviando…' : 'Enviar sugestão'}
+              {sending ? 'Criando…' : 'Criar'}
             </button>
           </div>
         </form>
@@ -427,11 +483,42 @@ export default function RoadmapClient({
   state?: BoardState;
   isAuthenticated?: boolean;
 }) {
-  const [columns, setColumns] = useState<RoadmapColumn[]>(
-    initialColumns.length > 0 ? initialColumns : emptyColumns(),
-  );
+  const router = useRouter();
+  const [columns, setColumns] = useState<RoadmapColumn[]>(() => doServidor(initialColumns));
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+
+  /**
+   * ⚠️ O QUADRO TEM DE SEGUIR O SERVIDOR — não dá para só inicializar o estado
+   * com a prop e esquecer.
+   *
+   * `router.refresh()` re-renderiza o Server Component e MESCLA o payload novo
+   * neste componente montado, "without losing unaffected client-side React
+   * (e.g. useState)" — está escrito assim na doc do Next 16.2.10, em
+   * `03-api-reference/04-functions/use-router.md`. Preservar o `useState` é o
+   * comportamento pretendido (é o que salva scroll e input no meio de uma
+   * edição), mas para um estado que ESPELHA a prop significa: prop nova,
+   * estado velho, tela parada. Foi isso que segurou a task recém-criada fora do
+   * Backlog — o refresh disparava e o servidor devolvia o card certo; quem
+   * descartava era este componente.
+   *
+   * O conserto é o padrão do React de ajustar estado durante o render quando a
+   * prop muda (guardar a prop anterior e comparar), e não um `useEffect`: o
+   * efeito re-renderizaria uma segunda vez, e por um quadro o usuário veria a
+   * lista velha depois de o servidor já ter mandado a nova.
+   *
+   * A comparação é por IDENTIDADE de propósito. Cada refresh desserializa um
+   * payload novo, então `initialColumns` é sempre outro array — inclusive
+   * quando o conteúdo é igual. Ressincronizar à toa não custa nada; deixar de
+   * ressincronizar custa o bug.
+   */
+  const [quadroDoServidor, setQuadroDoServidor] = useState(initialColumns);
+  if (initialColumns !== quadroDoServidor) {
+    setQuadroDoServidor(initialColumns);
+    // O voto otimista em curso é descartado aqui, e tem de ser: o servidor
+    // acabou de dizer qual é a contagem, e ele é a autoridade sobre isso.
+    setColumns(doServidor(initialColumns));
+  }
 
   /** Aplica um patch a UM card, sem mexer no resto do quadro. */
   const patchCard = useCallback((cardId: string, patch: Partial<RoadmapCard>) => {
@@ -515,8 +602,8 @@ export default function RoadmapClient({
           type="button"
           onClick={() => setModalOpen(true)}
           data-testid="criar-task"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--success)]"
-          style={{ background: 'var(--success)' }}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--ink)]"
+          style={{ background: 'var(--ink)', color: 'var(--paper)' }}
         >
           <Plus className="h-4 w-4" aria-hidden />
           Criar task
@@ -552,7 +639,17 @@ export default function RoadmapClient({
       </div>
 
       {modalOpen && (
-        <CreateTaskModal onClose={() => setModalOpen(false)} onCreated={() => setModalOpen(false)} />
+        <CreateTaskModal
+          onClose={() => setModalOpen(false)}
+          onCreated={() => {
+            setModalOpen(false);
+            // A task nasce APROVADA e já pertence ao Backlog — então ela tem de
+            // aparecer agora. Quem monta o card é o servidor (posição e
+            // contagem de voto vêm de lá): `refresh()` refaz a leitura em vez de
+            // o cliente inventar um card que ainda não existe no quadro dele.
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

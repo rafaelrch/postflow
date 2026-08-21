@@ -12,11 +12,30 @@ const sql = readFileSync(
   'utf8',
 );
 
+/**
+ * ⚠️ A REGRA DE INSERT DESTE ARQUIVO ESTÁ SUPERADA. A migration
+ * `20260821170000_roadmap_backlog_sem_aprovacao.sql` (lida logo abaixo) troca
+ * `approval = 'pending'` por `'approved'` na policy de sugestão e no default da
+ * coluna. Os testes daqui continuam existindo porque esta migration JÁ FOI
+ * APLICADA no banco e não pode ser editada: o que eles guardam é o que este
+ * arquivo diz, não o que vale hoje. Quem quiser saber a regra em vigor lê o
+ * bloco "roadmap — backlog sem aprovação".
+ */
+const sqlNovo = readFileSync(
+  new URL('../supabase/migrations/20260821170000_roadmap_backlog_sem_aprovacao.sql', import.meta.url),
+  'utf8',
+);
+
 /** Sem comentários: evita que uma frase em comentário faça um teste passar. */
-const code = sql
-  .split('\n')
-  .filter((line) => !line.trimStart().startsWith('--'))
-  .join('\n');
+function semComentarios(texto: string) {
+  return texto
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('--'))
+    .join('\n');
+}
+
+const code = semComentarios(sql);
+const codeNovo = semComentarios(sqlNovo);
 
 describe('roadmap — migration', () => {
   it('é idempotente no padrão das outras', () => {
@@ -36,7 +55,8 @@ describe('roadmap — migration', () => {
     expect(code).toContain("check (status in ('backlog', 'faremos', 'cozinhando', 'pronto'))");
   });
 
-  it('trava os 3 estados de aprovação e nasce PENDENTE', () => {
+  /** O default 'pending' é o que a migration SEGUINTE inverte. */
+  it('trava os 3 estados de aprovação e, NESTE arquivo, nascia PENDENTE', () => {
     expect(code).toContain("check (approval in ('pending', 'approved', 'rejected'))");
     expect(code).toMatch(/approval text not null default 'pending'/);
   });
@@ -82,7 +102,8 @@ describe('roadmap — RLS', () => {
     expect(code).toMatch(/create policy roadmap_cards_public_read[\s\S]*?for select using \(approval = 'approved'\)/);
   });
 
-  it('sugestão só em nome próprio, pendente e no backlog', () => {
+  /** Regra superada pela migration de 17:00 — ver o bloco do fim do arquivo. */
+  it('sugestão só em nome próprio, pendente e no backlog (regra ANTIGA)', () => {
     const policy = code.match(/create policy roadmap_cards_suggest[\s\S]*?;/)?.[0] ?? '';
     expect(policy).toContain('for insert to authenticated');
     expect(policy).toContain('auth.uid() = author_id');
@@ -134,5 +155,71 @@ describe('roadmap — RLS', () => {
     expect(code).toContain('revoke all on table public.roadmap_cards from public, anon, authenticated');
     expect(code).toContain('grant insert on table public.roadmap_cards to authenticated');
     expect(code).not.toMatch(/grant\s+[\w, ]*insert[\w, ]*on table public\.roadmap_cards to [\w, ]*anon/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A REGRA EM VIGOR
+// ---------------------------------------------------------------------------
+
+/**
+ * `20260821170000_roadmap_backlog_sem_aprovacao.sql` — a task do usuário nasce
+ * VISÍVEL no Backlog. Esta é a regra que vale; a de cima é o histórico.
+ */
+describe('roadmap — backlog sem aprovação', () => {
+  it('avisa no topo que SUBSTITUI a regra da migration anterior', () => {
+    expect(sqlNovo).toMatch(/SUBSTITUI A REGRA/i);
+    expect(sqlNovo).toContain('20260821143000_roadmap_publico.sql');
+  });
+
+  it('é idempotente e transacional, no padrão das outras', () => {
+    expect(codeNovo).toContain('begin;');
+    expect(codeNovo).toContain('commit;');
+    expect(codeNovo).toContain('drop policy if exists roadmap_cards_suggest on public.roadmap_cards');
+  });
+
+  it('documenta o que faz e o que NÃO faz', () => {
+    expect(sqlNovo).toMatch(/O QUE ESTA MIGRATION FAZ/);
+    expect(sqlNovo).toMatch(/O QUE ELA NÃO FAZ/);
+  });
+
+  /** O ponto da mudança: a sugestão nasce aprovada, e só no backlog. */
+  it('a policy de insert passa a exigir approved, ainda no backlog e em nome próprio', () => {
+    const policy = codeNovo.match(/create policy roadmap_cards_suggest[\s\S]*?;/)?.[0] ?? '';
+    expect(policy).toContain('for insert to authenticated');
+    expect(policy).toContain('auth.uid() = author_id');
+    expect(policy).toContain("approval = 'approved'");
+    expect(policy).not.toContain("approval = 'pending'");
+    expect(policy).toContain("status = 'backlog'");
+  });
+
+  it('o default da coluna acompanha a policy', () => {
+    expect(codeNovo).toMatch(/alter column approval set default 'approved'/);
+  });
+
+  /**
+   * O conceito de aprovação FICA. 'rejected' é como o admin tira spam do quadro
+   * sem apagar a linha — o que mudou foi o padrão, não a existência da coluna.
+   */
+  it('não remove a coluna approval nem nenhum dos 3 valores', () => {
+    expect(codeNovo).not.toMatch(/drop column\s+(if exists\s+)?approval/i);
+    expect(codeNovo).not.toMatch(/drop constraint[\s\S]*approval/i);
+    expect(sqlNovo).toMatch(/rejected/);
+  });
+
+  /**
+   * ESTE é o teste que prova que a metade fechada continua fechada: sem policy
+   * de update, mover de coluna segue impossível pelo caminho do cliente.
+   */
+  it('não cria policy de update, delete nem leitura nova', () => {
+    const policies = [...codeNovo.matchAll(/create policy (\w+) on public\.(\w+)\s+for (\w+)/g)];
+    expect(policies).toHaveLength(1);
+    expect(policies[0][1]).toBe('roadmap_cards_suggest');
+    expect(policies[0][3]).toBe('insert');
+  });
+
+  /** Aprovar em massa por migration decidiria pelo admin o que ele não olhou. */
+  it('não faz backfill dos cards que já estavam pendentes', () => {
+    expect(codeNovo).not.toMatch(/update public\.roadmap_cards/i);
   });
 });

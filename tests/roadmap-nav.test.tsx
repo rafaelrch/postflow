@@ -65,14 +65,20 @@ describe('Roadmap na navegação', () => {
     expect(link.getAttribute('href')).toBe('/roadmap');
   });
 
-  it('vem depois de Agenda e antes de Onboarding', async () => {
+  /**
+   * O ÚLTIMO da lista, depois de Configurações — ordem pedida pelo Rafael
+   * (21/08). Antes ele ficava entre Agenda e Onboarding.
+   */
+  it('é o último item da navegação, depois de Configurações', async () => {
     await renderSidebar();
     const hrefs = screen
       .getAllByRole('link')
       .map((a) => a.getAttribute('href'))
       .filter((h): h is string => !!h);
+
+    expect(hrefs.indexOf('/roadmap')).toBeGreaterThan(hrefs.indexOf('/configuracoes'));
+    expect(hrefs.indexOf('/roadmap')).toBeGreaterThan(hrefs.indexOf('/onboarding'));
     expect(hrefs.indexOf('/roadmap')).toBeGreaterThan(hrefs.indexOf('/agenda'));
-    expect(hrefs.indexOf('/roadmap')).toBeLessThan(hrefs.indexOf('/onboarding'));
   });
 
   it('leva um ícone, como todos os outros itens', async () => {

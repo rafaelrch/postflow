@@ -71,8 +71,12 @@ describe('POST /api/roadmap/suggestions', () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
-  /** A sugestão NASCE PENDENTE — é o que segura o mural de spam. */
-  it('grava a sugestão como pending, no backlog, com autoria da SESSÃO', async () => {
+  /**
+   * A sugestão NASCE APROVADA e já aparece no Backlog (decisão do Rafael,
+   * 21/08). O que segura o spam não é mais a fila de moderação: é o rate limit
+   * desta rota e o 'rejected' do admin, depois.
+   */
+  it('grava a sugestão como approved, no backlog, com autoria da SESSÃO', async () => {
     const insert = vi.fn().mockResolvedValue({ error: null });
     mockFrom.mockReturnValue({ insert });
 
@@ -84,20 +88,36 @@ describe('POST /api/roadmap/suggestions', () => {
       title: VALIDA.title,
       description: VALIDA.description,
       author_id: USER.id,
-      approval: 'pending',
+      approval: 'approved',
       status: 'backlog',
       position: 0,
     });
   });
 
-  it('ignora approval e autoria mandados pelo cliente', async () => {
+  /**
+   * Nascer aprovado abre o BACKLOG, não o quadro. As outras 3 colunas continuam
+   * fechadas: um `status: 'pronto'` no corpo é ignorado aqui e recusado pela
+   * policy se alguém tentar por fora.
+   */
+  it('ignora approval, status e autoria mandados pelo cliente', async () => {
     const insert = vi.fn().mockResolvedValue({ error: null });
     mockFrom.mockReturnValue({ insert });
-    await suggest(request({ ...VALIDA, authorId: 'forjado', approval: 'approved', status: 'pronto' }));
+    await suggest(request({ ...VALIDA, authorId: 'forjado', approval: 'rejected', status: 'pronto' }));
     const payload = insert.mock.calls[0][0];
     expect(payload.author_id).toBe(USER.id);
-    expect(payload.approval).toBe('pending');
+    expect(payload.approval).toBe('approved');
     expect(payload.status).toBe('backlog');
+  });
+
+  /** Descrição é opcional: sem ela a rota grava normalmente, com string vazia. */
+  it('aceita sugestão sem descrição', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    mockFrom.mockReturnValue({ insert });
+
+    const res = await suggest(request({ title: VALIDA.title }));
+
+    expect(res.status).toBe(201);
+    expect(insert.mock.calls[0][0].description).toBe('');
   });
 
   it('título curto: 400 com mensagem útil por campo', async () => {

@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const { mockToastError, mockToastSuccess } = vi.hoisted(() => ({
+const { mockToastError, mockToastSuccess, mockRefresh } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
+  mockRefresh: vi.fn(),
 }));
 
 vi.mock('react-hot-toast', () => ({
   default: { error: mockToastError, success: mockToastSuccess },
+}));
+
+/** A task nasce visível: depois de criar, a tela relê o quadro do servidor. */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
 
 import RoadmapClient, { emptyColumns } from '../app/(app)/roadmap/RoadmapClient';
@@ -81,15 +87,25 @@ describe('roadmap — as 4 colunas', () => {
 // ───────────────────────────────────────────────────────── estados
 
 describe('roadmap — vazio, carregando e erro', () => {
-  /** "0 itens" é número, não informação — cada coluna diz o que o vazio significa. */
-  it('cada coluna vazia tem frase própria, e nenhuma diz "0 itens"', () => {
+  /**
+   * COLUNA VAZIA FICA VAZIA (Rafael, 21/08). Havia uma frase por coluna; saiu.
+   * O contador do cabeçalho continua sendo quem diz que ali não tem nada.
+   */
+  it('coluna vazia não tem caixa de texto nenhuma, e o contador fica', () => {
     render(<RoadmapClient initialColumns={board()} />);
-    const frases = ROADMAP_STATUSES.map((s) => screen.getByTestId(`column-empty-${s}`).textContent ?? '');
-    expect(new Set(frases).size).toBe(4);
-    for (const f of frases) {
-      expect(f.length).toBeGreaterThan(10);
-      expect(f).not.toMatch(/0 iten/i);
+    for (const s of ROADMAP_STATUSES) {
+      expect(screen.queryByTestId(`column-empty-${s}`)).toBeNull();
+      expect(screen.getByTestId(`column-${s}`).textContent).toContain('0');
     }
+  });
+
+  it('nenhuma das frases antigas de coluna vazia sobrou na tela', () => {
+    const { container } = render(<RoadmapClient initialColumns={board()} />);
+    const texto = container.textContent ?? '';
+    expect(texto).not.toMatch(/Nada no backlog/i);
+    expect(texto).not.toMatch(/Nada decidido/i);
+    expect(texto).not.toMatch(/Nada em produção/i);
+    expect(texto).not.toMatch(/primeira entrega/i);
   });
 
   it('carregando: esqueleto em cada coluna, sem card e sem frase de vazio', () => {
@@ -230,9 +246,15 @@ describe('roadmap — voto', () => {
 // ───────────────────────────────────────────────────────── popup
 
 describe('roadmap — popup Criar task', () => {
+  const TITULO_VALIDO = 'Exportar em PDF';
+
   function abrir() {
     render(<RoadmapClient initialColumns={board()} />);
     fireEvent.click(screen.getByTestId('criar-task'));
+  }
+
+  function preencherTitulo(valor = TITULO_VALIDO) {
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: valor } });
   }
 
   it('o botão do topo e o cartão da primeira coluna abrem o mesmo popup', () => {
@@ -250,49 +272,120 @@ describe('roadmap — popup Criar task', () => {
     expect(screen.getAllByTestId('adicionar-task-card')).toHaveLength(1);
   });
 
-  /** O aviso vem ANTES de enviar, senão a fila de moderação vira fila de duplicatas. */
-  it('avisa que a sugestão passa por aprovação', () => {
+  // ── a referência que o Rafael mandou ──────────────────────────────────────
+
+  it('o título do diálogo é "Criar task" e o primário é "Criar"', () => {
     abrir();
-    expect(screen.getByTestId('aviso-aprovacao').textContent).toMatch(/aprovação/i);
+    // Pelo id do `aria-labelledby`: o botão do cabeçalho do quadro também diz
+    // "Criar task", e um getByText pegaria os dois.
+    expect(document.getElementById('criar-task-titulo')?.textContent).toBe('Criar task');
+    expect(screen.getByTestId('enviar-sugestao').textContent).toBe('Criar');
+    expect(screen.getByTestId('cancelar-task').textContent).toBe('Cancelar');
   });
 
-  it('título curto não envia e mostra o erro no campo', async () => {
+  it('tem seta de voltar e X, e os dois fecham', () => {
+    abrir();
+    fireEvent.click(screen.getByTestId('voltar-popup'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('criar-task'));
+    fireEvent.click(screen.getByTestId('fechar-popup'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('os campos têm rótulo ACIMA e placeholder próprio', () => {
+    abrir();
+    expect(screen.getByLabelText('Título').getAttribute('placeholder')).toBe('Título da task');
+    const desc = screen.getByLabelText('Descrição') as HTMLTextAreaElement;
+    expect(desc.tagName).toBe('TEXTAREA');
+    expect(desc.getAttribute('placeholder')).toBe('Descrição (opcional)');
+    expect(desc.rows).toBe(5);
+    expect(desc.className).toContain('resize-y');
+  });
+
+  /**
+   * O aviso "sua sugestão passa por aprovação" SAIU: com a task nascendo no
+   * Backlog ele virou mentira, e aviso que mente é pior que aviso nenhum.
+   */
+  it('não avisa mais que a sugestão passa por aprovação', () => {
+    abrir();
+    expect(screen.queryByTestId('aviso-aprovacao')).toBeNull();
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/aprova/i);
+  });
+
+  // ── o primário só acende com título válido ────────────────────────────────
+
+  it('"Criar" começa desabilitado e acende quando o título fica válido', () => {
+    abrir();
+    const botao = screen.getByTestId('enviar-sugestao') as HTMLButtonElement;
+    expect(botao.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'oi' } });
+    expect(botao.disabled).toBe(true);
+
+    preencherTitulo();
+    expect(botao.disabled).toBe(false);
+  });
+
+  it('título com HTML mantém o "Criar" apagado', () => {
+    abrir();
+    preencherTitulo('<script>alert(1)</script>');
+    expect((screen.getByTestId('enviar-sugestao') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('título inválido não envia nada', async () => {
     abrir();
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'oi' } });
+    fireEvent.click(screen.getByTestId('enviar-sugestao'));
+
+    await waitFor(() => expect(globalThis.fetch).not.toHaveBeenCalled());
+  });
+
+  // ── descrição opcional ────────────────────────────────────────────────────
+
+  /** A descrição é OPCIONAL: só o título segura o envio. */
+  it('descrição vazia envia, e o corpo vai com a descrição em branco', async () => {
+    abrir();
+    preencherTitulo();
+    expect((screen.getByTestId('enviar-sugestao') as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId('enviar-sugestao'));
+
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe('/api/roadmap/suggestions');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      title: TITULO_VALIDO,
+      description: '',
+    });
+  });
+
+  it('descrição de duas letras também envia', async () => {
+    abrir();
+    preencherTitulo();
+    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'ok' } });
+    fireEvent.click(screen.getByTestId('enviar-sugestao'));
+
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+    expect(screen.queryByTestId('erro-descricao')).toBeNull();
+  });
+
+  /** O teto e o HTML continuam valendo para quem escrever alguma coisa. */
+  it('HTML na descrição não envia e mostra o erro no campo', async () => {
+    abrir();
+    preencherTitulo();
     fireEvent.change(screen.getByLabelText('Descrição'), {
-      target: { value: 'Uma descrição suficientemente longa.' },
+      target: { value: 'Texto com <img src=x onerror=1> dentro.' },
     });
     fireEvent.click(screen.getByTestId('enviar-sugestao'));
 
-    await waitFor(() => expect(screen.getByTestId('erro-titulo')).toBeTruthy());
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('descrição curta não envia', async () => {
-    abrir();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Exportar em PDF' } });
-    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'curta' } });
-    fireEvent.click(screen.getByTestId('enviar-sugestao'));
-
-    await waitFor(() => expect(screen.getByTestId('erro-descricao')).toBeTruthy());
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('HTML no título não envia', async () => {
-    abrir();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: '<script>alert(1)</script>' } });
-    fireEvent.change(screen.getByLabelText('Descrição'), {
-      target: { value: 'Uma descrição suficientemente longa.' },
-    });
-    fireEvent.click(screen.getByTestId('enviar-sugestao'));
-
-    await waitFor(() => expect(screen.getByTestId('erro-titulo').textContent).toMatch(/HTML/));
+    await waitFor(() => expect(screen.getByTestId('erro-descricao').textContent).toMatch(/HTML/));
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it('válidos enviam o corpo certo, já aparado', async () => {
     abrir();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: '  Exportar em PDF  ' } });
+    preencherTitulo('  Exportar em PDF  ');
     fireEvent.change(screen.getByLabelText('Descrição'), {
       target: { value: '  Queria baixar o carrossel como PDF.  ' },
     });
@@ -319,10 +412,7 @@ describe('roadmap — popup Criar task', () => {
       errResponse(400, { error: 'Dados inválidos.', fields: { title: 'O título não pode conter HTML.' } }),
     );
     abrir();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Exportar em PDF' } });
-    fireEvent.change(screen.getByLabelText('Descrição'), {
-      target: { value: 'Queria baixar o carrossel como PDF.' },
-    });
+    preencherTitulo();
     fireEvent.click(screen.getByTestId('enviar-sugestao'));
 
     await waitFor(() =>
@@ -330,18 +420,125 @@ describe('roadmap — popup Criar task', () => {
     );
   });
 
-  it('sucesso avisa que passa por revisão e fecha o popup', async () => {
+  /** Nasce no Backlog: o aviso diz isso, e a tela relê o quadro do servidor. */
+  it('sucesso avisa que já está no Backlog, fecha o popup e recarrega o quadro', async () => {
     abrir();
-    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Exportar em PDF' } });
-    fireEvent.change(screen.getByLabelText('Descrição'), {
-      target: { value: 'Queria baixar o carrossel como PDF.' },
-    });
+    preencherTitulo();
     fireEvent.click(screen.getByTestId('enviar-sugestao'));
 
     await waitFor(() =>
-      expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/revisão/i)),
+      expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/backlog/i)),
     );
+    expect(mockToastSuccess).not.toHaveBeenCalledWith(expect.stringMatching(/revisão|aprova/i));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it('ESC fecha o popup', () => {
+    abrir();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+// ───────────────────────────────────────────────────────── quadro x servidor
+
+/**
+ * O QUADRO TEM DE SEGUIR O SERVIDOR.
+ *
+ * `router.refresh()` re-renderiza o Server Component e entrega ao Client
+ * Component um `initialColumns` NOVO — mas ele NÃO desmonta nada: a doc do Next
+ * 16.2.10 (`03-api-reference/04-functions/use-router.md`) diz que o payload é
+ * mesclado "without losing unaffected client-side React (e.g. useState)". Ou
+ * seja: prop nova, estado velho. Um `useState(initialColumns)` que só lê a prop
+ * no primeiro mount ignora o quadro atualizado para sempre, e foi exatamente
+ * isso que segurou a task recém-criada fora da tela.
+ *
+ * Estes testes rodam o caminho REAL do refresh: props novas no mesmo componente
+ * montado. É o que o `rerender` faz.
+ */
+describe('roadmap — o quadro segue o servidor', () => {
+  it('card novo vindo do servidor aparece sem remontar o componente', () => {
+    const { rerender } = render(<RoadmapClient initialColumns={board([card()])} />);
+    expect(screen.getByTestId('card-c1')).toBeTruthy();
+    expect(screen.queryByTestId('card-c2')).toBeNull();
+
+    // O que o refresh entrega: MESMO componente, outro `initialColumns`.
+    rerender(<RoadmapClient initialColumns={board([card(), card({ id: 'c2', title: 'Modo escuro' })])} />);
+
+    expect(screen.getByTestId('card-c2')).toBeTruthy();
+    expect(screen.getByText('Modo escuro')).toBeTruthy();
+  });
+
+  it('contagem de voto atualizada pelo servidor chega à tela', () => {
+    const { rerender } = render(<RoadmapClient initialColumns={board([card({ voteCount: 3 })])} />);
+    expect(screen.getByTestId('vote-count-c1').textContent).toBe('3');
+
+    rerender(<RoadmapClient initialColumns={board([card({ voteCount: 9, hasVoted: true })])} />);
+
+    expect(screen.getByTestId('vote-count-c1').textContent).toBe('9');
+    expect(screen.getByTestId('vote-c1').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('card removido no servidor some da tela', () => {
+    const { rerender } = render(<RoadmapClient initialColumns={board([card()])} />);
+    rerender(<RoadmapClient initialColumns={board([])} />);
+    expect(screen.queryByTestId('card-c1')).toBeNull();
+  });
+
+  /** O contador do cabeçalho é derivado do quadro: tem de andar junto. */
+  it('o contador da coluna acompanha o quadro novo', () => {
+    const { rerender } = render(<RoadmapClient initialColumns={board([])} />);
+    expect(screen.getByTestId('column-backlog').textContent).toContain('0');
+
+    rerender(<RoadmapClient initialColumns={board([card()])} />);
+    expect(screen.getByTestId('column-backlog').textContent).toContain('1');
+  });
+
+  /** Re-render com a MESMA prop não pode desfazer um voto otimista em curso. */
+  it('re-render com o mesmo quadro preserva o voto otimista', async () => {
+    const colunas = board([card()]);
+    const { rerender } = render(<RoadmapClient initialColumns={colunas} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('vote-c1'));
+    });
+    expect(screen.getByTestId('vote-count-c1').textContent).toBe('4');
+
+    rerender(<RoadmapClient initialColumns={colunas} />);
+    expect(screen.getByTestId('vote-count-c1').textContent).toBe('4');
+  });
+});
+
+// ───────────────────────────────────────────────────────── cor
+
+/**
+ * Todo BOTÃO da tela vira PRETO (Rafael, 21/08) — o token de primário do
+ * produto, `--ink`, o mesmo de `.brand-btn.primary`. As BARRAS coloridas do
+ * cabeçalho de cada coluna FICAM: são identidade de coluna, não botão.
+ */
+describe('roadmap — botão primário é preto', () => {
+  it('o "Criar task" do cabeçalho usa o token de primário, não o verde', () => {
+    render(<RoadmapClient initialColumns={board()} />);
+    const style = screen.getByTestId('criar-task').getAttribute('style') ?? '';
+    expect(style).toContain('var(--ink)');
+    expect(style).not.toContain('--success');
+  });
+
+  it('o "Criar" do popup usa o mesmo token', () => {
+    render(<RoadmapClient initialColumns={board()} />);
+    fireEvent.click(screen.getByTestId('criar-task'));
+    const style = screen.getByTestId('enviar-sugestao').getAttribute('style') ?? '';
+    expect(style).toContain('var(--ink)');
+    expect(style).not.toContain('--success');
+  });
+
+  it('as barras de coluna continuam coloridas e distintas', () => {
+    render(<RoadmapClient initialColumns={board()} />);
+    const cores = ROADMAP_STATUSES.map(
+      (s) => screen.getByTestId(`column-accent-${s}`).getAttribute('style') ?? '',
+    );
+    expect(new Set(cores).size).toBe(4);
   });
 });
 

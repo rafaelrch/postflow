@@ -48,7 +48,11 @@ export function isRoadmapApproval(value: unknown): value is RoadmapApproval {
 
 export const TITLE_MIN = 5;
 export const TITLE_MAX = 120;
-export const DESCRIPTION_MIN = 10;
+/**
+ * ⚠️ NÃO existe DESCRIPTION_MIN. A descrição é OPCIONAL (decisão do Rafael,
+ * 21/08): o popup diz "Descrição (opcional)" e a rota aceita vazia. Só o teto
+ * continua, porque ele protege o banco (`roadmap_cards_description_len`).
+ */
 export const DESCRIPTION_MAX = 2000;
 
 /**
@@ -82,6 +86,10 @@ export type SuggestionValidation =
  *
  * Mensagem por CAMPO, e útil: "Dados inválidos." sozinho obriga a pessoa a
  * adivinhar qual dos dois campos recusou e por quê.
+ *
+ * O título é obrigatório; a DESCRIÇÃO NÃO É. Esta é a única função que sabe
+ * disso — o popup importa daqui em vez de repetir a regra, senão o cliente e a
+ * rota divergem no primeiro ajuste de limite.
  */
 export function validateSuggestion(input: unknown): SuggestionValidation {
   const raw = (input ?? {}) as Record<string, unknown>;
@@ -100,11 +108,11 @@ export function validateSuggestion(input: unknown): SuggestionValidation {
     fields.title = 'O título não pode conter HTML.';
   }
 
-  if (description.length === 0) {
-    fields.description = 'Escreva uma descrição.';
-  } else if (description.length < DESCRIPTION_MIN) {
-    fields.description = `A descrição precisa de pelo menos ${DESCRIPTION_MIN} caracteres.`;
-  } else if (description.length > DESCRIPTION_MAX) {
+  // Descrição VAZIA passa: o título sozinho já diz o que a pessoa quer, e
+  // exigir um parágrafo para propor "Exportar em PDF" só produz texto de
+  // enrolação. As outras regras (teto, HTML) continuam valendo para quem
+  // escrever algo.
+  if (description.length > DESCRIPTION_MAX) {
     fields.description = `A descrição passa de ${DESCRIPTION_MAX} caracteres (tem ${description.length}).`;
   } else if (HTML_LIKE.test(description)) {
     fields.description = 'A descrição não pode conter HTML.';

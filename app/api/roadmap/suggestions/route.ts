@@ -15,12 +15,19 @@ const SUGGESTION_WINDOW_MS = 10 * 60_000;
 /**
  * POST /api/roadmap/suggestions — o usuário propõe uma ideia para o roadmap.
  *
- * A sugestão NASCE PENDENTE e não aparece no quadro público até o admin
- * aprovar: roadmap com escrita aberta é mural de spam.
+ * A sugestão NASCE APROVADA e aparece no Backlog na hora (decisão do Rafael,
+ * 21/08 — ver `supabase/migrations/20260821170000_roadmap_backlog_sem_aprovacao.sql`,
+ * que substitui a regra da migration anterior). O que segura o mural de spam
+ * agora são duas outras coisas, não a fila de moderação: o rate limit acima e o
+ * 'rejected' do admin, que tira o card do quadro depois sem apagar a linha.
+ *
+ * O usuário só consegue pôr card no BACKLOG. As outras 3 colunas continuam
+ * fechadas: `roadmap_cards` não tem policy de UPDATE, então mover de coluna é
+ * impossível pelo caminho do cliente, com ou sem esta rota.
  *
  * ⚠️ Usa o client da SESSÃO (anon + RLS), não o service_role. Aqui isso não é
  * descuido, é o desenho: a policy `roadmap_cards_suggest` já exige
- * `author_id = auth.uid()`, `approval = 'pending'` e `status = 'backlog'`. Com
+ * `author_id = auth.uid()`, `approval = 'approved'` e `status = 'backlog'`. Com
  * service_role, o banco aceitaria qualquer coisa que a rota mandasse e a
  * garantia passaria a depender só deste arquivo estar certo. Menor privilégio: o
  * banco continua sendo a segunda trava.
@@ -69,7 +76,7 @@ export async function POST(request: NextRequest) {
       title: validation.value.title,
       description: validation.value.description,
       author_id: user.id,
-      approval: 'pending',
+      approval: 'approved',
       status: 'backlog',
       position: 0,
     });
@@ -84,10 +91,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 201 sem devolver o card: ele ainda não é público. Devolver o id daria ao
-    // cliente uma referência a uma linha que ele não consegue ler.
+    // 201 sem devolver o card: a tela recarrega o quadro do servidor, que é a
+    // autoridade sobre posição e contagem de voto. Devolver o card aqui criaria
+    // uma segunda montagem do mesmo dado, com outro caminho para divergir.
     return NextResponse.json(
-      { ok: true, message: 'Sugestão enviada! Ela aparece no quadro depois da nossa revisão.' },
+      { ok: true, message: 'Task criada! Ela já está no Backlog.' },
       { status: 201 },
     );
   } catch {

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   DESCRIPTION_MAX,
-  DESCRIPTION_MIN,
   ROADMAP_STATUSES,
   ROADMAP_STATUS_LABELS,
   TITLE_MAX,
@@ -87,22 +86,37 @@ describe('roadmap — validação da sugestão', () => {
     if (!r.ok) expect(r.fields.title).toContain(String(TITLE_MAX + 1));
   });
 
-  it('recusa descrição curta e descrição longa', () => {
-    const curta = validateSuggestion({ ...validos, description: 'curta' });
-    expect(curta.ok).toBe(false);
-    if (!curta.ok) expect(curta.fields.description).toContain(String(DESCRIPTION_MIN));
+  /**
+   * A DESCRIÇÃO É OPCIONAL (decisão do Rafael, 21/08). Não há mínimo: só o
+   * teto, que é o que protege o CHECK do banco. Este teste é o oposto do que
+   * havia aqui antes — que exigia 10 caracteres.
+   */
+  it('aceita descrição vazia, ausente e só com espaços', () => {
+    expect(validateSuggestion({ title: validos.title, description: '' }).ok).toBe(true);
+    expect(validateSuggestion({ title: validos.title }).ok).toBe(true);
+    expect(validateSuggestion({ title: validos.title, description: '   ' }).ok).toBe(true);
 
+    const r = validateSuggestion({ title: validos.title, description: '   ' });
+    if (r.ok) expect(r.value.description).toBe('');
+  });
+
+  it('aceita descrição curtíssima: "ok" não é erro', () => {
+    expect(validateSuggestion({ ...validos, description: 'ok' }).ok).toBe(true);
+  });
+
+  it('recusa descrição longa e diz o teto', () => {
     const longa = validateSuggestion({ ...validos, description: 'a'.repeat(DESCRIPTION_MAX + 1) });
     expect(longa.ok).toBe(false);
     if (!longa.ok) expect(longa.fields.description).toContain(String(DESCRIPTION_MAX));
   });
 
-  it('recusa campo ausente com mensagem própria, não com "muito curto"', () => {
+  /** O título continua obrigatório — o opcional é só a descrição. */
+  it('recusa título ausente com mensagem própria, sem reclamar da descrição', () => {
     const r = validateSuggestion({});
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.fields.title).toBe('Escreva um título.');
-      expect(r.fields.description).toBe('Escreva uma descrição.');
+      expect(r.fields.description).toBeUndefined();
     }
   });
 
