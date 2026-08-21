@@ -397,3 +397,137 @@ describe('admin/roadmap — mover é operável por teclado', () => {
     );
   });
 });
+
+// ───────────────────────────────────────── detalhe do card (popup)
+
+describe('admin/roadmap — detalhe do card', () => {
+  const LONGA = Array.from(
+    { length: 30 },
+    (_, i) => `Linha ${i + 1} de uma descrição que não cabe nas três linhas do card.`,
+  ).join('\n');
+
+  it('clicar no título abre o detalhe com a descrição COMPLETA', () => {
+    render(<RoadmapAdminClient initialBoard={board([card({ description: LONGA })])} />);
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+
+    expect(screen.getByTestId('admin-detalhe-titulo').textContent).toBe('Exportar em PDF');
+    expect(screen.getByTestId('admin-detalhe-descricao').textContent).toBe(LONGA);
+  });
+
+  it('mostra o selo, a coluna atual e a contagem de votos', () => {
+    render(
+      <RoadmapAdminClient
+        initialBoard={board([card({ approval: 'pending', status: 'faremos', voteCount: 9 })])}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+
+    expect(screen.getByTestId('admin-detalhe-selo').textContent).toBe('Pendente');
+    expect(screen.getByTestId('admin-detalhe-coluna').textContent).toBe('Faremos');
+    expect(screen.getByTestId('admin-detalhe-votos').textContent).toContain('9');
+  });
+
+  /**
+   * ⚠️ A ARMADILHA DESTA TELA. O card do /admin tem CONTROLES dentro. Se o card
+   * inteiro fosse a área clicável, mexer no seletor de coluna abriria o popup na
+   * cara de quem só queria mover o card. O gatilho é o TÍTULO justamente por
+   * isso, e estes três testes são o que segura a escolha.
+   */
+  it('mexer no <select> de coluna NÃO abre o popup', async () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+
+    const seletor = screen.getByTestId('admin-mover-c1');
+    fireEvent.mouseDown(seletor);
+    fireEvent.click(seletor);
+    fireEvent.change(seletor, { target: { value: 'faremos' } });
+
+    await waitFor(() => expect(ultimoCorpo()).toEqual({ cardId: 'c1', status: 'faremos' }));
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+  });
+
+  it('clicar em Aprovar NÃO abre o popup', async () => {
+    render(<RoadmapAdminClient initialBoard={board([card({ approval: 'pending' })])} />);
+
+    fireEvent.click(screen.getByTestId('admin-aprovar-c1'));
+
+    await waitFor(() => expect(ultimoCorpo()).toEqual({ cardId: 'c1', approval: 'approved' }));
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+  });
+
+  it('clicar em Recusar NÃO abre o popup', async () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+
+    fireEvent.click(screen.getByTestId('admin-recusar-c1'));
+
+    await waitFor(() => expect(ultimoCorpo()).toEqual({ cardId: 'c1', approval: 'rejected' }));
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+  });
+
+  it('ESC fecha e o foco VOLTA para o gatilho', () => {
+    render(<RoadmapAdminClient initialBoard={board([card({ description: LONGA })])} />);
+    const gatilho = screen.getByTestId('admin-abrir-detalhe-c1');
+    gatilho.focus();
+    fireEvent.click(gatilho);
+    expect(screen.getByTestId('admin-detalhe-popup')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+    expect(document.activeElement).toBe(gatilho);
+  });
+
+  it('o X e o clique fora também fecham', () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+    fireEvent.click(screen.getByTestId('admin-fechar-detalhe'));
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+    fireEvent.click(screen.getByTestId('admin-detalhe-popup'));
+    expect(screen.queryByTestId('admin-detalhe-popup')).toBeNull();
+  });
+
+  it('é um dialog modal rotulado pelo próprio título', () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+    const dialog = screen.getByTestId('admin-detalhe-popup');
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.getAttribute('aria-labelledby')).toBe('admin-roadmap-detalhe-titulo');
+  });
+
+  /** O `<select>` é focável e não pode ficar aninhado num botão. */
+  it('o gatilho é um BUTTON e não existe botão dentro de botão no card', () => {
+    const { container } = render(<RoadmapAdminClient initialBoard={board([card({ approval: 'pending' })])} />);
+    expect(screen.getByTestId('admin-abrir-detalhe-c1').tagName).toBe('BUTTON');
+    expect(container.querySelectorAll('button button')).toHaveLength(0);
+    expect(container.querySelectorAll('button select')).toHaveLength(0);
+  });
+});
+
+// ───────────────────────────────────────── o coração do admin é leitura
+
+describe('admin/roadmap — o contador de votos não é um like', () => {
+  it('não é botão e não tem aria-pressed', () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+    const votos = screen.getByTestId('admin-votos-c1');
+    expect(votos.tagName).toBe('SPAN');
+    expect(votos.getAttribute('aria-pressed')).toBeNull();
+    expect(votos.closest('button')).toBeNull();
+  });
+
+  /** Mesmo desenho do quadro público, para o olho reconhecer a mesma coisa. */
+  it('usa o mesmo coração, e não o chevron antigo', () => {
+    const { container } = render(<RoadmapAdminClient initialBoard={board([card()])} />);
+    expect(screen.getByTestId('admin-votos-c1').querySelector('.lucide-heart')).toBeTruthy();
+    expect(container.querySelector('.lucide-chevron-up')).toBeNull();
+  });
+
+  it('a contagem continua na tela', () => {
+    render(<RoadmapAdminClient initialBoard={board([card({ voteCount: 12 })])} />);
+    expect(screen.getByTestId('admin-votos-c1').textContent).toContain('12');
+  });
+});

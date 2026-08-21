@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronUp, Map as MapIcon, Undo2, XCircle } from 'lucide-react';
+import { CheckCircle2, Heart, Map as MapIcon, Undo2, X, XCircle } from 'lucide-react';
+import RoadmapDialog from '@/components/roadmap/RoadmapDialog';
 import {
   ROADMAP_STATUSES,
   ROADMAP_STATUS_LABELS,
@@ -63,11 +64,13 @@ function Card({
   card,
   onMover,
   onAprovacao,
+  onAbrirDetalhe,
   ocupado,
 }: {
   card: AdminRoadmapCard;
   onMover: (card: AdminRoadmapCard, status: RoadmapStatus) => void;
   onAprovacao: (card: AdminRoadmapCard, approval: RoadmapApproval) => void;
+  onAbrirDetalhe: (card: AdminRoadmapCard) => void;
   ocupado: boolean;
 }) {
   const seletorId = `coluna-${card.id}`;
@@ -80,11 +83,32 @@ function Card({
       aria-busy={ocupado ? 'true' : undefined}
     >
       <header>
-        <h3>{card.title}</h3>
+        {/* ⚠️ O GATILHO DO DETALHE É O TÍTULO, e não o card inteiro. Este card
+            tem CONTROLES dentro — o `<select>` de coluna e os botões de aprovar
+            e recusar. Card-inteiro-clicável só existe de dois jeitos, e os dois
+            quebram: um `<button>` em volta de tudo é botão dentro de botão (HTML
+            inválido, e o `<select>` deixa de responder ao teclado), e um
+            `<div onClick>` que filtra `event.target` não é alcançável por Tab —
+            ler a descrição viraria função de mouse. O título é um `<button>` de
+            verdade e não se sobrepõe a controle nenhum. */}
+        <h3>
+          <button
+            type="button"
+            className="admin-roadmap-title-btn"
+            data-testid={`admin-abrir-detalhe-${card.id}`}
+            onClick={() => onAbrirDetalhe(card)}
+          >
+            {card.title}
+          </button>
+        </h3>
         {/* A contagem é a informação que decide a ordem do roadmap: fica no
-            card, não escondida atrás de um clique. */}
+            card, não escondida atrás de um clique.
+            ⚠️ MESMO CORAÇÃO do quadro público, para o olho reconhecer a mesma
+            coisa — mas aqui é `<span>`, não botão, e sem `aria-pressed`: não
+            existe like de admin. Transformar leitura em ação prometeria um voto
+            que a rota não aceita. */}
         <span className="admin-roadmap-votes" data-testid={`admin-votos-${card.id}`}>
-          <ChevronUp size={13} strokeWidth={2} aria-hidden />
+          <Heart size={13} strokeWidth={2} aria-hidden />
           {card.voteCount}
           <span className="sr-only"> voto(s)</span>
         </span>
@@ -152,6 +176,60 @@ function Card({
   );
 }
 
+// ───────────────────────────────────────────────────────────── Detalhe
+
+/**
+ * O DETALHE DO CARD — porque `.admin-roadmap-desc` corta a descrição em 3 linhas
+ * e o resto do texto não tinha onde ser lido. Mesma casca de foco do quadro
+ * público (`RoadmapDialog`); só o desenho é do painel.
+ *
+ * É LEITURA, e só. Mover, aprovar e recusar continuam no card: duplicar os
+ * controles aqui criaria um segundo lugar para o mesmo PATCH — e dois lugares
+ * que fazem a mesma coisa divergem no primeiro ajuste.
+ */
+function DetalheModal({ card, onClose }: { card: AdminRoadmapCard; onClose: () => void }) {
+  return (
+    <RoadmapDialog
+      labelledBy="admin-roadmap-detalhe-titulo"
+      onClose={onClose}
+      testId="admin-detalhe-popup"
+      overlayClassName="admin-roadmap-detalhe-overlay"
+      panelClassName="admin-roadmap-detalhe"
+    >
+      <header>
+        <h2 id="admin-roadmap-detalhe-titulo" data-testid="admin-detalhe-titulo">
+          {card.title}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          data-testid="admin-fechar-detalhe"
+          className="admin-roadmap-detalhe-fechar"
+        >
+          <X size={14} aria-hidden />
+        </button>
+      </header>
+
+      <div className="admin-roadmap-detalhe-meta">
+        <span className="admin-roadmap-pill" data-approval={card.approval} data-testid="admin-detalhe-selo">
+          {APPROVAL_LABEL[card.approval]}
+        </span>
+        <span data-testid="admin-detalhe-coluna">{ROADMAP_STATUS_LABELS[card.status]}</span>
+        <span className="admin-roadmap-votes" data-testid="admin-detalhe-votos">
+          <Heart size={13} strokeWidth={2} aria-hidden />
+          {card.voteCount}
+          <span className="sr-only"> voto(s)</span>
+        </span>
+      </div>
+
+      <p className="admin-roadmap-detalhe-desc" data-testid="admin-detalhe-descricao">
+        {card.description || 'Esta task não tem descrição.'}
+      </p>
+    </RoadmapDialog>
+  );
+}
+
 // ───────────────────────────────────────────────────────────── Quadro
 
 export default function RoadmapAdminClient({
@@ -167,6 +245,11 @@ export default function RoadmapAdminClient({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * O detalhe guarda o ID, não o card: aprovar ou mover reconstrói o board
+   * inteiro, e um objeto congelado mostraria o selo e a coluna de antes da ação.
+   */
+  const [detalheId, setDetalheId] = useState<string | null>(null);
 
   // Ver o ⚠️ do topo: prop nova, estado velho, tela congelada.
   const [doServidor, setDoServidor] = useState(initialBoard);
@@ -275,6 +358,15 @@ export default function RoadmapAdminClient({
     [executar],
   );
 
+  const abrirDetalhe = useCallback((card: AdminRoadmapCard) => setDetalheId(card.id), []);
+
+  /** O card do detalhe, sempre lido do board corrente. `null` fecha o popup. */
+  const detalhe = useMemo(() => {
+    if (!detalheId) return null;
+    const todos = [...board.pendentes, ...board.colunas.flatMap((c) => c.cards), ...board.recusados];
+    return todos.find((c) => c.id === detalheId) ?? null;
+  }, [board, detalheId]);
+
   if (state === 'loading') {
     return (
       <div className="admin-roadmap-skeleton" data-testid="admin-roadmap-carregando" aria-busy="true">
@@ -309,6 +401,8 @@ export default function RoadmapAdminClient({
 
   return (
     <div className="admin-roadmap">
+      {detalhe && <DetalheModal card={detalhe} onClose={() => setDetalheId(null)} />}
+
       {/* `role=status`/`role=alert`: o resultado da ação também é anunciado a
           quem não está olhando para o card que mudou. */}
       {erro && (
@@ -350,6 +444,7 @@ export default function RoadmapAdminClient({
                 card={card}
                 onMover={mover}
                 onAprovacao={decidir}
+                onAbrirDetalhe={abrirDetalhe}
                 ocupado={pendingId === card.id}
               />
             ))}
@@ -386,6 +481,7 @@ export default function RoadmapAdminClient({
                   card={card}
                   onMover={mover}
                   onAprovacao={decidir}
+                onAbrirDetalhe={abrirDetalhe}
                   ocupado={pendingId === card.id}
                 />
               ))}
@@ -410,6 +506,7 @@ export default function RoadmapAdminClient({
                 card={card}
                 onMover={mover}
                 onAprovacao={decidir}
+                onAbrirDetalhe={abrirDetalhe}
                 ocupado={pendingId === card.id}
               />
             ))}

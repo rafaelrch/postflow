@@ -580,3 +580,195 @@ describe('roadmap — acessibilidade', () => {
   });
 });
 
+
+// ───────────────────────────────────────── detalhe do card (popup)
+
+/**
+ * O POPUP EXISTE POR CAUSA DA DESCRIÇÃO LONGA. O card corta em 3 linhas e, até
+ * esta entrega, não havia onde ler o resto — o texto estava no banco e o produto
+ * não o mostrava. Por isso os testes daqui usam uma descrição que o card
+ * TRUNCA de verdade e afirmam que o popup traz o texto INTEIRO.
+ */
+describe('roadmap — popup de detalhe do card', () => {
+  const LONGA = Array.from(
+    { length: 30 },
+    (_, i) => `Linha ${i + 1} de uma descrição que não cabe nas três linhas do card.`,
+  ).join('\n');
+
+  it('clicar no título abre o detalhe com o título e a descrição COMPLETOS', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: LONGA })])} />);
+    expect(screen.queryByTestId('detalhe-popup')).toBeNull();
+
+    // O card continua truncando — é a metade do problema que não muda.
+    expect(screen.getByTestId('card-desc-c1').getAttribute('style') ?? '').toContain(
+      '-webkit-line-clamp: 3',
+    );
+
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+
+    expect(screen.getByTestId('detalhe-titulo').textContent).toBe('Exportar em PDF');
+    expect(screen.getByTestId('detalhe-descricao').textContent).toBe(LONGA);
+  });
+
+  it('a descrição do popup preserva as quebras de linha e rola sozinha', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: LONGA })])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+
+    const desc = screen.getByTestId('detalhe-descricao');
+    expect(desc.className).toContain('whitespace-pre-wrap');
+    expect(desc.className).toContain('overflow-y-auto');
+    // Sem corte nenhum: o popup é justamente o lugar onde o texto não é cortado.
+    expect(desc.getAttribute('style') ?? '').not.toContain('line-clamp');
+  });
+
+  it('mostra a contagem de votos e o estado do card', () => {
+    render(<RoadmapClient initialColumns={board([card({ status: 'cozinhando', voteCount: 7 })])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+
+    expect(screen.getByTestId('detalhe-votos').textContent).toContain('7');
+    expect(screen.getByTestId('detalhe-estado').textContent).toBe('Estamos cozinhando');
+  });
+
+  it('card sem descrição diz que não tem, em vez de abrir um popup vazio', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: '' })])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    expect(screen.getByTestId('detalhe-descricao').textContent).toBe('Esta task não tem descrição.');
+  });
+
+  it('ESC fecha e o foco VOLTA para o gatilho', () => {
+    render(<RoadmapClient initialColumns={board([card({ description: LONGA })])} />);
+    const gatilho = screen.getByTestId('abrir-detalhe-c1');
+    gatilho.focus();
+    fireEvent.click(gatilho);
+    expect(screen.getByTestId('detalhe-popup')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByTestId('detalhe-popup')).toBeNull();
+    expect(document.activeElement).toBe(gatilho);
+  });
+
+  it('o X e o clique fora também fecham', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    fireEvent.click(screen.getByTestId('fechar-detalhe'));
+    expect(screen.queryByTestId('detalhe-popup')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    fireEvent.click(screen.getByTestId('detalhe-popup'));
+    expect(screen.queryByTestId('detalhe-popup')).toBeNull();
+  });
+
+  /** Clicar DENTRO do painel não pode fechar — só o clique no overlay. */
+  it('clicar dentro do painel não fecha', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    fireEvent.click(screen.getByTestId('detalhe-descricao'));
+    expect(screen.getByTestId('detalhe-popup')).toBeTruthy();
+  });
+
+  it('é um dialog modal rotulado pelo próprio título', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    const dialog = screen.getByTestId('detalhe-popup');
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.getAttribute('aria-labelledby')).toBe('roadmap-detalhe-titulo');
+    expect(document.getElementById('roadmap-detalhe-titulo')).toBe(screen.getByTestId('detalhe-titulo'));
+  });
+
+  /**
+   * O gatilho é o TÍTULO, não o card inteiro. Card-inteiro-clicável aqui só se
+   * escreveria como botão em volta do like — botão dentro de botão.
+   */
+  it('o gatilho é um botão de verdade, e não há botão dentro de botão no card', () => {
+    const { container } = render(<RoadmapClient initialColumns={board([card()])} />);
+    expect(screen.getByTestId('abrir-detalhe-c1').tagName).toBe('BUTTON');
+    expect(container.querySelectorAll('button button')).toHaveLength(0);
+  });
+
+  /** O like continua sendo o like: clicar nele não pode abrir o detalhe. */
+  it('clicar no coração NÃO abre o detalhe', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    fireEvent.click(screen.getByTestId('vote-c1'));
+    expect(screen.queryByTestId('detalhe-popup')).toBeNull();
+  });
+});
+
+// ───────────────────────────────────────── o like: coração + número
+
+describe('roadmap — o like é só coração e número', () => {
+  it('continua sendo um BUTTON, com aria-pressed acompanhando o estado', async () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    const botao = screen.getByTestId('vote-c1');
+    expect(botao.tagName).toBe('BUTTON');
+    expect(botao.getAttribute('aria-pressed')).toBe('false');
+    expect(botao.getAttribute('aria-label')).toBe('Votar em Exportar em PDF');
+
+    fireEvent.click(botao);
+    await waitFor(() => expect(screen.getByTestId('vote-c1').getAttribute('aria-pressed')).toBe('true'));
+  });
+
+  it('coração VAZADO quando não votou e PREENCHIDO quando votou', () => {
+    const { rerender } = render(<RoadmapClient initialColumns={board([card()])} />);
+    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).not.toContain('fill-current');
+
+    rerender(<RoadmapClient initialColumns={board([card({ hasVoted: true })])} />);
+    const cheio = screen.getByTestId('vote-heart-c1').getAttribute('class') ?? '';
+    expect(cheio).toContain('fill-current');
+    expect(cheio).toContain('var(--danger)');
+  });
+
+  /** Sem "shape": nem pílula, nem borda, nem fundo. */
+  it('o botão não tem borda nem fundo', () => {
+    render(<RoadmapClient initialColumns={board([card({ hasVoted: true })])} />);
+    const cls = screen.getByTestId('vote-c1').className;
+    expect(cls).not.toMatch(/border/);
+    expect(cls).not.toMatch(/\bbg-/);
+  });
+
+  /**
+   * Sem borda em repouso, o anel de foco é a ÚNICA pista de "estou aqui" para
+   * quem navega por Tab.
+   */
+  it('mantém foco visível', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    expect(screen.getByTestId('vote-c1').className).toContain('focus-visible:ring');
+  });
+
+  it('hover deixa o coração AZUL enquanto não votou, e não apaga o vermelho de quem votou', () => {
+    const { rerender } = render(<RoadmapClient initialColumns={board([card()])} />);
+    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).toContain(
+      'group-hover:text-[var(--studio-select)]',
+    );
+
+    rerender(<RoadmapClient initialColumns={board([card({ hasVoted: true })])} />);
+    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).not.toContain('group-hover:');
+  });
+
+  it('o clique que VOTA comemora; o que desfaz o like, não', () => {
+    const { unmount } = render(<RoadmapClient initialColumns={board([card()])} />);
+    fireEvent.click(screen.getByTestId('vote-c1'));
+    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).toContain('scale-125');
+    unmount();
+
+    render(<RoadmapClient initialColumns={board([card({ hasVoted: true })])} />);
+    fireEvent.click(screen.getByTestId('vote-c1'));
+    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).not.toContain('scale-125');
+  });
+
+  /** Quem pediu menos animação recebe a troca de cor sem o pulso. */
+  it('respeita prefers-reduced-motion', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+    const cls = screen.getByTestId('vote-heart-c1').getAttribute('class') ?? '';
+    expect(cls).toContain('motion-reduce:transition-none');
+    expect(cls).toContain('motion-reduce:transform-none');
+  });
+
+  /** O chevron era o desenho antigo — ele saiu junto com a pílula. */
+  it('não sobrou chevron nenhum no card', () => {
+    const { container } = render(<RoadmapClient initialColumns={board([card()])} />);
+    expect(container.querySelector('.lucide-chevron-up')).toBeNull();
+  });
+});

@@ -781,7 +781,15 @@ html.dark .admin-root {
 .admin-roadmap-card[aria-busy='true'] { opacity: .55; }
 .admin-roadmap-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .admin-roadmap-card h3 { margin: 0; min-width: 0; color: var(--admin-text); font-size: 10.5px; font-weight: 600; line-height: 1.35; }
-.admin-roadmap-votes { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; padding: 2px 6px; color: var(--admin-text-secondary); background: var(--admin-surface-soft); border: 1px solid var(--admin-border); border-radius: 999px; font-size: 9.5px; font-variant-numeric: tabular-nums; }
+/* SÓ coração e número: sem pílula, sem borda, sem fundo — o mesmo desenho do
+   quadro público. Aqui é LEITURA (um <span>), então também não tem hover nem
+   foco: não existe like de admin. */
+.admin-roadmap-votes { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; color: var(--admin-text-muted); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+/* O título vira o gatilho do detalhe — um <button> de verdade que herda a
+   tipografia do <h3> em vez de parecer um botão do painel. */
+.admin-roadmap-title-btn { padding: 0; color: inherit; background: none; border: 0; border-radius: 3px; font: inherit; text-align: left; cursor: pointer; }
+.admin-roadmap-title-btn:hover { text-decoration: underline; }
+.admin-roadmap-title-btn:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 2px; }
 .admin-roadmap-pill { align-self: flex-start; padding: 2px 7px; border-radius: 999px; font-size: 8.5px; font-weight: 600; text-transform: uppercase; }
 .admin-roadmap-pill[data-approval='pending'] { color: var(--admin-warning); background: var(--admin-warning-soft); }
 .admin-roadmap-pill[data-approval='approved'] { color: var(--admin-positive); background: color-mix(in srgb, var(--admin-positive) 10%, transparent); }
@@ -796,6 +804,20 @@ html.dark .admin-root {
 .admin-roadmap-btn[data-tone='approve']:hover { color: var(--admin-positive); border-color: color-mix(in srgb, var(--admin-positive) 45%, var(--admin-border)); }
 .admin-roadmap-btn[data-tone='reject']:hover { color: var(--admin-danger); border-color: color-mix(in srgb, var(--admin-danger) 45%, var(--admin-border)); }
 .admin-roadmap-btn:disabled { opacity: .5; cursor: not-allowed; }
+/* Detalhe do card — o comportamento (ESC, foco preso, foco de volta no gatilho,
+   clique fora) vem da RoadmapDialog; daqui sai só o desenho do painel. */
+.admin-roadmap-detalhe-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .5); }
+.admin-roadmap-detalhe { display: flex; width: 100%; max-width: 460px; flex-direction: column; padding: 14px; gap: 10px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 11px; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .55); }
+.admin-roadmap-detalhe > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.admin-roadmap-detalhe h2 { margin: 0; min-width: 0; color: var(--admin-text); font-size: 12px; font-weight: 600; line-height: 1.35; }
+.admin-roadmap-detalhe-fechar { flex: 0 0 auto; display: inline-flex; padding: 3px; color: var(--admin-text-muted); background: none; border: 0; border-radius: 5px; cursor: pointer; }
+.admin-roadmap-detalhe-fechar:hover { color: var(--admin-text); background: var(--admin-surface-soft); }
+.admin-roadmap-detalhe-fechar:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
+.admin-roadmap-detalhe-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--admin-text-secondary); font-size: 9.5px; }
+/* A descrição COMPLETA: as quebras de linha que a pessoa escreveu são parte do
+   texto, e um texto de 2000 caracteres rola aqui dentro em vez de empurrar o
+   diálogo para fora da tela. */
+.admin-roadmap-detalhe-desc { margin: 0; max-height: 46vh; overflow-y: auto; padding-top: 9px; border-top: 1px solid var(--admin-border); color: var(--admin-text-secondary); font-size: 10px; line-height: 1.5; white-space: pre-wrap; }
 .admin-roadmap-skeleton { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 18px 28px 32px; gap: 10px; }
 .admin-roadmap-skeleton > div { height: 120px; background: var(--admin-surface-soft); border: 1px solid var(--admin-border); border-radius: 10px; }
 

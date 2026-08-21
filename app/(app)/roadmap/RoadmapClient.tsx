@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronUp, Plus, X } from 'lucide-react';
+import { ArrowLeft, Heart, Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import RoadmapDialog from '@/components/roadmap/RoadmapDialog';
 import {
   DESCRIPTION_MAX,
   ROADMAP_STATUSES,
@@ -98,6 +99,29 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 
 // ───────────────────────────────────────────────────────────── Card
 
+/**
+ * O like: SÓ coração e número — sem pílula, sem borda, sem fundo.
+ *
+ * ⚠️ TIRAR A APARÊNCIA DE BOTÃO NÃO É TIRAR O BOTÃO. Continua sendo um
+ * `<button>` nativo com `aria-pressed`: é o elemento que dá Enter/Espaço a quem
+ * não usa mouse, e é o `aria-pressed` que diz "votado" a quem usa leitor de
+ * tela — a cor sozinha não diz nada. Sem borda em repouso, o anel de foco passa
+ * a ser a ÚNICA pista de "estou aqui" para quem navega por Tab, então ele fica
+ * mais visível do que era, não menos.
+ *
+ * ── AS CORES SÃO TOKENS DO TEMA ─────────────────────────────────────────────
+ * Vermelho = `--danger`, o único vermelho do tema. Azul = `--studio-select`, o
+ * único azul: mora em `:root` (não é escopo do editor), tem par no modo escuro e
+ * já é a cor de "selecionado" do produto. Nenhum hex novo entra aqui.
+ *
+ * ── O PULSO ─────────────────────────────────────────────────────────────────
+ * A comemoração é uma transição de `transform` em dois tempos (cresce, volta),
+ * e não um `@keyframes`: não precisa de regra global nova e morre sozinha. Ela
+ * só roda no clique que VOTA — desfazer o like volta ao vazado sem festa.
+ * `motion-reduce:` desliga a transformação em CSS, então quem pediu menos
+ * animação recebe a troca de cor no mesmo instante; a regra vale ao vivo, sem
+ * depender de o componente ter remontado.
+ */
 function VoteButton({
   card,
   onToggle,
@@ -107,27 +131,49 @@ function VoteButton({
   onToggle: (card: RoadmapCard) => void;
   disabled: boolean;
 }) {
+  const [comemorando, setComemorando] = useState(false);
+
+  function handleClick() {
+    // Só o clique que VOTA comemora. `hasVoted` aqui é o estado ANTES do toggle.
+    if (!card.hasVoted) {
+      setComemorando(true);
+      window.setTimeout(() => setComemorando(false), 220);
+    }
+    onToggle(card);
+  }
+
   return (
     <button
       type="button"
-      onClick={() => onToggle(card)}
+      onClick={handleClick}
       disabled={disabled}
-      // `aria-pressed` é o que comunica "votado" a quem usa leitor de tela — a
-      // cor sozinha não diz nada. Reflete o hasVoted que veio do servidor.
       aria-pressed={card.hasVoted}
       aria-label={`Votar em ${card.title}`}
       data-testid={`vote-${card.id}`}
+      data-voted={card.hasVoted ? 'true' : 'false'}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)]',
+        // `group` para o coração poder reagir ao hover do botão inteiro: quem
+        // passa o cursor mira no par ícone+número, não só no desenho.
+        'group inline-flex items-center gap-1.5 p-0 text-[12px] font-semibold',
+        'rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--ink)]',
         'disabled:opacity-50 disabled:cursor-not-allowed',
-        card.hasVoted
-          ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-ink)]'
-          : 'border-[var(--line-strong)] bg-[var(--paper)] text-[var(--ink-dim)] hover:border-[var(--ink)] hover:text-[var(--ink)]',
       )}
     >
-      <ChevronUp className="h-3.5 w-3.5" aria-hidden />
-      <span data-testid={`vote-count-${card.id}`} className="tabular-nums">
+      <Heart
+        aria-hidden
+        data-testid={`vote-heart-${card.id}`}
+        className={cn(
+          'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none motion-reduce:transform-none',
+          comemorando && 'scale-125',
+          card.hasVoted
+            ? // Votado: preenchido e vermelho. NÃO fica azul no hover — o cursor
+              // ainda está em cima do coração quando a animação termina, e um
+              // hover azul apagaria justamente o vermelho que acabou de aparecer.
+              'fill-current text-[var(--danger)]'
+            : 'text-[var(--ink-dim)] group-hover:text-[var(--studio-select)]',
+        )}
+      />
+      <span data-testid={`vote-count-${card.id}`} className="tabular-nums text-[var(--ink-dim)]">
         {card.voteCount}
       </span>
     </button>
@@ -137,10 +183,12 @@ function VoteButton({
 function Card({
   card,
   onToggle,
+  onAbrirDetalhe,
   pending,
 }: {
   card: RoadmapCard;
   onToggle: (card: RoadmapCard) => void;
+  onAbrirDetalhe: (card: RoadmapCard) => void;
   pending: boolean;
 }) {
   return (
@@ -148,7 +196,22 @@ function Card({
       data-testid={`card-${card.id}`}
       className="rounded-xl border border-[var(--line)] bg-white p-3 shadow-sm"
     >
-      <h3 className="text-[13px] font-bold leading-snug text-[var(--ink)]">{card.title}</h3>
+      {/* ⚠️ O GATILHO DO DETALHE É O TÍTULO, e não o card inteiro. O card já tem
+          um botão dentro (o like) e, no /admin, um `<select>` e mais dois botões:
+          card-inteiro-clicável só se escreve como `<button>` em volta de tudo —
+          botão dentro de botão, HTML inválido — ou como `<div onClick>` com
+          filtro de `event.target`, que exclui o teclado. O título é um botão de
+          verdade, sem sobreposição nenhuma com os controles. */}
+      <h3 className="text-[13px] font-bold leading-snug text-[var(--ink)]">
+        <button
+          type="button"
+          onClick={() => onAbrirDetalhe(card)}
+          data-testid={`abrir-detalhe-${card.id}`}
+          className="w-full rounded-sm text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
+        >
+          {card.title}
+        </button>
+      </h3>
       {card.description && (
         <p
           data-testid={`card-desc-${card.id}`}
@@ -179,12 +242,14 @@ function Column({
   column,
   state,
   onToggle,
+  onAbrirDetalhe,
   pendingId,
   children,
 }: {
   column: RoadmapColumn;
   state: BoardState;
   onToggle: (card: RoadmapCard) => void;
+  onAbrirDetalhe: (card: RoadmapCard) => void;
   pendingId: string | null;
   children?: React.ReactNode;
 }) {
@@ -239,10 +304,90 @@ function Column({
 
         {state === 'ready' &&
           column.cards.map((card) => (
-            <Card key={card.id} card={card} onToggle={onToggle} pending={pendingId === card.id} />
+            <Card
+              key={card.id}
+              card={card}
+              onToggle={onToggle}
+              onAbrirDetalhe={onAbrirDetalhe}
+              pending={pendingId === card.id}
+            />
           ))}
       </div>
     </section>
+  );
+}
+
+// ───────────────────────────────────────────────────────────── Popup de detalhe
+
+/**
+ * O DETALHE DO CARD — o popup que existe porque a descrição é truncada em 3
+ * linhas no card e, até aqui, o resto do texto não tinha ONDE ser lido. O dado
+ * já estava no banco; o produto é que não o mostrava.
+ *
+ * A descrição vem com `whitespace-pre-wrap` (as quebras que a pessoa escreveu
+ * são parte do texto) e com rolagem própria, para um texto de 2000 caracteres
+ * não empurrar o rodapé do diálogo para fora da tela.
+ */
+function CardDetailModal({ card, onClose }: { card: RoadmapCard; onClose: () => void }) {
+  return (
+    <RoadmapDialog
+      labelledBy="roadmap-detalhe-titulo"
+      onClose={onClose}
+      testId="detalhe-popup"
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      panelClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+    >
+      <div className="flex items-start gap-2 border-b border-[var(--line)] bg-[var(--paper-2)] px-4 py-3">
+        {/* Título COMPLETO: sem truncar, porque é para isto que se abriu. */}
+        <h2
+          id="roadmap-detalhe-titulo"
+          data-testid="detalhe-titulo"
+          className="text-[15px] font-bold leading-snug text-[var(--ink)]"
+        >
+          {card.title}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          data-testid="fechar-detalhe"
+          className="ml-auto shrink-0 rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="px-4 py-4">
+        {card.description ? (
+          <p
+            data-testid="detalhe-descricao"
+            className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink-dim)]"
+          >
+            {card.description}
+          </p>
+        ) : (
+          <p data-testid="detalhe-descricao" className="text-[13px] text-[var(--ink-muted)]">
+            Esta task não tem descrição.
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 border-t border-[var(--line)] px-4 py-3 text-[12px] text-[var(--ink-dim)]">
+        {/* MESMO coração do card, para o olho reconhecer a mesma coisa — mas
+            aqui ele é leitura, não ação: o voto se dá no card. */}
+        <span data-testid="detalhe-votos" className="inline-flex items-center gap-1.5">
+          <Heart
+            aria-hidden
+            className={cn('h-4 w-4', card.hasVoted ? 'fill-current text-[var(--danger)]' : 'text-[var(--ink-dim)]')}
+          />
+          <span className="tabular-nums">{card.voteCount}</span>
+          <span className="sr-only"> voto(s)</span>
+        </span>
+        <span data-testid="detalhe-estado" className="ml-auto font-semibold text-[var(--ink)]">
+          {ROADMAP_STATUS_LABELS[card.status]}
+        </span>
+      </div>
+    </RoadmapDialog>
   );
 }
 
@@ -253,7 +398,6 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<{ title?: string; description?: string }>({});
   const [sending, setSending] = useState(false);
-  const painelRef = useRef<HTMLDivElement>(null);
 
   /**
    * MESMA função que a rota usa, também para decidir se o primário está
@@ -265,48 +409,10 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const tituloInvalido = !check.ok && !!check.fields.title;
 
   /**
-   * ESC fecha e o Tab não sai do diálogo.
-   *
-   * `aria-modal` só PROMETE isso ao leitor de tela; quem cumpre é este handler.
-   * Sem ele, o Tab passeia pelos botões do quadro atrás do overlay — que o mouse
-   * não alcança, porque o overlay os cobre.
+   * ESC, foco preso, foco de volta no gatilho e clique fora vivem na
+   * `RoadmapDialog` — a mesma casca que o popup de detalhe usa. O que sobrou
+   * aqui é só o formulário.
    */
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-
-      const painel = painelRef.current;
-      if (!painel) return;
-      const focaveis = painel.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input, textarea, [href], [tabindex]:not([tabindex="-1"])',
-      );
-      if (focaveis.length === 0) return;
-      const primeiro = focaveis[0];
-      const ultimo = focaveis[focaveis.length - 1];
-      const ativo = document.activeElement;
-
-      if (e.shiftKey && (ativo === primeiro || !painel.contains(ativo))) {
-        e.preventDefault();
-        ultimo.focus();
-      } else if (!e.shiftKey && ativo === ultimo) {
-        e.preventDefault();
-        primeiro.focus();
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
-  /** O foco entra no diálogo pelo campo que a pessoa veio preencher. */
-  useEffect(() => {
-    painelRef.current?.querySelector<HTMLElement>('#roadmap-titulo')?.focus();
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -342,18 +448,16 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const descLen = description.trim().length;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="criar-task-titulo"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <RoadmapDialog
+      labelledBy="criar-task-titulo"
+      onClose={onClose}
+      /* O foco entra no diálogo pelo campo que a pessoa veio preencher — e não
+         no primeiro focável, que é a seta de voltar. */
+      initialFocusSelector="#roadmap-titulo"
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      panelClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
     >
-      <div
-        ref={painelRef}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
-      >
+      <>
         {/* Faixa clara do cabeçalho: seta de voltar, título, X. A seta e o X
             fazem a MESMA coisa — fechar. Não há passo anterior neste fluxo, e
             uma seta que levasse a outro lugar prometeria um que não existe. */}
@@ -467,8 +571,8 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </>
+    </RoadmapDialog>
   );
 }
 
@@ -487,6 +591,15 @@ export default function RoadmapClient({
   const [columns, setColumns] = useState<RoadmapColumn[]>(() => doServidor(initialColumns));
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  /**
+   * O detalhe guarda o ID, não o card.
+   *
+   * Guardar o objeto congelaria a contagem do instante em que se abriu: um voto
+   * dado no card atrás do overlay, ou uma ressincronização com o servidor,
+   * deixariam o popup mostrando um número que já não é verdade. O ID é a única
+   * parte que não muda.
+   */
+  const [detalheId, setDetalheId] = useState<string | null>(null);
 
   /**
    * ⚠️ O QUADRO TEM DE SEGUIR O SERVIDOR — não dá para só inicializar o estado
@@ -589,6 +702,14 @@ export default function RoadmapClient({
     [columns, state],
   );
 
+  /** O card do detalhe, sempre lido do quadro corrente. `null` fecha o popup. */
+  const detalhe = useMemo(
+    () => (detalheId ? colunas.flatMap((c) => c.cards).find((c) => c.id === detalheId) ?? null : null),
+    [colunas, detalheId],
+  );
+
+  const abrirDetalhe = useCallback((card: RoadmapCard) => setDetalheId(card.id), []);
+
   return (
     <div className="p-6">
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -618,6 +739,7 @@ export default function RoadmapClient({
             column={column}
             state={state}
             onToggle={toggleVote}
+            onAbrirDetalhe={abrirDetalhe}
             pendingId={pendingId}
           >
             {/* O cartão de adicionar mora no topo da PRIMEIRA coluna e faz o
@@ -637,6 +759,8 @@ export default function RoadmapClient({
           </Column>
         ))}
       </div>
+
+      {detalhe && <CardDetailModal card={detalhe} onClose={() => setDetalheId(null)} />}
 
       {modalOpen && (
         <CreateTaskModal
