@@ -1,13 +1,34 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from './useEditorStore';
 import { createClient } from '@/lib/supabase';
 import { mapSlideToDbRow } from '@/lib/slide-mapper';
 
-export function useAutoSave() {
+/**
+ * `onCarouselCreated` avisa que o PRIMEIRO save acabou de criar o carrossel no
+ * banco e que a URL vai passar a ter `?id=`.
+ *
+ * 🔴 Existe por causa de uma corrida real: trocar a URL faz o `useSearchParams`
+ * da página ver um id que ela nunca CARREGOU (o deck nasceu em memória), e a
+ * página então ia reler o banco — no instante em que os slides ainda não foram
+ * gravados. A leitura voltava com 0 slides e o editor piscava "Este carrossel
+ * não possui slides salvos" por cima de um deck que estava ali, inteiro.
+ *
+ * Por isso o aviso sai no MESMO passo síncrono do `replaceState`, e antes dele:
+ * quem recebe marca o id como já carregado, e a releitura nem chega a começar.
+ * Só adiar o `replaceState` para depois dos slides estreitaria a janela sem
+ * fechá-la — o insert dos slides pode falhar ou demorar do mesmo jeito.
+ */
+export function useAutoSave(onCarouselCreated?: (id: string) => void) {
   const setSaveStatus = useEditorStore((s) => s.setSaveStatus);
   const setCarouselId = useEditorStore((s) => s.setCarouselId);
+
+  // Em ref para o `saveNow` não trocar de identidade a cada render: ele é
+  // dependência do efeito de autosave da página, que re-assinaria a store a
+  // cada render se a função mudasse.
+  const onCreatedRef = useRef(onCarouselCreated);
+  useEffect(() => { onCreatedRef.current = onCarouselCreated; }, [onCarouselCreated]);
 
   // Mutex: o save faz delete+insert dos slides — dois saves simultâneos
   // corromperiam os dados. Se chegar pedido durante um save, roda de novo no fim.
@@ -60,6 +81,11 @@ export function useAutoSave() {
 
         id = data.id as string;
         setCarouselId(id);
+
+        // ANTES do replaceState, e sem `await` entre os dois: a partir daqui a
+        // URL passa a ter um id, e quem estiver ouvindo precisa já saber que
+        // este deck está em memória. Ver o comentário no topo do hook.
+        onCreatedRef.current?.(id);
 
         if (typeof window !== 'undefined') {
           window.history.replaceState({}, '', `/generator?id=${id}`);

@@ -57,12 +57,21 @@ export default function GeneratorClient() {
       ? 'error'
       : 'loading';
 
-  const { saveNow } = useAutoSave();
+  // O primeiro save cria o carrossel e troca a URL para `?id=`. Marcar o id
+  // como já carregado NO MESMO PASSO fecha a corrida na origem: sem isto o
+  // `carouselIdParam` novo apontaria para um deck que esta página nunca leu,
+  // e o efeito abaixo iria ao banco justamente antes de os slides existirem.
+  const { saveNow } = useAutoSave(setLoadedCarouselId);
   const { registerSlideRef, downloadSlide, downloadAll } = useExport();
 
   // ── Load carousel from URL param ──────────────────────────────────────────
   useEffect(() => {
     if (!carouselIdParam) return;
+    // Este deck JÁ está em memória — foi criado aqui ou lido aqui. Reler o
+    // banco não traria nada e traria risco: entre o INSERT do carrossel e o
+    // dos slides a leitura volta vazia (a tela de "não possui slides salvos"),
+    // e mesmo depois ela sobrescreveria o que o usuário digitou desde o save.
+    if (loadedCarouselId === carouselIdParam) return;
 
     let cancelled = false;
     setFailedCarouselId(null);
@@ -142,7 +151,7 @@ export default function GeneratorClient() {
     return () => {
       cancelled = true;
     };
-  }, [carouselIdParam, loadCarousel, reloadNonce]);
+  }, [carouselIdParam, loadedCarouselId, loadCarousel, reloadNonce]);
 
   // ── Auto-save: 2,5s após a última edição, salva sozinho ──────────────────
   useEffect(() => {
