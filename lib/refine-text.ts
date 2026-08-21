@@ -45,11 +45,28 @@ export type RefineRequest = {
 const SCOPES: readonly RefineScope[] = ['carousel', 'slide', 'field'];
 
 /**
- * `satisfies` mantém esta lista amarrada ao union de `types/index.ts`: um
- * estilo novo lá que não entre aqui quebra o build, em vez de virar um 400
- * silencioso em produção.
+ * Os estilos que o refino aceita — um por valor de `SlideStyle`.
+ *
+ * É um MAPA, e não um array, porque `Record<SlideStyle, true>` é o que de fato
+ * exige a lista COMPLETA: falta uma chave, o build quebra. Um array com
+ * `satisfies readonly SlideStyle[]` só garante que cada item É um SlideStyle —
+ * ele aceita lista incompleta sem reclamar, que era exatamente a garantia que
+ * o comentário antigo aqui prometia e não entregava. Medido em 21/08: removendo
+ * 'template02' do array, `tsc --noEmit` saía com ZERO erro, e o estilo virava
+ * um 400 em produção.
+ *
+ * O valor `true` não é lido por ninguém: o que interessa é a chave.
  */
-const STYLES = ['minimalist', 'profile', 'editorial', 'template01', 'template02'] as const satisfies readonly SlideStyle[];
+const STYLE_SET = {
+  minimalist: true,
+  profile: true,
+  editorial: true,
+  template01: true,
+  template02: true,
+} as const satisfies Record<SlideStyle, true>;
+
+/** A mesma lista, na forma que a validação e a mensagem de erro consomem. */
+const STYLES = Object.keys(STYLE_SET) as (keyof typeof STYLE_SET)[];
 
 /** Campos de texto de primeira classe do slide. Nada além destes é refinável. */
 export const REFINABLE_FIELDS = ['title', 'description', 'subtitle'] as const;
