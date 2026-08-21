@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   X, ArrowRight, ArrowLeft, Sparkles, Image as ImageIcon,
@@ -298,7 +299,135 @@ function previewSlide(style: SlideStyle): Slide {
   };
 }
 
+/**
+ * Preview pronto de cada template, em `public/templates/`.
+ *
+ * O nome do arquivo casa com o VALOR de `SlideStyle`, não com o nome de
+ * produto do card ("Manifesto" é `template01`): quem for procurar o asset
+ * parte do código, não do rótulo. Mapa EXPLÍCITO, e não caminho montado por
+ * concatenação — string montada esconde o preview trocado entre dois
+ * templates, que é o erro que ninguém percebe olhando o diff.
+ *
+ * `Record<SlideStyle, …>` de propósito: quando a TASK 3 acrescentar um estilo,
+ * o TypeScript quebra AQUI e obriga alguém a decidir se aquele template tem
+ * preview ou não, em vez de o card sair silenciosamente sem imagem.
+ * `minimalist` é `null` porque nem é oferecido no wizard.
+ */
+const TEMPLATE_PREVIEW: Record<SlideStyle, string | null> = {
+  minimalist: null,
+  profile: '/templates/preview-profile.webp',
+  editorial: '/templates/preview-editorial.webp',
+  template01: '/templates/preview-template01.webp',
+  template02: '/templates/preview-template02.webp',
+};
+
+/**
+ * Dimensão INTRÍNSECA dos previews (todos os quatro são 540×675).
+ *
+ * Declarada para o browser reservar o espaço antes de a imagem chegar — sem
+ * isso o card salta quando ela carrega, e o grid inteiro se mexe embaixo do
+ * ponteiro de quem já ia clicar.
+ */
+const PREVIEW_SIZE = { width: 540, height: 675 };
+
+/**
+ * O formato em que os previews foram renderizados.
+ *
+ * 🔴 Os assets são 4:5. A miniatura AO VIVO acompanha o formato escolhido no
+ * passo 1 (1:1 e 9:16 têm outra altura), então em 1:1/9:16 não existe preview
+ * que represente aquela forma: enfiar o 4:5 na caixa deformaria, cortaria ou
+ * deixaria tarja. Nesses formatos cai na miniatura viva, que é fiel por
+ * construção — é a mesma regra do D1 ("miniatura viva quando a imagem
+ * faltar"), aplicada à falta por FORMATO e não por arquivo.
+ *
+ * Se um dia chegarem previews 1:1 e 9:16, isto vira um mapa por formato.
+ */
+const PREVIEW_FORMAT: SlideFormat = '4:5';
+
+/** Há preview estático para este template NESTE formato? */
+function temPreview(style: SlideStyle, format: SlideFormat): boolean {
+  return TEMPLATE_PREVIEW[style] !== null && format === PREVIEW_FORMAT;
+}
+
+/**
+ * A miniatura do card: preview pronto quando existe, miniatura VIVA quando
+ * não existe ou quando a imagem falha ao carregar.
+ *
+ * O caminho vivo não virou lixo com a chegada dos assets — ele é o degrau de
+ * baixo. O preview estático ganha acabamento e perde a garantia de estar
+ * atualizado; o `SlidePreview` é fiel por construção. Quando o preview não
+ * pode aparecer, o usuário continua vendo o template certo, nunca um card
+ * quebrado nem um buraco no grid.
+ */
 function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideFormat }) {
+  const src = TEMPLATE_PREVIEW[style];
+  const podeUsarImagem = temPreview(style, format);
+
+  /**
+   * `carregando` → esqueleto no lugar da imagem; `falhou` → miniatura viva.
+   * Começa em `carregando` só quando há imagem a esperar: sem isso o card sem
+   * asset piscaria um esqueleto que nunca vira nada.
+   */
+  const [estado, setEstado] = useState<'carregando' | 'pronta' | 'falhou'>(
+    podeUsarImagem ? 'carregando' : 'falhou',
+  );
+
+  if (!podeUsarImagem || !src || estado === 'falhou') {
+    return <TemplateThumbAoVivo style={style} format={format} />;
+  }
+
+  const fmt = getFormat(format);
+  const largura = Math.round(THUMB_HEIGHT * (fmt.width / fmt.height));
+
+  return (
+    <span
+      className="relative block overflow-hidden rounded-[6px]"
+      style={{
+        border: '1.5px solid var(--ink)',
+        lineHeight: 0,
+        width: largura,
+        height: THUMB_HEIGHT,
+      }}
+      aria-hidden
+    >
+      {/* Esqueleto: ocupa a caixa enquanto a imagem não chega. Fica ATRÁS da
+          imagem, então some sozinho quando ela pinta por cima. */}
+      {estado === 'carregando' && (
+        <span
+          className="absolute inset-0 animate-pulse"
+          style={{ background: 'var(--paper-2)' }}
+          data-testid={`template-preview-loading-${style}`}
+        />
+      )}
+      <NextImage
+        src={src}
+        /*
+         * DECORATIVA, de propósito. O card já diz "Manifesto" e a linha de
+         * apoio em texto, dentro do mesmo botão; um alt descritivo faria o
+         * leitor de tela anunciar o template duas vezes seguidas. O nome
+         * continua sendo lido — pelo texto, que é onde ele deve estar.
+         */
+        alt=""
+        width={PREVIEW_SIZE.width}
+        height={PREVIEW_SIZE.height}
+        /* Só baixa ao entrar na tela: o grid abre com 4 cards e o passo 2 nem
+           sempre é visitado. */
+        loading="lazy"
+        decoding="async"
+        /* A caixa tem ~106px de largura; sem `sizes` o Next serviria uma
+           variante bem maior do que a tela precisa. */
+        sizes={`${largura}px`}
+        onLoad={() => setEstado('pronta')}
+        onError={() => setEstado('falhou')}
+        className="block h-full w-full object-cover"
+        data-testid={`template-preview-${style}`}
+      />
+    </span>
+  );
+}
+
+/** A miniatura viva de sempre: o SlidePreview real, fiel por construção. */
+function TemplateThumbAoVivo({ style, format }: { style: SlideStyle; format: SlideFormat }) {
   const fmt = getFormat(format);
   const settings: GlobalSettings = {
     ...DEFAULT_GLOBAL_SETTINGS,
@@ -316,6 +445,7 @@ function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideForm
       className="block overflow-hidden rounded-[6px]"
       style={{ border: '1.5px solid var(--ink)', lineHeight: 0 }}
       aria-hidden
+      data-testid={`template-thumb-vivo-${style}`}
     >
       <SlidePreview
         slide={previewSlide(style)}
