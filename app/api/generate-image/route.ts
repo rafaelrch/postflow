@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { toFile } from 'openai';
 import { openai, buildImagePrompt, imageSizeForShape } from '@/lib/openai';
-import type { ImageShape } from '@/types';
+import type { ImageShape, ImageSurface } from '@/types';
+import { getBrandContext, type BrandContext } from '@/lib/brand-context';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { requireCredits, refundCredits } from '@/lib/subscription';
 import { CREDIT_COSTS } from '@/lib/credits';
@@ -24,6 +25,12 @@ interface GenerateImageBody {
   quality?: 'low' | 'medium' | 'high' | 'auto';
   /** Formato do destino da imagem no slide — ver `imageShape` no hook. */
   shape?: string;
+  /** Claridade da superfície do destino — ver `imageSurface` no hook. */
+  surface?: string;
+  /** Título do carrossel: âncora comum das imagens do mesmo deck. */
+  deckTitle?: string;
+  /** Quantas imagens este disparo vai gerar (só no lote). */
+  seriesSize?: number;
   /** Direção livre digitada no painel de IA. */
   userPrompt?: string;
   /** URL de imagem de referência: dispara images.edit em vez de generate. */
@@ -46,6 +53,16 @@ export async function POST(req: NextRequest) {
   // O corpo do POST vem do cliente: shape desconhecido cai no padrão de hoje.
   const SHAPES: readonly ImageShape[] = ['full-bleed', 'inset-block', 'inset-landscape'];
   const shape: ImageShape = SHAPES.find((s) => s === body.shape) ?? 'full-bleed';
+  // Mesma regra para a superfície: valor desconhecido cai em 'dark', que é
+  // exatamente a atmosfera que o prompt tinha cravada antes desta mudança.
+  const SURFACES: readonly ImageSurface[] = ['light', 'dark'];
+  const surface: ImageSurface = SURFACES.find((s) => s === body.surface) ?? 'dark';
+  // O tamanho da série só serve para uma frase do prompt. Sanitiza aqui porque
+  // o corpo vem do cliente: nada de NaN nem de número absurdo no texto.
+  const seriesSize = Number.isFinite(body.seriesSize)
+    ? Math.min(Math.max(Math.trunc(body.seriesSize as number), 0), 50)
+    : undefined;
+  const deckTitle = typeof body.deckTitle === 'string' ? body.deckTitle.slice(0, 120) : undefined;
   if (!slideId || !title) {
     return NextResponse.json({ error: 'slideId e title são obrigatórios' }, { status: 400 });
   }
@@ -61,7 +78,33 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = await createServerSupabaseClient();
-    const prompt = buildImagePrompt({ title, description, isCover, isFinal, shape, userPrompt });
+
+    // Contexto de marca do onboarding — o mesmo que a rota de TEXTO já usa
+    // (`generate-carousel`). Até aqui o usuário descrevia marca, tom e paleta,
+    // o texto respeitava e a imagem ignorava.
+    //
+    // Best-effort e em try/catch PRÓPRIO, de propósito: uma falha ao ler o
+    // perfil não pode entrar no catch de fora, porque lá embaixo ele estornaria
+    // o crédito e devolveria erro. Perfil ilegível vira prompt sem marca — que
+    // é o comportamento de hoje — e a geração segue.
+    let brand: BrandContext | undefined;
+    try {
+      brand = await getBrandContext(userId, supabase);
+    } catch (err) {
+      console.error('[generate-image] brand context', err);
+    }
+
+    const prompt = buildImagePrompt({
+      title,
+      description,
+      isCover,
+      isFinal,
+      shape,
+      surface,
+      userPrompt,
+      brand,
+      series: { deckTitle, size: seriesSize },
+    });
     const size = imageSizeForShape(shape);
     let b64: string | undefined;
     let inputTokens: number | undefined;

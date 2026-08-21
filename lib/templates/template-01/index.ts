@@ -549,6 +549,45 @@ export function template01SlideMedia(slideIndex: number): {
 }
 
 /**
+ * A superfície do slide é CLARA ou ESCURA? (1-indexado)
+ *
+ * O Manifesto alterna: os modelos 4 e 5 são #FFFFFF, o 3 é #050416 e o 6 é
+ * #0D39E4. Quem gera imagem precisa disso — uma foto de atmosfera escura no
+ * modelo 4 cai num slide branco e briga com ele.
+ *
+ * Sai do SPEC, não de uma tabela escrita à mão: tabela envelhece calada no dia
+ * em que o Figma mudar uma cor, e ninguém liga o slide feio à lista esquecida
+ * num arquivo de imagem. O critério é a luminância percebida da cor de fundo.
+ *
+ * Degradê (modelos 1 e 2) devolve 'dark' de propósito: são justamente os
+ * modelos com imagem de FUNDO, onde o desenho põe um scrim preto por cima da
+ * foto para o texto branco funcionar. Ali escuro é o que o template pede.
+ */
+export function template01SlideSurface(slideIndex: number): 'light' | 'dark' {
+  const slide = TEMPLATE_01_SPEC.slides.find((s) => s.index === slideIndex);
+  const paint = slide?.background?.[0];
+  // Sem cor chapada (degradê ou ausente) o slide é dos que levam scrim escuro.
+  if (!paint?.color) return 'dark';
+  return luminanciaDeHex(paint.color) > 0.55 ? 'light' : 'dark';
+}
+
+/**
+ * Luminância percebida de um hex, 0 (preto) a 1 (branco).
+ *
+ * Pesos do olho humano (Rec. 601): o verde pesa muito mais que o azul. Um
+ * `(r+g+b)/3` chamaria o #0D39E4 do modelo 6 de claro demais.
+ */
+function luminanciaDeHex(hex: string): number {
+  const limpo = hex.replace('#', '');
+  const full = limpo.length === 3 ? limpo.split('').map((c) => c + c).join('') : limpo;
+  if (full.length !== 6) return 0;
+  const n = parseInt(full, 16);
+  if (Number.isNaN(n)) return 0;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+/**
  * Slot de imagem do slide (1-indexado), se houver. `undefined` no slide 6, que
  * não tem imagem nenhuma no desenho.
  */

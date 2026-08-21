@@ -27,6 +27,20 @@ export type SlideFormat = '4:5' | '1:1' | '9:16';
  */
 export type ImageShape = 'full-bleed' | 'inset-block' | 'inset-landscape';
 
+/**
+ * Claridade da SUPERFÍCIE em que a imagem gerada vai cair.
+ *
+ * Existe pelo mesmo motivo que `ImageShape`: a geração precisa saber onde a
+ * imagem aterrissa. Foto de atmosfera escura num card BRANCO (o Perfil) ou num
+ * slide creme (o Radar, #EEE5D9) faz o slide brigar consigo mesmo — e até aqui
+ * a atmosfera era `dark` fixa no prompt, igual para os quatro templates.
+ *
+ * Quem decide a superfície de um slide é `imageSurface` em
+ * hooks/useGenerateCarouselImages. Mora AQUI pelo mesmo motivo do `ImageShape`:
+ * o servidor consome, e não pode apontar para um módulo 'use client'.
+ */
+export type ImageSurface = 'light' | 'dark';
+
 export interface TextHighlight {
   text: string;
   color: string;

@@ -5,8 +5,8 @@ import toast from 'react-hot-toast';
 import GenerationToast from '@/components/editor/GenerationToast';
 import { useEditorStore } from './useEditorStore';
 import { useCreditsStore, handleInsufficientCredits } from './useCreditsStore';
-import { DEFAULT_IMAGE_POSITION, ImageShape, Slide, SlideStyle } from '@/types';
-import { template01ModelOf, template01SlideMedia } from '@/lib/templates/template-01';
+import { DEFAULT_IMAGE_POSITION, ImageShape, ImageSurface, Slide, SlideStyle, SlideTheme } from '@/types';
+import { template01ModelOf, template01SlideMedia, template01SlideSurface } from '@/lib/templates/template-01';
 import { template01SetImage } from '@/lib/templates/template-01/image';
 import { template02ModelOf } from '@/lib/templates/template-02';
 import { template02SetImage } from '@/lib/templates/template-02/image';
@@ -61,11 +61,28 @@ export interface GenerateOptions {
   referenceImageUrl?: string;
 }
 
+/**
+ * O que vale para o DECK inteiro, e não para um slide.
+ *
+ * Vai igual em todas as chamadas do mesmo lote — é essa repetição literal que
+ * amarra as N imagens no mesmo ensaio. Não guarda estado em lugar nenhum: quem
+ * dispara calcula uma vez e repassa.
+ */
+export interface DeckContext {
+  /** Superfície do slide (clara/escura). É a única parte que muda por slide. */
+  surface: ImageSurface;
+  /** Título do carrossel — âncora comum da série. */
+  deckTitle?: string;
+  /** Quantas imagens este disparo vai gerar. */
+  seriesSize?: number;
+}
+
 async function generateForSlide(
   slide: Slide,
   slideIndex: number,
   totalSlides: number,
   shape: ImageShape,
+  deck: DeckContext,
   opts?: GenerateOptions,
 ): Promise<string> {
   const isCover = slideIndex === 0;
@@ -81,6 +98,9 @@ async function generateForSlide(
       isCover,
       isFinal,
       shape,
+      surface: deck.surface,
+      deckTitle: deck.deckTitle,
+      seriesSize: deck.seriesSize,
       userPrompt: opts?.userPrompt,
       referenceImageUrl: opts?.referenceImageUrl,
     }),
@@ -104,12 +124,13 @@ async function generateForSlideWithRetry(
   slideIndex: number,
   totalSlides: number,
   shape: ImageShape,
+  deck: DeckContext,
   onRateLimit?: (waitSeconds: number) => void,
   opts?: GenerateOptions,
 ): Promise<string> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await generateForSlide(slide, slideIndex, totalSlides, shape, opts);
+      return await generateForSlide(slide, slideIndex, totalSlides, shape, deck, opts);
     } catch (err) {
       const isRateLimit = err instanceof GenerateImageError && err.status === 429;
       if (!isRateLimit || attempt >= MAX_RATE_LIMIT_RETRIES) throw err;
@@ -236,6 +257,49 @@ export function imageShape(
 }
 
 /**
+ * A SUPERFÍCIE em que a imagem deste slide vai cair — clara ou escura.
+ *
+ * Até aqui a atmosfera era `dark` cravada no prompt, igual para os quatro
+ * templates. Mas o Radar é creme (#EEE5D9), o card do Perfil é #FFFFFF e o
+ * Manifesto alterna modelos brancos (#FFFFFF) e quase-pretos (#050416): pedir
+ * foto escura para qualquer um deles entrega imagem que briga com o slide que
+ * a recebe.
+ *
+ * A regra tem duas metades, e a divisa é o mesmo `imageDestination` de sempre:
+ *
+ * 1. A imagem É O FUNDO e o texto vai POR CIMA dela. Aqui claridade não é
+ *    gosto: nos templates o desenho põe scrim escuro e texto branco sobre a
+ *    foto (a `regraCabecalho` do spec do T2 diz isso com todas as letras),
+ *    então a imagem precisa ser escura para o texto continuar existindo.
+ * 2. A imagem é uma CAIXA EMBUTIDA. Ela não carrega texto nenhum, e o que
+ *    importa é combinar com o papel em volta.
+ *
+ * Editorial e Minimalist não têm papel próprio: seguem o TEMA do deck, que é o
+ * mesmo que decide a cor do texto que vai junto.
+ */
+export function imageSurface(
+  slide: Slide,
+  style: SlideStyle,
+  index: number,
+  target: ImageTarget,
+  theme: SlideTheme,
+): ImageSurface {
+  const destino = imageDestination(slide, style, index, target);
+
+  // O Manifesto responde pelo próprio spec, modelo a modelo.
+  if (style === 'template01') {
+    return template01SlideSurface(destino.model ?? template01ModelOf(slide, index));
+  }
+  // Radar: capa é foto de fundo sob cabeçalho branco; internos são bloco sobre
+  // o papel creme.
+  if (style === 'template02') return destino.model === 1 ? 'dark' : 'light';
+  // Perfil: a mídia do post é uma caixa dentro de um card #FFFFFF.
+  if (style === 'profile') return 'light';
+
+  return theme === 'light' ? 'light' : 'dark';
+}
+
+/**
  * Onde a imagem gerada é gravada.
  *
  * Nos TEMPLATES 1 e 2 vai para o SLOT do slide — antes ia para os campos
@@ -301,7 +365,7 @@ export function batchTargets(
 }
 
 export function useGenerateCarouselImages() {
-  const { slides, style, updateSlide } = useEditorStore();
+  const { slides, style, updateSlide, carouselTitle, globalSettings } = useEditorStore();
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
@@ -349,7 +413,14 @@ export function useGenerateCarouselImages() {
         try {
           // O shape é calculado POR SLIDE: no mesmo carrossel a capa é
           // full-bleed e os internos são bloco estreito.
-          const url = await generateForSlideWithRetry(slide, i, slides.length, imageShape(slide, style, i, target), (waitSecs) => {
+          // O shape e a SUPERFÍCIE saem por slide (a capa não é o interno).
+          // Já `deckTitle` e `seriesSize` são do DECK: vão iguais nas N
+          // chamadas, e é essa repetição literal que amarra o ensaio.
+          const url = await generateForSlideWithRetry(slide, i, slides.length, imageShape(slide, style, i, target), {
+            surface: imageSurface(slide, style, i, target, globalSettings.theme),
+            deckTitle: carouselTitle,
+            seriesSize: targets.length,
+          }, (waitSecs) => {
             // O aviso de rate limit é uma NOTA no toast, não um toast novo: o
             // usuário continua vendo quanto do lote já saiu.
             showProgress(done, `Limite da OpenAI atingido — aguardando ${waitSecs}s…`);
@@ -417,7 +488,11 @@ export function useGenerateCarouselImages() {
     showLoading();
 
     try {
-      const url = await generateForSlideWithRetry(slide, index, slides.length, imageShape(slide, style, index, target), (waitSecs) => {
+      // Slide avulso NÃO manda série: uma imagem só não é um ensaio, e
+      // prometer coerência com imagens que não estão sendo geradas seria ruído.
+      const url = await generateForSlideWithRetry(slide, index, slides.length, imageShape(slide, style, index, target), {
+        surface: imageSurface(slide, style, index, target, globalSettings.theme),
+      }, (waitSecs) => {
         showLoading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`);
       }, opts);
       updateSlide(index, imagePatch(slide, style, index, target, url));

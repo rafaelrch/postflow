@@ -191,7 +191,20 @@ BUSCA NA WEB (ativada pelo usuário):
 Use a busca na web para basear o conteúdo em fatos, lançamentos e notícias atuais sobre o tema — com números e datas reais do que encontrar.
 Nunca inclua citações, URLs ou referências de fontes no JSON final.`;
 
-export const IMAGE_STYLE_SUFFIX = ', editorial cinematic photograph, dark atmosphere, vertical composition, professional photography, shallow depth of field, no text, no logos, no captions, no watermarks';
+/**
+ * 🔴 O `IMAGE_STYLE_SUFFIX` MORREU AQUI, e isso é a correção — não uma perda.
+ *
+ * Ele era colado no fim de TODO prompt de imagem e carregava duas ordens que
+ * não podiam ser fixas:
+ *   - "vertical composition", que contradizia o enquadramento do
+ *     `inset-landscape` ("wide horizontal composition") na MESMA frase;
+ *   - "dark atmosphere", imposta aos quatro templates, inclusive ao card
+ *     branco do Perfil e ao slide creme do Radar.
+ *
+ * O acabamento fotográfico que ele tinha de útil virou a camada OUTPUT, a
+ * orientação virou COMPOSITION e a atmosfera virou ART DIRECTION — todas em
+ * lib/image-prompt.ts, cada uma derivada de onde a imagem cai.
+ */
 
 /**
  * Tamanho pedido à OpenAI para cada formato de destino.
@@ -223,38 +236,12 @@ export function imageSizeForShape(shape: ImageShape): '1024x1024' | '1024x1536' 
 }
 
 /**
- * Direção de ENQUADRAMENTO por formato de destino.
+ * O prompt de imagem mora em `lib/image-prompt.ts`, que é PURO — nenhum
+ * import do client da OpenAI. É o que deixa o prompt inteiro ser afirmado em
+ * teste de node, sem chave de API e sem gastar crédito do Rafael.
  *
- * Sem isto a capa full-bleed (1080x1350) e o bloco interno estreito recebiam a
- * mesma foto, e uma das duas sempre chegava mal cortada.
+ * Continua re-exportado daqui porque a rota e os testes já importavam por
+ * este caminho — trocar o endereço não era o objetivo da mudança.
  */
-const FRAMING_DIRECTION: Record<ImageShape, string> = {
-  'full-bleed':
-    ' Framing: full-bleed background composition that survives being cropped at the edges; keep the subject away from the borders and leave a calm, low-detail area where headline text will sit on top.',
-  'inset-block':
-    ' Framing: single centered subject in a tight vertical composition that still reads when cropped to a narrow portrait strip; keep everything essential in the central column, nothing important near the left or right edges.',
-  'inset-landscape':
-    ' Framing: single centered subject in a wide horizontal composition that survives being cropped at the top and bottom; keep everything essential in the middle band, with generous headroom and floor that can be trimmed away, and nothing important near the upper or lower edges.',
-};
-
-export function buildImagePrompt(input: {
-  title: string;
-  description?: string;
-  isCover?: boolean;
-  isFinal?: boolean;
-  /** Formato do lugar onde a imagem vai cair no slide. */
-  shape?: ImageShape;
-  /** Direção livre do usuário (textarea do painel de IA), tecida no prompt. */
-  userPrompt?: string;
-}): string {
-  const { title, description, isCover, isFinal, shape = 'full-bleed', userPrompt } = input;
-  const base = [title, description].filter(Boolean).join(' — ');
-  const intent = isCover
-    ? 'Cover slide cinematic establishing shot for: '
-    : isFinal
-      ? 'Closing slide minimalist evocative shot for: '
-      : 'Editorial illustrative shot for: ';
-  const framing = FRAMING_DIRECTION[shape] ?? FRAMING_DIRECTION['full-bleed'];
-  const extra = userPrompt?.trim() ? ` Additional art direction: ${userPrompt.trim()}.` : '';
-  return `${intent}${base}${extra}${framing}${IMAGE_STYLE_SUFFIX}`;
-}
+export { buildImagePrompt } from '@/lib/image-prompt';
+export type { ImagePromptInput, ImageSeries } from '@/lib/image-prompt';
