@@ -627,7 +627,24 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ─── Overlay dos diálogos do roadmap ────────────────────────────
-   O escurecer + desfocar do fundo, num lugar só.
+   SÓ DESFOQUE. Sem escurecer.
+
+   🔴 O ESCURECIMENTO SAIU A PEDIDO DO RAFAEL (rodada 4), NÃO POR ESQUECIMENTO.
+   Nas palavras dele: "no portal ele fica com blur e escurece, mas não quero que
+   fique escuro, quero apenas o blur". Se você veio aqui achando que falta um
+   `background` e que dá para "consertar" devolvendo o véu preto — não dá, isso é
+   reverter uma decisão de produto. Leve a proposta a ele antes.
+
+   ⚠️ A CONSEQUÊNCIA, PARA QUEM FOR MEXER DEPOIS: sem cor nenhuma, o
+   `backdrop-filter` passa a ser a ÚNICA coisa que separa o diálogo do conteúdo
+   atrás dele. Onde ele não renderiza — navegador com aceleração de hardware
+   desligada é o caso comum — o overlay fica INVISÍVEL e o diálogo aparece
+   colado no quadro, sem separação alguma. Isso NÃO é teórico: no navegador do
+   próprio Rafael o blur não renderiza hoje (`CSS.supports` responde true, o
+   valor computa, e nada desfoca; um elemento de controle criado do zero também
+   não desfocou). O diálogo continua utilizável — ele tem fundo, borda e sombra
+   próprios, e o overlay segue capturando o clique de fora — mas o contraste com
+   o fundo é o que se perde. É o custo aceito da decisão acima.
 
    ⚠️ MORA AQUI, E NÃO EM CADA CHAMADOR, porque quem aplica é a casca
    (`components/roadmap/RoadmapDialog.tsx`), sem condição nenhuma: os dois
@@ -635,18 +652,15 @@ input[type="range"]::-moz-range-thumb {
    outro é a inconsistência que ninguém defende depois. Um terceiro diálogo
    que use a casca nasce com o fundo certo sem ninguém lembrar disso.
 
-   A RECEITA É A QUE JÁ EXISTE NO PRODUTO — `components/editor/ScheduleModal.tsx`
-   usa `bg-black/70 backdrop-blur-sm`, e `backdrop-blur-sm` é `blur(8px)` no
-   Tailwind 4. Aqui está em CSS puro de propósito: o overlay do /admin é
-   `admin.css`, e cravar utilitário do Tailwind dentro da casca obrigaria o
-   painel a herdar o sistema de classes do produto. Preto com alfa não é token
-   de tema nenhum, então esta regra serve aos dois lados sem misturar paletas.
-
-   `-webkit-backdrop-filter` acompanha o padrão do `.glass` logo abaixo (Safari).
-   Sem suporte a backdrop-filter, sobra o escurecido — que já é o pedido.
+   O RAIO É O DO PRODUTO — `components/editor/ScheduleModal.tsx` usa
+   `backdrop-blur-sm`, que é `blur(8px)` no Tailwind 4. (Aquele modal também
+   escurece, com `bg-black/70`; o que esta regra herda dele é o desfoque.) Aqui
+   está em CSS puro de propósito: o overlay do /admin é `admin.css`, e cravar
+   utilitário do Tailwind dentro da casca obrigaria o painel a herdar o sistema
+   de classes do produto. Sem cor, esta regra não carrega token de tema nenhum,
+   então serve aos dois lados sem misturar paletas.
    ──────────────────────────────────────────────────────────── */
 .roadmap-dialog-overlay {
-  background: rgba(0, 0, 0, 0.7);
   /* ⚠️ O `-webkit-` VEM PRIMEIRO, e a ordem não é estilo: o Lightning CSS (o
      minificador do Next) trata os dois como a mesma propriedade e, quando a
      versão padrão vem antes, ele DESCARTA a padrão e deixa só a `-webkit-`.

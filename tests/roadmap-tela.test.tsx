@@ -784,6 +784,13 @@ describe('roadmap — o like é só coração e número', () => {
 describe('roadmap — o fundo desfoca quando o diálogo abre', () => {
   const GLOBALS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
+  /** O corpo da regra `.roadmap-dialog-overlay`, como está escrito na fonte. */
+  function regraOverlay(): string {
+    const inicio = GLOBALS.indexOf('.roadmap-dialog-overlay {');
+    expect(inicio).toBeGreaterThan(-1);
+    return GLOBALS.slice(inicio, GLOBALS.indexOf('}', inicio));
+  }
+
   it('o popup de Criar task e o de detalhe usam O MESMO overlay', () => {
     render(<RoadmapClient initialColumns={board([card()])} />);
 
@@ -795,15 +802,26 @@ describe('roadmap — o fundo desfoca quando o diálogo abre', () => {
     expect(screen.getByTestId('detalhe-popup').className).toContain('roadmap-dialog-overlay');
   });
 
-  /** O blur está na regra, e é a receita que o produto já usa (blur(8px)). */
-  it('a classe do overlay declara escurecido E backdrop-filter', () => {
-    const bloco = GLOBALS.slice(
-      GLOBALS.indexOf('.roadmap-dialog-overlay {'),
-      GLOBALS.indexOf('}', GLOBALS.indexOf('.roadmap-dialog-overlay {')),
-    );
-    expect(bloco).toContain('rgba(0, 0, 0, 0.7)');
+  /** O desfoque está na regra, no raio que o produto já usa (blur(8px)). */
+  it('a classe do overlay declara backdrop-filter', () => {
+    const bloco = regraOverlay();
     expect(bloco).toMatch(/^\s*-webkit-backdrop-filter: blur\(8px\);$/m);
     expect(bloco).toMatch(/^\s*backdrop-filter: blur\(8px\);$/m);
+  });
+
+  /**
+   * 🔴 SÓ BLUR, SEM ESCURECER — pedido do Rafael (rodada 4): "no portal ele fica
+   * com blur e escurece, mas não quero que fique escuro, quero apenas o blur".
+   *
+   * Este teste existe para o escurecimento não VOLTAR por engano: um `background`
+   * aqui parece um esquecimento consertado, e é uma decisão de produto revertida.
+   * A consequência aceita está escrita em `app/globals.css`, junto da regra —
+   * onde o `backdrop-filter` não renderiza, o overlay fica invisível.
+   */
+  it('o overlay NÃO pinta cor nenhuma: o blur é a única separação', () => {
+    const bloco = regraOverlay();
+    expect(bloco).not.toMatch(/background/);
+    expect(bloco).not.toMatch(/rgba\(/);
   });
 
   /**
@@ -814,10 +832,7 @@ describe('roadmap — o fundo desfoca quando o diálogo abre', () => {
    * então nessa ordem invertida o blur sumiria lá, e nenhum teste de DOM veria.
    */
   it('o -webkit- vem ANTES da versão padrão, para as duas sobreviverem ao build', () => {
-    const bloco = GLOBALS.slice(
-      GLOBALS.indexOf('.roadmap-dialog-overlay {'),
-      GLOBALS.indexOf('}', GLOBALS.indexOf('.roadmap-dialog-overlay {')),
-    );
+    const bloco = regraOverlay();
     const prefixado = bloco.indexOf('-webkit-backdrop-filter:');
     const padrao = bloco.search(/(^|\n)\s*backdrop-filter:/);
     expect(prefixado).toBeGreaterThan(-1);
