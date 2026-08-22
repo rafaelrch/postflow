@@ -5,8 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
 import { ShootingStarsGrid } from '@/components/ui/shooting-stars-grid';
+import { ImageStreamHero } from '@/components/ui/image-stream-hero';
+import { BlurReveal } from '@/components/ui/blur-reveal';
+import ParallaxGallery from '@/components/ui/3d-parallax-unfurling-gallery';
+import SphereImageGrid, { type ImageData } from '@/components/ui/img-sphere';
 import LeadCaptureModal from '@/components/billing/LeadCaptureModal';
-import { ChevronRight, Plus, X, Heart, MessageCircle, Repeat2, Check } from 'lucide-react';
+import { ChevronRight, Plus, X, Menu, Heart, MessageCircle, Repeat2, Check } from 'lucide-react';
 
 /* ────────────────────────────────────────────────────────────────
    CREATOOLS · LANDING PAGE
@@ -65,7 +69,20 @@ const LP_CSS = `
     letter-spacing: -0.01em;
   }
   .lp ::selection { background: var(--lp-black); color: #fff; }
-  .lp-h { font-weight: 700; line-height: 1.04; }
+   .lp-h { font-weight: 700; line-height: 1.04; }
+   .lp-hero-gradient {
+     --lp-hero-gradient: linear-gradient(to right, #E4572E, #FFA0DE);
+   }
+   .lp-hero-gradient > span[aria-hidden="true"] > span {
+     color: transparent;
+     background-image: var(--lp-hero-gradient);
+     background-attachment: fixed;
+     background-size: 100vw 100vh;
+     background-position: 0 0;
+     background-repeat: no-repeat;
+     -webkit-background-clip: text;
+     background-clip: text;
+   }
   .lp-badge {
     display: inline-flex; align-items: center;
     font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
@@ -101,10 +118,90 @@ const LP_CSS = `
   .lp-btn.white:hover { transform: translateY(-1px); }
   .lp-btn:disabled { opacity: 0.55; pointer-events: none; }
 
-  /* Login some no mobile para a marca caber na barra (decisão do Rafael: quem
-     já é cliente entra pelo CTA ou digitando /login). É display:none, então ele
-     sai também do tab e do leitor de tela — esconder só na vista deixaria um
-     botão invisível recebendo foco.
+  /* Navbar sobre o hero: o papel translúcido cria uma superfície legível sem
+     virar uma faixa sólida diante do primeiro mockup. Os tokens do componente
+     shadcn são papel/linha/tinta/acento nesta landing. */
+  .lp-nav-shell {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px 10px 16px;
+    border: 1px solid color-mix(in srgb, var(--line) 92%, var(--ink) 8%);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    color: var(--ink);
+    backdrop-filter: blur(10px) saturate(1.08);
+    -webkit-backdrop-filter: blur(10px) saturate(1.08);
+    box-shadow: 0 16px 32px -22px rgba(10, 10, 10, 0.28);
+    transition: border-radius 220ms var(--ease), background 220ms var(--ease);
+  }
+  .lp-nav-shell.is-open { border-radius: 20px; }
+  .lp-nav-shell .lp-btn { border-radius: 999px; }
+  .lp-nav-shell .lp-btn.black { border: 0; box-shadow: none; }
+  .lp-nav-shell .lp-btn.black:hover { transform: translateY(-1px); }
+  .lp-nav-shell .lp-btn.black:hover,
+  .lp-nav-shell .lp-btn.black:active { box-shadow: none; }
+  .lp-nav-links { color: var(--ink-dim); }
+  .lp-nav-link {
+    display: inline-flex; align-items: center; height: 24px; min-height: 24px; max-height: 24px;
+    line-height: 24px; min-width: 0;
+    transition: color 180ms ease;
+  }
+  .lp-nav-link:hover, .lp-nav-link:focus-visible { color: var(--accent-ink); }
+  .lp-nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .lp-nav-viewport {
+    display: block; flex: 0 0 auto; width: max-content; height: 24px;
+    min-height: 24px; max-height: 24px; line-height: 24px; overflow: hidden;
+  }
+  .lp-nav-label {
+    display: flex; flex-direction: column; width: max-content; flex: 0 0 48px; height: 48px;
+    min-height: 48px; max-height: 48px; line-height: 24px; overflow: hidden;
+    align-items: flex-start;
+    transition: transform 220ms var(--ease);
+  }
+  .lp-nav-link:hover .lp-nav-label, .lp-nav-link:focus-visible .lp-nav-label { transform: translateY(-24px); }
+  .lp-nav-label-face {
+    display: flex; align-items: center; flex: 0 0 24px; height: 24px;
+    min-height: 24px; max-height: 24px; line-height: 24px; white-space: nowrap;
+  }
+  .lp-nav-login {
+    display: none;
+    background: color-mix(in srgb, var(--paper) 94%, transparent) !important;
+    color: var(--ink) !important;
+    border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+    box-shadow: none;
+  }
+  .lp-nav-login:hover { background: var(--paper) !important; transform: translateY(-1px); }
+  .lp-nav-menu-button {
+    display: grid; place-items: center; width: 38px; height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 999px; color: var(--ink);
+    transition: background 180ms ease, color 180ms ease, border-radius 220ms var(--ease);
+  }
+  .lp-nav-menu-button:hover { background: var(--paper-2); }
+  .lp-nav-shell.is-open .lp-nav-menu-button { border-radius: 12px; }
+  .lp-nav-mobile-panel {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 18px 4px 4px;
+    border-top: 1px solid var(--line);
+  }
+  .lp-nav-mobile-link {
+    display: flex; align-items: center; min-height: 42px; padding: 0 12px;
+    border-radius: 12px; color: var(--ink-dim);
+    transition: background 180ms ease, color 180ms ease;
+  }
+  .lp-nav-mobile-link:hover, .lp-nav-mobile-link:focus-visible { background: var(--paper-2); color: var(--ink); }
+  .lp-nav-mobile-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lp-nav-mobile .lp-nav-login { display: inline-flex; justify-content: center; width: 100%; }
+  @media (min-width: 768px) {
+    .lp-nav-menu-button, .lp-nav-mobile-panel { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lp-nav-shell, .lp-nav-label, .lp-nav-menu-button, .lp-nav-mobile-link { transition: none; }
+  }
+
+  /* O grupo de ações desktop some no mobile para a marca caber na barra; os
+     mesmos links reaparecem no painel mobile real. O Login fica display:none
+     fora do painel, então não deixa um botão invisível recebendo foco.
      A regra mora AQUI, e não numa classe .hidden do Tailwind, porque este
      style é injetado no body, DEPOIS da folha do Tailwind: com a mesma
      especificidade quem vem por último ganha, e o display:inline-flex de
@@ -186,8 +283,22 @@ const LP_CSS = `
   /* Quem pediu menos movimento ve o resultado final, parado: imagem nitida e
      sem o selo de "gerando". */
   @media (prefers-reduced-motion: reduce) {
-    .lp-render-img   { animation: none; filter: none; transform: none; }
-    .lp-render-badge { animation: none; opacity: 0; }
+   .lp-render-img   { animation: none; filter: none; transform: none; }
+   .lp-render-badge { animation: none; opacity: 0; }
+   }
+
+  /* O corredor acompanha a composição do hero: no mobile o eixo sobe para
+     que as primeiras cartas apareçam ainda na viewport inicial; no desktop
+     conserva respiro entre a linha de apoio e a faixa de imagens. */
+  .lp-hero-stream {
+    --hero-stream-axis: 10%;
+    --hero-stream-card-scale: 1.22;
+  }
+  @media (min-width: 768px) {
+    .lp-hero-stream {
+      --hero-stream-axis: 32%;
+      --hero-stream-card-scale: 1;
+    }
   }
 `;
 
@@ -221,6 +332,8 @@ function ArrowChip({ dark = false, solid = false }: { dark?: boolean; solid?: bo
 /* ─── Nav ─────────────────────────────────────────────────────── */
 
 function Nav() {
+  const shouldReduceMotion = useReducedMotion();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const links = [
     { href: '#recursos', label: 'Recursos' },
     { href: '#como-funciona', label: 'Como funciona' },
@@ -229,12 +342,12 @@ function Nav() {
   ];
   return (
     <motion.header
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="absolute top-0 left-0 right-0 z-50"
+      initial={shouldReduceMotion ? false : { opacity: 0, x: '-50%', y: -16 }}
+      animate={{ opacity: 1, x: '-50%', y: 0 }}
+      transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="fixed top-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-6xl"
     >
-      <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+      <div className={`lp-nav-shell ${isMenuOpen ? 'is-open' : ''}`}>
         {/* Só a logo, sem o nome escrito ao lado. Com o texto fora, o alt da
             imagem é o ÚNICO nome acessível deste link — sem ele o leitor de tela
             anunciaria "link" e mais nada. Não apague o alt.
@@ -246,10 +359,9 @@ function Nav() {
             manda agora (`h-*` + `w-auto`), e os atributos vão no tamanho grande
             para o Next servir arquivo com resolução de sobra em tela retina.
 
-            A altura ainda é responsiva, mas o aperto diminuiu: o Login sai da
-            barra abaixo de 640px (.lp-nav-login), o que devolveu ~88px e deixou
-            a marca subir de 12 para 32px no celular. 44px continua só no
-            desktop, onde sobra espaço. */}
+            A altura ainda é responsiva, mas o aperto diminuiu: no mobile as
+            ações ficam no painel da navbar. 44px continua só no desktop, onde
+            sobra espaço. */}
         <Link href="/" className="flex items-center">
           <Image
             src="/LOGO_SEMFUNDO.png"
@@ -260,18 +372,64 @@ function Nav() {
           />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-[14.5px] font-medium" style={{ color: 'var(--lp-gray-2)' }}>
+        <nav className="lp-nav-links hidden md:flex items-center gap-8 text-[14.5px] font-medium">
           {links.map((l) => (
-            <a key={l.href} href={l.href} className="hover:text-black transition-colors">{l.label}</a>
+            <a key={l.href} href={l.href} className="lp-nav-link" aria-label={l.label}>
+              <span className="lp-nav-viewport" aria-hidden="true">
+                <span className="lp-nav-label">
+                  <span className="lp-nav-label-face">{l.label}</span>
+                  <span className="lp-nav-label-face">{l.label}</span>
+                </span>
+              </span>
+            </a>
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3">
           <Link href="/login" className="lp-btn light lp-nav-login !py-[13px] !px-6 text-[14px]">Login</Link>
           <Link href="/cadastro" className="lp-btn black !text-[14px] !pl-5 !py-[7px]">
             Começar agora <ArrowChip dark />
           </Link>
         </div>
+
+        <button
+          type="button"
+          className="lp-nav-menu-button md:hidden"
+          aria-label={isMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+          aria-expanded={isMenuOpen}
+          aria-controls="lp-mobile-menu"
+          onClick={() => setIsMenuOpen((open) => !open)}
+        >
+          {isMenuOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Menu className="h-4 w-4" aria-hidden="true" />}
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isMenuOpen && (
+            <motion.div
+              id="lp-mobile-menu"
+              key="lp-mobile-menu"
+              initial={shouldReduceMotion ? false : { opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={shouldReduceMotion ? undefined : { opacity: 0, height: 0 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
+              className="lp-nav-mobile-panel lp-nav-mobile md:hidden basis-full"
+            >
+              {links.map((l) => (
+                <a key={l.href} href={l.href} className="lp-nav-mobile-link" onClick={() => setIsMenuOpen(false)}>
+                  {l.label}
+                </a>
+              ))}
+              <div className="mt-2 grid gap-2">
+                <Link href="/login" className="lp-btn light lp-nav-login !py-[13px] !px-6 text-[14px]" onClick={() => setIsMenuOpen(false)}>
+                  Login
+                </Link>
+                <Link href="/cadastro" className="lp-btn black justify-center !text-[14px] !py-[9px]" onClick={() => setIsMenuOpen(false)}>
+                  Começar agora <ArrowChip dark />
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.header>
   );
@@ -280,107 +438,28 @@ function Nav() {
 /* ─── Hero ────────────────────────────────────────────────────── */
 
 const HERO_IMAGES = [1, 3].flatMap((c) =>
-  [1, 2, 3, 4, 5].map((s) => `/cards_para_hero/carrossel-${c}/carrossel-${c}---${s}.webp`)
+  [1, 2, 3, 4, 5].map((s) => ({
+    src: `/cards_para_hero/carrossel-${c}/carrossel-${c}---${s}.webp`,
+    alt: '',
+  })),
 );
 
-const HERO_ITEM_W = 230;
-const HERO_ITEM_H = 288;
-const HERO_GAP = 10;
-const HERO_MAIN_GAP = 3;
-const HERO_STEP = HERO_ITEM_W + HERO_GAP;
-const HERO_MAIN_SCALE = 1.34;
-const HERO_INTERVAL_MS = 3000;
-// Odd count, centered on the main card. Wide enough that cards mount/unmount
-// beyond the viewport edge — a freshly mounted card appears at its final slot
-// with no transition, so if that happened on-screen it would overlap the card
-// still sliding out of that slot (the "stacked cards" glitch).
-const HERO_WINDOW = 15;
-
-// Distance from center for a given slot: slot 0 is the main (scaled-up) card,
-// so its neighbors (±1) need extra room to keep a real gap instead of
-// overlapping into the bigger card; farther slots then space out normally.
-function heroSlotX(slot: number) {
-  if (slot === 0) return 0;
-  const mainHalf = (HERO_ITEM_W * HERO_MAIN_SCALE) / 2;
-  const baseHalf = HERO_ITEM_W / 2;
-  const firstNeighbor = mainHalf + HERO_MAIN_GAP + baseHalf;
-  const dist = firstNeighbor + (Math.abs(slot) - 1) * HERO_STEP;
-  return slot > 0 ? dist : -dist;
-}
-
 function HeroCarousel() {
-  const [step, setStep] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setStep((s) => s + 1), HERO_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, []);
-
-  const n = HERO_IMAGES.length;
-  const half = Math.floor(HERO_WINDOW / 2);
-
-  const renderedItems = Array.from({ length: HERO_WINDOW }, (_, idx) => {
-    const k = step - half + idx;
-    const imgIndex = ((k % n) + n) % n;
-    return { k, src: HERO_IMAGES[imgIndex] };
-  });
-
-  // Edge fade measured in px from the center, not % of the viewport: stays
-  // fully opaque through the two side cards (±1), then fades out across the
-  // first half of the ±2 cards — main + 2 whole cards + 2 half cards visible.
-  const maskSolid = heroSlotX(1) + HERO_ITEM_W / 2;
-  const maskEnd = heroSlotX(2) + HERO_ITEM_W * 0.34;
-  const heroMask = `linear-gradient(90deg, transparent calc(50% - ${maskEnd}px), #000 calc(50% - ${maskSolid}px), #000 calc(50% + ${maskSolid}px), transparent calc(50% + ${maskEnd}px))`;
-
   return (
-    <div className="relative w-full overflow-x-hidden" style={{ height: HERO_ITEM_H * HERO_MAIN_SCALE + 256 }}>
-      <div
-        className="absolute inset-0"
-        style={{
-          maskImage: heroMask,
-          WebkitMaskImage: heroMask,
-        }}
-      >
-        {renderedItems.map((item) => {
-          // Content advances right → left: as `step` grows, each card's slot
-          // decreases, so the current main card (slot 0) drifts left and the
-          // next one (slot +1) slides in from the right to take its place.
-          const slot = item.k - step;
-          const isMain = slot === 0;
-          const scale = isMain ? HERO_MAIN_SCALE : 1;
-          return (
-            <div
-              key={item.k}
-              className="absolute top-1/2 left-1/2 rounded-[20px] overflow-hidden"
-              style={{
-                width: HERO_ITEM_W,
-                height: HERO_ITEM_H,
-                marginTop: -HERO_ITEM_H / 2,
-                marginLeft: -HERO_ITEM_W / 2,
-                transform: `translateX(${heroSlotX(slot)}px) scale(${scale})`,
-                transition: 'transform 900ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 900ms cubic-bezier(0.22, 1, 0.36, 1)',
-                zIndex: isMain ? 20 : 10,
-                background: '#0B0B0B',
-                border: '4px solid #161616',
-                boxShadow: isMain
-                  ? '0 32px 70px -20px rgba(0,0,0,0.55)'
-                  : '0 14px 28px -14px rgba(0,0,0,0.25)',
-              }}
-            >
-              <Image src={item.src} alt="" fill sizes="310px" className="object-cover" />
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <ImageStreamHero
+      images={HERO_IMAGES}
+      axis="var(--hero-stream-axis)"
+      scale="var(--hero-stream-card-scale)"
+      className="lp-hero-stream h-[440px] w-full md:h-[560px]"
+    />
   );
 }
 
 function Hero() {
   return (
     <ShootingStarsGrid
-      className="min-h-0 rounded-none border-0 shadow-none !bg-none !bg-white"
-      contentClassName="block min-h-0 px-0 py-0 sm:px-0 pt-32 md:pt-36 pb-14"
+      className="min-h-0 rounded-none border-0 shadow-none !bg-none !bg-white overflow-x-clip overflow-y-visible"
+      contentClassName="block min-h-0 px-0 py-0 sm:px-0 pt-32 md:pt-36 pb-6 md:pb-14"
       glow={false}
     >
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
@@ -388,12 +467,18 @@ function Hero() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-          className="lp-h tracking-tighter"
-          style={{ fontSize: 'clamp(38px, 5.4vw, 64px)' }}
+          className="font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl"
         >
-          <span style={{ color: 'var(--lp-gray)' }}>Seu conteúdo do Instagram</span>
+          <BlurReveal as="span" style={{ color: 'var(--lp-black)' }}>
+            Seu conteúdo do Instagram
+          </BlurReveal>
           <br />
-          pronto em minutos, não em horas.
+          <BlurReveal
+            as="span"
+            className="lp-hero-gradient bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent"
+          >
+            pronto em minutos, não em horas.
+          </BlurReveal>
         </motion.h1>
 
         <motion.p
@@ -438,7 +523,7 @@ function Hero() {
         initial={{ opacity: 0, y: 48 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.55 }}
-        className="relative mt-4 md:mt-6"
+        className="relative mt-0 md:mt-6"
       >
         <HeroCarousel />
       </motion.div>
@@ -484,8 +569,8 @@ function Truth() {
 
         <FadeUp delay={0.12}>
           <span className="lp-badge" style={{ background: '#fff', color: 'var(--lp-black)' }}>A verdade que ninguém te conta</span>
-          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(32px, 4vw, 48px)' }}>
-            Aqui está a verdade <span style={{ color: 'var(--lp-gray)' }}>brutal</span>
+          <h2 className="mt-6 font-display text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+            Aqui está a verdade <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">brutal</span>
             <br className="hidden md:block" /> sobre o Instagram em 2026
           </h2>
           <div className="mt-6 space-y-4 text-[15.5px] leading-relaxed" style={{ color: 'var(--lp-gray-2)' }}>
@@ -537,7 +622,9 @@ function HowItWorks() {
       <div className="max-w-5xl mx-auto text-center">
         <FadeUp>
           <span className="lp-badge outline">Em 3 passos</span>
-          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>Tão simples que parece mágica</h2>
+          <h2 className="mt-5 mx-auto text-center font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
+            Tão simples que parece <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">mágica</span>
+          </h2>
           <p className="mt-4 text-[17px]" style={{ color: 'var(--lp-gray)' }}>3 passos. Poucos minutos. Post pronto pra publicar.</p>
         </FadeUp>
 
@@ -932,10 +1019,10 @@ function Features() {
       <div className="max-w-6xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge outline">Vários recursos exclusivos</span>
-          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+          <h2 className="mt-5 mx-auto text-center font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
             Tudo que você precisa pra
             <br />
-            <span style={{ color: 'var(--lp-gray)' }}>crescer no Instagram</span>
+            <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">crescer no Instagram</span>
           </h2>
           <p className="mt-4 text-[17px] max-w-xl mx-auto" style={{ color: 'var(--lp-gray)' }}>
             Um estúdio completo dentro do Creatools. Veja os recursos mais usados em ação.
@@ -1085,6 +1172,45 @@ const MARQUEE_ITEMS = [
   { src: '/clientes/cliente-11.webp', handle: '@biancamartins_' },
 ];
 
+const PEOPLE_SPHERE_ADDITIONAL_IMAGES: ImageData[] = [
+  { id: 'people-who-use-portrait-01', src: '/people-who-use/portrait-01.webp', alt: 'Pessoa usuária do Creatools' },
+  { id: 'people-who-use-portrait-02', src: '/people-who-use/portrait-02.webp', alt: 'Pessoa usuária do Creatools' },
+  { id: 'people-who-use-portrait-03', src: '/people-who-use/portrait-03.webp', alt: 'Pessoa usuária do Creatools' },
+  { id: 'people-who-use-portrait-04', src: '/people-who-use/portrait-04.webp', alt: 'Pessoa usuária do Creatools' },
+  { id: 'people-who-use-portrait-05', src: '/people-who-use/portrait-05.webp', alt: 'Pessoa usuária do Creatools' },
+  { id: 'people-who-use-portrait-06', src: '/people-who-use/portrait-06.webp', alt: 'Pessoa usuária do Creatools' },
+  ...Array.from({ length: 27 }, (_, index) => {
+    const portraitNumber = String(index + 7).padStart(2, '0');
+    return {
+      id: `people-who-use-generated-${portraitNumber}`,
+      src: `/people-who-use/portrait-${portraitNumber}.webp`,
+      alt: 'Pessoa usuária do Creatools',
+    };
+  }),
+  ...Array.from({ length: 16 }, (_, index) => {
+    const externalNumber = String(index + 1).padStart(2, '0');
+    return {
+      id: `people-who-use-external-${externalNumber}`,
+      src: `/people-who-use/external-${externalNumber}.webp`,
+      alt: 'Pessoa usuária do Creatools',
+    };
+  }),
+];
+
+const PEOPLE_SPHERE_REAL_IMAGES: ImageData[] = [
+  ...PEOPLE_SPHERE_ADDITIONAL_IMAGES,
+  ...MARQUEE_ITEMS.map((item) => ({
+    id: item.handle,
+    src: item.src,
+    alt: `Cliente ${item.handle}`,
+    title: item.handle,
+  })),
+];
+
+const PEOPLE_SPHERE_SLOT_COUNT = 60;
+
+const PEOPLE_SPHERE_IMAGES: ImageData[] = PEOPLE_SPHERE_REAL_IMAGES;
+
 /**
  * Repetições do conjunto na faixa. Tem que ser PAR: a animação desloca a trilha
  * em -50%, então a metade precisa cair exatamente sobre um número inteiro de
@@ -1140,8 +1266,10 @@ function Results() {
       <div className="max-w-6xl mx-auto text-center">
         <FadeUp>
           <span className="lp-badge soft">Resultados reais</span>
-          <h2 className="lp-h tracking-tighter mt-6 max-w-3xl mx-auto" style={{ fontSize: 'clamp(30px, 3.8vw, 48px)' }}>
-            Veja o tipo de post que você vai criar <span style={{ color: 'var(--lp-gray)' }}>com o Creatools</span>
+          <h2 className="mt-5 max-w-3xl mx-auto text-center font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl md:whitespace-nowrap">
+            Veja o tipo de post que você vai
+            <br />
+            <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">criar com o Creatools</span>
           </h2>
           <p className="mt-4 text-[16px]" style={{ color: 'var(--lp-gray)' }}>
             Carrosséis e news cards gerados dentro da plataforma. Sem Canva, sem Photoshop, sem designer.
@@ -1206,6 +1334,43 @@ function Results() {
   );
 }
 
+function PeopleWhoUse() {
+  return (
+    <section
+      aria-labelledby="people-who-use-title"
+      className="overflow-hidden bg-[#F7F7F7] px-6 py-16 md:py-24"
+    >
+      <div className="mx-auto grid w-full max-w-7xl items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,720px)] lg:gap-16">
+        <div className="text-center md:text-left">
+          <h2
+            id="people-who-use-title"
+            className="font-display text-center text-4xl font-bold tracking-tighter sm:text-5xl md:text-left md:text-6xl"
+          >
+            Pessoas que <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">usam</span>
+          </h2>
+        </div>
+
+        <div className="flex min-w-0 justify-center overflow-hidden">
+          <SphereImageGrid
+            images={PEOPLE_SPHERE_IMAGES}
+            containerSize={720}
+            sphereRadius={250}
+            dragSensitivity={0.8}
+            momentumDecay={0.96}
+            maxRotationSpeed={6}
+            baseImageScale={0.22}
+            perspective={1000}
+            autoRotate
+            autoRotateSpeed={0.2}
+            responsive
+            className="w-full max-w-[720px]"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── Faça as contas ──────────────────────────────────────────── */
 
 const COSTS = [
@@ -1223,8 +1388,8 @@ function DoTheMath() {
       <div className="max-w-3xl mx-auto text-center">
         <FadeUp>
           <span className="lp-badge on-dark">Faça as contas</span>
-          <h2 className="lp-h tracking-tighter mt-6 text-white" style={{ fontSize: 'clamp(32px, 4.2vw, 52px)' }}>
-            Quanto você pagaria <span style={{ color: '#6E6E6A' }}>separado</span>
+          <h2 className="mt-5 mx-auto text-center font-display text-4xl font-bold tracking-tighter text-white sm:text-5xl md:text-6xl md:whitespace-nowrap">
+            Quanto você pagaria <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">separado</span>
             <br /> por tudo isso?
           </h2>
         </FadeUp>
@@ -1325,23 +1490,23 @@ function Pricing() {
   // menores que os das outras seções. No mobile pode rolar à vontade, então os
   // valores base ficam confortáveis e só o md: aperta.
   return (
-    <section id="planos" className="py-12 md:py-4 px-6 bg-white">
+    <section id="planos" className="py-16 md:py-24 px-6 bg-white">
       <div className="max-w-5xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge soft">Comece agora</span>
-          <h2 className="lp-h tracking-tighter mt-3" style={{ fontSize: 'clamp(30px, 3vw, 38px)' }}>
+          <h2 className="mt-5 mx-auto text-center font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
             Escolha a melhor opção
             <br />
-            <span style={{ color: 'var(--lp-gray)' }}>para começar</span>
+            <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">para começar</span>
           </h2>
-          <p className="mt-2.5 text-[15px]" style={{ color: 'var(--lp-gray)' }}>
+          <p className="mt-4 text-[15px]" style={{ color: 'var(--lp-gray)' }}>
             Checkout seguro (cartão de crédito). Sem fidelidade. Cancele quando quiser.
           </p>
         </FadeUp>
 
         {/* Dois planos, não três: grade de 2 colunas e centrada. Manter
             md:grid-cols-3 deixaria um buraco de coluna vazia. */}
-        <div className="mt-4 grid md:grid-cols-2 gap-5 max-w-3xl mx-auto items-start">
+        <div className="mt-8 grid md:grid-cols-2 gap-5 max-w-3xl mx-auto items-start">
           {/* Mensal */}
           <FadeUp delay={0.05}>
             <div className="rounded-[28px] p-7" style={{ background: 'var(--lp-band)' }}>
@@ -1505,8 +1670,8 @@ function Faq() {
       <div className="max-w-3xl mx-auto">
         <FadeUp className="text-center">
           <span className="lp-badge soft">FAQ</span>
-          <h2 className="lp-h tracking-tighter mt-6" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
-            Perguntas <span style={{ color: 'var(--lp-gray)' }}>frequentes</span>
+          <h2 className="mt-5 mx-auto text-center font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
+            Perguntas <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">frequentes</span>
           </h2>
         </FadeUp>
 
@@ -1565,10 +1730,10 @@ function FinalCTA() {
     <section className="pb-24 md:pb-32 px-6 text-center bg-white">
       <FadeUp>
         <Image src="/ICON_SEMFUNDO.png" alt="Creatools" width={129} height={129} className="mx-auto object-contain" />
-        <h2 className="lp-h tracking-tighter" style={{ fontSize: 'clamp(34px, 4.4vw, 54px)' }}>
+        <h2 className="mt-5 mx-auto text-center font-display text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
           Comece a publicar com
           <br />
-          <span style={{ color: 'var(--lp-gray)' }}>consistência de verdade</span>
+          <span className="bg-gradient-to-r from-[#E4572E] to-[#FFA0DE] bg-clip-text text-transparent">consistência de verdade</span>
         </h2>
         <p className="mt-5 text-[16px] max-w-md mx-auto" style={{ color: 'var(--lp-gray)' }}>
           Escolha o plano, a IA já está ativa. Em minutos você tem o primeiro carrossel pronto.
@@ -1668,9 +1833,11 @@ export default function LandingPage() {
       <Hero />
       <Truth />
       <HowItWorks />
+      <ParallaxGallery />
       <Features />
       <Marquee />
       <Results />
+      <PeopleWhoUse />
       <DoTheMath />
       <Pricing />
       <Faq />

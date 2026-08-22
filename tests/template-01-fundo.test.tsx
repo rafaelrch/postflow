@@ -11,30 +11,29 @@ import {
 import Template01Slide from '@/components/slides/Template01Slide';
 
 /**
- * COR DE FUNDO DO SLIDE no TEMPLATE 1 — pedido do Rafael.
+ * COR DE FUNDO DO SLIDE no TEMPLATE 1 — pedido do Rafael (decisão final).
  *
- * O caminho de dados já existia inteiro (`Template01SlideControl.background`,
- * `template01Overrides`, `slideBackground`); faltava a UI. O que estes testes
- * travam é a REGRA, não a tela:
+ * No T1 o "Fundo do slide" grava `backgroundColor` + marca `background` (fundo
+ * CHAPADO, igual aos outros templates). Por cima dele o T1 traz um DEGRADÊ
+ * PRETO de legibilidade, FIXO e INQUEBRÁVEL — sempre presente, sempre preto,
+ * independente da cor escolhida no fundo ou do que o usuário mexe no painel
+ * "Sombra / Overlay".
  *
+ * O que estes testes travam:
  *   1. sem a MARCA, o fundo é o do spec — é isso que faz o carrossel recém
- *      gerado nascer idêntico ao gabarito, e é o que quebra se alguém voltar a
- *      inferir override por comparação de valor;
- *   2. com a marca, vale a cor escolhida;
- *   3. restaurar apaga a marca e o spec volta a mandar;
- *   4. o painel só grava com a marca junto — sem ela a cor não apareceria e o
- *      controle pareceria quebrado.
+ *      gerado nascer idêntico ao gabarito;
+ *   2. ao mexer no "Fundo do slide" do T1, a cor vira o FUNDO (chapado) e NÃO
+ *      substitui o degradê preto de legibilidade, que continua presente por cima;
+ *   3. a marca é `background`, nunca `shadow`;
+ *   4. o degradê de legibilidade (rgba(0,0,0,...)) aparece SEMPRE — com ou sem
+ *      a marca de fundo, e não importa a cor escolhida;
+ *   5. restaurar apaga a marca e o spec volta a mandar.
  *
- * Os modelos 1 e 2 têm DEGRADÊ no desenho: escolher uma cor ali substitui o
- * degradê inteiro por chapado. Não é bloqueado (o Rafael pediu liberdade), mas a
- * UI tem de avisar — e isso também está travado aqui.
+ * Os modelos 1 e 2 têm DEGRADÊ no desenho do spec: mesmo neles, ao escolher uma
+ * cor o fundo vira chapado e o degradê PRETO de legibilidade é composto por cima.
  */
 
 vi.mock('@/hooks/useGenerateCarouselImages', async () => {
-  // Spread do módulo real: a barra lateral também usa `batchTargets` daqui, e
-  // um mock que lista export por export quebra a cada função nova. Só o hook e
-  // o `isEditorialCoverSlide` são substituídos, que é o que estes testes querem
-  // controlar.
   const real = await vi.importActual<typeof import('@/hooks/useGenerateCarouselImages')>(
     '@/hooks/useGenerateCarouselImages'
   );
@@ -58,11 +57,14 @@ vi.mock('react-hot-toast', () => ({
 
 import EditorSidebar from '@/components/editor/EditorSidebar';
 
+const VERMELHO = '#F41515';
 const VERDE = '#12B76A';
 const MODELO_AZUL = 6;
 const AZUL_DO_SPEC = '#0D39E4';
-/** Os únicos dois modelos com degradê no desenho. */
+/** Os únicos dois modelos com degradê no desenho do spec. */
 const MODELOS_DEGRADE = [1, 2];
+/** rgb do preto, para conferir o overlay de legibilidade. */
+const PRETO_RGB = 'rgba(0,0,0';
 
 /** Um slide de template01 sem imagem — o fundo tem de vir do spec, não da foto. */
 function slideDoModelo(model: number, extra: Partial<Slide> = {}): Slide {
@@ -78,7 +80,7 @@ function slideDoModelo(model: number, extra: Partial<Slide> = {}): Slide {
   } as Slide;
 }
 
-/** O `background` inline do slide renderizado. */
+/** O `background` inline do slide renderizado (raiz). */
 function fundoRenderizado(slide: Slide): string {
   const html = renderToStaticMarkup(
     <Template01Slide
@@ -95,6 +97,18 @@ function fundoRenderizado(slide: Slide): string {
     .map((d) => d.trim())
     .find((d) => d.startsWith('background:'));
   return (decl ?? '').slice('background:'.length).trim().replace(/&#x27;|&quot;/g, '');
+}
+
+/** O HTML completo do slide — pega também o overlay de legibilidade (div filha). */
+function htmlCompleto(slide: Slide): string {
+  return renderToStaticMarkup(
+    <Template01Slide
+      slide={slide}
+      globalSettings={DEFAULT_GLOBAL_SETTINGS}
+      slideIndex={slide.position}
+      totalSlides={TEMPLATE_01_MODELS.length}
+    />
+  );
 }
 
 /** Deck de 6 slides, um por modelo, com o `active` selecionado. */
@@ -124,6 +138,7 @@ function abrePainel(id: string): HTMLElement {
 
 /** O campo hexadecimal do `ColorPicker` dentro de um painel. */
 function campoHex(painel: HTMLElement): HTMLInputElement {
+  fireEvent.click(within(painel).getByRole('button', { name: /abrir seletor de cor/i }));
   return within(painel).getByPlaceholderText('#000000') as HTMLInputElement;
 }
 
@@ -145,10 +160,7 @@ describe('sem a marca, o fundo é o do spec', () => {
   });
 
   it('cor gravada SEM a marca não pinta nada — é o que segura o carrossel gerado', () => {
-    // A geração grava `backgroundColor` da marca do usuário em todo slide. Se o
-    // override voltasse a ser inferido por valor, isso pintaria chapado por cima
-    // do degradê do Figma — foi exatamente o defeito de antes.
-    const slide = slideDoModelo(MODELO_AZUL, { backgroundColor: VERDE });
+    const slide = slideDoModelo(MODELO_AZUL, { backgroundColor: VERMELHO });
     expect(fundoRenderizado(slide)).toBe(AZUL_DO_SPEC);
   });
 
@@ -156,52 +168,101 @@ describe('sem a marca, o fundo é o do spec', () => {
     const bg = template01SpecBackground(model);
     expect(bg.solid).toBeUndefined();
     expect(bg.css).toContain('linear-gradient');
-    // O seletor precisa de um `#RRGGBB` para abrir: a primeira parada do degradê.
     expect(bg.swatch).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  });
+
+  it.each(TEMPLATE_01_MODELS)('o degradê de legibilidade PRETO está presente no modelo %i sem marca', (model) => {
+    expect(htmlCompleto(slideDoModelo(model))).toContain(PRETO_RGB);
   });
 });
 
-describe('com a marca, a cor escolhida manda', () => {
-  it.each(TEMPLATE_01_MODELS)('modelo %i pinta a cor do usuário', (model) => {
-    const slide = slideDoModelo(model, {
+describe('no T1 a cor do Fundo do slide vira o FUNDO (chapado) + degradê preto por cima', () => {
+  it.each(TEMPLATE_01_MODELS)('modelo %i: fundo vira a cor escolhida e o degradê preto continua', (model) => {
+    montaDeck(model - 1);
+    const fundo = abrePainel('fundoDoSlide');
+    fireEvent.change(campoHex(fundo), { target: { value: VERMELHO } });
+
+    // Marca `background`, nunca `shadow`.
+    expect(ativo().templateOverrides?.background).toBe(true);
+    expect(ativo().templateOverrides?.shadow).toBeFalsy();
+    expect(ativo().backgroundColor).toBe(VERMELHO);
+
+    const html = htmlCompleto(ativo());
+    // O fundo (raiz) virou a cor escolhida, chapada.
+    expect(fundoRenderizado(ativo())).toBe(VERMELHO);
+    // O degradê PRETO de legibilidade continua por cima — não virou a cor.
+    expect(html).toContain(PRETO_RGB);
+    // A cor escolhida NUNCA aparece como overlay rgba (só no fundo chapado).
+    expect(html).not.toContain('rgba(244,21,21');
+  });
+
+  it('modelo de degradê do spec (1): ao escolher cor, o fundo do spec some e entra o chapado', () => {
+    montaDeck(0); // modelo 1
+    const fundo = abrePainel('fundoDoSlide');
+    fireEvent.change(campoHex(fundo), { target: { value: VERMELHO } });
+    // O fundo (raiz) é a cor escolhida, não o degradê do spec.
+    expect(fundoRenderizado(ativo())).toBe(VERMELHO);
+    // Mas o degradê de legibilidade preto persiste.
+    expect(htmlCompleto(ativo())).toContain(PRETO_RGB);
+  });
+
+  it('render direto: escolher vermelho deixa fundo vermelho + overlay preto', () => {
+    const slide = slideDoModelo(MODELO_AZUL, {
+      backgroundColor: VERMELHO,
+      templateOverrides: { background: true },
+    });
+    expect(fundoRenderizado(slide)).toBe(VERMELHO);
+    const html = htmlCompleto(slide);
+    expect(html).toContain(PRETO_RGB);
+    expect(html).not.toContain('rgba(244,21,21');
+  });
+});
+
+describe('o degradê de legibilidade é INQUEBRÁVEL', () => {
+  it('aparece sempre, com ou sem marca de fundo', () => {
+    // Sem marca nenhuma.
+    expect(htmlCompleto(slideDoModelo(3))).toContain(PRETO_RGB);
+    // Com marca de fundo de uma cor qualquer.
+    const marcado = slideDoModelo(3, {
       backgroundColor: VERDE,
       templateOverrides: { background: true },
     });
-    expect(fundoRenderizado(slide)).toBe(VERDE);
+    expect(htmlCompleto(marcado)).toContain(PRETO_RGB);
   });
 
-  it('nos modelos de degradê a cor SUBSTITUI o degradê inteiro', () => {
-    for (const model of MODELOS_DEGRADE) {
-      const slide = slideDoModelo(model, {
-        backgroundColor: VERDE,
-        templateOverrides: { background: true },
-      });
-      expect(fundoRenderizado(slide)).not.toContain('gradient');
-    }
+  it('a cor do overlay é SEMPRE preta, ignorando slide.shadow.color', () => {
+    // Se alguém gravou uma cor de sombra (ex.: via API/legacy), o T1 ainda
+    // renderiza o overlay PRETO, nunca essa cor.
+    const comCorEstranha = slideDoModelo(3, {
+      shadow: { ...DEFAULT_SLIDE.shadow, color: VERMELHO },
+      templateOverrides: { shadow: true },
+    });
+    const html = htmlCompleto(comCorEstranha);
+    expect(html).toContain(PRETO_RGB);
+    expect(html).not.toContain('rgba(244,21,21');
   });
 });
 
 describe('restaurar volta ao spec', () => {
   it('sem a marca o fundo é o do desenho de novo', () => {
     const escolhido = slideDoModelo(MODELO_AZUL, {
-      backgroundColor: VERDE,
+      backgroundColor: VERMELHO,
       templateOverrides: { background: true },
     });
-    expect(fundoRenderizado(escolhido)).toBe(VERDE);
+    expect(fundoRenderizado(escolhido)).toBe(VERMELHO);
 
     // Restaurar apaga a MARCA; `backgroundColor` pode continuar gravado.
     const restaurado = { ...escolhido, templateOverrides: undefined } as Slide;
     expect(fundoRenderizado(restaurado)).toBe(AZUL_DO_SPEC);
   });
 
-  it('o botão da barra lateral conta a alteração e a desfaz', () => {
+  it('o botão da barra lateral conta a alteração (background) e a desfaz', () => {
     montaDeck(MODELO_AZUL - 1);
 
     const fundo = abrePainel('fundoDoSlide');
-    fireEvent.change(campoHex(fundo), { target: { value: VERDE } });
+    fireEvent.change(campoHex(fundo), { target: { value: VERMELHO } });
     expect(ativo().templateOverrides?.background).toBe(true);
 
-    // O badge do painel de restaurar conta as chaves de `templateOverrides`.
     const restaurar = document.querySelector('[data-panel="restaurarTemplate"]') as HTMLElement;
     expect(within(restaurar).getByText('1')).toBeTruthy();
 
@@ -214,8 +275,6 @@ describe('restaurar volta ao spec', () => {
 });
 
 describe('o painel na barra lateral', () => {
-  // O TEXTO do canto vale para o deck inteiro (é a assinatura do carrossel);
-  // cor e visibilidade continuam por slide. Pedido do Rafael.
   it('propaga o texto do canto ao deck e desliga só no slide selecionado', () => {
     montaDeck(1);
     const painel = abrePainel('cantos');
@@ -259,12 +318,21 @@ describe('o painel na barra lateral', () => {
     expect(campoHex(abrePainel('fundoDoSlide')).value).toBe(AZUL_DO_SPEC);
   });
 
-  it('escrever a cor grava o valor E a marca — sem a marca o spec venceria', () => {
-    montaDeck(MODELO_AZUL - 1);
-    fireEvent.change(campoHex(abrePainel('fundoDoSlide')), { target: { value: VERDE } });
+  it('abre na cor de fundo quando ela já foi escolhida', () => {
+    montaDeck(MODELO_AZUL - 1, {
+      backgroundColor: VERMELHO,
+      templateOverrides: { background: true },
+    });
+    expect(campoHex(abrePainel('fundoDoSlide')).value).toBe(VERMELHO);
+  });
 
-    expect(ativo().backgroundColor).toBe(VERDE);
+  it('escrever a cor grava no backgroundColor E marca background', () => {
+    montaDeck(MODELO_AZUL - 1);
+    fireEvent.change(campoHex(abrePainel('fundoDoSlide')), { target: { value: VERMELHO } });
+
+    expect(ativo().backgroundColor).toBe(VERMELHO);
     expect(ativo().templateOverrides?.background).toBe(true);
+    expect(ativo().templateOverrides?.shadow).toBeFalsy();
   });
 
   it('vem entre "Estilo do texto" e "Restaurar", que continua o último', () => {
@@ -274,7 +342,6 @@ describe('o painel na barra lateral', () => {
     );
     expect(ids.indexOf('fundoDoSlide')).toBeGreaterThan(ids.indexOf('estiloDoTexto'));
     expect(ids.indexOf('fundoDoSlide')).toBeLessThan(ids.indexOf('restaurarTemplate'));
-    // Os cantos agora pertencem ao slide selecionado e o restaurar fecha tudo.
     expect(ids.indexOf('cantos')).toBeLessThan(ids.indexOf('restaurarTemplate'));
     expect(ids.at(-1)).toBe('restaurarTemplate');
   });
@@ -284,7 +351,11 @@ describe('o painel na barra lateral', () => {
     const painel = abrePainel('fundoDoSlide');
     expect(within(painel).queryByText(/arraste/i)).toBeNull();
     expect(within(painel).queryByText(/IA/)).toBeNull();
-    expect(within(painel).queryAllByRole('slider')).toHaveLength(0);
+    expect(within(painel).getByTestId('cromia-swatch')).toBeTruthy();
+    fireEvent.click(within(painel).getByRole('button', { name: /abrir seletor de cor/i }));
+    expect(within(painel).getAllByRole('slider')).toHaveLength(2);
+    expect(within(painel).getByRole('slider', { name: /saturação/i })).toBeTruthy();
+    expect(within(painel).getByRole('slider', { name: /matiz/i })).toBeTruthy();
   });
 
   it('o rótulo "Fundo do slide" aparece uma vez só', () => {
@@ -292,13 +363,21 @@ describe('o painel na barra lateral', () => {
     expect(screen.getAllByText('Fundo do slide')).toHaveLength(1);
   });
 
-  it.each(MODELOS_DEGRADE)('não mostra explicação sobre degradê no modelo %i', (model) => {
+  it.each(TEMPLATE_01_MODELS)('não mostra explicação sobre degradê no modelo %i', (model) => {
     montaDeck(model - 1);
     expect(within(abrePainel('fundoDoSlide')).queryByText(/degradê/)).toBeNull();
   });
 
-  it('não avisa de degradê em slide de cor chapada', () => {
+  it('o painel "Sombra / Overlay" trava a cor em preto e não tem liga/desliga no T1', () => {
     montaDeck(MODELO_AZUL - 1);
-    expect(within(abrePainel('fundoDoSlide')).queryByText(/degradê/)).toBeNull();
+    const painel = abrePainel('sombraOverlay');
+    // Sem toggle de "Exibir sombra" (sempre ligado).
+    expect(within(painel).queryByText('Exibir sombra')).toBeNull();
+    // A cor aparece travada em preto, sem picker.
+    expect(within(painel).getByText('preto fixo (legibilidade)')).toBeTruthy();
+    // Sliders de opacidade/tamanho/distância continuam disponíveis.
+    expect(within(painel).getByText('Opacidade')).toBeTruthy();
+    expect(within(painel).getByText('Tamanho')).toBeTruthy();
+    expect(within(painel).getByText('Distância')).toBeTruthy();
   });
 });

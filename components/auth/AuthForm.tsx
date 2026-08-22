@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, Quote } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
@@ -82,6 +82,23 @@ function signupIntentMessage(code: string | undefined, fallback?: string): strin
       return fallback || 'Não foi possível confirmar o pagamento.';
   }
 }
+
+/** Depoimentos de decoração da coluna direita (estilo 21dev). Texto e avatares
+ *  são placeholders coerentes com a marca — não bloqueiam o fluxo de auth. */
+const TESTIMONIALS = [
+  {
+    name: 'Bia Criativa',
+    handle: '@bia.criativa',
+    avatar: '/clientes/cliente-01.webp',
+    quote: 'Em uma tarde montei 12 carrosséis pro cliente. Antes levava a semana.',
+  },
+  {
+    name: 'Studio Marques',
+    handle: '@studio.marques',
+    avatar: '/clientes/cliente-04.webp',
+    quote: 'O Creatools virou meu braço direito nas entregas mensais de conteúdo.',
+  },
+] as const;
 
 export default function AuthForm({
   mode,
@@ -262,25 +279,34 @@ export default function AuthForm({
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-5 py-10" style={{ background: 'var(--paper)' }}>
-      <Link href="/" className="flex items-center" aria-label="Creatools">
-        <Image
-          src="/LOGO_SEMFUNDO.png"
-          alt="Creatools"
-          width={268}
-          height={80}
-          priority
-          className="h-16 w-auto object-contain dark:invert"
-        />
-      </Link>
-
-      <div className="flex-1 w-full flex items-center justify-center">
+    // Split-screen 50/50 (padrão 21dev): esquerda = form, direita = hero +
+    // testimonials. A coluna direita é puramente decorativa e some no mobile.
+    <main className="flex flex-col md:flex-row min-h-[100dvh]" style={{ background: 'var(--paper)' }}>
+      {/* ESQUERDA — formulário */}
+      <section className="flex-1 flex items-center justify-center px-5 py-10 sm:px-8 md:p-12">
         <div className="w-full max-w-[420px]">
-          <div className="mb-6 text-center">
-            <h1 className="section-title" style={{ fontSize: 40 }}>{title}</h1>
+          <Link href="/" className="flex items-center mb-8 fade-in" style={{ animationDelay: '80ms' }} aria-label="Creatools">
+            <Image
+              src="/LOGO_SEMFUNDO.png"
+              alt="Creatools"
+              width={268}
+              height={80}
+              priority
+              className="h-12 w-auto object-contain dark:invert"
+            />
+          </Link>
+
+          <div className="mb-7 fade-in" style={{ animationDelay: '160ms' }}>
+            <h1 className="section-title" style={{ fontSize: 38 }}>{title}</h1>
+            <p className="mt-2 text-[14px]" style={{ color: 'var(--ink-dim)' }}>
+              {isSignup
+                ? 'Crie sua conta e comece a produzir.'
+                : 'Bem-vindo de volta. Entre para continuar.'}
+            </p>
             {isSignup && planLabel && (
-              <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-dim)' }}>
-                Plano <strong style={{ color: 'var(--accent)' }}>{planLabel}</strong> ativado — crie sua conta para acessar.
+              <p className="mt-3 text-[13px] inline-flex items-center gap-2" style={{ color: 'var(--ink-dim)' }}>
+                <span className="chip soft">Plano</span>
+                <strong style={{ color: 'var(--accent)' }}>{planLabel}</strong> ativado
               </p>
             )}
           </div>
@@ -328,7 +354,7 @@ export default function AuthForm({
               )}
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="brand-card flex flex-col gap-4" style={{ padding: 20 }}>
+            <form onSubmit={handleSubmit} className="brand-card flex flex-col gap-4 fade-in" style={{ padding: 22, animationDelay: '240ms' }}>
               {isSignup ? (
                 // Texto fixo, não input: o e-mail vem do pagamento e não é
                 // editável. Um campo editável aqui seria mentira — a conta
@@ -437,14 +463,65 @@ export default function AuthForm({
             </form>
           )}
 
-          <p className="mt-6 text-center text-[13px]" style={{ color: 'var(--ink-dim)' }}>
+          <p className="mt-6 text-center text-[13px] fade-in" style={{ color: 'var(--ink-dim)', animationDelay: '320ms' }}>
             {isSignup ? 'Já tem conta?' : 'Ainda não tem conta?'}{' '}
             <Link className="font-semibold underline underline-offset-4" style={{ color: 'var(--ink)' }} href={isSignup ? `/login?next=${encodeURIComponent(next)}` : `/cadastro?next=${encodeURIComponent(next)}`}>
               {isSignup ? 'Entrar' : 'Criar conta'}
             </Link>
           </p>
         </div>
-      </div>
+      </section>
+
+      {/* DIREITA — imagem clara (cantos arredondados + margem) + título + testimonials (decoração, some no mobile) */}
+      <aside
+        className="hidden md:block flex-1 relative overflow-hidden"
+        aria-hidden
+        style={{ background: 'var(--paper)' }}
+      >
+        {/* Imagem de apoio, com margem nas bordas e cantos levemente arredondados */}
+        <div
+          className="absolute inset-3 md:inset-4 bg-cover bg-center rounded-[var(--radius-lg)]"
+          style={{ backgroundImage: 'url(/hero/login-hero.webp)' }}
+        />
+
+        {/* Título de prova social + testimonials, sobre a imagem */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-4 w-[88%] max-w-[560px]">
+            {TESTIMONIALS.map((t, i) => (
+              <figure
+                key={t.handle}
+                className="flex-1 min-w-[220px] rounded-[var(--radius-lg)] p-4 flex flex-col gap-2 fade-in"
+                style={{
+                  background: 'color-mix(in srgb, var(--paper) 82%, white)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--ink)',
+                  animationDelay: `${320 + i * 120}ms`,
+                  boxShadow: '0 10px 30px -16px rgba(0,0,0,0.18)',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <Image
+                    src={t.avatar}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="w-9 h-9 rounded-full object-cover shrink-0"
+                    style={{ border: '1.5px solid var(--line)' }}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>{t.name}</p>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--ink-dim)' }}>{t.handle}</p>
+                  </div>
+                  <Quote className="w-4 h-4 ml-auto shrink-0" style={{ color: 'var(--accent)' }} />
+                </div>
+                <blockquote className="text-[13px] leading-5" style={{ color: 'var(--ink-dim)' }}>
+                  {t.quote}
+                </blockquote>
+              </figure>
+            ))}
+        </div>
+      </aside>
     </main>
   );
 }
