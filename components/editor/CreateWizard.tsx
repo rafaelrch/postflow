@@ -35,6 +35,7 @@ import {
   TEMPLATE_01_DEFAULT_CORNERS,
   template01SlotsFromContent,
   template01SlotsForSlide,
+  template01ModelOf,
   TEMPLATE_01_SLIDE_COUNT,
 } from '@/lib/templates/template-01';
 import {
@@ -1059,7 +1060,12 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             // Deck gerado: 6 slides, um por modelo, na ordem do spec. Gravar o
             // modelo em vez de deixá-lo sair da posição é o que mantém o desenho
             // certo se o usuário reordenar ou inserir um slide depois.
-            templateModel: i + 1,
+            //
+            // O valor sai da MESMA regra do render (TEMPLATE_01_MODELS + clamp),
+            // não de um `i + 1` cru: este número agora vai para o banco, e a
+            // coluna tem `check (template_model between 1 and 6)` — um valor
+            // fora da faixa derrubaria o INSERT dos slides inteiro.
+            templateModel: template01ModelOf(null, i),
             templateSlots: {
               // Manual/JSON já entregam os slots prontos (e zerados onde o
               // usuário não escreveu); a IA entrega título/descrição soltos.
@@ -1222,6 +1228,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
               cta_button: DEFAULT_SLIDE.ctaButton,
               background_color: DEFAULT_SLIDE.backgroundColor,
               template_slots: editor.templateSlots,
+              // Sem esta linha o deck reabria derivando o modelo da POSIÇÃO
+              // pelo fallback de compatibilidade de `template01ModelOf`, e
+              // reordenar um slide trocava o desenho dele.
+              template_model: editor.templateModel,
             };
           }
 
