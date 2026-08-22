@@ -18,6 +18,11 @@ export default defineConfig({
   },
   test: {
     /**
+     * Repõe localStorage/sessionStorage, que o vitest 4 não copia do jsdom para
+     * o global. Só isso — o arquivo explica a causa e diz quando apagá-lo.
+     */
+    setupFiles: ['./tests/setup/webstorage.ts'],
+    /**
      * Os defaults do vitest REPOSTOS à mão, porque declarar `exclude`
      * sobrescreve a lista inteira em vez de somar. O item que interessa é o
      * último: sem ele a suíte varre .claude/worktrees/ e roda os testes de
