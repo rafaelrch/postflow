@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import EditorSidebar from '@/components/editor/EditorSidebar';
@@ -8,6 +8,7 @@ import SlideCanvas from '@/components/editor/SlideCanvas';
 import HiddenSlides from '@/components/editor/HiddenSlides';
 import CreateWizard from '@/components/editor/CreateWizard';
 import ScheduleModal from '@/components/editor/ScheduleModal';
+import CornerPlaceholderModal from '@/components/editor/CornerPlaceholderModal';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useExport } from '@/hooks/useExport';
@@ -15,6 +16,7 @@ import { createClient } from '@/lib/supabase';
 import { Slide, SlideStyle } from '@/types';
 import { mapDbSlideToSlide, mapDbCarouselToGlobalSettings } from '@/lib/slide-mapper';
 import { loadCarouselById } from '@/lib/carousel-load';
+import { findFactoryCorners, type CornerPlaceholderHit } from '@/lib/corner-placeholder';
 import toast from 'react-hot-toast';
 import GeneratorLoading from '@/components/editor/GeneratorLoading';
 
@@ -33,12 +35,16 @@ export default function GeneratorClient() {
   const carouselIdParam = searchParams.get('id');
 
   const {
-    slides, activeSlideIndex, saveStatus,
+    slides, activeSlideIndex, saveStatus, style,
     setActiveSlideIndex, loadCarousel,
   } = useEditorStore();
 
   const [showWizard, setShowWizard] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  // Cantos de fábrica detectados na tentativa atual de exportar/agendar. Lista
+  // vazia = popup fechado. Nada disto é persistido (ver `comGuardaDeCanto`).
+  const [cornerHits, setCornerHits] = useState<CornerPlaceholderHit[]>([]);
+  const pendingCornerAction = useRef<(() => void) | null>(null);
   const [loadedCarouselId, setLoadedCarouselId] = useState<string | null>(null);
   const [failedCarouselId, setFailedCarouselId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -196,6 +202,48 @@ export default function GeneratorClient() {
     return () => window.removeEventListener('keydown', handler);
   }, [activeSlideIndex, loadState, saveNow, slides.length, setActiveSlideIndex]);
 
+  // ── Guarda do canto de fábrica ────────────────────────────────────────────
+  /**
+   * Manifesto e Radar nascem com os cantos escritos 'LOREM IPSUM' /
+   * '@LOREMIPSUM'. Antes de EXPORTAR ou AGENDAR, avisa — é aí que o texto de
+   * fábrica sai da conta do usuário, dentro do PNG ou do post.
+   *
+   * 🔴 SÓ nestes dois gatilhos. Nunca no salvar, manual ou automático:
+   *   • o autosave chama `saveNow()` 2,5s depois de cada edição (efeito acima),
+   *     então avisar no salvar abriria o popup a cada 2,5 segundos enquanto o
+   *     usuário digita — um pedágio, não um aviso;
+   *   • o carrossel salvo é PRIVADO do dono (supabase/schema.sql, política
+   *     `carousels_owner`). Salvo com latim, o latim não vaza para ninguém.
+   * Quem "consertar" isto avisando no save está reintroduzindo o pedágio.
+   */
+  const comGuardaDeCanto = (acao: () => void) => () => {
+    const estado = useEditorStore.getState();
+    const hits = findFactoryCorners(estado.slides, estado.style, estado.globalSettings);
+    if (hits.length === 0) {
+      acao();
+      return;
+    }
+    pendingCornerAction.current = acao;
+    setCornerHits(hits);
+  };
+
+  /**
+   * Fecha o popup e segue com a ação que ficou segurada — venha do "usar este
+   * texto", do "desativar" ou do X. Fechar adia só ESTA ação: nada é gravado,
+   * e na próxima exportação o aviso volta.
+   *
+   * O `setTimeout(0)` não é enfeite: quando o usuário acabou de corrigir os
+   * cantos, a exportação lê o DOM dos slides ocultos (`HiddenSlides`), que só
+   * carrega o texto novo depois que o React re-renderiza. Sem o adiamento o
+   * PNG sairia com o latim que o popup acabou de trocar.
+   */
+  const seguirAposCanto = () => {
+    const acao = pendingCornerAction.current;
+    pendingCornerAction.current = null;
+    setCornerHits([]);
+    if (acao) setTimeout(acao, 0);
+  };
+
   // ── Manual save ───────────────────────────────────────────────────────────
   const handleManualSave = async () => {
     await saveNow();
@@ -254,20 +302,24 @@ export default function GeneratorClient() {
         <div className="absolute inset-y-0 left-0 z-20 w-[300px] flex bg-[var(--background)]">
           <EditorSidebar
             onOpenWizard={() => setShowWizard(true)}
-            onDownloadSlide={() => downloadSlide()}
-            onDownloadAll={downloadAll}
+            onDownloadSlide={comGuardaDeCanto(() => downloadSlide())}
+            onDownloadAll={comGuardaDeCanto(downloadAll)}
           />
         </div>
 
         <SlideCanvas
           onSave={handleManualSave}
-          onSchedule={() => setShowScheduleModal(true)}
+          onSchedule={comGuardaDeCanto(() => setShowScheduleModal(true))}
           saveStatus={saveStatus}
         />
       </div>
 
       {/* Hidden slides for html2canvas export */}
       <HiddenSlides registerRef={registerSlideRef} />
+
+      {cornerHits.length > 0 && (
+        <CornerPlaceholderModal hits={cornerHits} style={style} onClose={seguirAposCanto} />
+      )}
 
       {showWizard && <CreateWizard onClose={() => setShowWizard(false)} />}
       {showScheduleModal && (
