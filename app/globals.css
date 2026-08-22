@@ -492,6 +492,14 @@ body {
 .fade-in { animation: fadeUp 440ms var(--ease) both; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+/* Blur reveal — a página inteira aparece com um leve desfoque que se resolve.
+   Usado na tela de login (AuthForm) no carregamento. */
+.blur-reveal { animation: blurReveal 620ms var(--ease) both; }
+@keyframes blurReveal {
+  from { opacity: 0; filter: blur(14px); transform: translateY(8px) scale(0.992); }
+  to   { opacity: 1; filter: blur(0);    transform: none; }
+}
+
 /* ─── CreateWizard · motion ─────────────────────────────────────
    O wizard é o único fluxo com transição direcional entre etapas, então
    os keyframes vivem aqui em vez de virar utilitário genérico. Todo o
@@ -578,7 +586,8 @@ body {
 .cw-close:hover { background: var(--paper-3); color: var(--ink); }
 
 @media (prefers-reduced-motion: reduce) {
-  .cw-overlay, .cw-modal, .cw-step-fwd, .cw-step-back, .cw-total-swap { animation: none; }
+  .cw-overlay, .cw-modal, .cw-step-fwd, .cw-step-back, .cw-total-swap,
+  .blur-reveal { animation: none; }
   .cw-progress-fill, .cw-progress-knob, .cw-box { transition: none; }
   .cw-option, .cw-option:hover, .cw-option:active,
   .cw-option[aria-pressed='true']:hover,

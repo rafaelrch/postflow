@@ -201,13 +201,24 @@ export function template01Overrides(
     // Sem marca à parte: a chave existir JÁ é o gesto do usuário.
     slotStyles,
     background: touched(slide, 'background') ? slide.backgroundColor : undefined,
-    // O spec já traz o próprio degradê; o overlay do editor só entra quando o
-    // usuário mexe no controle — senão a sombra de fábrica escureceria o
-    // template inteiro no primeiro render.
-    shadow:
-      touched(slide, 'shadow') && shadow.style !== 'none'
-        ? getShadowOverlayGradient(shadow.opacity, shadow.color, shadow.size, shadow.distance)
-        : undefined,
+    // DEGRADÊ DE LEGIBILIDADE (preto, fixo) — só no Template 1.
+    //
+    // O "Fundo do slide" do T1 grava `backgroundColor` (fundo chapado, igual aos
+    // outros templates). Para o texto continuar legível sobre QUALQUER cor o
+    // Rafael decidiu, o T1 traz um véu degradê PRETO por cima — e ele é
+    // INQUEBRÁVEL: está sempre presente e a cor é SEMPRE preta, independente do
+    // que o usuário escolhe no "Fundo do slide" ou no painel "Sombra / Overlay".
+    //
+    // Por isso ignoramos `shadow.color` (trava em preto) e desligamos o `style:
+    // 'none'` (trava ligado). A opacidade/tamanho/distância vêm do spec de fábrica
+    // quando o usuário não mexeu no painel, e do que ele ajustou quando mexeu.
+    // `getShadowOverlayGradient` já cai no preto se a cor vier undefined.
+    shadow: getShadowOverlayGradient(
+      shadow.opacity,
+      '#000000',
+      shadow.size,
+      shadow.distance
+    ),
     hideCorners: corners.show === false,
     textOffset: touched(slide, 'textOffset') ? slide.textOffset : undefined,
     titleGapDelta: touched(slide, 'titleDescriptionGap') ? slide.titleDescriptionGap : undefined,

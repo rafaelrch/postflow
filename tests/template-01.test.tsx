@@ -528,10 +528,12 @@ describe('TEMPLATE 1 — slide 5: as duas colunas da faixa dividem o centro', ()
 describe('TEMPLATE 1 — overrides do editor', () => {
   const slideBase = { ...DEFAULT_SLIDE, id: 's', position: 0 } as Slide;
 
-  it('um slide recém-criado não produz nenhum override', () => {
+  it('um slide recém-criado não produz override de fundo nem de tipografia', () => {
     const ov = template01Overrides(slideBase, DEFAULT_GLOBAL_SETTINGS);
     expect(ov.background).toBeUndefined();
-    expect(ov.shadow).toBeUndefined();
+    // O shadow no T1 é SEMPRE o degradê preto de legibilidade (fixo), mesmo sem
+    // marca — por isso ele existe, mas é sempre preto.
+    expect(ov.shadow).toContain('rgba(0,0,0');
     expect(ov.title).toMatchObject({ fontScale: 1, color: undefined, font: undefined });
     expect(ov.body).toMatchObject({ fontScale: 1, color: undefined });
     expect(ov.backgroundImage.position).toBeUndefined();
@@ -672,9 +674,17 @@ describe('TEMPLATE 1 — geração não produz override', () => {
     expect(html).toContain(TEMPLATE_01_SPEC.slides[0].background[0].css!);
   });
 
-  it('a sombra de fábrica do editor não escurece o template', () => {
-    // DEFAULT_SLIDE.shadow é { style: 'base', opacity: 88 } — sem marca, nada.
-    expect(template01Overrides(slideGerado(1), DEFAULT_GLOBAL_SETTINGS).shadow).toBeUndefined();
+  it('a sombra de legibilidade do T1 é fixa (preta) e sempre presente', () => {
+    // No T1 o degradê preto de legibilidade existe SEMPRE — independente de marca
+    // — e é sempre preto, ignorando qualquer cor de slide.shadow.
+    const ov = template01Overrides(slideGerado(1), DEFAULT_GLOBAL_SETTINGS);
+    expect(ov.shadow).toContain('rgba(0,0,0');
+    // Não é tingido por uma cor que porventura esteja em slide.shadow.
+    const comCor = template01Overrides(
+      { ...slideGerado(1), shadow: { style: 'base', opacity: 88, color: '#123456' } },
+      DEFAULT_GLOBAL_SETTINGS
+    );
+    expect(comCor.shadow).toContain('rgba(0,0,0');
   });
 
   it('marcar o controle — e só isso — faz o override existir', () => {
@@ -774,12 +784,11 @@ describe('TEMPLATE 1 — cada controle da barra lateral tem efeito no render', (
     expect(tops['s1.headline']).toBe(specTop - 30);
   });
 
-  it('degradê/overlay do editor entra por cima do degradê do template', () => {
+  it('degradê/overlay de legibilidade entra por cima do degradê do template', () => {
     const html = com({ shadow: { style: 'base', opacity: 60, color: '#123456' } }, 'shadow');
-    // O overlay sai em rgba() para poder variar a opacidade ao longo do degradê.
-    expect(html).toContain('rgba(18,52,86');
-    // Sem marca, a sombra de fábrica não pinta nada.
-    expect(renderSlide(0)).not.toContain('rgba(0,0,0,0.88)');
+    // No T1 o overlay é SEMPRE preto, ignorando a cor do slide.shadow.
+    expect(html).toContain('rgba(0,0,0');
+    expect(html).not.toContain('rgba(18,52,86');
     // O degradê do spec continua lá.
     expect(html).toContain(TEMPLATE_01_SPEC.slides[0].background[0].css!);
   });

@@ -220,9 +220,10 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const t01ImageSlot = t01Model != null ? template01ImageSlot(t01Model) : undefined;
   const t01ImageUrl = t01Model != null ? template01SlideImageUrl(slide, t01Model) : '';
 
-  // Fundo: sem a MARCA o slide segue o spec, então o seletor tem de abrir na cor
-  // de fábrica daquele modelo (o 6 em `#0D39E4`) — nunca num padrão do editor,
-  // que mostraria uma cor que não é a que está na tela.
+  // Fundo: sem a MARCA de fundo, o slide segue o spec, então o seletor tem de
+  // abrir na cor de fábrica daquele modelo (o 6 em `#0D39E4`) — nunca num padrão
+  // do editor. Mexendo no "Fundo do slide" a cor vai para `backgroundColor` e
+  // marca `background`; a cor escolhida NUNCA toca o degradê de legibilidade.
   const t01SpecBg = t01Model != null ? template01SpecBackground(t01Model) : undefined;
   const t01BgValue =
     slide.templateOverrides?.background && slide.backgroundColor
@@ -311,6 +312,13 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   ─────────────────────────────────────────────────────────────────────────── */
   const setT01 = (patch: Partial<Slide>, ...keys: Template01SlideControl[]) =>
     updateActiveSlide({ ...patch, templateOverrides: markTemplate01Override(slide.templateOverrides, ...keys) });
+
+  /** Escreve a sombra marcando `shadow` no T1 (no T1 o override de overlay só
+   *  existe com a marca — ver `template01Overrides`). Não-T1 ignora a marca. */
+  const setShadow = (patch: Partial<Slide['shadow']>) =>
+    isT01
+      ? setT01({ shadow: { ...slide.shadow, ...patch } }, 'shadow')
+      : updateActiveSlide({ shadow: { ...slide.shadow, ...patch } });
 
   /** Estilo de UM slot. A chave existir já é o gesto do usuário — sem marca. */
   const setT01Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
@@ -1023,23 +1031,43 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
-    sombraOverlay: (
+    sombraOverlay: isT01 ? (
+      <>
+        {/* No T1 o degradê de legibilidade é FIXO: sempre presente e sempre preto,
+           para o texto ficar legível sobre qualquer cor de fundo. O usuário só
+           ajusta opacidade/tamanho/distância — a COR e o liga/desliga ficam
+           travados (ver `template01Overrides`). */}
+        <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} unit="%"
+          onChange={(v) => setShadow({ opacity: v })} />
+        <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} unit="%"
+          onChange={(v) => setShadow({ size: v })} />
+        <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} unit="%"
+          onChange={(v) => setShadow({ distance: v })} />
+        {/* A cor do degradê de legibilidade é fixa (preta) no T1 — mostramos só
+           um swatch estático, sem picker, para deixar claro que não dá para mudar. */}
+        <div className="flex items-center gap-2 text-[11px] text-[var(--ink-muted)]">
+          <span>Cor</span>
+          <span className="inline-block h-4 w-4 rounded-full border border-[var(--line)]" style={{ background: '#000000' }} />
+          <span className="italic">preto fixo (legibilidade)</span>
+        </div>
+      </>
+    ) : (
       <>
         <Toggle
           on={slide.shadow.style !== 'none'}
-          onToggle={() => updateActiveSlide({ shadow: { ...slide.shadow, style: slide.shadow.style === 'none' ? 'base' : 'none' } })}
+          onToggle={() => setShadow({ style: slide.shadow.style === 'none' ? 'base' : 'none' })}
           label="Exibir sombra"
         />
         {slide.shadow.style !== 'none' && (
           <>
             <Slider label="Opacidade" value={slide.shadow.opacity} min={0} max={100} unit="%"
-              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, opacity: v } })} />
+              onChange={(v) => setShadow({ opacity: v })} />
             <Slider label="Tamanho" value={slide.shadow.size ?? 85} min={10} max={100} unit="%"
-              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, size: v } })} />
+              onChange={(v) => setShadow({ size: v })} />
             <Slider label="Distância" value={slide.shadow.distance ?? 55} min={10} max={100} unit="%"
-              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, distance: v } })} />
+              onChange={(v) => setShadow({ distance: v })} />
             <ColorPicker label="Cor" value={slide.shadow.color || '#000000'}
-              onChange={(v) => updateActiveSlide({ shadow: { ...slide.shadow, color: v } })} />
+              onChange={(v) => setShadow({ color: v })} />
           </>
         )}
       </>
@@ -1062,6 +1090,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ) : isT01 ? (
       <>
+        {/* No T1 a cor escolhida vai para o FUNDO chapado (backgroundColor), igual
+           aos outros templates. O degradê preto de legibilidade é fixo e mora no
+           overlay de sombra (ver overrides.ts) — nunca é afetado por aqui. */}
         <ColorPicker
           label="Cor"
           value={t01BgValue}
