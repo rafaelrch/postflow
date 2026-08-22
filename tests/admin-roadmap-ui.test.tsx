@@ -620,3 +620,46 @@ describe('admin/roadmap — texto longo sem espaço quebra em vez de transbordar
     expect(screen.getByTestId('admin-detalhe-descricao').textContent).toBe(SEM_ESPACO);
   });
 });
+
+// ───────────────────────────────────────── sombra do painel
+
+/**
+ * Mesma regra do quadro público — ver `tests/roadmap-tela.test.tsx`. Nada de
+ * teste de pixel: o que se trava é o que separa "flutuando" de "mancha".
+ */
+describe('admin/roadmap — a sombra do painel do diálogo', () => {
+  /** As camadas de um `box-shadow`, separadas nas vírgulas de topo. */
+  function camadas(corpo: string): string[] {
+    const valor = corpo.slice(corpo.indexOf('box-shadow:') + 'box-shadow:'.length);
+    return valor
+      .slice(0, valor.indexOf(';') === -1 ? undefined : valor.indexOf(';'))
+      .split(/,(?![^(]*\))/)
+      .map((c) => c.trim())
+      .filter(Boolean);
+  }
+
+  it('o painel do diálogo carrega a regra do painel', () => {
+    render(<RoadmapAdminClient initialBoard={board([card()])} />);
+    fireEvent.click(screen.getByTestId('admin-abrir-detalhe-c1'));
+    expect(screen.getByTestId('admin-detalhe-titulo').closest('.admin-roadmap-detalhe')).toBeTruthy();
+  });
+
+  it('a sombra é em camadas, com alfa baixo em cada uma', () => {
+    const lista = camadas(regraAdmin('.admin-roadmap-detalhe'));
+    expect(lista.length).toBeGreaterThanOrEqual(3);
+
+    for (const camada of lista) {
+      const alfa = Number(camada.match(/,\s*([0-9.]+)\s*\)\s*$/)?.[1]);
+      expect(alfa).toBeGreaterThan(0);
+      expect(alfa).toBeLessThanOrEqual(0.25);
+    }
+  });
+
+  it('toda camada desce, e nenhuma tem spread positivo', () => {
+    for (const camada of camadas(regraAdmin('.admin-roadmap-detalhe'))) {
+      const [, y, , spread] = camada.split(/\s+/);
+      expect(Number.parseFloat(y)).toBeGreaterThan(0);
+      if (spread && spread.endsWith('px')) expect(Number.parseFloat(spread)).toBeLessThanOrEqual(0);
+    }
+  });
+});

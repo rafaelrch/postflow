@@ -934,3 +934,94 @@ describe('roadmap — texto longo sem espaço quebra em vez de transbordar', () 
     expect(screen.getByTestId('detalhe-descricao').textContent).toBe(SEM_ESPACO);
   });
 });
+
+// ───────────────────────────────────────── sombra do painel
+
+/**
+ * "O popup tem que parecer que tá flutuando" (Rafael, rodada 5).
+ *
+ * ⚠️ NÃO HÁ TESTE DE PIXEL AQUI, de propósito: número de sombra é ajuste fino e
+ * um teste que o repetisse só engessaria o retoque sem provar nada. O que estes
+ * testes travam são as REGRAS que fazem a diferença entre "flutuando" e
+ * "sujeira embaixo da caixa" — e que sobrevivem a qualquer ajuste de valor.
+ */
+describe('roadmap — a sombra do painel do diálogo', () => {
+  const GLOBALS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
+
+  /** O corpo de uma regra de globals.css, pelo seletor exato. */
+  function regra(seletor: string): string {
+    const inicio = GLOBALS.indexOf(`${seletor} {`);
+    expect(inicio).toBeGreaterThan(-1);
+    return GLOBALS.slice(inicio, GLOBALS.indexOf('}', inicio));
+  }
+
+  /** As camadas de um `box-shadow`, separadas nas vírgulas de topo. */
+  function camadas(corpo: string): string[] {
+    const bruto = corpo.slice(corpo.indexOf('box-shadow:') + 'box-shadow:'.length);
+    const fim = bruto.indexOf(';');
+    return (fim === -1 ? bruto : bruto.slice(0, fim))
+      // Vírgula que NÃO está dentro de um `rgba(...)`: essa separa as camadas.
+      .split(/,(?![^(]*\))/)
+      .map((c) => c.trim())
+      .filter(Boolean);
+  }
+
+  it('os DOIS diálogos do quadro público usam o mesmo painel', () => {
+    render(<RoadmapClient initialColumns={board([card()])} />);
+
+    fireEvent.click(screen.getByTestId('criar-task'));
+    expect(document.querySelector('.roadmap-dialog-panel')).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    fireEvent.click(screen.getByTestId('abrir-detalhe-c1'));
+    const painel = screen.getByTestId('detalhe-titulo').closest('.roadmap-dialog-panel');
+    expect(painel).toBeTruthy();
+    // A sombra de UMA camada do Tailwind saiu: ela é o oposto de esfumaçada.
+    expect(painel?.className).not.toContain('shadow-2xl');
+  });
+
+  /**
+   * EM CAMADAS é o que faz a leitura de "objeto no ar": contato + ambiente.
+   * Uma sombra só, por mais larga que seja, lê como mancha.
+   */
+  it('a sombra é em camadas, não uma só', () => {
+    expect(camadas(regra('.roadmap-dialog-panel')).length).toBeGreaterThanOrEqual(3);
+  });
+
+  /**
+   * "Não aumente o preto, ESPALHE": alfa baixo em cada camada. O valor que saiu
+   * daqui tinha 0.55 numa camada só.
+   */
+  it('cada camada tem alfa baixo', () => {
+    for (const camada of camadas(regra('.roadmap-dialog-panel'))) {
+      const alfa = Number(camada.match(/,\s*([0-9.]+)\s*\)\s*$/)?.[1]);
+      expect(alfa).toBeGreaterThan(0);
+      expect(alfa).toBeLessThanOrEqual(0.25);
+    }
+  });
+
+  /** Luz vindo de cima, e nada de engordar a borda com spread positivo. */
+  it('toda camada desce, e nenhuma tem spread positivo', () => {
+    for (const camada of camadas(regra('.roadmap-dialog-panel'))) {
+      const [, y, , spread] = camada.split(/\s+/);
+      expect(Number.parseFloat(y)).toBeGreaterThan(0);
+      if (spread && spread.endsWith('px')) expect(Number.parseFloat(spread)).toBeLessThanOrEqual(0);
+    }
+  });
+
+  /**
+   * ⚠️ MODO ESCURO pelo caminho que o projeto já tem, e não um segundo sistema:
+   * `--shadow-hue` vira claro no `html.dark` (é o mecanismo do `--sh-soft`), e o
+   * alfa cai junto — sombra clara com alfa de tema claro vira halo leitoso.
+   */
+  it('a cor vem do --shadow-hue e o escuro tem regra própria, mais fraca', () => {
+    const claro = regra('.roadmap-dialog-panel');
+    const escuro = regra('html.dark .roadmap-dialog-panel');
+    expect(claro).toContain('var(--shadow-hue)');
+    expect(escuro).toContain('var(--shadow-hue)');
+
+    const alfa = (corpo: string) =>
+      camadas(corpo).reduce((soma, c) => soma + Number(c.match(/,\s*([0-9.]+)\s*\)\s*$/)?.[1] ?? 0), 0);
+    expect(alfa(escuro)).toBeLessThan(alfa(claro));
+  });
+});

@@ -346,7 +346,7 @@ function CardDetailModal({ card, onClose }: { card: RoadmapCard; onClose: () => 
       onClose={onClose}
       testId="detalhe-popup"
       overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4"
-      panelClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+      panelClassName="roadmap-dialog-panel w-full max-w-lg overflow-hidden rounded-2xl bg-white"
     >
       <div className="flex items-start gap-2 border-b border-[var(--line)] bg-[var(--paper-2)] px-4 py-3">
         {/* Título COMPLETO: sem truncar, porque é para isto que se abriu.
@@ -480,7 +480,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
          no primeiro focável, que é a seta de voltar. */
       initialFocusSelector="#roadmap-titulo"
       overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4"
-      panelClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+      panelClassName="roadmap-dialog-panel w-full max-w-lg overflow-hidden rounded-2xl bg-white"
     >
       <>
         {/* Faixa clara do cabeçalho: seta de voltar, título, X. A seta e o X

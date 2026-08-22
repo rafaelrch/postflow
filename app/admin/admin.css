@@ -813,7 +813,22 @@ html.dark .admin-root {
    `.roadmap-dialog-overlay` (app/globals.css), que a casca aplica sozinha nos
    dois diálogos do roadmap. Daqui sai só posição e espaçamento. */
 .admin-roadmap-detalhe-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.admin-roadmap-detalhe { display: flex; width: 100%; max-width: 460px; flex-direction: column; padding: 14px; gap: 10px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 11px; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .55); }
+/* A SOMBRA É EM TRÊS CAMADAS — contato, ambiente perto, ambiente longe. O motivo
+   longo está em `app/globals.css`, na `.roadmap-dialog-panel`: elevação se faz
+   espalhando, não escurecendo, e aqui a sombra virou a única separação entre o
+   diálogo e o quadro (o overlay não escurece mais). Saiu daqui um
+   `0 18px 40px -18px rgba(0,0,0,.55)` — uma camada só, alfa alto, que lia como
+   sujeira embaixo da caixa em vez de altura.
+
+   ⚠️ A GEOMETRIA É A MESMA do quadro público; a COR não. Lá a sombra usa
+   `rgba(var(--shadow-hue), …)`, que vira branca no `html.dark`. Aqui fica preta
+   nos dois temas porque é assim que TODA elevação do painel funciona hoje
+   (`.admin-customer-drawer`, os cards, os popovers — nenhuma tem override em
+   `html.dark .admin-root`). Usar o `--shadow-hue` só aqui faria deste diálogo a
+   única superfície do /admin com sombra clara no escuro. No tema escuro do
+   painel a separação continua vindo da borda, como no resto do /admin — é uma
+   limitação do painel inteiro, não desta regra. */
+.admin-roadmap-detalhe { display: flex; width: 100%; max-width: 460px; flex-direction: column; padding: 14px; gap: 10px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 11px; box-shadow: 0 2px 6px -1px rgba(0, 0, 0, .06), 0 12px 28px -6px rgba(0, 0, 0, .10), 0 40px 80px -20px rgba(0, 0, 0, .14); }
 .admin-roadmap-detalhe > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .admin-roadmap-detalhe h2 { margin: 0; min-width: 0; color: var(--admin-text); font-size: 12px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .admin-roadmap-detalhe-fechar { flex: 0 0 auto; display: inline-flex; padding: 3px; color: var(--admin-text-muted); background: none; border: 0; border-radius: 5px; cursor: pointer; }
