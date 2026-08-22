@@ -161,8 +161,20 @@ describe('CreateWizard — 4 etapas', () => {
     fireEvent.click(screen.getByText('Stories'));   // 9:16 → 1080 × 1920
     fireEvent.click(primario());
 
-    // O SlidePreview dimensiona pela proporção real: 1080 × (132/1920).
-    const molduras = Array.from(document.querySelectorAll('div[style*="width: 74.25px"]'));
+    /*
+     * A afirmação continua sendo a mesma — a miniatura tem a LARGURA do
+     * formato escolhido, e não a do 4:5 — mas mudou de alvo na TASK 2B.
+     *
+     * Antes ela media a div interna do SlidePreview (1080 × 132/1920 =
+     * 74.25px), porque em 9:16 o card caía na miniatura viva por falta de
+     * preview naquele formato. Agora existe preview 9:16 e o card mostra a
+     * imagem, então quem carrega a largura do formato é a MOLDURA do card:
+     * round(132 × 9/16) = 74px. Medir a div do SlidePreview aqui voltaria a
+     * afirmar "o card caiu no fallback", que é o contrário do que a TASK 2B
+     * entregou. A queda para a miniatura viva segue coberta, por asset
+     * ausente e por erro de carregamento, em wizard-template-preview.
+     */
+    const molduras = Array.from(document.querySelectorAll('span[style*="width: 74px"]'));
     expect(molduras.length).toBe(4);
   });
 

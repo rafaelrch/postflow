@@ -301,53 +301,79 @@ function previewSlide(style: SlideStyle): Slide {
 }
 
 /**
- * Preview pronto de cada template, em `public/templates/`.
+ * Preview pronto de cada template, em `public/templates/`, agora nos TRÊS
+ * formatos: cada par (estilo × formato) tem o seu arquivo, renderizado naquela
+ * forma. Antes só existia o 4:5 e 1:1/9:16 caíam na miniatura viva por FALTA
+ * DE FORMATO; esse motivo de queda acabou.
  *
  * O nome do arquivo casa com o VALOR de `SlideStyle`, não com o nome de
- * produto do card ("Manifesto" é `template01`): quem for procurar o asset
- * parte do código, não do rótulo. Mapa EXPLÍCITO, e não caminho montado por
- * concatenação — string montada esconde o preview trocado entre dois
- * templates, que é o erro que ninguém percebe olhando o diff.
+ * produto do card ("Manifesto" é `template01`), e termina no formato: quem for
+ * procurar o asset parte do código, não do rótulo. Mapa EXPLÍCITO nos dois
+ * eixos, e não caminho montado por concatenação — string montada esconde o
+ * preview trocado entre dois templates (ou entre dois formatos do mesmo
+ * template), que é o erro que ninguém percebe olhando o diff.
  *
- * `Record<SlideStyle, …>` de propósito: quando a TASK 3 acrescentar um estilo,
- * o TypeScript quebra AQUI e obriga alguém a decidir se aquele template tem
- * preview ou não, em vez de o card sair silenciosamente sem imagem.
- * `minimalist` é `null` porque nem é oferecido no wizard.
+ * `Record<SlideStyle, Record<SlideFormat, …>>` de propósito, e a exaustividade
+ * vale nos DOIS eixos: quando a TASK 3 acrescentar um estilo — ou quando
+ * chegar um formato novo — o TypeScript quebra AQUI e obriga alguém a decidir
+ * se aquele par tem preview, em vez de o card sair silenciosamente sem imagem.
+ * `minimalist` é `null` nos três porque nem é oferecido no wizard.
  */
-const TEMPLATE_PREVIEW: Record<SlideStyle, string | null> = {
-  minimalist: null,
-  profile: '/templates/preview-profile.webp',
-  editorial: '/templates/preview-editorial.webp',
-  template01: '/templates/preview-template01.webp',
-  template02: '/templates/preview-template02.webp',
+const TEMPLATE_PREVIEW: Record<SlideStyle, Record<SlideFormat, string | null>> = {
+  minimalist: {
+    '4:5': null,
+    '1:1': null,
+    '9:16': null,
+  },
+  profile: {
+    '4:5': '/templates/preview-profile-4x5.webp',
+    '1:1': '/templates/preview-profile-1x1.webp',
+    '9:16': '/templates/preview-profile-9x16.webp',
+  },
+  editorial: {
+    '4:5': '/templates/preview-editorial-4x5.webp',
+    '1:1': '/templates/preview-editorial-1x1.webp',
+    '9:16': '/templates/preview-editorial-9x16.webp',
+  },
+  template01: {
+    '4:5': '/templates/preview-template01-4x5.webp',
+    '1:1': '/templates/preview-template01-1x1.webp',
+    '9:16': '/templates/preview-template01-9x16.webp',
+  },
+  template02: {
+    '4:5': '/templates/preview-template02-4x5.webp',
+    '1:1': '/templates/preview-template02-1x1.webp',
+    '9:16': '/templates/preview-template02-9x16.webp',
+  },
 };
 
 /**
- * Dimensão INTRÍNSECA dos previews (todos os quatro são 540×675).
+ * Dimensão INTRÍNSECA dos previews, POR FORMATO.
  *
  * Declarada para o browser reservar o espaço antes de a imagem chegar — sem
  * isso o card salta quando ela carrega, e o grid inteiro se mexe embaixo do
- * ponteiro de quem já ia clicar.
+ * ponteiro de quem já ia clicar. Por isso é por formato e não uma só: uma
+ * dimensão de 4:5 declarada num asset 1:1 reservaria a caixa errada e traria
+ * o salto de volta justamente nos formatos novos.
+ *
+ * Todos têm 675px de ALTURA de propósito: o card fixa a altura
+ * (`THUMB_HEIGHT`) e varia a largura, então altura constante = mesma densidade
+ * de pixel nos três formatos.
  */
-const PREVIEW_SIZE = { width: 540, height: 675 };
+const PREVIEW_SIZE: Record<SlideFormat, { width: number; height: number }> = {
+  '4:5': { width: 540, height: 675 },
+  '1:1': { width: 675, height: 675 },
+  '9:16': { width: 380, height: 675 },
+};
 
-/**
- * O formato em que os previews foram renderizados.
- *
- * 🔴 Os assets são 4:5. A miniatura AO VIVO acompanha o formato escolhido no
- * passo 1 (1:1 e 9:16 têm outra altura), então em 1:1/9:16 não existe preview
- * que represente aquela forma: enfiar o 4:5 na caixa deformaria, cortaria ou
- * deixaria tarja. Nesses formatos cai na miniatura viva, que é fiel por
- * construção — é a mesma regra do D1 ("miniatura viva quando a imagem
- * faltar"), aplicada à falta por FORMATO e não por arquivo.
- *
- * Se um dia chegarem previews 1:1 e 9:16, isto vira um mapa por formato.
- */
-const PREVIEW_FORMAT: SlideFormat = '4:5';
+/** O preview pronto deste template NESTE formato, ou `null` se não existe. */
+function previewSrc(style: SlideStyle, format: SlideFormat): string | null {
+  return TEMPLATE_PREVIEW[style][format];
+}
 
 /** Há preview estático para este template NESTE formato? */
 function temPreview(style: SlideStyle, format: SlideFormat): boolean {
-  return TEMPLATE_PREVIEW[style] !== null && format === PREVIEW_FORMAT;
+  return previewSrc(style, format) !== null;
 }
 
 /**
@@ -359,9 +385,17 @@ function temPreview(style: SlideStyle, format: SlideFormat): boolean {
  * atualizado; o `SlidePreview` é fiel por construção. Quando o preview não
  * pode aparecer, o usuário continua vendo o template certo, nunca um card
  * quebrado nem um buraco no grid.
+ *
+ * Com os três formatos cobertos, sobram só DOIS motivos de queda — asset
+ * ausente no mapa (`null`) e imagem que FALHA ao carregar. Nenhum dos dois se
+ * reabre: é a decisão D1.
+ *
+ * Exportado só para o teste: o motivo "asset ausente" é hoje inalcançável pelo
+ * wizard (o único estilo sem preview, `minimalist`, não tem card), e sem isto
+ * essa queda ficaria sem prova — coberta por leitura de código, não por teste.
  */
-function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideFormat }) {
-  const src = TEMPLATE_PREVIEW[style];
+export function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideFormat }) {
+  const src = previewSrc(style, format);
   const podeUsarImagem = temPreview(style, format);
 
   /**
@@ -379,6 +413,7 @@ function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideForm
 
   const fmt = getFormat(format);
   const largura = Math.round(THUMB_HEIGHT * (fmt.width / fmt.height));
+  const tamanho = PREVIEW_SIZE[format];
 
   return (
     <span
@@ -409,8 +444,8 @@ function TemplateThumb({ style, format }: { style: SlideStyle; format: SlideForm
          * continua sendo lido — pelo texto, que é onde ele deve estar.
          */
         alt=""
-        width={PREVIEW_SIZE.width}
-        height={PREVIEW_SIZE.height}
+        width={tamanho.width}
+        height={tamanho.height}
         /* Só baixa ao entrar na tela: o grid abre com 4 cards e o passo 2 nem
            sempre é visitado. */
         loading="lazy"
