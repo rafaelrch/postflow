@@ -455,3 +455,80 @@ describe('Manifesto: o modelo 6 não entra no lote', () => {
     expect(screen.queryByText('Imagem')).toBeNull();
   });
 });
+
+/**
+ * OS TRÊS CHECKBOXES SAÍRAM — correção de rumo pedida pelo Rafael.
+ *
+ * A primeira versão das fatias 2 e 3 pôs três switches aqui, um por modo. Ele
+ * olhou a tela e disse: "isso aqui não tem que ter esse checkbox. O usuário só
+ * tem que conseguir gerar."
+ *
+ * O recurso não foi embora com eles: as direções de marca, de figura pública e
+ * de identidade continuam no prompt, escritas na forma CONDICIONAL que o
+ * material já usava. Quem avalia a condição é o modelo, que recebe a copy
+ * inteira e, quando há referência, a própria foto. O que sumiu foi o clique.
+ *
+ * Este describe trava o painel de VOLTA no que ele era: referência, prompt,
+ * escopo e gerar. Nada mais.
+ */
+describe('AiGenPanel — sem controles de modo', () => {
+  afterEach(cleanup);
+
+  function abrePainel(props: Partial<React.ComponentProps<typeof AiGenPanel>> = {}) {
+    const r = render(
+      <AiGenPanel
+        buttonLabel="Gerar imagem com IA"
+        generating={false}
+        slideTitle="t"
+        slideDescription="d"
+        onGenerate={vi.fn()}
+        {...props}
+      />
+    );
+    fireEvent.click(screen.getByText(/Gerar imagem com IA/));
+    return r;
+  }
+
+  it('🔴 não existe switch nenhum no painel', () => {
+    abrePainel();
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+  });
+
+  it('🔴 nem os rótulos dos três modos que existiram', () => {
+    abrePainel();
+    for (const morto of [/preservar identidade/i, /marcas citadas/i, /pessoas p[úu]blicas/i]) {
+      expect(screen.queryByText(morto)).toBeNull();
+    }
+  });
+
+  it('o painel continua sendo referência + prompt + gerar', () => {
+    abrePainel();
+    expect(screen.getByText(/Imagem de refer[êe]ncia \(opcional\)/)).toBeTruthy();
+    expect(screen.getByText('Prompt')).toBeTruthy();
+    expect(screen.getByText('Gerar')).toBeTruthy();
+  });
+
+  it('🔴 a chamada carrega SÓ prompt e referência', () => {
+    // Se algum campo de modo voltar a vazar daqui, este teste pega.
+    const onGenerate = vi.fn();
+    abrePainel({ onGenerate });
+    fireEvent.click(screen.getByText('Gerar'));
+    expect(onGenerate).toHaveBeenCalledWith({
+      userPrompt: undefined,
+      referenceImageUrl: undefined,
+    });
+  });
+
+  it('com prompt escrito, a chamada continua sendo só esses dois campos', () => {
+    const onGenerate = vi.fn();
+    abrePainel({ onGenerate });
+    fireEvent.change(screen.getByPlaceholderText(/Descreva a imagem/), {
+      target: { value: 'luz de fim de tarde' },
+    });
+    fireEvent.click(screen.getByText('Gerar'));
+    expect(onGenerate).toHaveBeenCalledWith({
+      userPrompt: 'luz de fim de tarde',
+      referenceImageUrl: undefined,
+    });
+  });
+});

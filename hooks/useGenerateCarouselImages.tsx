@@ -75,6 +75,18 @@ export interface DeckContext {
   deckTitle?: string;
   /** Quantas imagens este disparo vai gerar. */
   seriesSize?: number;
+  /**
+   * Posição 1-based deste slide no DECK. É o ÚNICO campo do `DeckContext` que
+   * muda de slide para slide — e é de propósito: ele varia só o enquadramento,
+   * enquanto `deckTitle` e `seriesSize` continuam idênticos e amarram o ensaio.
+   *
+   * 🔴 É o índice do DECK, nunca a posição no LOTE. O lote é "deste slide em
+   * diante", então a posição dentro dele muda conforme onde o usuário clicou —
+   * o slide 3 seria o 1º do lote se ele gerasse a partir dele. O índice do deck
+   * é a identidade estável do slide: regerar o slide 3 sozinho devolve o mesmo
+   * enquadramento que ele tinha no lote.
+   */
+  seriesIndex?: number;
 }
 
 async function generateForSlide(
@@ -101,6 +113,7 @@ async function generateForSlide(
       surface: deck.surface,
       deckTitle: deck.deckTitle,
       seriesSize: deck.seriesSize,
+      seriesIndex: deck.seriesIndex,
       userPrompt: opts?.userPrompt,
       referenceImageUrl: opts?.referenceImageUrl,
     }),
@@ -420,6 +433,7 @@ export function useGenerateCarouselImages() {
             surface: imageSurface(slide, style, i, target, globalSettings.theme),
             deckTitle: carouselTitle,
             seriesSize: targets.length,
+            seriesIndex: i + 1,
           }, (waitSecs) => {
             // O aviso de rate limit é uma NOTA no toast, não um toast novo: o
             // usuário continua vendo quanto do lote já saiu.
@@ -490,8 +504,14 @@ export function useGenerateCarouselImages() {
     try {
       // Slide avulso NÃO manda série: uma imagem só não é um ensaio, e
       // prometer coerência com imagens que não estão sendo geradas seria ruído.
+      //
+      // O ÍNDICE, porém, vai. Ele não promete conjunto nenhum — só escolhe o
+      // enquadramento deste slide. Mandá-lo aqui é o que faz regerar só o slide
+      // 3 devolver o mesmo plano que ele tinha quando saiu no lote; omiti-lo
+      // devolveria uma imagem com enquadramento diferente das vizinhas.
       const url = await generateForSlideWithRetry(slide, index, slides.length, imageShape(slide, style, index, target), {
         surface: imageSurface(slide, style, index, target, globalSettings.theme),
+        seriesIndex: index + 1,
       }, (waitSecs) => {
         showLoading(`Limite da OpenAI atingido — aguardando ${waitSecs}s…`);
       }, opts);

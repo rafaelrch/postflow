@@ -20,9 +20,15 @@ import { NextRequest } from 'next/server';
 // tests/generate-carousel-credits.test.ts.
 const {
   mockImagesGenerate, mockGetUser, mockRpc, mockAdminRpc,
-  mockUpload, mockGetPublicUrl, mockProfileSingle, mockAfter,
+  mockUpload, mockGetPublicUrl, mockProfileSingle, mockAfter, mockBuildImagePrompt,
 } = vi.hoisted(() => ({
   mockImagesGenerate: vi.fn(),
+  // Espião, não constante: o prompt tem testes próprios, mas o que a ROTA
+  // MONTA e entrega ao builder só dá para afirmar aqui.
+  mockBuildImagePrompt: vi.fn((_input: {
+    series?: { deckTitle?: string; size?: number; index?: number };
+    hasReference?: boolean;
+  }) => 'image prompt'),
   mockGetUser: vi.fn(),
   mockRpc: vi.fn(),
   mockAdminRpc: vi.fn(),
@@ -44,7 +50,7 @@ vi.mock('openai', () => ({ default: class OpenAI {}, toFile: vi.fn() }));
 // O prompt tem testes próprios (build-image-prompt). Aqui interessa a ROTA.
 vi.mock('@/lib/openai', () => ({
   openai: { images: { generate: mockImagesGenerate, edit: vi.fn() } },
-  buildImagePrompt: () => 'image prompt',
+  buildImagePrompt: mockBuildImagePrompt,
   imageSizeForShape: () => '1024x1536',
 }));
 
@@ -202,6 +208,74 @@ describe('os campos novos do corpo são validados — vêm do cliente', () => {
       const r = await POST(pedido({ seriesSize }));
       expect(r.status).toBe(200);
     }
+  });
+
+  it('🔴 seriesIndex chega ao builder dentro da série, junto de deckTitle e size', async () => {
+    // A fatia 4 abriu um campo NOVO no corpo do POST. Se ele parasse na rota, o
+    // enquadramento por slide existiria no builder e nunca seria usado — o
+    // defeito mais fácil de não notar, porque nada quebra.
+    await POST(pedido({ seriesIndex: 3, seriesSize: 6, deckTitle: 'Rotina' }));
+    expect(mockBuildImagePrompt).toHaveBeenCalledTimes(1);
+    expect(mockBuildImagePrompt.mock.calls[0]?.[0]).toMatchObject({
+      series: { deckTitle: 'Rotina', size: 6, index: 3 },
+    });
+  });
+
+  it('seriesIndex ausente continua chegando como undefined — chamada de hoje intacta', async () => {
+    await POST(pedido({ seriesSize: 4 }));
+    expect(mockBuildImagePrompt.mock.calls[0]?.[0].series?.index).toBeUndefined();
+  });
+
+  it('seriesIndex absurdo ou não numérico não quebra a rota nem vaza para o prompt', async () => {
+    for (const seriesIndex of [Number.NaN, -5, 0, 1e9, 'terceiro', null]) {
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } }, error: null });
+      mockRpc.mockResolvedValue({ data: 95, error: null });
+      mockProfileSingle.mockResolvedValue({ data: null, error: null });
+      mockUpload.mockResolvedValue({ error: null });
+      mockGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://cdn/x.png' } });
+      mockImagesGenerate.mockResolvedValue({ data: [{ b64_json: 'AAAA' }], usage: {} });
+      const r = await POST(pedido({ seriesIndex }));
+      expect(r.status).toBe(200);
+      const recebido = mockBuildImagePrompt.mock.calls[0]?.[0].series?.index;
+      // 1e9 é finito e positivo: a rota o apara para o teto, não deixa passar.
+      expect(recebido === undefined || (Number.isInteger(recebido) && recebido > 0 && recebido <= 50)).toBe(true);
+    }
+  });
+
+  it('🔴 hasReference chega ao builder, derivado do referenceImageUrl', async () => {
+    // É a ÚNICA coisa que a rota informa ao prompt sobre a referência. O que a
+    // foto MOSTRA é pergunta para quem consegue olhar para ela — o modelo, que
+    // recebe a imagem junto no images.edit.
+    await POST(pedido({ referenceImageUrl: 'https://cdn/pessoa.png' }));
+    expect(mockBuildImagePrompt.mock.calls[0]?.[0].hasReference).toBe(true);
+  });
+
+  it('sem referência, hasReference é falso', async () => {
+    await POST(pedido());
+    expect(mockBuildImagePrompt.mock.calls[0]?.[0].hasReference).toBe(false);
+  });
+
+  it('🔴 hasReference NÃO é campo do cliente — o corpo não consegue forjá-lo', async () => {
+    // Se o cliente pudesse afirmar isso, haveria duas verdades sobre a mesma
+    // pergunta, e a que decide images.edit poderia discordar da que monta o
+    // prompt. Quem manda é sempre o referenceImageUrl.
+    await POST(pedido({ hasReference: true }));
+    expect(mockBuildImagePrompt.mock.calls[0]?.[0].hasReference).toBe(false);
+  });
+
+  it('🔴 os sinalizadores de modo NÃO existem mais no contrato da rota', async () => {
+    // A correção de rumo do Rafael: os checkboxes saíram, e com eles os campos.
+    // Mandar os antigos não pode ligar nada nem quebrar a rota — corpo de um
+    // cliente velho em cache continua sendo atendido.
+    const r = await POST(
+      pedido({ referenceMode: 'identity', allowRequestedBrands: true, allowPublicFigures: true }),
+    );
+    expect(r.status).toBe(200);
+    const recebido = mockBuildImagePrompt.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(recebido.referenceMode).toBeUndefined();
+    expect(recebido.allowRequestedBrands).toBeUndefined();
+    expect(recebido.allowPublicFigures).toBeUndefined();
   });
 
   it('deckTitle gigante não quebra a rota', async () => {

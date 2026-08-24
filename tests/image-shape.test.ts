@@ -92,10 +92,26 @@ describe('imageSizeForShape', () => {
 });
 
 describe('buildImagePrompt — direção de enquadramento', () => {
-  it('full-bleed pede composição que aguenta corte e área calma para o texto', () => {
+  it('full-bleed pede composição que aguenta corte e região CALMA — nunca vazia', () => {
+    // 🔴 MUDOU NA FATIA 1 DA TASK 4. O nome antigo deste teste era "área calma
+    // para o texto", e o prompt dizia "Leave a calm, low-detail area across the
+    // lower half". O verbo "leave" é o defeito: o modelo entregava metade do
+    // quadro lisa, e a foto chegava ao slide já pela metade. A decisão de fundo
+    // NÃO mudou — a região onde a tipografia entra continua tendo de ser mais
+    // calma, porque o texto do slide é desenhado por cima. O que mudou é que
+    // calma passou a significar MENOS INTERFERÊNCIA, não ausência de cena.
     const p = buildImagePrompt({ title: 'Tema', shape: 'full-bleed' });
     expect(p).toMatch(/full-bleed/i);
     expect(p).toMatch(/crop/i);
+    // Metade 1: a região da tipografia é mais calma.
+    expect(p).toMatch(/typography/i);
+    expect(p).toMatch(/calmer/i);
+    // Metade 2: e continua sendo cena fotografada.
+    expect(p).toMatch(/still contain/i);
+    expect(p).toMatch(/environment, texture, light, atmosphere and depth/i);
+    // E o quadro inteiro é preenchido de propósito.
+    expect(p).toMatch(/fill the entire photographic frame/i);
+    expect(p).not.toMatch(/\bleave\b|\bblank\b|\bempty\b/i);
   });
 
   it('inset-block pede assunto centrado e recorte vertical apertado', () => {

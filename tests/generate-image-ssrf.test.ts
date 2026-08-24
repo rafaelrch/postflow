@@ -395,3 +395,52 @@ describe('barreira e estorno de créditos', () => {
     expect(mockRefundCredits).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * GENERATE x EDIT — a fatia 3 NÃO pode ter mexido nisto.
+ *
+ * A regra é antiga e continua sendo a mesma: existe `referenceImageUrl`, é
+ * `images.edit`; não existe, é `images.generate`. O Identity Mode é um campo do
+ * PROMPT — ele diz o que a referência é, nunca se a referência existe.
+ *
+ * Estes dois testes existem porque o erro seria silencioso e caro: converter
+ * identidade em `images.generate` mandaria a foto da pessoa como texto, e o
+ * usuário pagaria crédito por uma imagem de alguém parecido.
+ */
+describe('a direção de identidade não desvia o fluxo de referência', () => {
+  function pedidoSimples(referenceImageUrl?: string) {
+    return new NextRequest('http://localhost/api/generate-image', {
+      method: 'POST',
+      body: JSON.stringify({ slideId: 'slide-1', title: 'Título', referenceImageUrl }),
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  it('COM referência é images.edit — e é ela que liga a direção de identidade', async () => {
+    expect((await POST(pedidoSimples(validUrl))).status).toBe(200);
+    expect(mockEdit).toHaveBeenCalledTimes(1);
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it('🔴 SEM referência é images.generate', async () => {
+    expect((await POST(pedidoSimples(undefined))).status).toBe(200);
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(mockEdit).not.toHaveBeenCalled();
+  });
+
+  it('🔴 o corpo antigo com referenceMode não muda o fluxo nem quebra', async () => {
+    // Os campos de modo saíram na correção de rumo. Um cliente velho que ainda
+    // os mande continua atendido, e continua indo para images.edit.
+    const antigo = new NextRequest('http://localhost/api/generate-image', {
+      method: 'POST',
+      body: JSON.stringify({
+        slideId: 'slide-1', title: 'Título', referenceImageUrl: validUrl,
+        referenceMode: 'identity', allowRequestedBrands: true,
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+    expect((await POST(antigo)).status).toBe(200);
+    expect(mockEdit).toHaveBeenCalledTimes(1);
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+})

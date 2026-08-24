@@ -31,6 +31,8 @@ interface GenerateImageBody {
   deckTitle?: string;
   /** Quantas imagens este disparo vai gerar (só no lote). */
   seriesSize?: number;
+  /** Posição 1-based deste slide no DECK — varia o enquadramento. */
+  seriesIndex?: number;
   /** Direção livre digitada no painel de IA. */
   userPrompt?: string;
   /** URL de imagem de referência: dispara images.edit em vez de generate. */
@@ -63,6 +65,14 @@ export async function POST(req: NextRequest) {
     ? Math.min(Math.max(Math.trunc(body.seriesSize as number), 0), 50)
     : undefined;
   const deckTitle = typeof body.deckTitle === 'string' ? body.deckTitle.slice(0, 120) : undefined;
+  // Mesma regra do `seriesSize`, e pelo mesmo motivo: o índice vem do cliente e
+  // só serve para escolher uma frase de enquadramento. Valor fora da faixa cai
+  // em `undefined`, e o prompt sai exatamente como saía antes desta fatia — o
+  // builder já trata índice inválido, mas sanitizar aqui mantém a rota com uma
+  // regra só para todo campo numérico que chega de fora.
+  const seriesIndex = Number.isFinite(body.seriesIndex)
+    ? Math.min(Math.max(Math.trunc(body.seriesIndex as number), 0), 50) || undefined
+    : undefined;
   if (!slideId || !title) {
     return NextResponse.json({ error: 'slideId e title são obrigatórios' }, { status: 400 });
   }
@@ -103,7 +113,11 @@ export async function POST(req: NextRequest) {
       surface,
       userPrompt,
       brand,
-      series: { deckTitle, size: seriesSize },
+      series: { deckTitle, size: seriesSize, index: seriesIndex },
+      // Quem sabe se existe referência é a ROTA — é o mesmo valor que escolhe
+      // `images.edit` logo abaixo. Deixar o cliente afirmar isso num campo
+      // próprio abriria uma segunda verdade sobre a mesma pergunta.
+      hasReference: !!referenceImageUrl,
     });
     const size = imageSizeForShape(shape);
     let b64: string | undefined;
