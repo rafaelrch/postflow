@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { Check, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CheckmarkCircle01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
+import { Swatch as AnimatedSwatch, useNativeHoverAnimation } from '@/lib/animated-heroicons';
 import { createClient } from '@/lib/supabase';
 import { uploadImageFile } from '@/lib/upload-image';
 import PhotoEditor from './PhotoEditor';
@@ -73,7 +75,7 @@ export default function OnboardingForm({ onComplete, compact = false }: { onComp
   const choosePhoto = (file: File) => { if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { toast.error('Escolha uma imagem de até 10 MB.'); return; } setPhotoFile(file); };
   const uploadEdited = async (file: File) => { setPhotoFile(null); setPhotoUploading(true); try { update('photoUrl', await uploadImageFile(file, 'profile-photos')); toast.success('Foto pronta para salvar.'); } catch (error) { toast.error(error instanceof Error ? error.message : 'Falha no upload da foto.'); } finally { setPhotoUploading(false); } };
 
-  if (loading) return <div className="grid flex-1 place-items-center"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+  if (loading) return <div className="grid flex-1 place-items-center"><HugeiconsIcon icon={Loading03Icon} size={20} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /></div>;
   return <form onSubmit={submit} className={`flex min-h-0 flex-1 flex-col ${compact ? '' : 'max-w-4xl'}`}>
     <WizardStepper step={step} />
     {/* min-h-0 + overflow-y-auto: quem rola é o CORPO do modal. Sem isto o
@@ -93,13 +95,59 @@ export default function OnboardingForm({ onComplete, compact = false }: { onComp
     {/* Com o editor aberto quem manda são Cancelar/Usar esta foto. Deixar
         Voltar/Continuar aqui embaixo poria dois pares de botões na tela ao
         mesmo tempo — foi parte do que o Rafael viu no print. */}
-    <footer className="mt-5 flex shrink-0 items-center justify-between gap-3"><span data-testid="onboarding-step" className="sr-only">{step}</span>{photoFile ? <p className="text-xs" style={{ color: 'var(--ink-dim)' }}>Termine o ajuste da foto para continuar.</p> : <>{step > 1 ? <button type="button" className="brand-btn outline" onClick={() => move(step - 1)}>Voltar</button> : <span />}{step < STEPS.length ? <button type="button" className="brand-btn" onClick={() => move(step + 1)}>Continuar</button> : <Button type="submit" disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Concluir onboarding'}</Button>}</>}</footer>
+    <footer className="mt-5 flex shrink-0 items-center justify-between gap-3"><span data-testid="onboarding-step" className="sr-only">{step}</span>{photoFile ? <p className="text-xs" style={{ color: 'var(--ink-dim)' }}>Termine o ajuste da foto para continuar.</p> : <>{step > 1 ? <button type="button" className="brand-btn outline" onClick={() => move(step - 1)}>Voltar</button> : <span />}{step < STEPS.length ? <button type="button" className="brand-btn" onClick={() => move(step + 1)}>Continuar</button> : <Button type="submit" disabled={saving}>{saving ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : 'Concluir onboarding'}</Button>}</>}</footer>
   </form>;
 }
 
-function WizardStepper({ step }: { step: number }) { return <ol className="grid grid-cols-5 gap-1 sm:gap-2">{STEPS.map((label, index) => { const number = index + 1; const done = number < step; const current = number === step; return <li key={label} className="relative flex min-w-0 flex-col items-center gap-1 text-center"><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${done || current ? 'text-white' : ''}`} style={{ background: done || current ? 'var(--accent)' : 'var(--paper-2)', border: '1px solid var(--border)' }}>{done ? <Check className="w-4 h-4" /> : number}</span>{number < STEPS.length && <span className="absolute left-[calc(50%+14px)] top-[13px] h-px w-[calc(100%-28px)]" style={{ background: done ? 'var(--accent)' : 'var(--border)' }} />}<span className="truncate text-[10px] sm:text-xs" style={{ color: current ? 'var(--ink)' : 'var(--ink-dim)' }}>{label}</span></li>; })}</ol>; }
+function WizardStepper({ step }: { step: number }) { return <ol className="grid grid-cols-5 gap-1 sm:gap-2">{STEPS.map((label, index) => { const number = index + 1; const done = number < step; const current = number === step; return <li key={label} className="relative flex min-w-0 flex-col items-center gap-1 text-center"><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${done || current ? 'text-white' : ''}`} style={{ background: done || current ? 'var(--accent)' : 'var(--paper-2)', border: '1px solid var(--border)' }}>{done ? <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} strokeWidth={1.75} aria-hidden /> : number}</span>{number < STEPS.length && <span className="absolute left-[calc(50%+14px)] top-[13px] h-px w-[calc(100%-28px)]" style={{ background: done ? 'var(--accent)' : 'var(--border)' }} />}<span className="truncate text-[10px] sm:text-xs" style={{ color: current ? 'var(--ink)' : 'var(--ink-dim)' }}>{label}</span></li>; })}</ol>; }
 function Heading({ title, text }: { title: string; text: string }) { return <header><p className="section-kicker">Passo</p><h2 className="font-display mt-1 text-3xl leading-none">{title}</h2><p className="mt-2 text-sm" style={{ color: 'var(--ink-dim)' }}>{text}</p></header>; }
 function Review({ label, value }: { label: string; value: string }) { return <div className="rounded-lg p-3" style={{ background: 'var(--paper)' }}><dt className="section-kicker">{label}</dt><dd className="mt-1 truncate">{value}</dd></div>; }
-function Palette({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) { return <section><span className="section-kicker block mb-2">Identidade visual</span><div className="flex flex-wrap gap-2">{value.map((color, index) => <label key={index} className="flex items-center gap-1 rounded-lg px-2 py-1" style={{ border: '1px solid var(--border)' }}><input aria-label={`Cor ${index + 1}`} type="color" value={/^#[0-9A-Fa-f]{6}$/.test(color) ? color : '#000000'} onChange={(event) => onChange(value.map((item, itemIndex) => itemIndex === index ? event.target.value.toUpperCase() : item))} /><input className="w-16 bg-transparent text-xs" value={color} onChange={(event) => onChange(value.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} />{value.length > 1 && <button type="button" aria-label={`Remover cor ${index + 1}`} onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}>×</button>}</label>)}{value.length < 6 && <button type="button" className="brand-btn outline sm" onClick={() => onChange([...value, '#FFFFFF'])}>Adicionar cor</button>}</div></section>; }
+function Palette({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) {
+  const animation = useNativeHoverAnimation();
+
+  return (
+    <section onMouseEnter={animation.onMouseEnter} onMouseLeave={animation.onMouseLeave}>
+      <span className="section-kicker mb-2 flex items-center gap-2">
+        <AnimatedSwatch ref={animation.iconRef} size={16} aria-hidden />
+        <span>Identidade visual</span>
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {value.map((color, index) => (
+          <label
+            key={index}
+            className="flex items-center gap-1 rounded-lg px-2 py-1"
+            style={{ border: '1px solid var(--border)' }}
+          >
+            <input
+              aria-label={`Cor ${index + 1}`}
+              type="color"
+              value={/^#[0-9A-Fa-f]{6}$/.test(color) ? color : '#000000'}
+              onChange={(event) => onChange(value.map((item, itemIndex) => itemIndex === index ? event.target.value.toUpperCase() : item))}
+            />
+            <input
+              className="w-16 bg-transparent text-xs"
+              value={color}
+              onChange={(event) => onChange(value.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+            />
+            {value.length > 1 && (
+              <button
+                type="button"
+                aria-label={`Remover cor ${index + 1}`}
+                onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
+              >
+                ×
+              </button>
+            )}
+          </label>
+        ))}
+        {value.length < 6 && (
+          <button type="button" className="brand-btn outline sm" onClick={() => onChange([...value, '#FFFFFF'])}>
+            Adicionar cor
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 function Field({ label, value, onChange, ...props }: { label: string; value: string; onChange: (value: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) { return <label className="block"><span className="section-kicker mb-2 block">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className="brand-input" {...props} /></label>; }
 function Textarea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className="section-kicker mb-2 block">{label}</span><textarea value={value} onChange={(event) => onChange(event.target.value)} className="brand-textarea min-h-[84px]" /></label>; }

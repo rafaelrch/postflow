@@ -1,7 +1,8 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Info } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { InformationCircleIcon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { scopeHeaderCls } from './tokens';
 
@@ -60,7 +61,7 @@ export default function SidebarScopeHeader({
       {hint && <span className={cn(scopeHeaderCls, 'font-normal opacity-70')}>{hint}</span>}
       {info && (
         <span title={info} className="ml-auto cursor-help text-[var(--ink-muted)]">
-          <Info className="w-3.5 h-3.5" />
+          <HugeiconsIcon icon={InformationCircleIcon} size={14} strokeWidth={1.75} aria-hidden />
         </span>
       )}
     </div>

@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Check, RectangleVertical, Square, Smartphone } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import type { IconSvgElement } from '@hugeicons/react';
+import {
+  ChevronDownIcon,
+  RectangleVerticalIcon,
+  SmartphoneIcon,
+  SquareIcon,
+  Tick01Icon,
+} from '@hugeicons/core-free-icons';
 import { FORMAT_LIST, getFormat } from '@/lib/formats';
 import type { SlideFormat } from '@/types';
 
@@ -12,10 +20,10 @@ interface FormatDropdownProps {
 
 // Ícone que melhor representa a forma de cada formato — mapeado aqui, sem
 // acoplar ícone ao módulo de dados (lib/formats.ts).
-const FORMAT_ICON: Record<SlideFormat, React.ComponentType<{ className?: string }>> = {
-  '4:5': RectangleVertical,
-  '1:1': Square,
-  '9:16': Smartphone,
+const FORMAT_ICON: Record<SlideFormat, IconSvgElement> = {
+  '4:5': RectangleVerticalIcon,
+  '1:1': SquareIcon,
+  '9:16': SmartphoneIcon,
 };
 
 /**
@@ -80,13 +88,17 @@ export default function FormatDropdown({ value, onChange }: FormatDropdownProps)
           boxShadow: open ? 'var(--sh-1)' : 'none',
         }}
       >
-        <ActiveIcon className="w-[18px] h-[18px] shrink-0" />
+        <HugeiconsIcon icon={ActiveIcon} size={18} strokeWidth={1.75} aria-hidden />
         {/* Só o NOME no gatilho ("Carrossel"), como no desenho: a proporção
             passou a viver na barra de status, em "1080 × 1350px". Na lista
             aberta o `menuLabel` completo continua — lá ela desempata. */}
         <span className="flex-1 text-left truncate">{active.menuLabel.replace(/\s*\(.*\)$/, '')}</span>
-        <ChevronDown
-          className="w-4 h-4 shrink-0 transition-transform"
+        <HugeiconsIcon
+          icon={ChevronDownIcon}
+          size={16}
+          strokeWidth={1.75}
+          aria-hidden
+          className="shrink-0 transition-transform duration-150 motion-reduce:transition-none"
           style={{ transform: open ? 'rotate(180deg)' : 'none', color: 'var(--ink-dim)' }}
         />
       </button>
@@ -122,9 +134,9 @@ export default function FormatDropdown({ value, onChange }: FormatDropdownProps)
                     if (!selected) e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <HugeiconsIcon icon={Icon} size={16} strokeWidth={1.75} aria-hidden />
                   <span className="flex-1">{f.menuLabel}</span>
-                  {selected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                  {selected && <HugeiconsIcon icon={Tick01Icon} size={14} strokeWidth={1.75} aria-hidden />}
                 </button>
               </li>
             );

@@ -1,7 +1,8 @@
 'use client';
 
 import { ReactNode, useCallback, useEffect, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon, Tick01Icon } from '@hugeicons/core-free-icons';
 import { Slide } from '@/types';
 
 /**
@@ -99,7 +100,7 @@ export default function TemplateModelPicker({
             aria-label="Fechar"
             className="shrink-0 rounded-md p-1 text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
-            <X className="h-4 w-4" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -134,7 +135,7 @@ export default function TemplateModelPicker({
                 )}
                 {isSelected && (
                   <span className="absolute -top-2 left-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm">
-                    <Check className="h-3 w-3" />
+                    <HugeiconsIcon icon={Tick01Icon} size={12} strokeWidth={1.75} aria-hidden />
                   </span>
                 )}
                 <div

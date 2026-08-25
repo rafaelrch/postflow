@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import NewsCard, { NewsCardItem } from '@/components/news/NewsCard';
 import { NEWS_CARD_H, NEWS_CARD_W } from '@/components/news/NewsCardStrip';
 
@@ -83,7 +84,7 @@ export default function NewsCardStage({
         aria-label="Card anterior"
         className={seta}
       >
-        <ChevronLeft className="w-4 h-4 text-gray-900 dark:text-white" />
+        <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden className="text-gray-900 dark:text-white" />
       </button>
 
       <div ref={areaRef} className="flex-1 min-w-0 h-full flex items-center justify-center">
@@ -114,7 +115,7 @@ export default function NewsCardStage({
         aria-label="Próximo card"
         className={seta}
       >
-        <ChevronRight className="w-4 h-4 text-gray-900 dark:text-white" />
+        <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.75} aria-hidden className="text-gray-900 dark:text-white" />
       </button>
     </div>
   );

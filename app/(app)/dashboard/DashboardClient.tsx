@@ -2,7 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Copy, Trash2, Calendar, Layers, Search } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Calendar01Icon, Copy01Icon, DashboardSquare01Icon, Delete02Icon, Edit02Icon, Layers01Icon, Search01Icon } from '@hugeicons/core-free-icons';
+import { Plus as AnimatedPlus } from '@/lib/animated-heroicons';
+import { useNativeHoverAnimation } from '@/lib/animated-heroicons';
 import Button from '@/components/ui/Button';
 import CreateWizard from '@/components/editor/CreateWizard';
 import { createClient } from '@/lib/supabase';
@@ -131,6 +134,8 @@ export default function DashboardClient({
   const [showWizard, setShowWizard] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
+  const headerCreateAnimation = useNativeHoverAnimation();
+  const cardCreateAnimation = useNativeHoverAnimation();
 
   // O que está digitado. A LISTA já é o resultado da busca do servidor — este
   // estado existe só para o campo não engasgar entre a tecla e a navegação.
@@ -266,6 +271,7 @@ export default function DashboardClient({
         {/* Hero / header */}
         <header className="mb-10 flex flex-col gap-3">
           <span className="section-kicker flex items-center gap-2">
+            <HugeiconsIcon icon={DashboardSquare01Icon} size={14} strokeWidth={1.75} aria-hidden />
             <span className="dot-live" aria-hidden />
             Studio · Carrosséis
           </span>
@@ -288,7 +294,7 @@ export default function DashboardClient({
                   minWidth: 240,
                 }}
               >
-                <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-dim)' }} />
+                <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.75} aria-hidden className="shrink-0" style={{ color: 'var(--ink-dim)' }} />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -304,8 +310,15 @@ export default function DashboardClient({
                 </span>
               </label>
 
-              <Button variant="primary" size="md" onClick={() => setShowWizard(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setShowWizard(true)}
+                onMouseEnter={headerCreateAnimation.onMouseEnter}
+                onMouseLeave={headerCreateAnimation.onMouseLeave}
+                className="gap-2"
+              >
+                <AnimatedPlus ref={headerCreateAnimation.iconRef} size={16} aria-hidden />
                 Novo carrossel
               </Button>
             </div>
@@ -377,33 +390,20 @@ export default function DashboardClient({
                   de resultados ele seria o único card que não é resultado. */}
               {!buscando && <button
                 onClick={() => setShowWizard(true)}
-                className="
-                  aspect-[4/5] rounded-[14px] flex flex-col items-center justify-center gap-3
-                  transition-all duration-150 group
-                "
+                onMouseEnter={cardCreateAnimation.onMouseEnter}
+                onMouseLeave={cardCreateAnimation.onMouseLeave}
+                className="aspect-[4/5] rounded-[14px] flex flex-col items-center justify-center gap-3"
                 style={{
                   background: 'transparent',
                   border: '1.5px dashed var(--ink)',
                   color: 'var(--ink-dim)',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translate(-2px,-2px)';
-                  e.currentTarget.style.boxShadow = 'var(--sh-2)';
-                  e.currentTarget.style.background = 'var(--paper-2)';
-                  e.currentTarget.style.color = 'var(--ink)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = '';
-                  e.currentTarget.style.boxShadow = '';
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'var(--ink-dim)';
-                }}
               >
                 <div
-                  className="w-12 h-12 rounded-[10px] grid place-items-center transition-transform group-hover:scale-110"
+                  className="w-12 h-12 rounded-[10px] grid place-items-center"
                   style={{ border: '1.5px solid currentColor' }}
                 >
-                  <Plus className="w-5 h-5" />
+                  <AnimatedPlus ref={cardCreateAnimation.iconRef} size={20} aria-hidden />
                 </div>
                 <span className="font-mono text-[11px] uppercase tracking-[0.14em]">Novo carrossel</span>
               </button>}
@@ -451,14 +451,14 @@ export default function DashboardClient({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <IconActionButton onClick={() => handleEdit(carousel.id)} title="Editar">
-                        <Edit2 className="w-3.5 h-3.5" />
+                        <HugeiconsIcon icon={Edit02Icon} size={14} strokeWidth={1.75} aria-hidden />
                       </IconActionButton>
                       <IconActionButton
                         onClick={() => handleDuplicate(carousel.id)}
                         disabled={duplicating === carousel.id}
                         title="Duplicar"
                       >
-                        <Copy className="w-3.5 h-3.5" />
+                        <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={1.75} aria-hidden />
                       </IconActionButton>
                       <IconActionButton
                         onClick={() => handleDelete(carousel.id)}
@@ -466,7 +466,7 @@ export default function DashboardClient({
                         title="Deletar"
                         danger
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.75} aria-hidden />
                       </IconActionButton>
                     </div>
                   </div>
@@ -487,11 +487,11 @@ export default function DashboardClient({
                       style={{ color: 'var(--ink-dim)' }}
                     >
                       <span className="flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
+                        <HugeiconsIcon icon={Layers01Icon} size={12} strokeWidth={1.75} aria-hidden />
                         {carousel.slides?.[0]?.count ?? 0} slides
                       </span>
                       <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
+                        <HugeiconsIcon icon={Calendar01Icon} size={12} strokeWidth={1.75} aria-hidden />
                         {formatDate(carousel.updated_at)}
                       </span>
                     </div>
@@ -581,7 +581,7 @@ function SemResultado({ termo, onLimpar }: { termo: string; onLimpar: () => void
       className="rounded-[14px] px-8 py-16 text-center flex flex-col items-center gap-4"
       style={{ border: '1.5px dashed var(--ink)', background: 'var(--paper-2)' }}
     >
-      <Search className="w-6 h-6" style={{ color: 'var(--ink-dim)' }} aria-hidden />
+      <HugeiconsIcon icon={Search01Icon} size={24} strokeWidth={1.75} aria-hidden style={{ color: 'var(--ink-dim)' }} />
       <p className="font-display text-[26px] leading-tight" style={{ color: 'var(--ink)' }}>
         Nenhum carrossel com “{termo}”
       </p>
@@ -619,7 +619,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         Você revisa, ajusta e publica.
       </p>
       <Button variant="primary" size="lg" onClick={onCreate} className="mt-2">
-        <Plus className="w-4 h-4" />
+        <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.75} aria-hidden />
         Criar primeiro carrossel
       </Button>
     </div>

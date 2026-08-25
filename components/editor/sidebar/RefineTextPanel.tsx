@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Check, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon, SparklesIcon, Tick01Icon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { MAX_INSTRUCTION_LENGTH, type RefineScope } from '@/lib/refine-text';
 import type { RefinableField } from '@/lib/refine-fields';
@@ -157,7 +158,7 @@ export default function RefineTextPanel({
         disabled={loading}
         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-[var(--radius-sm)] bg-[var(--ink)] text-[var(--paper)] text-[12px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        <Sparkles className="w-3.5 h-3.5" />
+        <HugeiconsIcon icon={SparklesIcon} size={14} strokeWidth={1.75} aria-hidden />
         {loading ? 'Refinando…' : 'Refinar com IA'}
       </button>
 
@@ -186,7 +187,7 @@ export default function RefineTextPanel({
               onClick={onDiscard}
               className="h-8 flex items-center justify-center gap-1 rounded-[var(--radius-sm)] border-[1.5px] border-[var(--line-strong)] text-[12px] text-[var(--ink-dim)] hover:border-[var(--ink)] transition-colors"
             >
-              <X className="w-3.5 h-3.5" />
+              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} aria-hidden />
               Descartar
             </button>
             <button
@@ -194,7 +195,7 @@ export default function RefineTextPanel({
               onClick={onApply}
               className="h-8 flex items-center justify-center gap-1 rounded-[var(--radius-sm)] bg-[var(--ink)] text-[var(--paper)] text-[12px] font-semibold hover:opacity-90 transition-opacity"
             >
-              <Check className="w-3.5 h-3.5" />
+              <HugeiconsIcon icon={Tick01Icon} size={14} strokeWidth={1.75} aria-hidden />
               Aplicar
             </button>
           </div>

@@ -1,18 +1,18 @@
+import type { IconSvgElement } from '@hugeicons/react';
 import {
-  Baseline,
-  CircleUser,
-  Captions,
-  Contrast,
-  Frame,
-  Image as ImageIcon,
-  LayoutPanelLeft,
-  Palette,
-  RotateCcw,
-  SunMoon,
-  Type,
-  Wand2,
-  type LucideIcon,
-} from 'lucide-react';
+  CaptionsIcon,
+  ContrastIcon,
+  FrameIcon,
+  Image01Icon,
+  LayoutPanelLeftIcon,
+  PaletteIcon,
+  RotateCcwIcon,
+  SunMoonIcon,
+  TextUnderlineIcon,
+  TypeIcon,
+  UserCircle02Icon,
+  WandSparklesIcon,
+} from '@hugeicons/core-free-icons';
 import { GlobalSettings, Slide, SlideStyle } from '@/types';
 
 /**
@@ -73,35 +73,35 @@ export interface PanelContext {
 export interface PanelDef {
   id: PanelId;
   scope: PanelScope;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   /** Função quando o rótulo depende do contexto. */
   label: string | ((ctx: PanelContext) => string);
 }
 
 export const PANEL_REGISTRY: Record<PanelId, PanelDef> = {
-  perfil:            { id: 'perfil',            scope: 'post',   icon: CircleUser,       label: 'Perfil' },
+  perfil:            { id: 'perfil',            scope: 'post',   icon: UserCircle02Icon, label: 'Perfil' },
   // Escopo `slide` porque é do grupo do slide que ele nasce — mas o painel
   // oferece os TRÊS escopos por dentro (carrossel, slide, campo). O escopo do
   // registry diz onde o painel MORA na barra, não o alcance do que ele faz.
-  refinarTexto:      { id: 'refinarTexto',      scope: 'slide',  icon: Wand2,            label: 'Refinar texto com IA' },
+  refinarTexto:      { id: 'refinarTexto',      scope: 'slide',  icon: WandSparklesIcon, label: 'Refinar texto com IA' },
   // Escreve `globalSettings.theme` — vale para o carrossel inteiro. O rótulo
   // antigo ("Tema do slide") dizia o contrário do que o controle faz.
-  tema:              { id: 'tema',              scope: 'post',   icon: SunMoon,          label: 'Tema do carrossel' },
-  conteudoSlide:     { id: 'conteudoSlide',     scope: 'slide',  icon: Type,             label: 'Conteúdo do slide' },
+  tema:              { id: 'tema',              scope: 'post',   icon: SunMoonIcon,      label: 'Tema do carrossel' },
+  conteudoSlide:     { id: 'conteudoSlide',     scope: 'slide',  icon: TypeIcon,         label: 'Conteúdo do slide' },
   // Sem sufixo "— Slide N": o número vive no cabeçalho do grupo agora.
-  imagem:            { id: 'imagem',            scope: 'slide',  icon: ImageIcon,        label: 'Imagem' },
-  estiloDoTexto:     { id: 'estiloDoTexto',     scope: 'slide',  icon: Baseline,         label: 'Estilo do texto' },
-  textoDoSlide:      { id: 'textoDoSlide',      scope: 'slide',  icon: Type,             label: 'Texto do slide' },
+  imagem:            { id: 'imagem',            scope: 'slide',  icon: Image01Icon,      label: 'Imagem' },
+  estiloDoTexto:     { id: 'estiloDoTexto',     scope: 'slide',  icon: TextUnderlineIcon, label: 'Estilo do texto' },
+  textoDoSlide:      { id: 'textoDoSlide',      scope: 'slide',  icon: TypeIcon,         label: 'Texto do slide' },
   // Só o Perfil usa: os outros estilos já trazem o mesmo controle dentro do
   // painel de texto. Aqui ele é o painel inteiro porque o Perfil não tem
   // "Texto do slide" — a tipografia dele é fixa (ver `ProfileSlide`).
-  destaquesDoTexto:  { id: 'destaquesDoTexto',  scope: 'slide',  icon: Baseline,         label: 'Destaques no texto' },
-  layoutDoSlide:     { id: 'layoutDoSlide',     scope: 'slide',  icon: LayoutPanelLeft,  label: 'Layout do slide' },
-  sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: Contrast,         label: 'Sombra / Overlay' },
-  fundoDoSlide:      { id: 'fundoDoSlide',      scope: 'slide',  icon: Palette,          label: 'Fundo do slide' },
-  cantos:            { id: 'cantos',            scope: 'global', icon: Frame,            label: 'Cantos' },
-  cabecalho:         { id: 'cabecalho',         scope: 'slide',  icon: Captions,         label: 'Cantos' },
-  restaurarTemplate: { id: 'restaurarTemplate', scope: 'slide',  icon: RotateCcw,        label: 'Restaurar estilo original deste slide' },
+  destaquesDoTexto:  { id: 'destaquesDoTexto',  scope: 'slide',  icon: TextUnderlineIcon, label: 'Destaques no texto' },
+  layoutDoSlide:     { id: 'layoutDoSlide',     scope: 'slide',  icon: LayoutPanelLeftIcon, label: 'Layout do slide' },
+  sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: ContrastIcon,    label: 'Sombra / Overlay' },
+  fundoDoSlide:      { id: 'fundoDoSlide',      scope: 'slide',  icon: PaletteIcon,     label: 'Fundo do slide' },
+  cantos:            { id: 'cantos',            scope: 'global', icon: FrameIcon,       label: 'Cantos' },
+  cabecalho:         { id: 'cabecalho',         scope: 'slide',  icon: CaptionsIcon,    label: 'Cantos' },
+  restaurarTemplate: { id: 'restaurarTemplate', scope: 'slide',  icon: RotateCcwIcon,   label: 'Restaurar estilo original deste slide' },
 };
 
 export function panelLabel(id: PanelId, ctx: PanelContext): string {

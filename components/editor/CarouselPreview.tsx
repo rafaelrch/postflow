@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, ArrowRight01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { createClient } from '@/lib/supabase';
 import SlidePreview from './SlidePreview';
 import {
@@ -148,7 +149,7 @@ export default function CarouselPreview({ carouselId }: CarouselPreviewProps) {
         className="rounded-[10px] border-2 border-dashed flex items-center justify-center py-10"
         style={{ borderColor: 'var(--line-strong)' }}
       >
-        <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--ink-dim)' }} />
+        <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" style={{ color: 'var(--ink-dim)' }} />
       </div>
     );
   }
@@ -200,7 +201,7 @@ export default function CarouselPreview({ carouselId }: CarouselPreviewProps) {
           className="brand-btn icon outline"
           aria-label="Slide anterior"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden />
         </button>
 
         <div className="flex-1 flex flex-col items-center gap-1">
@@ -232,7 +233,7 @@ export default function CarouselPreview({ carouselId }: CarouselPreviewProps) {
           className="brand-btn icon outline"
           aria-label="Próximo slide"
         >
-          <ChevronRight className="w-4 h-4" />
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
     </div>

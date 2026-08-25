@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, Check, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Calendar01Icon,
+  Cancel01Icon,
+  Tick01Icon,
+  Loading03Icon,
+} from '@hugeicons/core-free-icons';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -119,14 +127,14 @@ export default function ScheduleModal({ onClose, onSaveFirst }: ScheduleModalPro
       <div className="bg-[var(--surface)] border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-md flex flex-col max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/8 dark:border-white/8">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-900/60 dark:text-white/60" />
+            <HugeiconsIcon icon={Calendar01Icon} size={16} strokeWidth={1.75} aria-hidden className="text-gray-900/60 dark:text-white/60" />
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Agendar carrossel</h2>
           </div>
           <button
             onClick={onClose}
             className="text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
-            <X className="w-5 h-5" />
+            <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -158,14 +166,14 @@ export default function ScheduleModal({ onClose, onSaveFirst }: ScheduleModalPro
                     disabled={!canGoPrev}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25 disabled:pointer-events-none"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden />
                   </button>
                   <button
                     type="button"
                     onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.75} aria-hidden />
                   </button>
                 </div>
               </div>
@@ -266,7 +274,7 @@ export default function ScheduleModal({ onClose, onSaveFirst }: ScheduleModalPro
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black text-sm font-bold hover:bg-gray-900/90 dark:hover:bg-white/90 transition-colors disabled:opacity-40"
             type="button"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {saving ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : <HugeiconsIcon icon={Tick01Icon} size={16} strokeWidth={1.75} aria-hidden />}
             Agendar
           </button>
         </div>

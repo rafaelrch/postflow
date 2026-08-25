@@ -496,10 +496,22 @@ describe('a barra lateral continua orientada a dado', () => {
     // exatamente assim que o card da faixa ficou preso num tamanho velho.
     // (Controles DENTRO do painel têm transições próprias de hover e não são
     // alvo desta regra: o que muda de tamanho na abertura é o wrapper.)
-    const chevron = container.querySelector('[data-panel] svg.lucide-chevron-right');
+    const chevron = container.querySelector('[data-panel] > button > svg');
     for (const el of [...corpos, chevron].filter(Boolean) as Element[]) {
       expect(el.getAttribute('class') ?? '').not.toMatch(/\btransition-all\b/);
     }
+  });
+
+  it('mantém o chevron estático com SVG e path internos', () => {
+    montaDeck(6, 0, 'editorial');
+    const { container } = render(
+      <EditorSidebar onDownloadSlide={vi.fn()} onDownloadAll={vi.fn()} onOpenWizard={vi.fn()} />,
+    );
+
+    const svg = container.querySelector('[data-panel] > button > svg');
+    expect(svg).toBeTruthy();
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(svg?.querySelector('path')).toBeTruthy();
   });
 
   it('o clique continua abrindo e fechando o painel', () => {

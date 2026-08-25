@@ -4,21 +4,34 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import {
-  LayoutGrid,
-  Newspaper,
-  Clapperboard,
-  Calendar,
-  Map,
-  Palette,
-  Settings,
-  Sun,
-  Moon,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ShieldCheck,
-} from 'lucide-react';
+  Calendar03Icon,
+  ClapperboardIcon,
+  LayoutGridIcon,
+  MapIcon,
+  NewspaperIcon,
+  Settings01Icon,
+  ShieldCheckIcon,
+  SidebarLeft01Icon,
+  SidebarRight01Icon,
+  SwatchIcon as HugeSwatchIcon,
+} from '@hugeicons/core-free-icons';
+import {
+  ArrowLeftOnRectangle,
+  CalendarDays as AnimatedCalendarDays,
+  Cog6Tooth,
+  Map as AnimatedMap,
+  Moon as AnimatedMoon,
+  Newspaper as AnimatedNewspaper,
+  Squares2x2,
+  Sun as AnimatedSun,
+  Swatch as AnimatedSwatch,
+} from '@/lib/animated-heroicons';
+import {
+  type AnimatedHeroiconComponent,
+  useNativeHoverAnimation,
+} from '@/lib/animated-heroicons';
 import { cn } from '@/lib/utils';
 import { REELS_ENABLED } from '@/lib/feature-flags';
 import { useTheme } from '@/components/ThemeProvider';
@@ -29,29 +42,74 @@ import { useCreditsStore } from '@/hooks/useCreditsStore';
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: IconSvgElement;
+  animatedIcon?: AnimatedHeroiconComponent;
   /** Rotas extras que mantêm o item ativo (além do próprio href). */
   match?: string[];
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard',  label: 'Carrosséis',  icon: LayoutGrid, match: ['/generator'] },
-  { href: '/news',       label: 'Notícias',     icon: Newspaper },
+  { href: '/dashboard',  label: 'Carrosséis',  icon: LayoutGridIcon, animatedIcon: Squares2x2, match: ['/generator'] },
+  { href: '/news',       label: 'Notícias',     icon: NewspaperIcon, animatedIcon: AnimatedNewspaper },
   // Reels fica fora da navegação enquanto a chave estiver desligada. O item
   // continua declarado aqui — religar é só voltar REELS_ENABLED pra true.
   ...(REELS_ENABLED
-    ? [{ href: '/reels', label: 'Reels', icon: Clapperboard } as NavItem]
+    ? [{ href: '/reels', label: 'Reels', icon: ClapperboardIcon } as NavItem]
     : []),
-  { href: '/agenda',     label: 'Agenda',       icon: Calendar },
-  { href: '/onboarding', label: 'Onboarding',   icon: Palette },
+  { href: '/agenda',     label: 'Agenda',       icon: Calendar03Icon, animatedIcon: AnimatedCalendarDays },
+  { href: '/onboarding', label: 'Onboarding',   icon: HugeSwatchIcon, animatedIcon: AnimatedSwatch },
   // `match: ['/conta']` mantém o item aceso no instante entre clicar num link
   // antigo de /conta e o redirect levar para /configuracoes/assinatura.
-  { href: '/configuracoes', label: 'Configurações', icon: Settings, match: ['/conta'] },
+  { href: '/configuracoes', label: 'Configurações', icon: Settings01Icon, animatedIcon: Cog6Tooth, match: ['/conta'] },
   // Roadmap é o ÚLTIMO, depois de Configurações — ordem pedida pelo Rafael
   // (21/08). Não é uma tela de trabalho do dia: é para onde se vai quando falta
   // alguma coisa no produto.
-  { href: '/roadmap',    label: 'Roadmap',      icon: Map },
+  { href: '/roadmap',    label: 'Roadmap',      icon: MapIcon, animatedIcon: AnimatedMap },
 ];
+
+function SidebarNavItem({
+  item,
+  pathname,
+  collapsed,
+}: {
+  item: NavItem;
+  pathname: string;
+  collapsed: boolean;
+}) {
+  const { iconRef, onMouseEnter, onMouseLeave } = useNativeHoverAnimation();
+  const { href, label, icon: Icon, animatedIcon: AnimatedIcon, match } = item;
+  const routes = [href, ...(match ?? [])];
+  const isActive = routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+
+  return (
+    <Link
+      href={href}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={cn(
+        'relative flex items-center rounded-[10px] text-[13.5px] font-medium',
+        collapsed ? 'justify-center h-11 w-11 mx-auto' : 'gap-3 px-3 py-2.5',
+        isActive ? 'brand-card interactive' : ''
+      )}
+      style={{
+        background: isActive ? 'white' : 'transparent',
+        color: isActive ? 'black' : 'var(--ink-dim)',
+        border: isActive ? '1.5px solid black' : '1.5px solid transparent',
+        boxShadow: isActive ? '3px 3px 0 0 black' : 'none',
+      }}
+    >
+      {AnimatedIcon ? (
+        <AnimatedIcon ref={iconRef} size={16} className="w-4 h-4 shrink-0" aria-hidden />
+      ) : (
+        <HugeiconsIcon icon={Icon} className="w-4 h-4 shrink-0" aria-hidden />
+      )}
+      {!collapsed && <span className="flex-1">{label}</span>}
+      <NavPending />
+    </Link>
+  );
+}
 
 /**
  * `isAdmin` chega calculado do servidor (app/(app)/layout.tsx) porque a regra
@@ -83,6 +141,8 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const credits = useCreditsStore((s) => s.balance);
   const fetchCredits = useCreditsStore((s) => s.fetch);
   const [collapsed, setCollapsed] = useState(false);
+  const signOutAnimation = useNativeHoverAnimation();
+  const themeAnimation = useNativeHoverAnimation();
 
   // No editor (/generator) a sidebar entra colapsada por padrão pra dar espaço
   // ao canvas. Isso NÃO grava no localStorage — a preferência das outras páginas
@@ -229,7 +289,11 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             color: 'var(--ink-dim)',
           }}
         >
-          {collapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+          {collapsed ? (
+            <HugeiconsIcon icon={SidebarRight01Icon} className="w-3.5 h-3.5" aria-hidden />
+          ) : (
+            <HugeiconsIcon icon={SidebarLeft01Icon} className="w-3.5 h-3.5" aria-hidden />
+          )}
         </button>
       </div>
 
@@ -240,35 +304,9 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           collapsed ? 'px-2' : 'px-3'
         )}
       >
-        {navItems.map(({ href, label, icon: Icon, match }) => {
-          const routes = [href, ...(match ?? [])];
-          const isActive = routes.some((r) => pathname === r || pathname.startsWith(`${r}/`));
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              aria-label={collapsed ? label : undefined}
-              className={cn(
-                'group relative flex items-center rounded-[10px] text-[13.5px] font-medium transition-all duration-150',
-                collapsed ? 'justify-center h-11 w-11 mx-auto' : 'gap-3 px-3 py-2.5',
-                isActive ? 'brand-card interactive' : 'hover:translate-x-[-1px]'
-              )}
-              style={{
-                background: isActive ? 'white' : 'transparent',
-                color: isActive ? 'black' : 'var(--ink-dim)',
-                border: isActive ? '1.5px solid black' : '1.5px solid transparent',
-                boxShadow: isActive ? '3px 3px 0 0 black' : 'none',
-              }}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              {!collapsed && <span className="flex-1">{label}</span>}
-              {/* Sinal de navegação pendente — precisa ficar DENTRO do `Link`,
-                  que é a única forma de o `useLinkStatus` enxergar o estado. */}
-              <NavPending />
-            </Link>
-          );
-        })}
+        {navItems.map((item) => (
+          <SidebarNavItem key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
+        ))}
       </nav>
 
       {/* Footer: theme toggle */}
@@ -350,33 +388,45 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             title={collapsed ? 'Painel administrativo' : undefined}
             aria-label="Painel administrativo"
           >
-            <ShieldCheck className="w-4 h-4" />
+             <HugeiconsIcon icon={ShieldCheckIcon} className="w-4 h-4" aria-hidden />
             {!collapsed && <span>Painel admin</span>}
           </Link>
         )}
         <button
           onClick={handleSignOut}
+          onMouseEnter={signOutAnimation.onMouseEnter}
+          onMouseLeave={signOutAnimation.onMouseLeave}
           className={cn('brand-btn ghost w-full mb-2', collapsed ? 'justify-center' : 'justify-start')}
           style={{ padding: '9px 12px', color: 'var(--ink-dim)' }}
           title={collapsed ? 'Sair' : undefined}
           aria-label="Sair"
         >
-          <LogOut className="w-4 h-4" />
+           <ArrowLeftOnRectangle ref={signOutAnimation.iconRef} size={16} className="w-4 h-4" aria-hidden />
           {!collapsed && <span>Sair</span>}
         </button>
         <button
           onClick={toggleTheme}
+          onMouseEnter={themeAnimation.onMouseEnter}
+          onMouseLeave={themeAnimation.onMouseLeave}
           className={cn('brand-btn outline w-full', collapsed ? 'justify-center' : 'justify-between')}
           style={{ padding: '9px 12px' }}
           title={collapsed ? (theme === 'light' ? 'Tema escuro' : 'Tema claro') : undefined}
           aria-label={theme === 'light' ? 'Tema escuro' : 'Tema claro'}
         >
           {collapsed ? (
-            theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />
+             theme === 'light' ? (
+                <AnimatedMoon ref={themeAnimation.iconRef} size={16} className="w-4 h-4" aria-hidden />
+             ) : (
+                <AnimatedSun ref={themeAnimation.iconRef} size={16} className="w-4 h-4" aria-hidden />
+             )
           ) : (
             <>
               <span className="flex items-center gap-2">
-                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                 {theme === 'light' ? (
+                    <AnimatedMoon ref={themeAnimation.iconRef} size={16} className="w-4 h-4" aria-hidden />
+                 ) : (
+                    <AnimatedSun ref={themeAnimation.iconRef} size={16} className="w-4 h-4" aria-hidden />
+                 )}
                 <span>{theme === 'light' ? 'Tema escuro' : 'Tema claro'}</span>
               </span>
               <span className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-dim)' }}>

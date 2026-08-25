@@ -1,7 +1,8 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import { ChevronRight, type LucideIcon } from 'lucide-react';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import { ChevronRightIcon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { panelLabelCls } from './tokens';
 
@@ -39,7 +40,7 @@ export default function SidebarPanel({
 }: {
   /** Identidade do painel. Use o mesmo valor no `key` do elemento. */
   id: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   label: string;
   /** Sinal curto à direita do rótulo — "3 alterações". */
   badge?: string;
@@ -132,7 +133,7 @@ export default function SidebarPanel({
         {/* O quadrado cinza do desenho é PLACEHOLDER de ícone — o ícone real do
             PANEL_REGISTRY ocupa a mesma pegada de 24×24. */}
         <span className="shrink-0 w-6 h-6 grid place-items-center">
-          <Icon className="w-[18px] h-[18px] text-[var(--ink)]" />
+          <HugeiconsIcon icon={Icon} className="w-[18px] h-[18px] text-[var(--ink)]" aria-hidden />
         </span>
         <span className={cn(panelLabelCls, 'flex-1 truncate')}>{label}</span>
         {badge && (
@@ -140,12 +141,15 @@ export default function SidebarPanel({
             {badge}
           </span>
         )}
-        <ChevronRight
+        <HugeiconsIcon
+          icon={ChevronRightIcon}
+          size={16}
+          strokeWidth={1.75}
           className={cn(
-            // Propriedade declarada UMA a UMA, nunca `transition-all`.
             'w-4 h-4 shrink-0 text-[var(--studio-ink-secondary)] transition-transform duration-200 ease-out',
             isOpen && 'rotate-90'
           )}
+          aria-hidden
         />
       </button>
 

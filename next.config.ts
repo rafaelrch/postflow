@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // O pacote oficial Heroicons Animated é um componente client-side Motion.
+  // Mantê-lo no bundle do fork Next evita externalização inconsistente do
+  // módulo `motion/react` nos chunks SSR/client.
+  transpilePackages: ['@heroicons-animated/react'],
   turbopack: {
     root: process.cwd(),
   },

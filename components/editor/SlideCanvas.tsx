@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Trash2, Plus, GripVertical, Save, CalendarPlus, Coins, Moon, Sun, CircleCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Add01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  CheckmarkCircle01Icon,
+  Coins01Icon,
+  Delete02Icon,
+  DragDropVerticalIcon,
+} from '@hugeicons/core-free-icons';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
 import { useTheme } from '@/components/ThemeProvider';
@@ -22,6 +31,15 @@ import {
   template02NextModel,
 } from '@/lib/templates/template-02';
 import { Slide } from '@/types';
+import {
+  BookmarkSquareIcon as AnimatedBookmarkSquare,
+  CalendarDateRangeIcon as AnimatedCalendarDateRange,
+  Moon as AnimatedMoon,
+  Plus as AnimatedPlus,
+  Sun as AnimatedSun,
+  Trash as AnimatedTrash,
+  useNativeHoverAnimation,
+} from '@/lib/animated-heroicons';
 
 // Margem vertical total (topo + base) reservada em volta dos cards na faixa —
 // o card ocupa a altura da área menos isto, e o scale deriva daí (fit-to-height).
@@ -103,6 +121,12 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
   const isTemplate01 = style === 'template01';
   const isTemplate02 = style === 'template02';
   const isSpecTemplate = isTemplate01 || isTemplate02;
+  const addAnimation = useNativeHoverAnimation();
+  const deleteAnimation = useNativeHoverAnimation(slides.length > 1);
+  const saveAnimation = useNativeHoverAnimation(saveStatusProp !== 'saving');
+  const themeAnimation = useNativeHoverAnimation();
+  const scheduleAnimation = useNativeHoverAnimation();
+  const bottomAddAnimation = useNativeHoverAnimation();
   const handleAdd = () => (isSpecTemplate ? setPickingModel(true) : addSlide());
 
   // O que CONTINUA a alternância do T2: depois da capa vem o modelo 2, e depois
@@ -259,9 +283,9 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                 disabled={activeSlideIndex === 0}
                 title="Slide anterior (←)"
                 aria-label="Slide anterior"
-                className={SEG_BTN}
+                className={`${SEG_BTN} group`}
               >
-                <ChevronLeft className="w-5 h-5" />
+                <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.75} aria-hidden className="transition-transform duration-150 motion-reduce:transition-none group-hover:-translate-x-0.5" />
               </button>
               <span
                 data-testid="slide-control-contador"
@@ -274,9 +298,9 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                 disabled={activeSlideIndex >= slides.length - 1}
                 title="Próximo slide (→)"
                 aria-label="Próximo slide"
-                className={SEG_BTN}
+                className={`${SEG_BTN} group`}
               >
-                <ChevronRight className="w-5 h-5" />
+                <HugeiconsIcon icon={ArrowRight01Icon} size={20} strokeWidth={1.75} aria-hidden className="transition-transform duration-150 motion-reduce:transition-none group-hover:translate-x-0.5" />
               </button>
             </div>
 
@@ -286,23 +310,27 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                 MODELO em vez de criar um slide genérico. */}
             <button
               onClick={handleAdd}
+              onMouseEnter={addAnimation.onMouseEnter}
+              onMouseLeave={addAnimation.onMouseLeave}
               title="Adicionar slide"
               aria-label="Adicionar slide"
-              className="shrink-0 w-[40px] h-[40px] grid place-items-center rounded-[10px] bg-[var(--accent)] text-[var(--paper)] hover:opacity-90 active:opacity-100 transition-opacity"
+              className="group shrink-0 w-[40px] h-[40px] grid place-items-center rounded-[10px] bg-[var(--accent)] text-[var(--paper)] hover:opacity-90 active:opacity-100 transition-opacity"
             >
-              <Plus className="w-5 h-5" />
+              <AnimatedPlus ref={addAnimation.iconRef} size={20} aria-hidden />
             </button>
 
             {/* Discreta ao lado. Alcance diferente da lixeira do hover do card:
                 aquela exclui o card sob o cursor, esta exclui o slide ATIVO. */}
             <button
               onClick={() => slides.length > 1 && removeSlide(activeSlideIndex)}
+              onMouseEnter={deleteAnimation.onMouseEnter}
+              onMouseLeave={deleteAnimation.onMouseLeave}
               disabled={slides.length <= 1}
               title={slides.length <= 1 ? 'O carrossel precisa de pelo menos um slide' : 'Excluir o slide ativo'}
               aria-label="Excluir slide ativo"
-              className="shrink-0 w-[40px] h-[40px] grid place-items-center rounded-[10px] bg-transparent text-[var(--studio-ink-secondary)] hover:text-[var(--danger)] hover:bg-[var(--studio-row)] disabled:text-[var(--studio-ink-disabled)] disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+              className="group shrink-0 w-[40px] h-[40px] grid place-items-center rounded-[10px] bg-transparent text-[var(--studio-ink-secondary)] hover:text-[var(--danger)] hover:bg-[var(--studio-row)] disabled:text-[var(--studio-ink-disabled)] disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
             >
-              <Trash2 className="w-[18px] h-[18px]" />
+              <AnimatedTrash ref={deleteAnimation.iconRef} size={18} aria-hidden />
             </button>
           </div>
         </div>
@@ -311,37 +339,45 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
           {onSave && (
             <button
               onClick={onSave}
+              onMouseEnter={saveAnimation.onMouseEnter}
+              onMouseLeave={saveAnimation.onMouseLeave}
               disabled={saveStatusProp === 'saving'}
               title="Salvar agora (Ctrl+S)"
               className={TERTIARY_BTN}
             >
-              <Save className="w-[18px] h-[18px]" />
+              <AnimatedBookmarkSquare ref={saveAnimation.iconRef} size={18} aria-hidden />
               Salvar
             </button>
           )}
 
           <span className={NEUTRAL_BTN} title="Seu saldo de créditos">
-            <Coins className="w-[18px] h-[18px]" />
+            <HugeiconsIcon icon={Coins01Icon} size={18} strokeWidth={1.75} aria-hidden />
             {credits ?? '—'} créditos
           </span>
 
           <button
             onClick={toggleTheme}
+            onMouseEnter={themeAnimation.onMouseEnter}
+            onMouseLeave={themeAnimation.onMouseLeave}
             aria-label={theme === 'light' ? 'Ativar tema escuro' : 'Ativar tema claro'}
             title={theme === 'light' ? 'Ativar tema escuro' : 'Ativar tema claro'}
             // O único com borda forte no desenho.
             className="shrink-0 w-[40px] h-[40px] grid place-items-center rounded-[10px] bg-[var(--studio-surface)] border border-[var(--studio-line-strong)] text-[var(--ink)] hover:border-[var(--ink)] transition-colors"
           >
-            {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            {theme === 'light'
+              ? <AnimatedMoon ref={themeAnimation.iconRef} size={20} aria-hidden />
+              : <AnimatedSun ref={themeAnimation.iconRef} size={20} aria-hidden />}
           </button>
 
           {onSchedule && (
             <button
               onClick={onSchedule}
+              onMouseEnter={scheduleAnimation.onMouseEnter}
+              onMouseLeave={scheduleAnimation.onMouseLeave}
               title="Agendar publicação na agenda"
               className="shrink-0 h-[42px] px-4 flex items-center gap-2 rounded-[10px] text-[14px] font-medium bg-[var(--studio-surface)] text-[var(--ink)] border-2 border-[var(--ink)] shadow-[var(--sh-studio)] hover:-translate-y-px active:translate-y-0 active:shadow-[var(--sh-press)] transition-all"
             >
-              <CalendarPlus className="w-[18px] h-[18px]" />
+              <AnimatedCalendarDateRange ref={scheduleAnimation.iconRef} size={18} aria-hidden />
               Agendar
             </button>
           )}
@@ -425,7 +461,7 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                               title="Arraste para reordenar"
                               className="absolute -top-1 left-1/2 -translate-x-1/2 z-20 h-[18px] px-1.5 rounded-[5px] bg-[var(--ink)] text-[var(--paper)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity flex items-center justify-center cursor-grab active:cursor-grabbing"
                             >
-                              <GripVertical className="w-3 h-3" />
+                              <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={1.75} aria-hidden />
                             </div>
 
                             <button
@@ -442,7 +478,7 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                               // Quem some é o hover; desabilitado só a apaga mais.
                               className="absolute -top-1 -right-1 z-20 w-[18px] h-[18px] rounded-[5px] bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--danger)] disabled:hover:bg-[var(--ink)] disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 disabled:group-hover:opacity-40 focus-visible:opacity-100 transition-opacity flex items-center justify-center"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <HugeiconsIcon icon={Delete02Icon} size={12} strokeWidth={1.75} aria-hidden />
                             </button>
 
                             {/* Card do slide.
@@ -489,10 +525,12 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                   {/* Botão adicionar ao fim da faixa */}
                   <button
                     onClick={handleAdd}
+                    onMouseEnter={bottomAddAnimation.onMouseEnter}
+                    onMouseLeave={bottomAddAnimation.onMouseLeave}
                     className="flex flex-col items-center justify-center gap-1 border border-dashed border-[var(--studio-line)] hover:border-[var(--studio-line-strong)] transition-colors rounded-[5px] text-[var(--studio-ink-secondary)] hover:text-[var(--ink)] shrink-0 mr-[21px]"
                     style={{ width: cardW, height: cardHpx }}
                   >
-                    <Plus className="w-6 h-6" />
+                    <AnimatedPlus ref={bottomAddAnimation.iconRef} size={24} aria-hidden />
                     <span className="text-[11px] font-medium">Adicionar</span>
                   </button>
                 </div>
@@ -549,7 +587,7 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
         data-testid="studio-status-bar"
         className="shrink-0 flex items-center gap-[18px] pt-[21px] pb-[26px] text-[14px]"
       >
-        <CircleCheck className="w-[18px] h-[18px] shrink-0 text-[var(--ink)]" />
+        <HugeiconsIcon icon={CheckmarkCircle01Icon} size={18} strokeWidth={1.75} aria-hidden className="shrink-0 text-[var(--ink)]" />
         <span data-testid="status-save" className="font-semibold text-[var(--ink)] whitespace-nowrap">
           {statusText}
         </span>

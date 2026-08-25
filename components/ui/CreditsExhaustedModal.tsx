@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { X, Sparkles } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon, SparklesIcon } from '@hugeicons/core-free-icons';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
 
 /**
@@ -55,7 +56,7 @@ export default function CreditsExhaustedModal() {
           className="absolute top-4 right-4 w-8 h-8 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           style={{ color: 'var(--ink-dim)' }}
         >
-          <X className="w-4 h-4" />
+           <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
         </button>
 
         <span
@@ -63,7 +64,7 @@ export default function CreditsExhaustedModal() {
           style={{ background: 'var(--ink)', color: 'var(--paper)' }}
           aria-hidden
         >
-          <Sparkles className="w-5 h-5" />
+           <HugeiconsIcon icon={SparklesIcon} size={20} strokeWidth={1.75} aria-hidden />
         </span>
 
         <h2

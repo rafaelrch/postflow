@@ -4,12 +4,21 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import {
-  X, ArrowRight, ArrowLeft, Sparkles, Image as ImageIcon,
-  Upload, Plus, Trash2, FileJson, Globe, Check,
-  RectangleVertical, Square, Smartphone,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+  Add01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Delete02Icon,
+  Globe02Icon,
+  RectangleVerticalIcon,
+  SmartphoneIcon,
+  SparklesIcon,
+  SquareIcon,
+  Tick01Icon,
+  Upload01Icon,
+} from '@hugeicons/core-free-icons';
 import Button from '@/components/ui/Button';
 import { cn, normalizeHandle } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
@@ -204,11 +213,11 @@ const STEP_TITLES = ['Formato do post', 'Template', 'Conteúdo', 'Identidade vis
 const FORMAT_META: Record<SlideFormat, {
   name: string;
   desc: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
 }> = {
-  '4:5':  { name: 'Carrossel', desc: 'Ideal para conteúdo educativo e listas',   icon: RectangleVertical },
-  '1:1':  { name: 'Quadrado',  desc: 'Ótimo para quotes e imagens simples',      icon: Square },
-  '9:16': { name: 'Stories',   desc: 'Perfeito para stories e reels verticais',  icon: Smartphone },
+  '4:5':  { name: 'Carrossel', desc: 'Ideal para conteúdo educativo e listas',   icon: RectangleVerticalIcon },
+  '1:1':  { name: 'Quadrado',  desc: 'Ótimo para quotes e imagens simples',      icon: SquareIcon },
+  '9:16': { name: 'Stories',   desc: 'Perfeito para stories e reels verticais',  icon: SmartphoneIcon },
 };
 
 /**
@@ -567,7 +576,7 @@ function OptionCard({
           className="absolute top-2 right-2 grid place-items-center rounded-full"
           style={{ width: 18, height: 18, background: 'var(--ink)', color: 'var(--paper)' }}
         >
-          <Check className="w-3 h-3" strokeWidth={3} />
+          <HugeiconsIcon icon={Tick01Icon} className="w-3 h-3" strokeWidth={3} aria-hidden />
         </span>
       )}
     </button>
@@ -1403,7 +1412,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             style={{ width: 40, height: 40, background: 'var(--ink)', color: 'var(--paper)' }}
             aria-hidden
           >
-            <Sparkles className="w-5 h-5" />
+            <HugeiconsIcon icon={SparklesIcon} className="w-5 h-5" aria-hidden />
           </span>
           <h2 id="cw-title" className="font-display min-w-0 flex-1 text-[24px] leading-tight" style={{ color: 'var(--ink)' }}>
             {STEP_TITLES[step - 1]}
@@ -1414,7 +1423,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             className="cw-close grid place-items-center w-8 h-8 rounded-full shrink-0"
             style={{ color: 'var(--ink-dim)' }}
           >
-            <X className="w-4 h-4" />
+            <HugeiconsIcon icon={Cancel01Icon} className="w-4 h-4" aria-hidden />
           </button>
         </div>
 
@@ -1466,7 +1475,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                         {meta.desc}
                       </span>
                     </span>
-                    <Icon className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-muted)' }} />
+                    <HugeiconsIcon icon={Icon} className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-muted)' }} aria-hidden />
                   </OptionCard>
                 );
               })}
@@ -1583,7 +1592,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       ? { background: 'var(--ink)', color: 'var(--paper)', borderColor: 'var(--ink)' }
                       : undefined}
                   >
-                    <Globe className="w-3.5 h-3.5 shrink-0" />
+                    <HugeiconsIcon icon={Globe02Icon} className="w-3.5 h-3.5 shrink-0" aria-hidden />
                     Web search
                   </button>
 
@@ -1647,7 +1656,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       aria-label="Slide anterior"
                       className="brand-btn outline icon sm"
                     >
-                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <HugeiconsIcon icon={ArrowLeft01Icon} className="w-3.5 h-3.5" aria-hidden />
                     </button>
                     <span className="text-[11px] font-semibold" style={{ color: 'var(--ink-dim)' }} data-testid="manual-pager">
                       Slide {manualIndex + 1} de {manualSlides.length}
@@ -1659,7 +1668,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       aria-label="Próximo slide"
                       className="brand-btn outline icon sm"
                     >
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <HugeiconsIcon icon={ArrowRight01Icon} className="w-3.5 h-3.5" aria-hidden />
                     </button>
                   </div>
 
@@ -1695,7 +1704,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                   {!isFixedDeck && (
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={addManualSlide} className="brand-btn outline sm flex-1">
-                        <Plus className="w-3.5 h-3.5" /> Adicionar slide
+                        <HugeiconsIcon icon={Add01Icon} className="w-3.5 h-3.5" aria-hidden /> Adicionar slide
                       </button>
                       {manualSlides.length > 1 && (
                         <button
@@ -1704,7 +1713,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                           aria-label="Remover este slide"
                           className="brand-btn outline icon sm"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <HugeiconsIcon icon={Delete02Icon} className="w-3.5 h-3.5" aria-hidden />
                         </button>
                       )}
                     </div>
@@ -1723,7 +1732,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       </strong>
                     </span>
                     <button onClick={() => jsonFileRef.current?.click()} className="brand-btn outline sm">
-                      <Upload className="w-3.5 h-3.5" /> Upload .json
+                      <HugeiconsIcon icon={Upload01Icon} className="w-3.5 h-3.5" aria-hidden /> Upload .json
                     </button>
                     <input
                       ref={jsonFileRef}
@@ -1948,7 +1957,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         <div className="flex items-center gap-3 px-6 pb-6">
           {step > 1 && (
             <button onClick={() => goTo(step - 1)} className="brand-btn outline pill sm">
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <HugeiconsIcon icon={ArrowLeft01Icon} className="w-3.5 h-3.5" aria-hidden />
               Voltar
             </button>
           )}
@@ -1962,14 +1971,14 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
             {step === totalSteps ? (
               loading ? 'Criando...' : (
                 <>
-                  <Sparkles className="w-4 h-4" />
+                  <HugeiconsIcon icon={SparklesIcon} className="w-4 h-4" aria-hidden />
                   Gerar
                 </>
               )
             ) : (
               <>
                 Continuar
-                <ArrowRight className="w-4 h-4" />
+                <HugeiconsIcon icon={ArrowRight01Icon} className="w-4 h-4" aria-hidden />
               </>
             )}
           </Button>

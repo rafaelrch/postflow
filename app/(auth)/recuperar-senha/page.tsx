@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Loader2, Mail, MailCheck } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowRight01Icon, Loading03Icon, Mail01Icon, MailCheckIcon } from '@hugeicons/core-free-icons';
 
 /**
  * "Esqueci minha senha": pede o e-mail e dispara o link de redefinição.
@@ -68,7 +69,7 @@ export default function RecuperarSenhaPage() {
           {enviado ? (
             <div className="brand-card flex flex-col gap-4" style={{ padding: 24 }} data-testid="recuperar-enviado">
               <div>
-                <MailCheck className="w-8 h-8 mb-3" style={{ color: 'var(--success)' }} />
+                <HugeiconsIcon icon={MailCheckIcon} size={32} strokeWidth={1.75} aria-hidden className="mb-3" style={{ color: 'var(--success)' }} />
                 <h2 className="font-display text-[26px] leading-none mb-2">Confira seu e-mail</h2>
                 <p className="text-[14px] leading-6" style={{ color: 'var(--ink-dim)' }}>
                   Se existir uma conta com esse e-mail, enviamos o link para redefinir a
@@ -88,8 +89,12 @@ export default function RecuperarSenhaPage() {
               <div>
                 <label className="section-kicker block mb-2" htmlFor="email">E-mail</label>
                 <div className="relative">
-                  <Mail
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                  <HugeiconsIcon
+                    icon={Mail01Icon}
+                    size={16}
+                    strokeWidth={1.75}
+                    aria-hidden
+                    className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                     style={{ color: 'var(--ink-dim)' }}
                   />
                   <input
@@ -124,7 +129,7 @@ export default function RecuperarSenhaPage() {
                 disabled={enviando}
                 className="brand-btn primary w-full justify-center mt-1"
               >
-                {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                {enviando ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.75} aria-hidden />}
                 {enviando ? 'Enviando…' : 'Enviar link'}
               </button>
             </form>

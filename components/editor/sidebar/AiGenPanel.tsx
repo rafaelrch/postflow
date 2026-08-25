@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Sparkles, Upload } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { SparklesIcon, Upload01Icon } from '@hugeicons/core-free-icons';
 import toast from 'react-hot-toast';
 import type { GenerateOptions } from '@/hooks/useGenerateCarouselImages';
 import { uploadImageFile } from '@/lib/upload-image';
@@ -114,7 +115,7 @@ export default function AiGenPanel({
             : 'bg-[var(--ink)] text-[var(--paper)] hover:opacity-90'
         )}
       >
-        <Sparkles className="w-3.5 h-3.5" />
+        <HugeiconsIcon icon={SparklesIcon} size={14} strokeWidth={1.75} aria-hidden />
         {buttonLabel}
       </button>
 
@@ -136,7 +137,7 @@ export default function AiGenPanel({
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-[var(--line-strong)] rounded-lg p-3 text-center cursor-pointer hover:border-[var(--ink)] transition-all"
             >
-              <Upload className="w-3.5 h-3.5 mx-auto mb-1 text-[var(--ink-muted)]" />
+              <HugeiconsIcon icon={Upload01Icon} size={14} strokeWidth={1.75} aria-hidden className="mx-auto mb-1 text-[var(--ink-muted)]" />
               <span className="text-[11px] text-[var(--ink-muted)] font-medium">
                 {uploading ? 'Enviando…' : 'Clique para anexar referência'}
               </span>
@@ -202,7 +203,7 @@ export default function AiGenPanel({
             disabled={generating || uploading}
             className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <HugeiconsIcon icon={SparklesIcon} size={14} strokeWidth={1.75} aria-hidden />
             {generating ? 'Gerando…' : generatingAll ? batchLabel : 'Gerar'}
           </button>
         </div>

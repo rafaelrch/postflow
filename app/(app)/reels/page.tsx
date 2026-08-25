@@ -1,19 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Clapperboard,
-  Download,
-  Upload,
-  Video,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  X,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+  Add01Icon,
+  Cancel01Icon,
+  ClapperboardIcon,
+  Delete02Icon,
+  Download01Icon,
+  PauseIcon,
+  PlayIcon,
+  Upload01Icon,
+  Video01Icon,
+  VolumeHighIcon,
+  VolumeOffIcon,
+} from '@hugeicons/core-free-icons';
 import toast from 'react-hot-toast';
 import ReelCard, { REEL_WIDTH } from '@/components/reels/ReelCard';
 import { DEFAULT_REEL, REEL_FORMAT, formatReelDuration, stripHandle, type ReelData } from '@/lib/reels';
@@ -555,7 +556,7 @@ export default function ReelsPage() {
                 className="w-16 h-16 rounded-2xl grid place-items-center"
                 style={{ background: 'var(--surface)', color: 'var(--ink-dim)', border: '1px solid var(--line)' }}
               >
-                <Clapperboard className="w-8 h-8" />
+                <HugeiconsIcon icon={ClapperboardIcon} size={32} strokeWidth={1.75} aria-hidden />
               </span>
               <div>
                 <h2 className="text-[18px] font-bold" style={{ color: 'var(--ink)' }}>
@@ -566,7 +567,7 @@ export default function ReelsPage() {
                 </p>
               </div>
               <button onClick={openNew} className="brand-btn primary" style={{ padding: '10px 18px' }}>
-                <Plus className="w-4 h-4" />
+                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.75} aria-hidden />
                 <span>Novo reel</span>
               </button>
             </div>
@@ -583,7 +584,7 @@ export default function ReelsPage() {
                   className="w-11 h-11 rounded-full grid place-items-center transition-transform group-hover:scale-110"
                   style={{ background: 'var(--surface)' }}
                 >
-                  <Plus className="w-5 h-5" />
+                  <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.75} aria-hidden />
                 </span>
                 <span className="text-[13px] font-medium">Novo reel</span>
               </button>
@@ -623,7 +624,7 @@ export default function ReelsPage() {
                           {row.avatar_url ? (
                             <img src={row.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover opacity-80" />
                           ) : (
-                            <Clapperboard className="w-9 h-9" style={{ color: 'rgba(255,255,255,0.35)' }} />
+                            <HugeiconsIcon icon={ClapperboardIcon} size={36} strokeWidth={1.75} aria-hidden style={{ color: 'rgba(255,255,255,0.35)' }} />
                           )}
                         </div>
                       )}
@@ -666,7 +667,7 @@ export default function ReelsPage() {
                         style={{ background: 'rgba(0,0,0,0.5)', color: '#fff' }}
                         aria-label="Remover reel"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.75} aria-hidden />
                       </button>
 
                       {/* Selo duração + MP4 */}
@@ -724,7 +725,7 @@ export default function ReelsPage() {
             className="brand-btn outline"
             style={{ padding: '8px 14px' }}
           >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            {isPlaying ? <HugeiconsIcon icon={PauseIcon} size={16} strokeWidth={1.75} aria-hidden /> : <HugeiconsIcon icon={PlayIcon} size={16} strokeWidth={1.75} aria-hidden />}
             <span>{isPlaying ? 'Pausar' : 'Reproduzir'}</span>
           </button>
           <button
@@ -733,7 +734,7 @@ export default function ReelsPage() {
             style={{ padding: '8px 14px' }}
             aria-pressed={reel.muted}
           >
-            {reel.muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {reel.muted ? <HugeiconsIcon icon={VolumeOffIcon} size={16} strokeWidth={1.75} aria-hidden /> : <HugeiconsIcon icon={VolumeHighIcon} size={16} strokeWidth={1.75} aria-hidden />}
             <span>{reel.muted ? 'Mudo' : 'Com som'}</span>
           </button>
         </div>
@@ -755,7 +756,7 @@ export default function ReelsPage() {
             style={{ padding: 6 }}
             aria-label="Fechar editor"
           >
-            <X className="w-4 h-4" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -779,7 +780,7 @@ export default function ReelsPage() {
                 className="brand-btn outline flex-1"
                 style={{ padding: '7px 12px' }}
               >
-                <Upload className="w-3.5 h-3.5" />
+                <HugeiconsIcon icon={Upload01Icon} size={14} strokeWidth={1.75} aria-hidden />
                 <span>{reel.avatarUrl ? 'Trocar' : 'Enviar'} avatar</span>
               </button>
               <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
@@ -900,7 +901,7 @@ export default function ReelsPage() {
                     className="text-[12px] font-medium mt-1 inline-flex items-center gap-1 disabled:opacity-50"
                     style={{ color: 'var(--accent)' }}
                   >
-                    <Upload className="w-3 h-3" />
+                    <HugeiconsIcon icon={Upload01Icon} size={12} strokeWidth={1.75} aria-hidden />
                     {uploading ? 'Enviando…' : 'Trocar vídeo'}
                   </button>
                 </div>
@@ -922,7 +923,7 @@ export default function ReelsPage() {
                   className="p-1.5 rounded-md shrink-0 self-start hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
                   style={{ color: 'var(--ink-dim)' }}
                 >
-                  <X className="w-4 h-4" />
+                  <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
                 </button>
               </div>
             ) : (
@@ -934,7 +935,7 @@ export default function ReelsPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed transition-colors disabled:opacity-50"
                   style={{ borderColor: 'var(--line-strong)', color: 'var(--ink-dim)' }}
                 >
-                  <Video className="w-4 h-4" />
+                  <HugeiconsIcon icon={Video01Icon} size={16} strokeWidth={1.75} aria-hidden />
                   {uploading ? 'Enviando…' : 'Enviar vídeo (MP4/WebM)'}
                 </button>
                 <p className="text-[11px] mt-1.5" style={{ color: 'var(--ink-dim)' }}>
@@ -967,7 +968,7 @@ export default function ReelsPage() {
             className="brand-btn primary w-full"
             style={{ padding: '9px 14px' }}
           >
-            <Download className="w-4 h-4" />
+            <HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={1.75} aria-hidden />
             <span>Baixar Reels (MP4)</span>
           </button>
         </div>
@@ -1026,7 +1027,7 @@ export default function ReelsPage() {
                     Cancelar
                   </button>
                   <button onClick={runExport} className="brand-btn primary" style={{ padding: '8px 16px' }}>
-                    <Download className="w-4 h-4" />
+                    <HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={1.75} aria-hidden />
                     <span>Baixar</span>
                   </button>
                 </div>

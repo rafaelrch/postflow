@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Lock, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon, LockKeyholeIcon } from '@hugeicons/core-free-icons';
 import {
   establishRecoverySession,
   type RecoveryClient,
@@ -129,7 +130,7 @@ export default function RedefinirSenhaPage() {
 
           {validando ? (
             <div className="brand-card flex items-center gap-3" style={{ padding: 24 }} data-testid="redefinir-validando">
-              <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--ink-dim)' }} />
+              <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" style={{ color: 'var(--ink-dim)' }} />
               <p className="text-[14px]" style={{ color: 'var(--ink-dim)' }}>Validando seu link…</p>
             </div>
           ) : !valido ? (
@@ -176,7 +177,7 @@ export default function RedefinirSenhaPage() {
                 disabled={enviando}
                 className="brand-btn primary w-full justify-center mt-1"
               >
-                {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {enviando ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : null}
                 {enviando ? 'Salvando…' : 'Salvar e entrar'}
               </button>
             </form>
@@ -204,8 +205,12 @@ function Campo({
     <div>
       <label className="section-kicker block mb-2" htmlFor={id}>{label}</label>
       <div className="relative">
-        <Lock
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+        <HugeiconsIcon
+          icon={LockKeyholeIcon}
+          size={16}
+          strokeWidth={1.75}
+          aria-hidden
+          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
           style={{ color: 'var(--ink-dim)' }}
         />
         <input

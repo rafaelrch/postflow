@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AtSign, CheckCircle2, Clock, Loader2, Mail, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { AtIcon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Loading03Icon, Mail01Icon } from '@hugeicons/core-free-icons';
 
 /**
  * Trocar o e-mail da conta — botão que abre um diálogo, na mesma gramática do
@@ -98,7 +99,7 @@ export default function ChangeEmailButton({
           className="mb-3 w-full rounded-[10px] p-3 flex items-start gap-2.5"
           style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}
         >
-          <Clock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--ink-dim)' }} />
+          <HugeiconsIcon icon={Clock01Icon} size={16} strokeWidth={1.75} aria-hidden className="shrink-0 mt-0.5" style={{ color: 'var(--ink-dim)' }} />
           <div className="min-w-0">
             <p className="text-[13px] font-medium" style={{ color: 'var(--ink)' }}>
               Aguardando confirmação em <span data-testid="email-pendente-endereco">{pendente}</span>
@@ -115,7 +116,7 @@ export default function ChangeEmailButton({
               disabled={enviando}
               onClick={() => pedir(pendente)}
             >
-              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              {enviando ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : <HugeiconsIcon icon={Mail01Icon} size={16} strokeWidth={1.75} aria-hidden />}
               {enviando ? 'Reenviando…' : 'Reenviar confirmação'}
             </button>
             {erro && !aberto && (
@@ -133,7 +134,7 @@ export default function ChangeEmailButton({
         onClick={() => setAberto(true)}
         className="brand-btn sm"
       >
-        <AtSign className="w-4 h-4" />
+        <HugeiconsIcon icon={AtIcon} size={16} strokeWidth={1.75} aria-hidden />
         Trocar e-mail
       </button>
 
@@ -160,7 +161,7 @@ export default function ChangeEmailButton({
               className="absolute top-4 right-4 w-8 h-8 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               style={{ color: 'var(--ink-dim)' }}
             >
-              <X className="w-4 h-4" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
             </button>
 
             <h2
@@ -182,8 +183,12 @@ export default function ChangeEmailButton({
               <div>
                 <label className="section-kicker block mb-1.5" htmlFor="novo-email">Novo e-mail</label>
                 <div className="relative">
-                  <AtSign
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                  <HugeiconsIcon
+                    icon={AtIcon}
+                    size={16}
+                    strokeWidth={1.75}
+                    aria-hidden
+                    className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                     style={{ color: 'var(--ink-dim)' }}
                   />
                   <input
@@ -230,7 +235,7 @@ export default function ChangeEmailButton({
                   className="brand-btn primary flex-1 justify-center"
                   style={{ padding: '10px 14px' }}
                 >
-                  {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  {enviando ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} strokeWidth={1.75} aria-hidden />}
                   {enviando ? 'Enviando…' : 'Enviar confirmação'}
                 </button>
               </div>

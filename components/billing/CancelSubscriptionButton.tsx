@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, AlertTriangle } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 
 /**
  * Cancelar assinatura, a partir do card "Assinatura" em /conta.
@@ -141,7 +142,7 @@ export default function CancelSubscriptionButton({
               className="absolute top-4 right-4 w-8 h-8 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               style={{ color: 'var(--ink-dim)' }}
             >
-              <X className="w-4 h-4" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
             </button>
 
             <span
@@ -149,7 +150,7 @@ export default function CancelSubscriptionButton({
               style={{ background: 'var(--danger)', color: '#fff' }}
               aria-hidden
             >
-              <AlertTriangle className="w-5 h-5" />
+              <HugeiconsIcon icon={Alert01Icon} size={20} strokeWidth={1.75} aria-hidden />
             </span>
 
             <h2

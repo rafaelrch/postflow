@@ -1,9 +1,12 @@
 'use client';
 
 import { ReactNode, useRef } from 'react';
-import { Download, Archive, Upload, Image, Underline, RotateCcw, ArrowLeft } from 'lucide-react';
-// `Image` já é o ícone do lucide neste arquivo — o componente do Next entra
-// com outro nome em vez de renomear as ~10 chamadas do ícone.
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  ArrowLeft01Icon,
+  UnderlineIcon,
+  Upload01Icon,
+} from '@hugeicons/core-free-icons';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { useEditorStore } from '@/hooks/useEditorStore';
@@ -32,6 +35,11 @@ import {
   visiblePanels,
 } from './sidebar/panels';
 import { cn, MIN_IMAGE_ZOOM } from '@/lib/utils';
+import {
+  ArchiveBoxArrowDownIcon as AnimatedArchiveBoxArrowDown,
+  ArrowDownTrayIcon as AnimatedArrowDownTray,
+  useNativeHoverAnimation,
+} from '@/lib/animated-heroicons';
 import { uploadImageFile } from '@/lib/upload-image';
 import toast from 'react-hot-toast';
 import {
@@ -128,7 +136,7 @@ function UnderlineToggle({ on, onToggle }: { on: boolean; onToggle: () => void }
           : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-dim)] hover:border-[var(--ink)] hover:text-[var(--ink)]'
       )}
     >
-      <Underline className="w-3 h-3" />
+      <HugeiconsIcon icon={UnderlineIcon} size={12} strokeWidth={1.75} aria-hidden />
     </button>
   );
 }
@@ -145,7 +153,13 @@ function DropZone({ label, onClick, onFile }: { label: string; onClick: () => vo
         if (f?.type.startsWith('image/')) onFile(f);
       }}
     >
-      <Upload className="w-4 h-4 mx-auto mb-1.5 text-[var(--ink-muted)] group-hover:text-[var(--ink-dim)] transition-colors" />
+      <HugeiconsIcon
+        icon={Upload01Icon}
+        size={16}
+        strokeWidth={1.75}
+        aria-hidden
+        className="mx-auto mb-1.5 text-[var(--ink-muted)] transition-transform duration-150 motion-reduce:transition-none group-hover:scale-105 group-hover:text-[var(--ink-dim)]"
+      />
       <span className="text-[11px] text-[var(--ink-muted)] font-medium">{label}</span>
     </div>
   );
@@ -173,6 +187,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
   const { generateAll, generateOne, generating } = useGenerateCarouselImages();
   const refine = useRefineText();
+  const downloadSlideAnimation = useNativeHoverAnimation();
+  const downloadAllAnimation = useNativeHoverAnimation();
 
   if (!slide) return null;
 
@@ -1353,7 +1369,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       // Raio das linhas do acordeão (11), não mais pílula — o tamanho novo fica.
       className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-[var(--studio-pill)] pl-2 pr-3 py-2 text-[12px] leading-none text-[var(--studio-pill-ink)] hover:bg-[var(--studio-line)] hover:text-[var(--ink)] transition-colors"
     >
-      <ArrowLeft className="w-4 h-4 shrink-0" />
+      <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden />
       Dashboard
     </Link>
   );
@@ -1393,9 +1409,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       <div className="shrink-0 px-[13px] pt-4 pb-[42px] flex flex-col gap-[5px]">
         <button
           onClick={onDownloadSlide}
+          onMouseEnter={downloadSlideAnimation.onMouseEnter}
+          onMouseLeave={downloadSlideAnimation.onMouseLeave}
           className="h-[46px] w-full rounded-[10px] bg-[var(--studio-panel)] border border-[var(--studio-line)] text-[14px] text-[var(--ink)] flex items-center justify-center gap-3 hover:border-[var(--studio-line-strong)] transition-colors"
         >
-          <Download className="w-[18px] h-[18px]" />
+          <AnimatedArrowDownTray ref={downloadSlideAnimation.iconRef} size={18} aria-hidden />
           Baixar Slide {activeSlideIndex + 1}
         </button>
         {/* Ação principal. Borda e sombra CASADAS na cor do TEMA, não da tinta:
@@ -1405,9 +1423,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             preenchimento continua sendo a tinta. */}
         <button
           onClick={onDownloadAll}
+          onMouseEnter={downloadAllAnimation.onMouseEnter}
+          onMouseLeave={downloadAllAnimation.onMouseLeave}
           className="h-[46px] w-full rounded-[10px] bg-[var(--ink)] text-[var(--paper)] text-[14px] flex items-center justify-center gap-3 border border-[var(--paper)] shadow-[var(--sh-studio-paper)] hover:-translate-y-px active:translate-y-0 active:shadow-[var(--sh-press)] transition-all"
         >
-          <Archive className="w-[18px] h-[18px]" />
+          <AnimatedArchiveBoxArrowDown ref={downloadAllAnimation.iconRef} size={18} aria-hidden />
           Exportar todos os slides
         </button>
       </div>

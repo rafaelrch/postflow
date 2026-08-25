@@ -749,23 +749,22 @@ describe('roadmap — o like é só coração e número', () => {
     expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).not.toContain('group-hover:');
   });
 
-  it('o clique que VOTA comemora; o que desfaz o like, não', () => {
-    const { unmount } = render(<RoadmapClient initialColumns={board([card()])} />);
-    fireEvent.click(screen.getByTestId('vote-c1'));
-    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).toContain('scale-125');
-    unmount();
-
-    render(<RoadmapClient initialColumns={board([card({ hasVoted: true })])} />);
-    fireEvent.click(screen.getByTestId('vote-c1'));
-    expect(screen.getByTestId('vote-heart-c1').getAttribute('class')).not.toContain('scale-125');
-  });
-
-  /** Quem pediu menos animação recebe a troca de cor sem o pulso. */
-  it('respeita prefers-reduced-motion', () => {
+  it('anima apenas no hover interno, com SVG/path e acesso do voto preservado', () => {
     render(<RoadmapClient initialColumns={board([card()])} />);
-    const cls = screen.getByTestId('vote-heart-c1').getAttribute('class') ?? '';
-    expect(cls).toContain('motion-reduce:transition-none');
-    expect(cls).toContain('motion-reduce:transform-none');
+    const button = screen.getByTestId('vote-c1');
+    const heart = screen.getByTestId('vote-heart-c1');
+
+    expect(button.getAttribute('aria-label')).toBe('Votar em Exportar em PDF');
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    expect(heart.getAttribute('aria-hidden')).toBe('true');
+    expect(heart.querySelector('svg')).toBeTruthy();
+    expect(heart.querySelector('path')).toBeTruthy();
+    expect(button.getAttribute('class')).not.toMatch(/(?:transform|scale|transition)/);
+
+    fireEvent.mouseEnter(heart);
+    fireEvent.mouseLeave(heart);
+    fireEvent.click(button);
+    expect(button.getAttribute('class')).not.toMatch(/(?:transform|scale|transition)/);
   });
 
   /** O chevron era o desenho antigo — ele saiu junto com a pílula. */

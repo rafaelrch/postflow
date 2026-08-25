@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ChevronDownIcon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 
 interface SectionProps {
@@ -21,9 +22,13 @@ export default function Section({ title, defaultOpen = false, children }: Sectio
         <span className="text-[9px] font-bold text-gray-900/40 dark:text-white/35 uppercase tracking-[0.1em]">
           {title}
         </span>
-        <ChevronDown
+        <HugeiconsIcon
+          icon={ChevronDownIcon}
+          size={14}
+          strokeWidth={1.75}
+          aria-hidden
           className={cn(
-            'w-3.5 h-3.5 text-gray-900/25 dark:text-white/25 transition-transform duration-200',
+            'text-gray-900/25 dark:text-white/25 transition-transform duration-200 motion-reduce:transition-none',
             open ? 'rotate-0' : '-rotate-90'
           )}
         />

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, Check, EyeOff } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert01Icon, Cancel01Icon, EyeOffIcon, Tick01Icon } from '@hugeicons/core-free-icons';
 import { useEditorStore } from '@/hooks/useEditorStore';
 import { cn } from '@/lib/utils';
 import type { CornerPlaceholderHit, DeckCornerSlot } from '@/lib/corner-placeholder';
@@ -193,7 +194,7 @@ export default function CornerPlaceholderModal({ hits, style, onClose }: CornerP
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/8 dark:border-white/8">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <HugeiconsIcon icon={Alert01Icon} size={16} strokeWidth={1.75} aria-hidden className="text-amber-500" />
             <h2
               id="corner-placeholder-title"
               className="text-base font-semibold text-gray-900 dark:text-white"
@@ -208,7 +209,7 @@ export default function CornerPlaceholderModal({ hits, style, onClose }: CornerP
             aria-label="Fechar"
             className="text-gray-900/40 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
-            <X className="w-5 h-5" />
+            <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -253,7 +254,7 @@ export default function CornerPlaceholderModal({ hits, style, onClose }: CornerP
             data-testid="corner-placeholder-disable"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-900/60 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
-            <EyeOff className="w-4 h-4" />
+            <HugeiconsIcon icon={EyeOffIcon} size={16} strokeWidth={1.75} aria-hidden />
             {slots.length === 1 ? 'Desativar este canto' : 'Desativar os cantos'}
           </button>
           <button
@@ -265,7 +266,7 @@ export default function CornerPlaceholderModal({ hits, style, onClose }: CornerP
               'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-900/90 dark:hover:bg-white/90',
             )}
           >
-            <Check className="w-4 h-4" />
+            <HugeiconsIcon icon={Tick01Icon} size={16} strokeWidth={1.75} aria-hidden />
             Usar este texto
           </button>
         </div>

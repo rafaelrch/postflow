@@ -2,7 +2,10 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Heart, Plus, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, ArrowLeft01Icon, Cancel01Icon, HeartIcon } from '@hugeicons/core-free-icons';
+import { HeartIcon as AnimatedHeartIcon } from '@animateicons/react/huge';
+import { Plus as AnimatedPlus, useNativeHoverAnimation } from '@/lib/animated-heroicons';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import RoadmapDialog from '@/components/roadmap/RoadmapDialog';
@@ -114,13 +117,10 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
  * único azul: mora em `:root` (não é escopo do editor), tem par no modo escuro e
  * já é a cor de "selecionado" do produto. Nenhum hex novo entra aqui.
  *
- * ── O PULSO ─────────────────────────────────────────────────────────────────
- * A comemoração é uma transição de `transform` em dois tempos (cresce, volta),
- * e não um `@keyframes`: não precisa de regra global nova e morre sozinha. Ela
- * só roda no clique que VOTA — desfazer o like volta ao vazado sem festa.
- * `motion-reduce:` desliga a transformação em CSS, então quem pediu menos
- * animação recebe a troca de cor no mesmo instante; a regra vale ao vivo, sem
- * depender de o componente ter remontado.
+ * ── O MOVIMENTO ─────────────────────────────────────────────────────────────
+ * O coração é passivo a ponteiros; o botão inteiro (`group`) é o gatilho visual
+ * e o CSS desliga o movimento quando o usuário prefere redução. Clique, foco e
+ * teclado continuam controlando o voto, mas não iniciam movimento.
  */
 function VoteButton({
   card,
@@ -131,14 +131,7 @@ function VoteButton({
   onToggle: (card: RoadmapCard) => void;
   disabled: boolean;
 }) {
-  const [comemorando, setComemorando] = useState(false);
-
   function handleClick() {
-    // Só o clique que VOTA comemora. `hasVoted` aqui é o estado ANTES do toggle.
-    if (!card.hasVoted) {
-      setComemorando(true);
-      window.setTimeout(() => setComemorando(false), 220);
-    }
     onToggle(card);
   }
 
@@ -159,12 +152,13 @@ function VoteButton({
         'disabled:opacity-50 disabled:cursor-not-allowed',
       )}
     >
-      <Heart
+      <AnimatedHeartIcon
         aria-hidden
         data-testid={`vote-heart-${card.id}`}
+        size={16}
+        isAnimated={false}
         className={cn(
-          'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none motion-reduce:transform-none',
-          comemorando && 'scale-125',
+          'pointer-events-none',
           card.hasVoted
             ? // Votado: preenchido e vermelho. NÃO fica azul no hover — o cursor
               // ainda está em cima do coração quando a animação termina, e um
@@ -367,7 +361,7 @@ function CardDetailModal({ card, onClose }: { card: RoadmapCard; onClose: () => 
           data-testid="fechar-detalhe"
           className="ml-auto shrink-0 rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
         >
-          <X className="h-4 w-4" />
+          <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
 
@@ -401,9 +395,12 @@ function CardDetailModal({ card, onClose }: { card: RoadmapCard; onClose: () => 
         {/* MESMO coração do card, para o olho reconhecer a mesma coisa — mas
             aqui ele é leitura, não ação: o voto se dá no card. */}
         <span data-testid="detalhe-votos" className="inline-flex items-center gap-1.5">
-          <Heart
+          <HugeiconsIcon
+            icon={HeartIcon}
             aria-hidden
-            className={cn('h-4 w-4', card.hasVoted ? 'fill-current text-[var(--danger)]' : 'text-[var(--ink-dim)]')}
+            size={16}
+            strokeWidth={1.75}
+            className={cn(card.hasVoted ? 'fill-current text-[var(--danger)]' : 'text-[var(--ink-dim)]')}
           />
           <span className="tabular-nums">{card.voteCount}</span>
           <span className="sr-only"> voto(s)</span>
@@ -494,7 +491,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
             data-testid="voltar-popup"
             className="rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
           <h2 id="criar-task-titulo" className="text-[15px] font-bold text-[var(--ink)]">
             Criar task
@@ -506,7 +503,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
             data-testid="fechar-popup"
             className="ml-auto rounded-md p-1 text-[var(--ink-dim)] hover:bg-black/5 hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)]"
           >
-            <X className="h-4 w-4" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -615,6 +612,7 @@ export default function RoadmapClient({
   const router = useRouter();
   const [columns, setColumns] = useState<RoadmapColumn[]>(() => doServidor(initialColumns));
   const [modalOpen, setModalOpen] = useState(false);
+  const createTaskAnimation = useNativeHoverAnimation();
   const [pendingId, setPendingId] = useState<string | null>(null);
   /**
    * O detalhe guarda o ID, não o card.
@@ -748,10 +746,12 @@ export default function RoadmapClient({
           type="button"
           onClick={() => setModalOpen(true)}
           data-testid="criar-task"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--ink)]"
+          onMouseEnter={createTaskAnimation.onMouseEnter}
+          onMouseLeave={createTaskAnimation.onMouseLeave}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--ink)]"
           style={{ background: 'var(--ink)', color: 'var(--paper)' }}
         >
-          <Plus className="h-4 w-4" aria-hidden />
+          <AnimatedPlus ref={createTaskAnimation.iconRef} size={16} aria-hidden />
           Criar task
         </button>
       </div>
@@ -778,7 +778,7 @@ export default function RoadmapClient({
                 className="mb-1 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--line-strong)] bg-white/50 px-3 py-3 text-[12px] font-medium text-[var(--ink-dim)] transition-colors hover:border-[var(--ink)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
                 Adicionar task
-                <Plus className="h-3.5 w-3.5" aria-hidden />
+                <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.75} aria-hidden />
               </button>
             )}
           </Column>

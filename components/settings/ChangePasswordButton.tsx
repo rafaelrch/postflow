@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Lock, Loader2, CheckCircle2, KeyRound, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon, CheckmarkCircle01Icon, Key01Icon, Loading03Icon, LockKeyholeIcon } from '@hugeicons/core-free-icons';
 import { createClient } from '@/lib/supabase';
 import {
   PASSWORD_MIN,
@@ -136,7 +137,7 @@ export default function ChangePasswordButton() {
         onClick={() => setAberto(true)}
         className="brand-btn sm"
       >
-        <KeyRound className="w-4 h-4" />
+        <HugeiconsIcon icon={Key01Icon} size={16} strokeWidth={1.75} aria-hidden />
         Trocar senha
       </button>
 
@@ -163,7 +164,7 @@ export default function ChangePasswordButton() {
               className="absolute top-4 right-4 w-8 h-8 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               style={{ color: 'var(--ink-dim)' }}
             >
-              <X className="w-4 h-4" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
             </button>
 
             <h2
@@ -176,7 +177,7 @@ export default function ChangePasswordButton() {
 
             {pronto ? (
               <div className="mt-4 flex items-start gap-3" data-testid="senha-trocada">
-                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--success)' }} />
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={20} strokeWidth={1.75} aria-hidden className="shrink-0 mt-0.5" style={{ color: 'var(--success)' }} />
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Senha alterada.</p>
                   {/* Dizer que continua logada é parte do contrato desta tela:
@@ -250,7 +251,7 @@ export default function ChangePasswordButton() {
                     className="brand-btn primary flex-1 justify-center"
                     style={{ padding: '10px 14px' }}
                   >
-                    {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {enviando ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : null}
                     {enviando ? 'Salvando…' : 'Salvar nova senha'}
                   </button>
                 </div>
@@ -282,7 +283,11 @@ function Campo({
     <div>
       <label className="section-kicker block mb-1.5" htmlFor={id}>{label}</label>
       <div className="relative">
-        <Lock
+        <HugeiconsIcon
+          icon={LockKeyholeIcon}
+          size={16}
+          strokeWidth={1.75}
+          aria-hidden
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
           style={{ color: 'var(--ink-dim)' }}
         />

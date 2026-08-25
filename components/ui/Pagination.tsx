@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 
 /**
  * Controle de paginação — um só, usado no dashboard e nas notícias.
@@ -80,7 +81,7 @@ export default function Pagination({
             title="Página anterior"
             className={seta}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
           <button
             type="button"
@@ -90,7 +91,7 @@ export default function Pagination({
             title="Próxima página"
             className={seta}
           >
-            <ChevronRight className="w-4 h-4" />
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
         </>
       )}

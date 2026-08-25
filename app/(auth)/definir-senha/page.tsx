@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon, LockKeyholeIcon } from '@hugeicons/core-free-icons';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { isPaidPasswordlessSession } from '@/lib/paid-password-session';
@@ -95,10 +96,10 @@ export default function DefinirSenhaPage() {
             <p style={{ color: 'var(--ink-dim)' }}>E-mail confirmado. Escolha uma senha para acessar o Creatools.</p>
             <label className="section-kicker" htmlFor="password">Senha</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--ink-dim)' }} />
+              <HugeiconsIcon icon={LockKeyholeIcon} size={16} strokeWidth={1.75} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink-dim)' }} />
               <input id="password" className="brand-input" style={{ paddingLeft: 40 }} type="password" minLength={6} required value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" placeholder="mínimo 6 caracteres" />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Definir senha</Button>
+            <Button type="submit" className="w-full" disabled={loading}>{loading ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : null} Definir senha</Button>
           </>
         ) : <p style={{ color: 'var(--ink-dim)' }}>Confirme seu e-mail pelo link recebido para continuar.</p>}
       </form>

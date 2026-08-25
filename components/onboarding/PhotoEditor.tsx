@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Crosshair, Move, RotateCw, ZoomIn } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CrosshairIcon, MoveIcon, RotateCwIcon, ZoomInIcon } from '@hugeicons/core-free-icons';
 import {
   EXPORT_SIZE,
   IDENTITY_CROP,
@@ -124,7 +125,7 @@ export default function PhotoEditor({ file, onCancel, onConfirm }: Props) {
       <div className="flex shrink-0 items-baseline justify-between gap-3">
         <p className="section-kicker">Ajuste a foto</p>
         <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--ink-dim)' }}>
-          <Move className="h-3.5 w-3.5" /> arraste para mover
+          <HugeiconsIcon icon={MoveIcon} size={14} strokeWidth={1.75} aria-hidden /> arraste para mover
         </span>
       </div>
 
@@ -162,7 +163,7 @@ export default function PhotoEditor({ file, onCancel, onConfirm }: Props) {
 
       <div className="grid shrink-0 gap-2">
         <label className="flex items-center gap-2 text-xs">
-          <ZoomIn className="h-4 w-4 shrink-0" /> Zoom
+          <HugeiconsIcon icon={ZoomInIcon} size={16} strokeWidth={1.75} aria-hidden className="shrink-0" /> Zoom
           <input
             aria-label="Zoom da foto"
             className="flex-1"
@@ -175,7 +176,7 @@ export default function PhotoEditor({ file, onCancel, onConfirm }: Props) {
           />
         </label>
         <label className="flex items-center gap-2 text-xs">
-          <RotateCw className="h-4 w-4 shrink-0" /> Rotação
+          <HugeiconsIcon icon={RotateCwIcon} size={16} strokeWidth={1.75} aria-hidden className="shrink-0" /> Rotação
           <input
             aria-label="Rotação da foto"
             className="flex-1"
@@ -195,7 +196,7 @@ export default function PhotoEditor({ file, onCancel, onConfirm }: Props) {
           className="brand-btn outline sm mr-auto inline-flex items-center gap-1.5"
           onClick={() => setCrop(IDENTITY_CROP)}
         >
-          <Crosshair className="h-3.5 w-3.5" /> Centralizar
+          <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={1.75} aria-hidden /> Centralizar
         </button>
         <button type="button" className="brand-btn outline sm" onClick={onCancel}>
           Cancelar

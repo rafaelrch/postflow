@@ -1,21 +1,26 @@
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import type { IconSvgElement } from '@hugeicons/react';
 import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Calendar as CalendarIcon,
-  X,
-  Trash2,
-  Check,
-  Clock,
-  LayoutGrid,
-  Newspaper,
-  StickyNote,
-  MoreHorizontal,
-} from 'lucide-react';
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Clock01Icon,
+  DashboardSquare01Icon,
+  Delete02Icon,
+  MoreHorizontalIcon,
+  NewspaperIcon,
+  StickyNote01Icon,
+  Tick01Icon,
+} from '@hugeicons/core-free-icons';
 import toast from 'react-hot-toast';
+import {
+  CalendarDays as AnimatedCalendarDays,
+  Plus as AnimatedPlus,
+  useNativeHoverAnimation,
+} from '@/lib/animated-heroicons';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import type { ScheduledPost } from './page';
@@ -27,10 +32,10 @@ import { trackProductEvent } from '@/lib/product-events';
 type Kind = ScheduledPost['kind'];
 type Status = ScheduledPost['status'];
 
-const KIND_META: Record<Kind, { label: string; tint: string; textOnTint: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  carousel: { label: 'Carrossel', tint: 'var(--ink)',         textOnTint: 'var(--paper)',  Icon: LayoutGrid },
-  news:     { label: 'News',      tint: 'var(--paper-3)',     textOnTint: 'var(--ink)',    Icon: Newspaper },
-  note:     { label: 'Nota',      tint: 'var(--paper-2)',     textOnTint: 'var(--ink)',    Icon: StickyNote },
+const KIND_META: Record<Kind, { label: string; tint: string; textOnTint: string; Icon: IconSvgElement }> = {
+  carousel: { label: 'Carrossel', tint: 'var(--ink)',         textOnTint: 'var(--paper)',  Icon: DashboardSquare01Icon },
+  news:     { label: 'News',      tint: 'var(--paper-3)',     textOnTint: 'var(--ink)',    Icon: NewspaperIcon },
+  note:     { label: 'Nota',      tint: 'var(--paper-2)',     textOnTint: 'var(--ink)',    Icon: StickyNote01Icon },
 };
 
 const STATUS_META: Record<Status, { label: string; dot: string }> = {
@@ -84,6 +89,9 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
   const [monthCursor, setMonthCursor] = useState<Date>(() => startOfMonth(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
   const [editor, setEditor] = useState<{ mode: 'create'; day: Date } | { mode: 'edit'; post: ScheduledPost } | null>(null);
+  const todayAnimation = useNativeHoverAnimation();
+  const headerCreateAnimation = useNativeHoverAnimation();
+  const selectedDayCreateAnimation = useNativeHoverAnimation();
 
   const days = useMemo(() => buildMonthGrid(monthCursor), [monthCursor]);
   const postsByDay = useMemo(() => {
@@ -232,15 +240,22 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="brand-btn outline" onClick={goToday}>
-              <CalendarIcon className="w-4 h-4" />
+            <button
+              className="brand-btn outline"
+              onClick={goToday}
+              onMouseEnter={todayAnimation.onMouseEnter}
+              onMouseLeave={todayAnimation.onMouseLeave}
+            >
+              <AnimatedCalendarDays ref={todayAnimation.iconRef} size={16} aria-hidden />
               <span>Hoje</span>
             </button>
             <button
               className="brand-btn primary"
               onClick={() => setEditor({ mode: 'create', day: selectedDay })}
+              onMouseEnter={headerCreateAnimation.onMouseEnter}
+              onMouseLeave={headerCreateAnimation.onMouseLeave}
             >
-              <Plus className="w-4 h-4" />
+              <AnimatedPlus ref={headerCreateAnimation.iconRef} size={16} aria-hidden />
               <span>Novo agendamento</span>
               <span
                 className="font-mono text-[10px] uppercase tracking-[0.14em] ml-1 px-1.5 py-[1px] rounded"
@@ -262,10 +277,10 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <button className="brand-btn icon outline" onClick={goPrevMonth} aria-label="Mês anterior">
-                  <ChevronLeft className="w-4 h-4" />
+                  <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.75} aria-hidden />
                 </button>
                 <button className="brand-btn icon outline" onClick={goNextMonth} aria-label="Próximo mês">
-                  <ChevronRight className="w-4 h-4" />
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.75} aria-hidden />
                 </button>
                 <h2
                   className="font-display ml-2 capitalize"
@@ -362,7 +377,7 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
                             role="button"
                             tabIndex={0}
                           >
-                            <Icon className="w-2.5 h-2.5 shrink-0" />
+                            <HugeiconsIcon icon={Icon} size={10} strokeWidth={1.75} aria-hidden className="shrink-0" />
                             <span className="truncate">{p.title || 'Sem título'}</span>
                           </div>
                         );
@@ -397,8 +412,10 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
             <button
               className="brand-btn outline w-full justify-center"
               onClick={() => setEditor({ mode: 'create', day: selectedDay })}
+              onMouseEnter={selectedDayCreateAnimation.onMouseEnter}
+              onMouseLeave={selectedDayCreateAnimation.onMouseLeave}
             >
-              <Plus className="w-4 h-4" />
+              <AnimatedPlus ref={selectedDayCreateAnimation.iconRef} size={16} aria-hidden />
               <span>Agendar neste dia</span>
             </button>
 
@@ -432,14 +449,14 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
                         className="brand-mark sm"
                         style={{ background: meta.tint, color: meta.textOnTint }}
                       >
-                        <Icon className="w-3.5 h-3.5" />
+                        <HugeiconsIcon icon={Icon} size={14} strokeWidth={1.75} aria-hidden />
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
                           {p.title || 'Sem título'}
                         </p>
                         <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] mt-0.5 flex items-center gap-2" style={{ color: 'var(--ink-dim)' }}>
-                          <Clock className="w-2.5 h-2.5" />
+                          <HugeiconsIcon icon={Clock01Icon} size={10} strokeWidth={1.75} aria-hidden />
                           {formatTimeShort(p.scheduled_at)}
                           <span className="inline-flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.dot }} />
@@ -447,7 +464,7 @@ export default function AgendaClient({ initialPosts }: { initialPosts: Scheduled
                           </span>
                         </p>
                       </div>
-                      <MoreHorizontal className="w-4 h-4 shrink-0" style={{ color: 'var(--ink-dim)' }} />
+                      <HugeiconsIcon icon={MoreHorizontalIcon} size={16} strokeWidth={1.75} aria-hidden className="shrink-0" style={{ color: 'var(--ink-dim)' }} />
                     </li>
                   );
                 })}
@@ -599,7 +616,7 @@ function EditorDrawer({
             onClick={onClose}
             aria-label="Fechar"
           >
-            <X className="w-4 h-4" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -685,7 +702,7 @@ function EditorDrawer({
               style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
               type="button"
             >
-              <Trash2 className="w-4 h-4" />
+              <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.75} aria-hidden />
               <span>Remover</span>
             </button>
           ) : (
@@ -702,7 +719,7 @@ function EditorDrawer({
               disabled={!canSave || saving}
               type="button"
             >
-              <Check className="w-4 h-4" />
+              <HugeiconsIcon icon={Tick01Icon} size={16} strokeWidth={1.75} aria-hidden />
               <span>{initial.id ? 'Salvar' : 'Agendar'}</span>
             </button>
           </div>

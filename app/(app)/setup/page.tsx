@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CheckmarkCircle01Icon, Copy01Icon, ExternalLinkIcon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { POSTFLOW_DATABASE_SCHEMA } from '@/lib/database-schema';
 
 const SQL = POSTFLOW_DATABASE_SCHEMA;
@@ -62,7 +63,7 @@ export default function SetupPage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
                     >
-                      Abrir <ExternalLink className="w-3 h-3" />
+                      Abrir <HugeiconsIcon icon={ExternalLinkIcon} size={12} strokeWidth={1.75} aria-hidden />
                     </a>
                   ),
                 },
@@ -87,7 +88,7 @@ export default function SetupPage() {
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-xs font-medium transition-all"
               >
-                {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={1.75} aria-hidden className="text-green-400" /> : <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={1.75} aria-hidden />}
                 {copied ? 'Copiado!' : 'Copiar SQL'}
               </button>
             </div>
@@ -103,13 +104,13 @@ export default function SetupPage() {
               disabled={checking}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 transition-colors disabled:opacity-50"
             >
-              {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {checking ? <HugeiconsIcon icon={Loading03Icon} size={16} strokeWidth={1.75} aria-hidden className="animate-spin motion-reduce:animate-none" /> : null}
               {checking ? 'Verificando...' : 'Verificar banco de dados'}
             </button>
 
             {status === 'ok' && (
               <div className="flex items-center gap-2 text-green-400 text-sm">
-                <CheckCircle className="w-4 h-4" />
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} strokeWidth={1.75} aria-hidden />
                 Banco configurado!{' '}
                 <a href="/dashboard" className="underline text-white">Ir para o Dashboard →</a>
               </div>

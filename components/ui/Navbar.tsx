@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Zap, LayoutDashboard, Sparkles, Sun, Moon } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { DashboardSquare01Icon, MoonIcon, SparklesIcon, SunIcon, ZapIcon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 
@@ -32,7 +33,7 @@ export default function Navbar({
     <header className="h-12 bg-[var(--background)] border-b border-black/[0.06] dark:border-white/[0.06] flex items-center px-4 gap-4 z-50 shrink-0">
       {/* Logo */}
       <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
-        <Zap className="w-5 h-5 text-gray-900 dark:text-white" />
+        <HugeiconsIcon icon={ZapIcon} className="w-5 h-5 text-gray-900 dark:text-white" aria-hidden />
         <span className="font-bold text-gray-900 dark:text-white text-sm">PostFlow</span>
       </Link>
 
@@ -47,7 +48,7 @@ export default function Navbar({
               : 'text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
           )}
         >
-          <LayoutDashboard className="w-3.5 h-3.5" />
+          <HugeiconsIcon icon={DashboardSquare01Icon} className="w-3.5 h-3.5" aria-hidden />
           Dashboard
         </Link>
         <Link
@@ -59,7 +60,7 @@ export default function Navbar({
               : 'text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
           )}
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <HugeiconsIcon icon={SparklesIcon} className="w-3.5 h-3.5" aria-hidden />
           Gerador
         </Link>
       </nav>
@@ -109,7 +110,11 @@ export default function Navbar({
         className="p-1.5 rounded-md text-gray-900/50 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         title={theme === 'light' ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
       >
-        {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        {theme === 'light' ? (
+          <HugeiconsIcon icon={MoonIcon} className="w-4 h-4" aria-hidden />
+        ) : (
+          <HugeiconsIcon icon={SunIcon} className="w-4 h-4" aria-hidden />
+        )}
       </button>
     </header>
   );
