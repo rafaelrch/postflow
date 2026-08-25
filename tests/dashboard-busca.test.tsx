@@ -260,6 +260,13 @@ const carrossel = (id: string, title: string) =>
   }) as never;
 
 describe('a tela separa os quatro casos', () => {
+  it('mantém a busca sem o badge visual de atalho ⌘K', () => {
+    render(<DashboardClient initialCarousels={[carrossel('a', 'Um')]} totalCarousels={1} />);
+
+    expect(screen.getByPlaceholderText('Buscar…')).toBeTruthy();
+    expect(screen.queryByText('⌘K')).toBeNull();
+  });
+
   it('digitar leva o termo para o URL — é o servidor que busca', () => {
     vi.useFakeTimers();
     try {

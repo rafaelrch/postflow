@@ -110,4 +110,13 @@ describe('badge da conta na sidebar — foto com fallback para a inicial', () =>
     await renderSidebar();
     await waitFor(() => expect(badge().textContent).toBe('R'));
   });
+
+  it('mantém o toggle de tema acessível sem o indicador visual ⌘ .', async () => {
+    await renderSidebar();
+
+    const toggle = screen.getByRole('button', { name: 'Tema escuro' });
+    expect(toggle).toBeTruthy();
+    expect(toggle.querySelector('svg')).toBeTruthy();
+    expect(screen.queryByText('⌘ .')).toBeNull();
+  });
 });

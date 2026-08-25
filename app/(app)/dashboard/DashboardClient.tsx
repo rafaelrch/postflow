@@ -302,12 +302,6 @@ export default function DashboardClient({
                   className="bg-transparent outline-none flex-1 placeholder:text-[var(--ink-muted)]"
                   style={{ color: 'var(--ink)' }}
                 />
-                <span
-                  className="font-mono text-[9.5px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded"
-                  style={{ color: 'var(--ink-dim)', border: '1px solid var(--line-strong)' }}
-                >
-                  ⌘K
-                </span>
               </label>
 
               <Button

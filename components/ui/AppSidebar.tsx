@@ -429,9 +429,6 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
                  )}
                 <span>{theme === 'light' ? 'Tema escuro' : 'Tema claro'}</span>
               </span>
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-dim)' }}>
-                ⌘ .
-              </span>
             </>
           )}
         </button>

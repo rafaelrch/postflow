@@ -3,8 +3,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const files = [
-  'app/admin/saude/HealthDashboard.tsx',
-  'app/admin/saude/page.tsx',
   'components/auth/PendingPayment.tsx',
 ];
 

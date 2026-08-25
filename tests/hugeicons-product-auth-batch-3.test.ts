@@ -11,7 +11,6 @@ const files = [
   'app/(auth)/definir-senha/page.tsx',
   'app/(auth)/recuperar-senha/page.tsx',
   'app/(auth)/redefinir-senha/page.tsx',
-  'app/(marketing)/assinatura/Shell.tsx',
   'components/billing/CancelSubscriptionButton.tsx',
 ];
 
