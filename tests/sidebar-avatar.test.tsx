@@ -119,4 +119,13 @@ describe('badge da conta na sidebar — foto com fallback para a inicial', () =>
     expect(toggle.querySelector('svg')).toBeTruthy();
     expect(screen.queryByText('⌘ .')).toBeNull();
   });
+
+  it('mantém a aba ativa navegável e sem bolinha de carregamento', async () => {
+    const { container } = await renderSidebar();
+
+    const activeTab = screen.getByRole('link', { name: 'Carrosséis' });
+    expect(activeTab.getAttribute('href')).toBe('/dashboard');
+    expect(activeTab.querySelector('svg')).toBeTruthy();
+    expect(container.querySelectorAll('.nav-pending')).toHaveLength(0);
+  });
 });

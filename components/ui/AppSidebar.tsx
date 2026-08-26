@@ -36,7 +36,6 @@ import { cn } from '@/lib/utils';
 import { REELS_ENABLED } from '@/lib/feature-flags';
 import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
-import NavPending from '@/components/ui/NavPending';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
 
 interface NavItem {
@@ -106,7 +105,6 @@ function SidebarNavItem({
         <HugeiconsIcon icon={Icon} className="w-4 h-4 shrink-0" aria-hidden />
       )}
       {!collapsed && <span className="flex-1">{label}</span>}
-      <NavPending />
     </Link>
   );
 }
