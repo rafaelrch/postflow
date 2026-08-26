@@ -791,7 +791,15 @@ function MockPalette() {
 function MockAiImages() {
   return (
     <div className="w-full max-w-[240px] text-left">
-      <div className="aspect-[4/5] rounded-2xl" style={{ background: 'conic-gradient(from 210deg at 50% 40%, #232323, #4a4a46, #17171a, #2e2e2a, #232323)' }} />
+      <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-[#1a1a1a]">
+        <Image
+          src="/landing/ai-images-card.webp"
+          alt="Imagem de carrossel gerada por IA para um slide sobre branding e tecnologia"
+          fill
+          sizes="240px"
+          className="object-cover"
+        />
+      </div>
       <div className="flex items-center justify-between mt-3">
         {/* Nada de modelo nem de fornecedor no selo — isso muda sem aviso e não
             é o que vende. O "5 créditos" fica: é preço, e bate com
