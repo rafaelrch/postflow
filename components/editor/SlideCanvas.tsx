@@ -30,6 +30,17 @@ import {
   template02NewSlideSlots,
   template02NextModel,
 } from '@/lib/templates/template-02';
+import Template03Slide from '@/components/slides/Template03Slide';
+import {
+  TEMPLATE_03_HEIGHT,
+  TEMPLATE_03_MODELS,
+  TEMPLATE_03_MODEL_COVER,
+  TEMPLATE_03_MODEL_STEP,
+  TEMPLATE_03_WIDTH,
+  template03ModelOf,
+  template03NewSlideSlots,
+  template03NextModel,
+} from '@/lib/templates/template-03';
 import { Slide } from '@/types';
 import {
   BookmarkSquareIcon as AnimatedBookmarkSquare,
@@ -98,6 +109,7 @@ const STYLE_LABEL: Record<string, string> = {
   editorial: 'Atelier',
   template01: 'Manifesto',
   template02: 'Radar',
+  template03: 'FlowLine',
 };
 
 interface SlideCanvasProps {
@@ -105,9 +117,10 @@ interface SlideCanvasProps {
   onSave?: () => void;
   onSchedule?: () => void;
   saveStatus?: 'saved' | 'saving' | 'unsaved';
+  registerVisibleSlideRef?: (id: string, el: HTMLDivElement | null) => void;
 }
 
-export default function SlideCanvas({ generatingProgress, onSave, onSchedule, saveStatus: saveStatusProp }: SlideCanvasProps) {
+export default function SlideCanvas({ generatingProgress, onSave, onSchedule, saveStatus: saveStatusProp, registerVisibleSlideRef }: SlideCanvasProps) {
   const {
     slides, activeSlideIndex, style, globalSettings, saveStatus, lastSavedAt,
     setActiveSlideIndex, reorderSlides, removeSlide, addSlide, setFormat,
@@ -120,7 +133,8 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
   const [pickingModel, setPickingModel] = useState(false);
   const isTemplate01 = style === 'template01';
   const isTemplate02 = style === 'template02';
-  const isSpecTemplate = isTemplate01 || isTemplate02;
+  const isTemplate03 = style === 'template03';
+  const isSpecTemplate = isTemplate01 || isTemplate02 || isTemplate03;
   const addAnimation = useNativeHoverAnimation();
   const deleteAnimation = useNativeHoverAnimation(slides.length > 1);
   const saveAnimation = useNativeHoverAnimation(saveStatusProp !== 'saving');
@@ -135,6 +149,14 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
     ? template02ModelOf(slides[slides.length - 1], slides.length - 1)
     : 1;
   const suggestedModel = template02NextModel(lastModel);
+
+  // 🔴 O FlowLine tem UMA capa e slides de conteúdo que repetem a forma: o
+  // sugerido é sempre o conteúdo. Sai de `template03NextModel` em vez de um literal para o dia em que
+  // a regra mudar não haver dois lugares dizendo coisas diferentes.
+  const t03LastModel = slides.length
+    ? template03ModelOf(slides[slides.length - 1], slides.length - 1)
+    : TEMPLATE_03_MODEL_COVER;
+  const t03SuggestedModel = template03NextModel(t03LastModel);
 
   // Créditos e tema vinham do trilho global, que não monta mais no editor — a
   // barra superior é dona dos dois agora. `fetch` é idempotente.
@@ -510,6 +532,9 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
                                 totalSlides={slides.length}
                                 scale={scale}
                                 isActive={isActive}
+                                captureRef={style === 'template03'
+                                  ? (el) => registerVisibleSlideRef?.(slide.id, el)
+                                  : undefined}
                                 onClick={() => setActiveSlideIndex(i)}
                                 onUpdateProfile={isActive ? handleUpdateProfile : undefined}
                                 onUpdateText={isActive ? handleUpdateText : undefined}
@@ -564,6 +589,33 @@ export default function SlideCanvas({ generatingProgress, onSave, onSchedule, sa
           }}
           onClose={() => setPickingModel(false)}
           testIdPrefix="t02-model"
+        />
+      )}
+
+      {pickingModel && isTemplate03 && slides[activeSlideIndex] && (
+        <TemplateModelPicker
+          models={TEMPLATE_03_MODELS}
+          labels={{ [TEMPLATE_03_MODEL_COVER]: 'Capa', [TEMPLATE_03_MODEL_STEP]: 'Conteúdo' }}
+          suggested={t03SuggestedModel}
+          title="Escolha o modelo do slide"
+          subtitle="Os 2 modelos do FlowLine. A capa abre o carrossel; cada slide seguinte desenvolve uma ideia independente na mesma forma."
+          canvas={{ width: TEMPLATE_03_WIDTH, height: TEMPLATE_03_HEIGHT }}
+          baseSlide={slides[activeSlideIndex] as Slide}
+          slotsForModel={(model) => template03NewSlideSlots(model)}
+          renderPreview={(slide, model) => (
+            <Template03Slide
+              slide={slide}
+              globalSettings={globalSettings}
+              slideIndex={model - 1}
+              totalSlides={TEMPLATE_03_MODELS.length}
+            />
+          )}
+          onPick={(patch) => {
+            addSlide(patch);
+            setPickingModel(false);
+          }}
+          onClose={() => setPickingModel(false)}
+          testIdPrefix="t03-model"
         />
       )}
 

@@ -9,6 +9,7 @@ import ProfileSlide from '@/components/slides/ProfileSlide';
 import EditorialSlide from '@/components/slides/EditorialSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
 import Template02Slide from '@/components/slides/Template02Slide';
+import Template03Slide from '@/components/slides/Template03Slide';
 
 interface SlidePreviewProps {
   slide: Slide;
@@ -19,13 +20,14 @@ interface SlidePreviewProps {
   scale?: number;
   isActive?: boolean;
   forExport?: boolean;
+  captureRef?: (el: HTMLDivElement | null) => void;
   onClick?: () => void;
   onUpdateProfile?: (updates: { name?: string; handle?: string }) => void;
   onUpdateText?: (updates: { title?: string; description?: string; subtitle?: string }) => void;
 }
 
 const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function SlidePreview(
-  { slide, globalSettings, style, slideIndex, totalSlides, scale = 0.22, isActive = false, forExport = false, onClick, onUpdateProfile, onUpdateText },
+  { slide, globalSettings, style, slideIndex, totalSlides, scale = 0.22, isActive = false, forExport = false, captureRef, onClick, onUpdateProfile, onUpdateText },
   ref
 ) {
   // Dimensões do formato ativo — a moldura escalada acompanha a proporção real.
@@ -43,10 +45,15 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
   // Enable pointer events when inline editing is possible (main canvas, profile style)
   // Only profile slide needs pointer events (inline editable text + photo)
   const innerPointerEvents = (style === 'profile' && (onUpdateProfile || onUpdateText)) ? 'auto' : 'none';
+  const setOuterRef = (node: HTMLDivElement | null) => {
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+    captureRef?.(node?.querySelector<HTMLDivElement>('.t03-slide') ?? null);
+  };
 
   return (
     <div
-      ref={ref}
+      ref={setOuterRef}
       onClick={onClick}
       style={{
         width: SLIDE_W * scale,
@@ -69,7 +76,15 @@ const SlidePreview = forwardRef<HTMLDivElement, SlidePreviewProps>(function Slid
           pointerEvents: innerPointerEvents,
         }}
       >
-        {style === 'template02' ? (
+        {style === 'template03' ? (
+          <Template03Slide
+            slide={slide}
+            globalSettings={globalSettings}
+            slideIndex={slideIndex}
+            totalSlides={totalSlides}
+            forExport={forExport}
+          />
+        ) : style === 'template02' ? (
           <Template02Slide
             slide={slide}
             globalSettings={globalSettings}

@@ -2,6 +2,11 @@ import type { Slide, SlideStyle } from '@/types';
 import type { RefineSlide } from '@/lib/refine-text';
 import { template01ModelOf, template01SlotsForSlide } from '@/lib/templates/template-01';
 import { template02ModelOf, template02TextSlotsForModel } from '@/lib/templates/template-02';
+import {
+  TEMPLATE_03_PRIMARY_SLOTS,
+  template03ModelOf,
+  template03TextSlotsForModel,
+} from '@/lib/templates/template-03';
 
 /**
  * O QUE O PAINEL DE REFINAR PODE OFERECER — parte pura, sem React.
@@ -60,6 +65,13 @@ export function refinableFields(slide: Slide, style: SlideStyle, slideIndex: num
       .filter((f) => f.value.trim().length > 0);
   }
 
+  if (style === 'template03') {
+    const model = template03ModelOf(slide, slideIndex);
+    return template03TextSlotsForModel(model)
+      .map((d) => ({ key: d.slot, label: d.label, value: slots[d.slot] ?? '' }))
+      .filter((f) => f.value.trim().length > 0);
+  }
+
   return [
     { key: 'title', label: 'Título', value: slide.title ?? '' },
     { key: 'description', label: 'Descrição', value: slide.description ?? '' },
@@ -76,13 +88,22 @@ export function refinableFields(slide: Slide, style: SlideStyle, slideIndex: num
  * `position` velha gravada) faria o merge devolver 502 position_mismatch num
  * carrossel perfeitamente válido.
  */
-export function slidesPayload(slides: Slide[]): RefineSlide[] {
+export function slidesPayload(slides: Slide[], style?: SlideStyle): RefineSlide[] {
   return slides.map((slide, i) => ({
     position: i,
-    title: slide.title ?? '',
+    title:
+      style === 'template03'
+        ? slide.templateSlots?.[TEMPLATE_03_PRIMARY_SLOTS[template03ModelOf(slide, i)]?.title] ?? slide.title ?? ''
+        : slide.title ?? '',
     // Campo VAZIO fica de fora: o teto do servidor é original + 20%, então 0
     // continua 0 e o campo entraria no prompt só como ruído ("NÃO ALTERE").
-    ...(slide.description ? { description: slide.description } : {}),
+    ...(style === 'template03'
+      ? (() => {
+          const bodySlot = TEMPLATE_03_PRIMARY_SLOTS[template03ModelOf(slide, i)]?.body;
+          const body = bodySlot ? slide.templateSlots?.[bodySlot] : slide.description;
+          return body ? { description: body } : {};
+        })()
+      : slide.description ? { description: slide.description } : {}),
     ...(slide.subtitle ? { subtitle: slide.subtitle } : {}),
     ...(slide.templateSlots != null ? { templateSlots: { ...slide.templateSlots } } : {}),
   }));
@@ -96,8 +117,55 @@ export function slidesPayload(slides: Slide[]): RefineSlide[] {
  * o que chegaria é `undefined` apagando o estilo do usuário. Patch vazio =
  * nada a escrever, e o chamador nem chama.
  */
-export function textPatch(original: Slide, proposto: RefineSlide): Partial<Slide> {
+function template03ProposedSlots(original: Slide, proposto: RefineSlide, slideIndex: number): Record<string, string> {
+  const model = template03ModelOf(original, slideIndex);
+  const primary = TEMPLATE_03_PRIMARY_SLOTS[model];
+  const originalSlots = original.templateSlots ?? {};
+  const slots = { ...(proposto.templateSlots ?? {}) };
+
+  // A resposta pode seguir o contrato genérico e mudar title/description, mas
+  // no T3 esses campos são apenas aliases dos slots por modelo. Projete-os de
+  // volta quando a IA não trouxe o slot correspondente alterado.
+  if (
+    primary &&
+    typeof proposto.title === 'string' &&
+    proposto.title !== original.title &&
+    slots[primary.title] === originalSlots[primary.title]
+  ) {
+    slots[primary.title] = proposto.title;
+  }
+  if (
+    primary &&
+    typeof proposto.description === 'string' &&
+    proposto.description !== (original.description ?? '') &&
+    slots[primary.body] === originalSlots[primary.body]
+  ) {
+    slots[primary.body] = proposto.description;
+  }
+  return slots;
+}
+
+export function textPatch(original: Slide, proposto: RefineSlide, style?: SlideStyle, slideIndex = 0): Partial<Slide> {
   const patch: Partial<Slide> = {};
+
+  if (style === 'template03' && original.templateSlots != null) {
+    const model = template03ModelOf(original, slideIndex);
+    const primary = TEMPLATE_03_PRIMARY_SLOTS[model];
+    const proposedSlots = template03ProposedSlots(original, proposto, slideIndex);
+    const changed = template03TextSlotsForModel(model).some(
+      (d) => proposedSlots[d.slot] !== original.templateSlots?.[d.slot],
+    );
+    if (changed) {
+      patch.templateSlots = { ...original.templateSlots, ...proposedSlots };
+      if (primary && proposedSlots[primary.title] != null && proposedSlots[primary.title] !== original.title) {
+        patch.title = proposedSlots[primary.title];
+      }
+      if (primary && proposedSlots[primary.body] != null && proposedSlots[primary.body] !== (original.description ?? '')) {
+        patch.description = proposedSlots[primary.body];
+      }
+    }
+    return patch;
+  }
 
   if (proposto.title != null && proposto.title !== original.title) {
     patch.title = proposto.title;
@@ -148,6 +216,15 @@ export function previewDiffs(
       if (after === before) return;
       diffs.push({ slideIndex: i, key, label: rotulos.get(key) ?? key, before, after });
     };
+
+    if (style === 'template03') {
+      const model = template03ModelOf(original, i);
+      const slots = template03ProposedSlots(original, proposto, i);
+      for (const d of template03TextSlotsForModel(model)) {
+        registra(d.slot, original.templateSlots?.[d.slot] ?? '', slots[d.slot] ?? original.templateSlots?.[d.slot] ?? '');
+      }
+      return;
+    }
 
     if (proposto.title != null) registra('title', original.title ?? '', proposto.title);
     if (proposto.description != null) registra('description', original.description ?? '', proposto.description);

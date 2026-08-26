@@ -68,7 +68,7 @@ export default function GeneratorClient() {
   // `carouselIdParam` novo apontaria para um deck que esta página nunca leu,
   // e o efeito abaixo iria ao banco justamente antes de os slides existirem.
   const { saveNow } = useAutoSave(setLoadedCarouselId);
-  const { registerSlideRef, downloadSlide, downloadAll } = useExport();
+  const { registerSlideRef, registerVisibleSlideRef, downloadSlide, downloadAll } = useExport();
 
   // ── Load carousel from URL param ──────────────────────────────────────────
   useEffect(() => {
@@ -308,6 +308,7 @@ export default function GeneratorClient() {
         </div>
 
         <SlideCanvas
+          registerVisibleSlideRef={registerVisibleSlideRef}
           onSave={handleManualSave}
           onSchedule={comGuardaDeCanto(() => setShowScheduleModal(true))}
           saveStatus={saveStatus}

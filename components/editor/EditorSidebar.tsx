@@ -16,6 +16,7 @@ import { refinableFields } from '@/lib/refine-fields';
 import Slider from './Slider';
 import Template01Slots from './Template01Slots';
 import Template02Slots from './Template02Slots';
+import Template03Slots from './Template03Slots';
 import SidebarGroup from './sidebar/SidebarGroup';
 import SidebarPanel from './sidebar/SidebarPanel';
 import ColorPicker from './sidebar/ColorPicker';
@@ -77,6 +78,44 @@ import {
   TEMPLATE_02_HIGHLIGHT_COLOR,
 } from '@/lib/templates/template-02';
 import { template02ClearImage, template02SetImage, template02SlideImageUrl } from '@/lib/templates/template-02/image';
+import {
+  TEMPLATE_03_DEFAULT_CORNERS,
+  template03HeaderSlotsForModel,
+  template03AvatarSlot,
+  template03HandleSlot,
+  template03ModelOf,
+  template03SlotColor,
+  template03SlotDefaults,
+  template03SlotFontName,
+  template03TextSlotsForModel,
+  template03SlotsForModel,
+} from '@/lib/templates/template-03';
+import {
+  template03ClearAvatar,
+  template03ClearImage,
+  template03SetAvatar,
+  template03SetImage,
+  template03SlideImageUrl,
+} from '@/lib/templates/template-03/image';
+import {
+  Template03SlideControl,
+  TEMPLATE_03_GRADIENT_DIRECTIONS,
+  TEMPLATE_03_GRADIENT_DIRECTION_LABELS,
+  TEMPLATE_03_CONTENT_POSITIONS,
+  TEMPLATE_03_CONTENT_POSITION_LABELS,
+  TEMPLATE_03_CONTENT_ALIGNS,
+  TEMPLATE_03_CONTENT_ALIGN_LABELS,
+  markTemplate03Override,
+  template03ContentPositionFor,
+  template03ContentAlignFor,
+  template03GradientDirectionFor,
+  template03SpecBackground,
+} from '@/lib/templates/template-03/overrides';
+import {
+  Template03ProfileStyle,
+  template03ApplyProfileStyle,
+  template03ProfileStyleFor,
+} from '@/lib/templates/template-03/profile';
 import {
   Template02SlideControl,
   markTemplate02Override,
@@ -184,6 +223,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const t01ImageRef = useRef<HTMLInputElement>(null);
   const t02ImageRef = useRef<HTMLInputElement>(null);
+  const t03ImageRef = useRef<HTMLInputElement>(null);
+  const t03AvatarRef = useRef<HTMLInputElement>(null);
 
   const { generateAll, generateOne, generating } = useGenerateCarouselImages();
   const refine = useRefineText();
@@ -257,6 +298,34 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const t02TextSlots = t02Model != null ? template02TextSlotsForModel(t02Model) : [];
   const t02HeaderSlots = t02Model != null ? template02HeaderSlotsForModel(t02Model) : [];
 
+  // ── TEMPLATE 3 ────────────────────────────────────────────────────────────
+  // Mesma regra dos dois anteriores: tudo segue o MODELO do slide, nunca a
+  // posição. No FlowLine isso é o ponto todo — o deck é ABERTO e TODO conteúdo
+  // compartilha as chaves `s2.*`, em qualquer posição.
+  const isT03 = style === 'template03';
+  const t03Model = isT03 ? template03ModelOf(slide, activeSlideIndex) : null;
+  const t03ImageUrl = t03Model != null ? template03SlideImageUrl(slide, t03Model) : '';
+  const t03AvatarUrl = t03Model != null ? slide.templateSlots?.[template03AvatarSlot(t03Model)] ?? '' : '';
+  const t03ProfileStyle = t03Model != null ? template03ProfileStyleFor(slide, t03Model) : null;
+  const t03TextSlots = t03Model != null ? template03TextSlotsForModel(t03Model) : [];
+  // A barra de perfil só tem UM campo de texto (o @); o avatar é slot de imagem
+  // e não entra no painel de texto.
+  const t03HeaderSlots =
+    t03Model != null
+      ? template03HeaderSlotsForModel(t03Model).filter((d) => d.kind === 'text')
+      : [];
+  const t03CornerSlots =
+    t03Model != null
+      ? template03SlotsForModel(t03Model).filter((d) => d.slot.startsWith('cantos.'))
+      : [];
+  // Sem a MARCA de fundo o slide segue o spec, então o seletor abre no degradê
+  // daquele modelo — nunca num padrão do editor.
+  const t03SpecBg = t03Model != null ? template03SpecBackground(t03Model) : undefined;
+  const t03BgValue =
+    slide.templateOverrides?.background && slide.backgroundColor
+      ? slide.backgroundColor
+      : t03SpecBg?.swatch ?? '#000000';
+
   const ctx: PanelContext = {
     style,
     slide,
@@ -302,6 +371,38 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const handleT02File = (f: File) =>
     upload(f, (url) => t02Model != null && updateActiveSlide(template02SetImage(slide, t02Model, url)));
 
+  const handleT03File = (f: File) =>
+    upload(f, (url) => t03Model != null && updateActiveSlide(template03SetImage(slide, t03Model, url)));
+
+  const handleT03AvatarFile = (f: File) =>
+    upload(f, (url) => {
+      slides.forEach((s, i) => {
+        const model = template03ModelOf(s, i);
+        updateSlide(i, template03SetAvatar(s, model, url));
+      });
+    }, 'profile-photos');
+
+  const clearT03Avatar = () => {
+    slides.forEach((s, i) => {
+      const model = template03ModelOf(s, i);
+      updateSlide(i, template03ClearAvatar(s, model));
+    });
+  };
+
+  /** A barra é uma unidade do deck: os dois modelos e todo conteúdo recebem o mesmo ajuste. */
+  const setT03ProfileStyle = (patch: Template03ProfileStyle) => {
+    // Os sliders podem disparar vários eventos antes do React renderizar de novo.
+    // Uma atualização atômica evita estados intermediários no autosave e garante
+    // que cada patch preserve os valores anteriores do slot do próprio modelo.
+    useEditorStore.setState((state) => ({
+      slides: state.slides.map((s, i) => {
+        const model = template03ModelOf(s, i);
+        return { ...s, ...template03ApplyProfileStyle(s, model, patch) };
+      }),
+      saveStatus: 'unsaved' as const,
+    }));
+  };
+
   const fileInputs = (
     <>
       <input ref={bgImageRef} type="file" accept="image/*" className="hidden"
@@ -312,6 +413,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT01File(f); e.target.value = ''; }} />
       <input ref={t02ImageRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT02File(f); e.target.value = ''; }} />
+      <input ref={t03ImageRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT03File(f); e.target.value = ''; }} />
+      <input ref={t03AvatarRef} type="file" accept="image/*" className="hidden"
+        data-template03-avatar-input
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleT03AvatarFile(f); e.target.value = ''; }} />
       <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => e.target.files?.[0] && upload(
           e.target.files[0],
@@ -387,6 +493,52 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   /** Mesma regra do T1: a categoria e o @ valem para o deck inteiro. */
   const setT02HeaderText = (slot: string, value: string) => setDeckSlotText(slot, value);
 
+  /* ── Escritas do TEMPLATE 3 ─────────────────────────────────────────────
+     Mesma disciplina dos dois anteriores: o handler MARCA o controle em
+     `templateOverrides`, e é a marca — nunca o valor — que faz o override
+     existir. Deck gerado não tem nenhuma, e por isso nasce idêntico ao spec.
+  ────────────────────────────────────────────────────────────────────────── */
+  const setT03 = (patch: Partial<Slide>, ...keys: Template03SlideControl[]) =>
+    updateActiveSlide({ ...patch, templateOverrides: markTemplate03Override(slide.templateOverrides, ...keys) });
+
+  /** Posição e alinhamento são overrides independentes do slide ativo. */
+  const setT03ContentOverride = (
+    patch: Partial<Pick<NonNullable<Slide['templateOverrides']>, 'contentPosition' | 'contentAlign'>>
+  ) => {
+    updateActiveSlide({
+      templateOverrides: {
+        ...(slide.templateOverrides ?? {}),
+        ...patch,
+      },
+    });
+  };
+
+  /** Estilo de UM slot. A chave existir já é o gesto do usuário — sem marca. */
+  const setT03Slot = (slot: string, patch: Partial<Template01SlotStyle>) =>
+    updateActiveSlide({
+      templateSlotStyles: {
+        ...(slide.templateSlotStyles ?? {}),
+        [slot]: { ...(slide.templateSlotStyles?.[slot] ?? {}), ...patch },
+      },
+    });
+
+  /**
+   * O @ e os cantos valem para o DECK inteiro, como no T1 e no T2.
+   *
+   * São a assinatura do carrossel, não conteúdo do slide: editar num slide só
+   * produzia um deck com assinaturas diferentes por página — que ninguém quer e
+   * ninguém percebe enquanto não exporta.
+   */
+  const setT03DeckText = (slot: string, value: string) =>
+    slides.forEach((s, i) => {
+      // O @ (handle) é slot POR MODELO (`s{model}.handle`); cada slide leê o seu.
+      // Resolver a chave por modelo do slide — igual ao avatar — senão num deck
+      // aberto o @ escrito em `s1.handle` não alcança os slides de modelo 2.
+      // Cantos são globais (`cantos.left`/`cantos.right`) e mantêm a chave fixa.
+      const key = slot.endsWith('.handle') ? template03HandleSlot(template03ModelOf(s, i)) : slot;
+      updateSlide(i, { templateSlots: { ...(s.templateSlots ?? {}), [key]: value } });
+    });
+
   const setHeaderStyles = (slots: string[], patch: Partial<Template01SlotStyle>) => {
     const next = { ...(slide.templateSlotStyles ?? {}) };
     for (const slot of slots) next[slot] = { ...(next[slot] ?? {}), ...patch };
@@ -433,6 +585,19 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   };
   const t02HeaderStyle = {
     ...(slide.templateSlotStyles?.[t02HeaderSlotNames[0]] ?? {}),
+    ...(globalSettings.templateCornerStyle ?? {}),
+  };
+
+  const t03HeaderSlotNames = t03HeaderSlots.map((d) => d.slot);
+  const t03CornerSlotNames = t03CornerSlots.map((d) => d.slot);
+  const t03HeaderVisible = t03HeaderSlotNames.every(
+    (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
+  );
+  const t03CornersVisible = t03CornerSlotNames.every(
+    (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
+  );
+  const t03CornerStyle = {
+    ...(slide.templateSlotStyles?.[t03CornerSlotNames[0]] ?? {}),
     ...(globalSettings.templateCornerStyle ?? {}),
   };
 
@@ -506,6 +671,58 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       <Template01Slots />
     ) : isT02 ? (
       <Template02Slots />
+    ) : isT03 ? (
+      <>
+        <Template03Slots />
+        <div className="space-y-2" data-template03-content-controls>
+          <div className={labelCls} data-template03-content-position-label>Posição do conteúdo</div>
+          <div role="group" aria-label="Posição do conteúdo" className="grid grid-cols-3 gap-1.5" data-template03-content-position-controls>
+            {TEMPLATE_03_CONTENT_POSITIONS.map((position) => {
+              const selected = t03Model != null && template03ContentPositionFor(slide, t03Model) === position;
+              return (
+                <button
+                  key={position}
+                  type="button"
+                  aria-label={TEMPLATE_03_CONTENT_POSITION_LABELS[position]}
+                  aria-pressed={selected}
+                  onClick={() => setT03ContentOverride({ contentPosition: position })}
+                  className={cn(
+                    'rounded-lg border px-2 py-2 text-[10px] transition-colors',
+                    selected
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-muted)] hover:border-[var(--ink)]',
+                  )}
+                >
+                  {TEMPLATE_03_CONTENT_POSITION_LABELS[position]}
+                </button>
+              );
+            })}
+          </div>
+          <div className={labelCls} data-template03-content-align-label>Alinhamento do conteúdo</div>
+          <div role="group" aria-label="Alinhamento do conteúdo" className="grid grid-cols-3 gap-1.5" data-template03-content-align-controls>
+            {TEMPLATE_03_CONTENT_ALIGNS.map((position) => {
+              const selected = t03Model != null && template03ContentAlignFor(slide, t03Model) === position;
+              return (
+                <button
+                  key={position}
+                  type="button"
+                  aria-label={TEMPLATE_03_CONTENT_ALIGN_LABELS[position]}
+                  aria-pressed={selected}
+                  onClick={() => setT03ContentOverride({ contentAlign: position })}
+                  className={cn(
+                    'rounded-lg border px-2 py-2 text-[10px] transition-colors',
+                    selected
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-muted)] hover:border-[var(--ink)]',
+                  )}
+                >
+                  {TEMPLATE_03_CONTENT_ALIGN_LABELS[position]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </>
     ) : (
       // profile: título + corpo, sem os controles de forma dos outros estilos.
       <>
@@ -538,7 +755,44 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     /* Um painel de imagem por slide, com upload, IA e ajustes juntos. Antes o
        upload e a geração viviam em painéis diferentes, gravando em campos
        diferentes, e um vencia o outro no render sem avisar ninguém. */
-    imagem: isT02 ? (
+    imagem: isT03 ? (
+      <>
+        <DropZone
+          label={t03ImageUrl ? 'Trocar imagem' : 'Clique ou arraste'}
+          onClick={() => t03ImageRef.current?.click()}
+          onFile={handleT03File}
+        />
+        <AiGenPanel
+          // A key precisa do índice: prompt e referência são estado local, e
+          // sem remontar ao trocar de slide o texto do slide 1 gera o slide 2.
+          key={`t03-img-${activeSlideIndex}`}
+          buttonLabel="Gerar imagem com IA"
+          generating={generating}
+          slideTitle={slide.title}
+          slideDescription={slide.description || ''}
+          // Todo modelo do FlowLine tem a MESMA imagem: a de fundo full-bleed.
+          onGenerate={(opts) => generateOne(activeSlideIndex, 'background', opts)}
+          onGenerateAll={(opts) => generateAll('background', activeSlideIndex, opts)}
+          batchContents={batchContentsFor('background')}
+        />
+        {t03ImageUrl && (
+          <>
+            <ImageThumb
+              url={t03ImageUrl}
+              onRemove={() => t03Model != null && updateActiveSlide(template03ClearImage(slide, t03Model))}
+            />
+            <Slider label="Opacidade" value={slide.backgroundImageOpacity ?? 100} min={0} max={100} unit="%"
+              onChange={(v) => setT03({ backgroundImageOpacity: v }, 'backgroundImageOpacity')} />
+            <Slider label="Posição X" value={slide.imagePosition.x} min={0} max={100} unit="%"
+              onChange={(v) => setT03({ imagePosition: { ...slide.imagePosition, x: v } }, 'backgroundImagePosition')} />
+            <Slider label="Posição Y" value={slide.imagePosition.y} min={0} max={100} unit="%"
+              onChange={(v) => setT03({ imagePosition: { ...slide.imagePosition, y: v } }, 'backgroundImagePosition')} />
+            <Slider label="Zoom" value={Math.max(MIN_IMAGE_ZOOM, slide.imagePosition.zoom)} min={MIN_IMAGE_ZOOM} max={300} unit="%"
+              onChange={(v) => setT03({ imagePosition: { ...slide.imagePosition, zoom: v } }, 'backgroundImagePosition')} />
+          </>
+        )}
+      </>
+    ) : isT02 ? (
       <>
         <DropZone
           label={t02ImageUrl ? 'Trocar imagem' : 'Clique ou arraste'}
@@ -745,7 +999,42 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
        uma mexida pegava blocos diferentes de uma vez — no slide 5, as duas
        colunas juntas. Entrelinha e alinhamento ficam fora da repetição de
        propósito: são um controle só para o slide. */
-    estiloDoTexto: isT02 ? (
+    estiloDoTexto: isT03 ? (
+      <>
+        {t03TextSlots.map((d) => {
+          const st = slide.templateSlotStyles?.[d.slot] ?? {};
+          const base = t03Model != null ? template03SlotDefaults(d.slot, t03Model) : undefined;
+          // O seletor abre mostrando o que ESTÁ na tela: a cor do spec daquele
+          // bloco NAQUELE modelo — o corpo é cinza na capa e branco no passo.
+          const specColor = t03Model != null ? template03SlotColor(d.slot, t03Model) : '#FFFFFF';
+          return (
+            <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
+              <span className={labelCls}>{d.label}</span>
+              <Slider label="Tamanho" value={Math.round(st.fontSize ?? base?.fontSizePx ?? 40)}
+                min={10} max={160} unit="px" onChange={(v) => setT03Slot(d.slot, { fontSize: v })} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <ColorPicker label="Cor" value={st.color || specColor} onChange={(v) => setT03Slot(d.slot, { color: v })} />
+                <UnderlineToggle on={!!st.underline} onToggle={() => setT03Slot(d.slot, { underline: !st.underline })} />
+              </div>
+              <div>
+                <span className={cn(labelCls, 'block mb-1')}>Fonte</span>
+                <ElementFontPicker
+                  value={st.font}
+                  defaultFontName={
+                    (t03Model != null ? template03SlotFontName(d.slot, t03Model) : undefined) ??
+                    'Inter Display Regular'
+                  }
+                  onChange={(v) => setT03Slot(d.slot, { font: v })}
+                />
+              </div>
+              <Slider label="Espaçamento de letras" value={st.letterSpacing ?? base?.letterSpacingEm ?? 0}
+                min={-0.1} max={0.3} step={0.01} unit="em"
+                onChange={(v) => setT03Slot(d.slot, { letterSpacing: v })} />
+            </div>
+          );
+        })}
+      </>
+    ) : isT02 ? (
       <>
         {t02TextSlots.map((d) => {
           const st = slide.templateSlotStyles?.[d.slot] ?? {};
@@ -1047,7 +1336,41 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
-    sombraOverlay: isT01 ? (
+    sombraOverlay: isT03 ? (
+        <div className="space-y-2" data-template03-gradient-controls>
+          <div className={labelCls}>Direção do degradê</div>
+          <div role="group" aria-label="Direção do degradê" className="grid grid-cols-2 gap-1.5">
+            {TEMPLATE_03_GRADIENT_DIRECTIONS.map((direction) => {
+              const selected = t03Model != null && template03GradientDirectionFor(slide, t03Model) === direction;
+              return (
+                <button
+                  key={direction}
+                  type="button"
+                  aria-label={TEMPLATE_03_GRADIENT_DIRECTION_LABELS[direction]}
+                  aria-pressed={selected}
+                  onClick={() => updateActiveSlide({
+                    templateOverrides: {
+                      ...(slide.templateOverrides ?? {}),
+                      overlayGradientDirection: direction,
+                    },
+                  })}
+                  className={cn(
+                    'rounded-lg border px-2 py-2 text-[10px] transition-colors',
+                    selected
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-muted)] hover:border-[var(--ink)]',
+                  )}
+                >
+                  {TEMPLATE_03_GRADIENT_DIRECTION_LABELS[direction]}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] leading-snug text-[var(--ink-muted)]">
+            A direção indica o percurso das paradas do degradê, da primeira à última.
+          </p>
+        </div>
+    ) : isT01 ? (
       <>
         {/* No T1 o degradê de legibilidade é FIXO: sempre presente e sempre preto,
            para o texto ficar legível sobre qualquer cor de fundo. O usuário só
@@ -1092,7 +1415,18 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     /* No template é SÓ A COR. Upload e IA ficam de fora de propósito: a imagem
        do template tem painel próprio ("Imagem"), e repeti-la aqui recriaria a
        duplicata que essa refatoração acabou de eliminar. */
-    fundoDoSlide: isT02 ? (
+    fundoDoSlide: isT03 ? (
+      <>
+        {/* Os dois modelos do FlowLine têm DEGRADÊ, não cor chapada: escolher
+            uma cor aqui substitui o degradê inteiro, como nos modelos 1 e 2 do
+            Template 1. O seletor abre na primeira parada do degradê do spec. */}
+        <ColorPicker
+          label="Cor"
+          value={t03BgValue}
+          onChange={(v) => setT03({ backgroundColor: v }, 'background')}
+        />
+      </>
+    ) : isT02 ? (
       <>
         <ColorPicker
           label="Cor"
@@ -1170,7 +1504,54 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
     /* Aba CANTOS — o MESMO componente nos três templates que a têm. Cada um só
        traduz o seu modelo de persistência (config global de cantos no legado,
        slots do spec no T1/T2) para as props do painel. */
-    cantos: isT01 ? (
+    cantos: isT03 ? (
+      /* A assinatura no TOPO do slide: marca à esquerda, arroba à direita.
+         Mesma regra do T1 — o texto é do deck, cor e visibilidade são do
+         slide, e tipografia/margem/opacidade são globais. */
+      <CornersPanel
+        show={t03CornersVisible}
+        onToggleShow={() => setHeaderStyles(t03CornerSlotNames, { visible: !t03CornersVisible })}
+        rows={t03CornerSlots.map((d) => ({
+          key: d.slot,
+          label: d.label,
+          value: slide.templateSlots?.[d.slot] ?? TEMPLATE_03_DEFAULT_CORNERS[d.slot] ?? d.defaultValue,
+          onChange: (v) => setT03DeckText(d.slot, v),
+          visible: slide.templateSlotStyles?.[d.slot]?.visible !== false,
+          onToggleVisible: () =>
+            setHeaderStyles([d.slot], {
+              visible: slide.templateSlotStyles?.[d.slot]?.visible === false,
+            }),
+          maxChars: d.maxCharsPerLine,
+        }))}
+        fontSize={Math.round(
+          t03CornerStyle.fontSize ??
+            (t03Model != null ? template03SlotDefaults(t03CornerSlotNames[0], t03Model)?.fontSizePx : undefined) ??
+            17
+        )}
+        onFontSize={(v) => setTemplateCornerStyle({ fontSize: v })}
+        margin={t03CornerStyle.margin ?? 0}
+        onMargin={(v) => setTemplateCornerStyle({ margin: v })}
+        opacity={t03CornerStyle.opacity ?? 100}
+        onOpacity={(v) => setTemplateCornerStyle({ opacity: v })}
+        color={
+          t03CornerStyle.color ||
+          (t03Model != null ? template03SlotColor(t03CornerSlotNames[0], t03Model) : '#FFFFFF')
+        }
+        onColor={(v) => setHeaderStyles(t03CornerSlotNames, { color: v })}
+        font={t03CornerStyle.font}
+        defaultFontName={
+          (t03Model != null ? template03SlotFontName(t03CornerSlotNames[0], t03Model) : undefined) ??
+          'Inter Display Medium'
+        }
+        onFont={(v) => setTemplateCornerStyle({ font: v })}
+        fontSizeMax={32}
+        labelCls={labelCls}
+        numericCls={numericCls}
+        inputCls={inputCls}
+        Toggle={Toggle}
+        Slider={Slider}
+      />
+    ) : isT01 ? (
       <CornersPanel
         show={t01HeaderVisible}
         onToggleShow={() => setHeaderStyles(t01CornerSlotNames, { visible: !t01HeaderVisible })}
@@ -1246,7 +1627,100 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
     /* TEXTO vale para o deck inteiro (ver `setDeckSlotText`); cor e visibilidade
        são deste slide; tipografia, margem e opacidade são globais. */
-    cabecalho: (
+    cabecalho: isT03 ? (
+      /* A BARRA DE PERFIL do FlowLine usa a geometria fixa do spec. O painel só
+         edita o @, visibilidade e a foto; tipografia, cor, tamanho e espaçamento
+         não são escolhas do usuário neste template. */
+      <>
+        <Toggle
+          on={t03HeaderVisible}
+          onToggle={() => setHeaderStyles(t03HeaderSlotNames, { visible: !t03HeaderVisible })}
+          label="Exibir barra de perfil"
+        />
+        {t03HeaderVisible && (
+          <>
+            {t03HeaderSlots.map((d) => {
+              const value = slide.templateSlots?.[d.slot] ?? d.defaultValue;
+              const visible = slide.templateSlotStyles?.[d.slot]?.visible !== false;
+              return (
+                <div key={d.slot} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={labelCls}>{d.label}</span>
+                    {d.maxCharsPerLine != null && (
+                      <span className={numericCls}>{value.length}/{d.maxCharsPerLine} car.</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={visible}
+                      aria-label={`Exibir ${d.label}`}
+                      onClick={() => setHeaderStyles([d.slot], { visible: !visible })}
+                      className={cn(
+                        'flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
+                        visible ? 'border-[var(--ink)] bg-[var(--ink)]' : 'border-[var(--line-strong)]',
+                      )}
+                    >
+                      {visible && <span className="text-[9px] font-bold text-[var(--paper)]">✓</span>}
+                    </button>
+                    <input
+                      className={cn(inputCls, 'flex-1')}
+                      value={value}
+                      disabled={!visible}
+                      maxLength={d.maxCharsPerLine}
+                      onChange={(e) => setT03DeckText(d.slot, e.target.value)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            <DropZone
+              label={t03AvatarUrl ? 'Trocar foto de perfil' : 'Carregar foto de perfil'}
+              onClick={() => t03AvatarRef.current?.click()}
+              onFile={handleT03AvatarFile}
+            />
+            {t03AvatarUrl && <ImageThumb url={t03AvatarUrl} onRemove={clearT03Avatar} />}
+            {t03ProfileStyle && (
+              <div className="space-y-3 pt-2" data-template03-profile-controls>
+                <Slider
+                  label="Escala da barra de perfil"
+                  value={t03ProfileStyle.profileScale}
+                  min={80}
+                  max={140}
+                  unit="%"
+                  onChange={(v) => setT03ProfileStyle({ profileScale: v })}
+                />
+                <Slider
+                  label="Zoom da foto"
+                  value={t03ProfileStyle.avatarZoom}
+                  min={100}
+                  max={250}
+                  unit="%"
+                  onChange={(v) => setT03ProfileStyle({ avatarZoom: v })}
+                />
+                <Slider
+                  label="Posição horizontal da foto"
+                  value={t03ProfileStyle.avatarPositionX}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => setT03ProfileStyle({ avatarPositionX: v })}
+                />
+                <Slider
+                  label="Posição vertical da foto"
+                  value={t03ProfileStyle.avatarPositionY}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => setT03ProfileStyle({ avatarPositionY: v })}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </>
+    ) : (
       <CornersPanel
         show={t02HeaderVisible}
         onToggleShow={() => setHeaderStyles(t02HeaderSlotNames, { visible: !t02HeaderVisible })}

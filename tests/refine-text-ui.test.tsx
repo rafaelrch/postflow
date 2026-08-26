@@ -43,6 +43,7 @@ import { PANEL_REGISTRY, TEMPLATE_SIDEBAR_CONFIG } from '@/components/editor/sid
 import { refinableFields, slidesPayload, textPatch, previewDiffs } from '@/lib/refine-fields';
 import { MAX_INSTRUCTION_LENGTH } from '@/lib/refine-text';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, type Slide } from '@/types';
+import { TEMPLATE_03_MODEL_COVER, TEMPLATE_03_MODEL_STEP } from '@/lib/templates/template-03';
 
 const TITULO_0 = 'O erro que trava seu carrossel';
 const DESC_0 = 'A maioria escreve para si mesma, não para quem lê.';
@@ -68,6 +69,36 @@ function carregaEditor(slides: Slide[] = [slide(0), slide(1), slide(2)]) {
       globalSettings: DEFAULT_GLOBAL_SETTINGS,
     });
   });
+}
+
+function carregaEditorT3() {
+  const slides = [
+    slide(0, {
+      title: 'projeção antiga da capa',
+      description: 'projeção antiga do corpo',
+      templateModel: TEMPLATE_03_MODEL_COVER,
+      templateSlots: {
+        's1.title': 'Capa canônica',
+        's1.body': 'Corpo canônico da capa',
+        's1.handle': '@flowline',
+        's1.image': 'https://cdn.test/capa.webp',
+      },
+    }),
+    slide(1, {
+      title: 'projeção antiga do passo',
+      description: 'projeção antiga do corpo do passo',
+      templateModel: TEMPLATE_03_MODEL_STEP,
+      templateSlots: {
+        's2.title': 'Passo 01 - Comece pelo fim',
+        's2.body': 'Defina a ação antes de escrever.',
+        's2.handle': '@flowline',
+        's2.image': 'https://cdn.test/passo.webp',
+      },
+    }),
+  ];
+  carregaEditor(slides);
+  act(() => useEditorStore.setState({ style: 'template03' }));
+  return slides;
 }
 
 /** Resposta 200 da rota: os slides propostos. */
@@ -270,6 +301,56 @@ describe('Refinar texto — preview antes de sobrescrever', () => {
     expect(screen.queryByText('Uma sugestão qualquer')).toBeNull();
     expect(useEditorStore.getState().slides[0].title).toBe(TITULO_0);
     expect(useEditorStore.getState().history).toHaveLength(0);
+  });
+});
+
+describe('Refinar texto — Template 3 usa os slots canônicos', () => {
+  it('resposta sem mudança é determinística e envia title/description projetados de s1/s2', async () => {
+    const slides = carregaEditorT3();
+    respondeOk(slides.map((s) => ({
+      position: s.position,
+      title: s.title,
+      description: s.description,
+      templateSlots: s.templateSlots,
+    })));
+    renderizaBarra();
+    abrePainel();
+    fireEvent.click(screen.getByRole('button', { name: /Refinar com IA/ }));
+
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith('A IA não sugeriu nenhuma mudança neste texto.'));
+    expect(ultimoCorpo().slides[0].title).toBe('Capa canônica');
+    expect(ultimoCorpo().slides[0].description).toBe('Corpo canônico da capa');
+    expect(screen.queryByRole('button', { name: /Aplicar/ })).toBeNull();
+  });
+
+  it('aplica a sugestão no slot s2 e mantém a projeção genérica sincronizada', async () => {
+    const slides = carregaEditorT3();
+    respondeOk([
+      {
+        position: 0,
+        title: 'Capa canônica',
+        description: 'Corpo canônico da capa',
+        templateSlots: slides[0].templateSlots,
+      },
+      {
+        position: 1,
+        title: 'Passo 01 - Termine pelo começo',
+        description: 'Defina a ação antes de escrever.',
+        templateSlots: {
+          ...slides[1].templateSlots,
+          's2.title': 'Passo 01 - Termine pelo começo',
+        },
+      },
+    ]);
+    renderizaBarra();
+    abrePainel();
+    fireEvent.click(screen.getByRole('button', { name: /Refinar com IA/ }));
+    await screen.findByText('Passo 01 - Termine pelo começo');
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar/ }));
+
+    const passo = useEditorStore.getState().slides[1];
+    expect(passo.templateSlots?.['s2.title']).toBe('Passo 01 - Termine pelo começo');
+    expect(passo.title).toBe('Passo 01 - Termine pelo começo');
   });
 });
 

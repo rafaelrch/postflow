@@ -53,10 +53,17 @@ export function useExport() {
   const { width: exportWidth, height: exportHeight } = getFormat(globalSettings.format);
 
   const exportRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const visibleExportRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const registerSlideRef = useCallback((id: string, el: HTMLDivElement | null) => {
     if (el) exportRef.current.set(id, el);
     else exportRef.current.delete(id);
+  }, []);
+
+  /** O PNG avulso captura o nó real visível; os refs ocultos ficam para o ZIP. */
+  const registerVisibleSlideRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) visibleExportRef.current.set(id, el);
+    else visibleExportRef.current.delete(id);
   }, []);
 
   /**
@@ -122,7 +129,7 @@ export function useExport() {
     const slide = slides[idx];
     if (!slide) return;
 
-    const el = exportRef.current.get(slide.id);
+    const el = visibleExportRef.current.get(slide.id) ?? exportRef.current.get(slide.id);
     if (!el) {
       toast.error('Elemento do slide não encontrado');
       return;
@@ -196,5 +203,5 @@ export function useExport() {
     }
   }, [slides, captureSlide, preloadImages, carouselTitle]);
 
-  return { registerSlideRef, downloadSlide, downloadAll };
+  return { registerSlideRef, registerVisibleSlideRef, downloadSlide, downloadAll };
 }

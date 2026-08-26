@@ -74,7 +74,7 @@ export function useRefineText() {
         body: JSON.stringify({
           scope: params.scope,
           style,
-          slides: slidesPayload(slides),
+          slides: slidesPayload(slides, style),
           ...(params.instruction ? { instruction: params.instruction } : {}),
           // `slideIndex` só vai quando o escopo o USA. O servidor ignora o
           // campo em 'carousel', mas mandar um alvo que o escopo não olha faz
@@ -129,7 +129,7 @@ export function useRefineText() {
     const { slides, pushHistory, updateSlide } = useEditorStore.getState();
 
     const patches = preview.slides
-      .map((proposto, i) => ({ index: i, patch: textPatch(slides[i], proposto) }))
+      .map((proposto, i) => ({ index: i, patch: textPatch(slides[i], proposto, useEditorStore.getState().style, i) }))
       .filter(({ patch }) => Object.keys(patch).length > 0);
 
     if (patches.length === 0) {

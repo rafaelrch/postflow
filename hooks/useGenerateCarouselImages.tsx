@@ -10,6 +10,8 @@ import { template01ModelOf, template01SlideMedia, template01SlideSurface } from 
 import { template01SetImage } from '@/lib/templates/template-01/image';
 import { template02ModelOf } from '@/lib/templates/template-02';
 import { template02SetImage } from '@/lib/templates/template-02/image';
+import { template03ModelOf } from '@/lib/templates/template-03';
+import { template03SetImage } from '@/lib/templates/template-03/image';
 
 /** Onde a imagem gerada é aplicada: fundo full-bleed do slide, ou imagem de conteúdo entre os textos. */
 export type ImageTarget = 'background' | 'content';
@@ -212,6 +214,9 @@ export function imageDestination(
     // posição resetar.
     return { kind: model === 1 ? 'background' : 'content', model };
   }
+  if (style === 'template03') {
+    return { kind: 'background', model: template03ModelOf(slide, index) };
+  }
   if (style === 'editorial') {
     // No Editorial o desenho do slide decide, não o `target`:
     // - a CAPA é a imagem, e não tem shape de conteúdo;
@@ -308,6 +313,8 @@ export function imageSurface(
   if (style === 'template02') return destino.model === 1 ? 'dark' : 'light';
   // Perfil: a mídia do post é uma caixa dentro de um card #FFFFFF.
   if (style === 'profile') return 'light';
+  // FlowLine: o scrim do template termina em preto e o texto fica por cima da foto.
+  if (style === 'template03') return 'dark';
 
   return theme === 'light' ? 'light' : 'dark';
 }
@@ -333,6 +340,9 @@ export function imagePatch(
   }
   if (style === 'template02') {
     return template02SetImage(slide, model as number, url);
+  }
+  if (style === 'template03') {
+    return template03SetImage(slide, model as number, url);
   }
   return target === 'content'
     ? { contentImageUrl: url, contentImagePosition: { ...DEFAULT_IMAGE_POSITION } }

@@ -1,4 +1,4 @@
-export type SlideStyle = 'minimalist' | 'profile' | 'editorial' | 'template01' | 'template02';
+export type SlideStyle = 'minimalist' | 'profile' | 'editorial' | 'template01' | 'template02' | 'template03';
 export type ContentLayout = 'cover' | 'text-image-text' | 'text-text-image' | 'image-text-text' | 'text-only';
 // Formato/proporção do slide. Todos compartilham largura 1080 (só a altura muda);
 // dimensões e labels vivem em lib/formats.ts. Ausência => '4:5' (legado).
@@ -235,6 +235,19 @@ export type Template01SlideControl =
   | 'backgroundImageOpacity'
   | 'contentImagePosition';
 
+/** Direções do overlay degradê do Template 3 — serializadas em templateOverrides. */
+export type Template03GradientDirection =
+  | 'bottom-to-top'
+  | 'top-to-bottom'
+  | 'left-to-right'
+  | 'right-to-left';
+
+/** Posição vertical do bloco de conteúdo (título+corpo) do Template 3. */
+export type Template03ContentPosition = 'topo' | 'centro' | 'baixo';
+
+/** Alinhamento horizontal do bloco de conteúdo (título+corpo) do Template 3. */
+export type Template03ContentAlign = 'esquerda' | 'centro' | 'direita';
+
 /** Controles dos cantos — deck inteiro, então moram no `GlobalSettings`. */
 export type Template01CornerControl =
   | 'cornerColor'
@@ -243,7 +256,14 @@ export type Template01CornerControl =
   | 'cornerOpacity'
   | 'cornerDistance';
 
-export type Template01SlideOverrideKeys = Partial<Record<Template01SlideControl, true>>;
+export type Template01SlideOverrideKeys = Partial<Record<Template01SlideControl, true>> & {
+  /** Chave exclusiva do FlowLine; T1/T2 não a leem nem a escrevem. */
+  overlayGradientDirection?: Template03GradientDirection;
+  /** Chave exclusiva do FlowLine; posição vertical do bloco de conteúdo. */
+  contentPosition?: Template03ContentPosition;
+  /** Chave exclusiva do FlowLine; alinhamento horizontal do bloco de conteúdo. */
+  contentAlign?: Template03ContentAlign;
+};
 export type Template01CornerOverrideKeys = Partial<Record<Template01CornerControl, true>>;
 
 /**
@@ -292,7 +312,13 @@ export interface Template01SlotStyle {
  * de todos os templates, não só do primeiro. O nome com "01" ficou por ser o
  * template que o introduziu; use este alias em código novo.
  */
-export type TemplateSlotStyle = Template01SlotStyle;
+export type TemplateSlotStyle = Template01SlotStyle & {
+  /** Controles exclusivos da Barra de perfil do Template 3. */
+  profileScale?: number;
+  avatarZoom?: number;
+  avatarPositionX?: number;
+  avatarPositionY?: number;
+};
 
 export interface Slide {
   id: string;
@@ -369,7 +395,7 @@ export interface Slide {
    *
    * Regra igual à de `templateOverrides`: GERAÇÃO NUNCA escreve aqui.
    */
-  templateSlotStyles?: Record<string, Template01SlotStyle>;
+  templateSlotStyles?: Record<string, TemplateSlotStyle>;
   editorialTitleOffsetY?: number;
   editorialDescOffsetY?: number;
   editorialImageOffsetY?: number;

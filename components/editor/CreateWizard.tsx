@@ -54,6 +54,12 @@ import {
   template02SlotsFromContent,
   template02TextSlotsForModel,
 } from '@/lib/templates/template-02';
+import {
+  TEMPLATE_03_DEFAULT_CORNERS,
+  template03ModelAt,
+  template03SlotsFromContent,
+  template03TextSlotsForModel,
+} from '@/lib/templates/template-03';
 import { useCreditsStore, handleInsufficientCredits } from '@/hooks/useCreditsStore';
 import toast from 'react-hot-toast';
 
@@ -135,6 +141,18 @@ function templateFieldsForSlide(style: SlideStyle, index: number): TemplateField
     }));
   }
 
+  if (style === 'template03') {
+    // Deck ABERTO: a posição 0 é a capa e todas as outras são conteúdo. Os campos
+    // saem do MODELO, então o slide 9 pede os mesmos slots `s2.*` do slide 2.
+    return template03TextSlotsForModel(template03ModelAt(index)).map((s) => ({
+      key: s.slot,
+      label: s.label,
+      multiline: (s.maxLines ?? 1) > 1,
+      placeholder: s.defaultValue.replace(/\n/g, ' ').slice(0, 60),
+      hint: limitHint(s.maxLines, s.maxCharsPerLine),
+    }));
+  }
+
   if (style === 'profile') {
     return [
       { key: 'title', label: 'Texto do post', multiline: true, placeholder: 'A frase que segura o leitor' },
@@ -152,7 +170,7 @@ function templateFieldsForSlide(style: SlideStyle, index: number): TemplateField
 
 /** Templates cujo conteúdo entra por slot, não por título/descrição. */
 function isSpecTemplate(style: SlideStyle): boolean {
-  return style === 'template01' || style === 'template02';
+  return style === 'template01' || style === 'template02' || style === 'template03';
 }
 
 /**
@@ -201,7 +219,7 @@ const FONT_PAIRS: { label: FontPair; preview: string; sub: string }[] = [
  * identidade visual para escolher antes de gerar, então o wizard TERMINA no
  * conteúdo: 3 passos em vez de 4.
  */
-const SKIP_VISUAL_STEP: SlideStyle[] = ['template01', 'template02'];
+const SKIP_VISUAL_STEP: SlideStyle[] = ['template01', 'template02', 'template03'];
 
 function stepCountFor(style: SlideStyle): number {
   return SKIP_VISUAL_STEP.includes(style) ? 3 : 4;
@@ -258,10 +276,17 @@ const TEMPLATES: {
     short: 'Deck aberto: quantos slides você quiser',
     detail: 'Forma fixa do Figma, deck aberto: os 3 modelos se alternam.',
   },
+  {
+    value: 'template03',
+    label: 'FlowLine',
+    short: 'Deck aberto: capa e conteúdo independente',
+    detail:
+      'Forma fixa do Figma, deck aberto: capa e slides de conteúdo independentes.',
+  },
 ];
 
 /** Templates cuja forma vem do spec — o step de ID visual respeita isso. */
-const FIXED_VISUAL_STYLES: SlideStyle[] = ['profile', 'template01', 'template02'];
+const FIXED_VISUAL_STYLES: SlideStyle[] = ['profile', 'template01', 'template02', 'template03'];
 
 /**
  * Campos de estilo de um slide nos estilos de forma LIVRE (profile/editorial).
@@ -288,7 +313,7 @@ const THUMB_PROFILE = { name: 'Ana Ribeiro', handle: '@anaribeiro' };
  * literalmente a capa daquele template.
  */
 function previewSlide(style: SlideStyle): Slide {
-  if (style === 'template01' || style === 'template02') {
+  if (style === 'template01' || style === 'template02' || style === 'template03') {
     return { ...DEFAULT_SLIDE, id: `thumb-${style}`, position: 0, templateModel: 1 };
   }
   return {
@@ -343,6 +368,19 @@ const TEMPLATE_PREVIEW: Record<SlideStyle, Record<SlideFormat, string | null>> =
     '4:5': '/templates/preview-editorial-4x5.webp',
     '1:1': '/templates/preview-editorial-1x1.webp',
     '9:16': '/templates/preview-editorial-9x16.webp',
+  },
+  /**
+   * TEMPLATE 3 (FlowLine) — só o 4:5 tem arquivo.
+   *
+   * O `.webp` foi derivado de `reference/slide1.png` do material (540x675,
+   * 12 KB). Os outros dois formatos ficam `null` de propósito: caem na
+   * MINIATURA VIVA, que é o comportamento previsto para o par sem arquivo — e é
+   * melhor que apontar para um caminho inexistente, que daria 404 calado.
+   */
+  template03: {
+    '4:5': '/templates/preview-template03-4x5.webp',
+    '1:1': null,
+    '9:16': null,
   },
   template01: {
     '4:5': '/templates/preview-template01-4x5.webp',
@@ -883,6 +921,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   // dramaturgia fechada. O padrão é 5 (a `sequenciaPadrao` do spec) e o usuário
   // muda no slider como em qualquer outro estilo.
   const isT02 = style === 'template02';
+  const isT03 = style === 'template03';
 
   // Depende do template: o T1 e o T2 não têm passo de identidade visual.
   const totalSteps = stepCountFor(style);
@@ -1182,6 +1221,64 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           };
         }
 
+        // TEMPLATE 3 (FlowLine): mesma disciplina dos dois anteriores — a
+        // GERAÇÃO NÃO ESCREVE ESTILO. Os campos de estilo saem nos valores de
+        // `DEFAULT_SLIDE` e `templateOverrides` nasce AUSENTE, senão a paleta do
+        // onboarding viraria "escolha do usuário" e pintaria chapado por cima
+        // do degradê do Figma (armadilha #3).
+        if (isT03) {
+          // Deck ABERTO: posição 0 é capa, todas as outras são conteúdo. Todo conteúdo
+          // grava as chaves `s2.*`, em qualquer posição — é a normalização por
+          // MODELO, e é o que faz o slide 9 existir sem `s9.*` no spec.
+          const model = template03ModelAt(i);
+          return {
+            id: `tmp-${i}-${Date.now()}`,
+            // Modelo GRAVADO, nunca inferido da posição: reordenar ou inserir um
+            // slide no meio continua desenhando certo.
+            templateModel: model,
+            templateSlots: {
+              // Ver o comentário do T1: manual/JSON já vêm por slot, e já
+              // zerados onde o usuário não escreveu.
+              ...(sl.slots ?? template03SlotsFromContent(model, {
+                title: sl.title,
+                description: sl.description,
+                imageUrl: sl.imageUrl,
+              })),
+              ...TEMPLATE_03_DEFAULT_CORNERS,
+              // 🔴 O @ da barra de perfil PRECISA ser escrito aqui.
+              //
+              // `template03SlotsFromContent` só preenche os slots de CONTEÚDO do
+              // slide; o handle é de escopo `header` e ficaria com a chave
+              // AUSENTE — e chave ausente mostra o texto de fábrica do Figma
+              // ("@userinstagram"), que é copy ilustrativa e não pode sobrar num
+              // deck gerado (armadilha #8).
+              //
+              // Pré-preenchido com o @ do onboarding quando existir, como manda
+              // o §1.8 do plano. Sem perfil, o mesmo marcador dos cantos — nunca
+              // o texto do Figma.
+              [`s${model}.handle`]:
+                effectiveProfile.handle || TEMPLATE_03_DEFAULT_CORNERS['cantos.right'],
+            },
+            position: i,
+            title: sl.title,
+            description: sl.description,
+            highlightWord: sl.highlightWord,
+            highlights: [],
+            backgroundImageUrl: '',
+            gridImageUrl: '',
+            imageType: 'background' as const,
+            imagePosition: { ...DEFAULT_IMAGE_POSITION },
+            contentImagePosition: { ...DEFAULT_IMAGE_POSITION },
+            shadow: { ...DEFAULT_SLIDE.shadow },
+            backgroundColor: DEFAULT_SLIDE.backgroundColor,
+            textPosition: DEFAULT_SLIDE.textPosition,
+            textAlignment: DEFAULT_SLIDE.textAlignment,
+            fontSize: { ...DEFAULT_SLIDE.fontSize },
+            lineHeight: DEFAULT_SLIDE.lineHeight,
+            ctaButton: { ...DEFAULT_SLIDE.ctaButton },
+          };
+        }
+
         return ({
         id: `tmp-${i}-${Date.now()}`,
         position: i,
@@ -1283,6 +1380,42 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
           // banco: no T2 o deck é aberto e o modelo não pode voltar a sair da
           // posição quando o carrossel for reaberto.
           if (isT02) {
+            const editor = editorSlides[i] as Record<string, unknown>;
+            return {
+              carousel_id: carousel.id,
+              position: i,
+              title: sl.title,
+              description: sl.description,
+              highlight_word: sl.highlightWord,
+              background_image_url: '',
+              grid_image_url: '',
+              image_type: 'background',
+              image_position: DEFAULT_IMAGE_POSITION,
+              content_image_position: DEFAULT_IMAGE_POSITION,
+              shadow_style: DEFAULT_SLIDE.shadow.style,
+              shadow_opacity: DEFAULT_SLIDE.shadow.opacity,
+              text_position: DEFAULT_SLIDE.textPosition,
+              text_offset: null,
+              text_alignment: DEFAULT_SLIDE.textAlignment,
+              subtitle: '',
+              font_size: DEFAULT_SLIDE.fontSize,
+              line_height: DEFAULT_SLIDE.lineHeight,
+              title_description_gap: null,
+              cta_button: DEFAULT_SLIDE.ctaButton,
+              background_color: DEFAULT_SLIDE.backgroundColor,
+              template_slots: editor.templateSlots,
+              template_model: editor.templateModel,
+            };
+          }
+
+          // Espelha o `editorSlides` acima.
+          //
+          // 🔴 `template_model` VAI para o banco. O TEMPLATE 1 não grava esta
+          // linha, e é por isso que um deck dele reabre derivando o modelo da
+          // POSIÇÃO — reordenar um slide troca o desenho. É bug conhecido, é
+          // outra task (a 10) e depende do Rafael; aqui o que importa é NÃO
+          // repetir o defeito num template que está nascendo.
+          if (isT03) {
             const editor = editorSlides[i] as Record<string, unknown>;
             return {
               carousel_id: carousel.id,

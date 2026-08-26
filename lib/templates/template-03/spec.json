@@ -1,0 +1,2889 @@
+{
+  "$schema": "creatools/template-spec@1",
+  "template": {
+    "id": "template-01",
+    "figmaFileKey": "isWpVlD6rcqo85h40I4aAK",
+    "figmaFileName": "TEMPLATE 3",
+    "figmaLastModified": "2026-08-22T13:05:27Z",
+    "figmaVersion": "2390513591835768419",
+    "slideCount": 4,
+    "canvas": {
+      "w": 1080,
+      "h": 1350,
+      "aspectRatio": "4:5",
+      "exportScales": [
+        1,
+        2
+      ]
+    }
+  },
+  "slides": [
+    {
+      "index": 1,
+      "figmaId": "1:2",
+      "figmaName": "TEMPLATE 3 - SLIDE 2",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "angleDeg": 178.58,
+          "handles": [
+            {
+              "x": 0.480555572715858,
+              "y": 0.16777778589254894
+            },
+            {
+              "x": 0.5000000552010893,
+              "y": 0.9522222650810599
+            },
+            {
+              "x": 0.08833333312160252,
+              "y": 0.17400002047128457
+            }
+          ],
+          "stops": [
+            {
+              "color": "#AAAAAA",
+              "alpha": 1.0,
+              "position": 0.0
+            },
+            {
+              "color": "#000000",
+              "alpha": 1.0,
+              "position": 1.0
+            }
+          ],
+          "axisLengthNormalized": 0.784685,
+          "cssStopsPercent": [
+            17.5343,
+            94.1284
+          ],
+          "css": "linear-gradient(178.58deg, #AAAAAA 17.5343%, #000000 94.1284%)"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "1:3",
+          "name": "Group 5",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 702.0,
+            "w": 812.31,
+            "h": 528.0,
+            "right": 133.69,
+            "bottom": 120.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "slot": "s1.Group 5",
+          "editable": false
+        },
+        {
+          "id": "1:4",
+          "name": "Lorem ipsum dolor sit amet.",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 702.0,
+            "w": 701.0,
+            "h": 228.0,
+            "right": 245.0,
+            "bottom": 420.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Lorem ipsum \ndolor sit amet.",
+            "lines": [
+              "Lorem ipsum ",
+              "dolor sit amet."
+            ],
+            "lineCount": 2,
+            "maxLineChars": 15,
+            "totalChars": 28
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 113.658,
+            "lineHeightPx": 114.23,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -6.8195,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 134.0
+          },
+          "slot": "s1.title",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 23
+        },
+        {
+          "id": "1:5",
+          "name": "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 955.1,
+            "w": 812.31,
+            "h": 138.0,
+            "right": 133.69,
+            "bottom": 256.9
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#A1A1A1",
+              "alpha": 1.0,
+              "css": "#A1A1A1"
+            }
+          ],
+          "text": {
+            "characters": "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            "lines": [
+              "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 95,
+            "totalChars": 95
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 42.325,
+            "lineHeightPx": 46.193,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.2698,
+            "letterSpacingEm": -0.03,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.15,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s1.body",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 103
+        },
+        {
+          "id": "1:6",
+          "name": ".....",
+          "type": "TEXT",
+          "box": {
+            "x": 484.0,
+            "y": 1184.0,
+            "w": 113.0,
+            "h": 46.0,
+            "right": 483.0,
+            "bottom": 120.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": ".....",
+            "lines": [
+              "....."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 5,
+            "totalChars": 5,
+            "styledRuns": [
+              {
+                "styleKey": "0",
+                "start": 0,
+                "end": 1,
+                "text": ".",
+                "override": {}
+              },
+              {
+                "styleKey": "37",
+                "start": 1,
+                "end": 5,
+                "text": "....",
+                "override": {
+                  "fills": [
+                    {
+                      "type": "SOLID",
+                      "blendMode": "NORMAL",
+                      "opacity": 1.0,
+                      "visible": true,
+                      "color": "#858585",
+                      "alpha": 1.0,
+                      "css": "#858585"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 42.325,
+            "lineHeightPx": 46.193,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": 7.1953,
+            "letterSpacingEm": 0.17,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s1.dots",
+          "editable": false,
+          "role": "indicador-de-posicao",
+          "dotsConfig": {
+            "total": 4,
+            "active": 1,
+            "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+          }
+        },
+        {
+          "id": "1:7",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s1.CANTOS",
+          "editable": false
+        },
+        {
+          "id": "1:8",
+          "name": "LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 104.0,
+            "h": 18.0,
+            "right": 905.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "LOREM IPSUM",
+            "lines": [
+              "LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 19
+        },
+        {
+          "id": "1:9",
+          "name": "@LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 897.0,
+            "y": 44.0,
+            "w": 120.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "@LOREM IPSUM",
+            "lines": [
+              "@LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 12,
+            "totalChars": 12
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 20
+        },
+        {
+          "id": "1:10",
+          "name": "Group 6",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 627.0,
+            "w": 304.44,
+            "h": 47.93,
+            "right": 641.56,
+            "bottom": 675.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s1.Group 6",
+          "editable": false
+        },
+        {
+          "id": "1:11",
+          "name": "@userinstagram",
+          "type": "TEXT",
+          "box": {
+            "x": 195.0,
+            "y": 636.0,
+            "w": 201.0,
+            "h": 31.0,
+            "right": 684.0,
+            "bottom": 683.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "@userinstagram",
+            "lines": [
+              "@userinstagram"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 14,
+            "totalChars": 14
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 30.362,
+            "lineHeightPx": 30.515,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -1.8217,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 195.0
+          },
+          "slot": "s1.handle",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 22
+        },
+        {
+          "id": "1:12",
+          "name": "checklist 1",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 409.0,
+            "y": 636.59,
+            "w": 29.44,
+            "h": 29.44,
+            "right": 641.56,
+            "bottom": 683.97
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "IMAGE",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "scaleMode": "FILL",
+              "imageRef": "ca468867dfa4a1eff88a3f26a2ee7a5fe019287d"
+            }
+          ],
+          "slot": "s1.badge",
+          "editable": false
+        },
+        {
+          "id": "1:13",
+          "name": "Ellipse 1",
+          "type": "ELLIPSE",
+          "box": {
+            "x": 134.0,
+            "y": 627.0,
+            "w": 47.93,
+            "h": 47.93,
+            "right": 898.07,
+            "bottom": 675.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#DA4F4F",
+              "alpha": 1.0,
+              "css": "#DA4F4F"
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "strokeWeight": 0.684684693813324,
+          "strokeAlign": "INSIDE",
+          "slot": "s1.avatar",
+          "editable": false
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "z": 0,
+          "type": "IMAGE_SLOT",
+          "slot": "s1.image",
+          "fit": "cover",
+          "position": "center",
+          "size": "1080x1350"
+        },
+        {
+          "z": 1,
+          "type": "GRADIENT_SCRIM",
+          "css": "linear-gradient(178.58deg, rgba(0,0,0,0) 17.5343%, #000000 94.1284%)",
+          "originalFigmaCss": "linear-gradient(178.58deg, #AAAAAA 17.5343%, #000000 94.1284%)",
+          "angleDeg": 178.58
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "figmaId": "1:14",
+      "figmaName": "TEMPLATE 3 - SLIDE 2",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "angleDeg": 358.75,
+          "handles": [
+            {
+              "x": 0.4999999817464882,
+              "y": 0.8903703480809758
+            },
+            {
+              "x": 0.4805555211739426,
+              "y": 9.079433982428498e-09
+            },
+            {
+              "x": 0.9451851512472591,
+              "y": 0.8841481202841789
+            }
+          ],
+          "stops": [
+            {
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "position": 0.0
+            },
+            {
+              "color": "#000000",
+              "alpha": 1.0,
+              "position": 1.0
+            }
+          ],
+          "axisLengthNormalized": 0.890583,
+          "cssStopsPercent": [
+            11.7973,
+            98.973
+          ],
+          "css": "linear-gradient(358.75deg, #FFFFFF 11.7973%, #000000 98.973%)"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "1:15",
+          "name": "Group 5",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 358.0,
+            "w": 658.0,
+            "h": 279.02,
+            "right": 288.0,
+            "bottom": 712.98
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "slot": "s2.Group 5",
+          "editable": false
+        },
+        {
+          "id": "1:16",
+          "name": "Passo 01 - Contexto total",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 358.0,
+            "w": 573.0,
+            "h": 186.0,
+            "right": 373.0,
+            "bottom": 806.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Passo 01 - \nContexto total",
+            "lines": [
+              "Passo 01 - ",
+              "Contexto total"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 14,
+            "totalChars": 26
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 92.067,
+            "lineHeightPx": 92.531,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -5.524,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 134.0
+          },
+          "slot": "s2.title",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 22
+        },
+        {
+          "id": "1:17",
+          "name": "Antes de digitar qualquer comando explicite toda a estrutura do seuprojeto para a IA.",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 563.02,
+            "w": 658.0,
+            "h": 74.0,
+            "right": 288.0,
+            "bottom": 712.98
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Antes de digitar qualquer comando explicite toda a estrutura do seuprojeto para a IA.",
+            "lines": [
+              "Antes de digitar qualquer comando explicite toda a estrutura do seuprojeto para a IA."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 85,
+            "totalChars": 85
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 34.285,
+            "lineHeightPx": 37.418,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.0286,
+            "letterSpacingEm": -0.03,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 134.0
+          },
+          "slot": "s2.body",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 93
+        },
+        {
+          "id": "1:21",
+          "name": "Group 6",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 283.0,
+            "w": 304.44,
+            "h": 47.93,
+            "right": 641.56,
+            "bottom": 1019.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s2.Group 6",
+          "editable": false
+        },
+        {
+          "id": "1:22",
+          "name": "@userinstagram",
+          "type": "TEXT",
+          "box": {
+            "x": 195.0,
+            "y": 292.0,
+            "w": 201.0,
+            "h": 31.0,
+            "right": 684.0,
+            "bottom": 1027.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "@userinstagram",
+            "lines": [
+              "@userinstagram"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 14,
+            "totalChars": 14
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 30.362,
+            "lineHeightPx": 30.515,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -1.8217,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 195.0
+          },
+          "slot": "s2.handle",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 22
+        },
+        {
+          "id": "1:23",
+          "name": "checklist 1",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 409.0,
+            "y": 292.59,
+            "w": 29.44,
+            "h": 29.44,
+            "right": 641.56,
+            "bottom": 1027.97
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "IMAGE",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "scaleMode": "FILL",
+              "imageRef": "ca468867dfa4a1eff88a3f26a2ee7a5fe019287d"
+            }
+          ],
+          "slot": "s2.badge",
+          "editable": false
+        },
+        {
+          "id": "1:24",
+          "name": "Ellipse 1",
+          "type": "ELLIPSE",
+          "box": {
+            "x": 134.0,
+            "y": 283.0,
+            "w": 47.93,
+            "h": 47.93,
+            "right": 898.07,
+            "bottom": 1019.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#DA4F4F",
+              "alpha": 1.0,
+              "css": "#DA4F4F"
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "strokeWeight": 0.684684693813324,
+          "strokeAlign": "INSIDE",
+          "slot": "s2.avatar",
+          "editable": false
+        },
+        {
+          "id": "1:25",
+          "name": ".....",
+          "type": "TEXT",
+          "box": {
+            "x": 484.0,
+            "y": 1184.0,
+            "w": 113.0,
+            "h": 46.0,
+            "right": 483.0,
+            "bottom": 120.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#858585",
+              "alpha": 1.0,
+              "css": "#858585"
+            }
+          ],
+          "text": {
+            "characters": ".....",
+            "lines": [
+              "....."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 5,
+            "totalChars": 5,
+            "styledRuns": [
+              {
+                "styleKey": "0",
+                "start": 0,
+                "end": 1,
+                "text": ".",
+                "override": {}
+              },
+              {
+                "styleKey": "42",
+                "start": 1,
+                "end": 2,
+                "text": ".",
+                "override": {
+                  "fills": [
+                    {
+                      "type": "SOLID",
+                      "blendMode": "NORMAL",
+                      "opacity": 1.0,
+                      "visible": true,
+                      "color": "#FFFFFF",
+                      "alpha": 1.0,
+                      "css": "#FFFFFF"
+                    }
+                  ]
+                }
+              },
+              {
+                "styleKey": "0",
+                "start": 2,
+                "end": 5,
+                "text": "...",
+                "override": {}
+              }
+            ]
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 42.325,
+            "lineHeightPx": 46.193,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": 7.1953,
+            "letterSpacingEm": 0.17,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s2.dots",
+          "editable": false,
+          "role": "indicador-de-posicao",
+          "dotsConfig": {
+            "total": 4,
+            "active": 2,
+            "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+          }
+        },
+        {
+          "id": "8:6",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s2.CANTOS",
+          "editable": false
+        },
+        {
+          "id": "8:7",
+          "name": "LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 104.0,
+            "h": 18.0,
+            "right": 905.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "LOREM IPSUM",
+            "lines": [
+              "LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 19
+        },
+        {
+          "id": "8:8",
+          "name": "@LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 897.0,
+            "y": 44.0,
+            "w": 120.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "@LOREM IPSUM",
+            "lines": [
+              "@LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 12,
+            "totalChars": 12
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 20
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "z": 0,
+          "type": "IMAGE_SLOT",
+          "slot": "s2.image",
+          "fit": "cover",
+          "position": "center",
+          "size": "1080x1350"
+        },
+        {
+          "z": 1,
+          "type": "GRADIENT_SCRIM",
+          "css": "linear-gradient(358.75deg, rgba(0,0,0,0) 11.7973%, #000000 98.973%)",
+          "originalFigmaCss": "linear-gradient(358.75deg, #FFFFFF 11.7973%, #000000 98.973%)",
+          "angleDeg": 358.75
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "figmaId": "1:26",
+      "figmaName": "TEMPLATE 3 - SLIDE 3",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "angleDeg": 180.0,
+          "handles": [
+            {
+              "x": 0.5,
+              "y": 0.10296296404321385
+            },
+            {
+              "x": 0.5000000000000002,
+              "y": 1.0000000262694198
+            },
+            {
+              "x": 0.051481468886897086,
+              "y": 0.10296296445976912
+            }
+          ],
+          "stops": [
+            {
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "position": 0.0
+            },
+            {
+              "color": "#000000",
+              "alpha": 1.0,
+              "position": 1.0
+            }
+          ],
+          "axisLengthNormalized": 0.897037,
+          "cssStopsPercent": [
+            10.2963,
+            100.0
+          ],
+          "css": "linear-gradient(180.0deg, #FFFFFF 10.2963%, #000000 100.0%)"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "1:30",
+          "name": "Group 7",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 461.0,
+            "w": 658.0,
+            "h": 428.02,
+            "right": 288.0,
+            "bottom": 460.98
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "CENTER",
+            "horizontal": "LEFT"
+          },
+          "slot": "s3.Group 7",
+          "editable": false
+        },
+        {
+          "id": "1:31",
+          "name": "Group 5",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 536.0,
+            "w": 658.0,
+            "h": 353.02,
+            "right": 288.0,
+            "bottom": 460.98
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "slot": "s3.Group 5",
+          "editable": false
+        },
+        {
+          "id": "1:32",
+          "name": "Passo 02 - Integração local",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 536.0,
+            "w": 638.0,
+            "h": 186.0,
+            "right": 308.0,
+            "bottom": 628.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Passo 02 - \nIntegração local",
+            "lines": [
+              "Passo 02 - ",
+              "Integração local"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 16,
+            "totalChars": 28
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 92.067,
+            "lineHeightPx": 92.531,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -5.524,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 134.0
+          },
+          "slot": "s3.title",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 24
+        },
+        {
+          "id": "1:33",
+          "name": "Execute o Claude diretamente no terminal da sua máquina de desenvolvimento. Isso permite que ele leia e edite seus arquivos locais de forma direta",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 741.02,
+            "w": 658.0,
+            "h": 148.0,
+            "right": 288.0,
+            "bottom": 460.98
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Execute o Claude diretamente no terminal da sua máquina de desenvolvimento. Isso permite que ele leia e edite seus arquivos locais de forma direta",
+            "lines": [
+              "Execute o Claude diretamente no terminal da sua máquina de desenvolvimento. Isso permite que ele leia e edite seus arquivos locais de forma direta"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 146,
+            "totalChars": 146
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 34.285,
+            "lineHeightPx": 37.418,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.0286,
+            "letterSpacingEm": -0.03,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 134.0
+          },
+          "slot": "s3.body",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 154
+        },
+        {
+          "id": "1:34",
+          "name": "Group 6",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 461.0,
+            "w": 304.44,
+            "h": 47.93,
+            "right": 641.56,
+            "bottom": 841.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s3.Group 6",
+          "editable": false
+        },
+        {
+          "id": "1:35",
+          "name": "@userinstagram",
+          "type": "TEXT",
+          "box": {
+            "x": 195.0,
+            "y": 470.0,
+            "w": 201.0,
+            "h": 31.0,
+            "right": 684.0,
+            "bottom": 849.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "@userinstagram",
+            "lines": [
+              "@userinstagram"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 14,
+            "totalChars": 14
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 30.362,
+            "lineHeightPx": 30.515,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -1.8217,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 195.0
+          },
+          "slot": "s3.handle",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 22
+        },
+        {
+          "id": "1:36",
+          "name": "checklist 1",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 409.0,
+            "y": 470.59,
+            "w": 29.44,
+            "h": 29.44,
+            "right": 641.56,
+            "bottom": 849.97
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "IMAGE",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "scaleMode": "FILL",
+              "imageRef": "ca468867dfa4a1eff88a3f26a2ee7a5fe019287d"
+            }
+          ],
+          "slot": "s3.badge",
+          "editable": false
+        },
+        {
+          "id": "1:37",
+          "name": "Ellipse 1",
+          "type": "ELLIPSE",
+          "box": {
+            "x": 134.0,
+            "y": 461.0,
+            "w": 47.93,
+            "h": 47.93,
+            "right": 898.07,
+            "bottom": 841.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#DA4F4F",
+              "alpha": 1.0,
+              "css": "#DA4F4F"
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "strokeWeight": 0.684684693813324,
+          "strokeAlign": "INSIDE",
+          "slot": "s3.avatar",
+          "editable": false
+        },
+        {
+          "id": "1:38",
+          "name": ".....",
+          "type": "TEXT",
+          "box": {
+            "x": 484.0,
+            "y": 1184.0,
+            "w": 113.0,
+            "h": 46.0,
+            "right": 483.0,
+            "bottom": 120.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#858585",
+              "alpha": 1.0,
+              "css": "#858585"
+            }
+          ],
+          "text": {
+            "characters": ".....",
+            "lines": [
+              "....."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 5,
+            "totalChars": 5,
+            "styledRuns": [
+              {
+                "styleKey": "0",
+                "start": 0,
+                "end": 1,
+                "text": ".",
+                "override": {}
+              },
+              {
+                "styleKey": "42",
+                "start": 1,
+                "end": 2,
+                "text": ".",
+                "override": {
+                  "fills": [
+                    {
+                      "type": "SOLID",
+                      "blendMode": "NORMAL",
+                      "opacity": 1.0,
+                      "visible": true,
+                      "color": "#FFFFFF",
+                      "alpha": 1.0,
+                      "css": "#FFFFFF"
+                    }
+                  ]
+                }
+              },
+              {
+                "styleKey": "0",
+                "start": 2,
+                "end": 5,
+                "text": "...",
+                "override": {}
+              }
+            ]
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 42.325,
+            "lineHeightPx": 46.193,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": 7.1953,
+            "letterSpacingEm": 0.17,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s3.dots",
+          "editable": false,
+          "role": "indicador-de-posicao",
+          "dotsConfig": {
+            "total": 4,
+            "active": 3,
+            "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+          }
+        },
+        {
+          "id": "8:10",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s3.CANTOS",
+          "editable": false
+        },
+        {
+          "id": "8:11",
+          "name": "LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 104.0,
+            "h": 18.0,
+            "right": 905.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "LOREM IPSUM",
+            "lines": [
+              "LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 19
+        },
+        {
+          "id": "8:12",
+          "name": "@LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 897.0,
+            "y": 44.0,
+            "w": 120.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "@LOREM IPSUM",
+            "lines": [
+              "@LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 12,
+            "totalChars": 12
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 20
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "z": 0,
+          "type": "IMAGE_SLOT",
+          "slot": "s3.image",
+          "fit": "cover",
+          "position": "center",
+          "size": "1080x1350"
+        },
+        {
+          "z": 1,
+          "type": "GRADIENT_SCRIM",
+          "css": "linear-gradient(180.0deg, rgba(0,0,0,0) 10.2963%, #000000 100.0%)",
+          "originalFigmaCss": "linear-gradient(180.0deg, #FFFFFF 10.2963%, #000000 100.0%)",
+          "angleDeg": 180.0
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "figmaId": "1:39",
+      "figmaName": "TEMPLATE 3 - SLIDE 4",
+      "canvas": {
+        "w": 1080,
+        "h": 1350,
+        "aspectRatio": "4:5"
+      },
+      "background": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "blendMode": "NORMAL",
+          "opacity": 1.0,
+          "visible": true,
+          "angleDeg": 180.0,
+          "handles": [
+            {
+              "x": 0.5,
+              "y": 0.10296296404321385
+            },
+            {
+              "x": 0.5000000000000002,
+              "y": 1.0000000262694198
+            },
+            {
+              "x": 0.051481468886897086,
+              "y": 0.10296296445976912
+            }
+          ],
+          "stops": [
+            {
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "position": 0.0
+            },
+            {
+              "color": "#000000",
+              "alpha": 1.0,
+              "position": 1.0
+            }
+          ],
+          "axisLengthNormalized": 0.897037,
+          "cssStopsPercent": [
+            10.2963,
+            100.0
+          ],
+          "css": "linear-gradient(180.0deg, #FFFFFF 10.2963%, #000000 100.0%)"
+        }
+      ],
+      "clipsContent": true,
+      "nodes": [
+        {
+          "id": "1:43",
+          "name": "Group 7",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 675.0,
+            "w": 806.0,
+            "h": 428.0,
+            "right": 140.0,
+            "bottom": 247.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "CENTER",
+            "horizontal": "LEFT"
+          },
+          "slot": "s4.Group 7",
+          "editable": false
+        },
+        {
+          "id": "1:44",
+          "name": "Group 5",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 750.0,
+            "w": 806.0,
+            "h": 353.0,
+            "right": 140.0,
+            "bottom": 247.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "slot": "s4.Group 5",
+          "editable": false
+        },
+        {
+          "id": "1:45",
+          "name": "Passo 03 - Refatoração ativa",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 750.0,
+            "w": 701.0,
+            "h": 186.0,
+            "right": 245.0,
+            "bottom": 414.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Passo 03 - \nRefatoração ativa",
+            "lines": [
+              "Passo 03 - ",
+              "Refatoração ativa"
+            ],
+            "lineCount": 2,
+            "maxLineChars": 17,
+            "totalChars": 29
+          },
+          "typography": {
+            "fontFamily": "Inter",
+            "fontPostScriptName": "Inter-Bold",
+            "fontStyle": "Bold",
+            "fontWeight": 700,
+            "italic": false,
+            "fontSizePx": 92.067,
+            "lineHeightPx": 92.531,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -5.524,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 134.0
+          },
+          "slot": "s4.title",
+          "editable": true,
+          "maxLines": 3,
+          "maxCharsPerLine": 25
+        },
+        {
+          "id": "1:46",
+          "name": "Use a IA para analisar códigos antigos e otimizar a velocidade das suas páginas. Uma plataforma rápida melhora absurdamente a percepção de valor e profissionalismo da sua marca.",
+          "type": "TEXT",
+          "box": {
+            "x": 134.0,
+            "y": 955.0,
+            "w": 806.0,
+            "h": 148.0,
+            "right": 140.0,
+            "bottom": 247.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "Use a IA para analisar códigos antigos e otimizar a velocidade das suas páginas. Uma plataforma rápida melhora absurdamente a percepção de valor e profissionalismo da sua marca.",
+            "lines": [
+              "Use a IA para analisar códigos antigos e otimizar a velocidade das suas páginas. Uma plataforma rápida melhora absurdamente a percepção de valor e profissionalismo da sua marca."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 177,
+            "totalChars": 177
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Regular",
+            "fontStyle": "Regular",
+            "fontWeight": 400,
+            "italic": false,
+            "fontSizePx": 34.285,
+            "lineHeightPx": 37.418,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -1.0286,
+            "letterSpacingEm": -0.03,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 537.0,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s4.body",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 185
+        },
+        {
+          "id": "1:47",
+          "name": "Group 6",
+          "type": "GROUP",
+          "box": {
+            "x": 134.0,
+            "y": 675.0,
+            "w": 304.44,
+            "h": 47.93,
+            "right": 641.56,
+            "bottom": 627.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s4.Group 6",
+          "editable": false
+        },
+        {
+          "id": "1:48",
+          "name": "@userinstagram",
+          "type": "TEXT",
+          "box": {
+            "x": 195.0,
+            "y": 684.0,
+            "w": 201.0,
+            "h": 31.0,
+            "right": 684.0,
+            "bottom": 635.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "text": {
+            "characters": "@userinstagram",
+            "lines": [
+              "@userinstagram"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 14,
+            "totalChars": 14
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 30.362,
+            "lineHeightPx": 30.515,
+            "lineHeightRatio": 1.005,
+            "letterSpacingPx": -1.8217,
+            "letterSpacingEm": -0.06,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 195.0
+          },
+          "slot": "s4.handle",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 22
+        },
+        {
+          "id": "1:49",
+          "name": "checklist 1",
+          "type": "RECTANGLE",
+          "box": {
+            "x": 409.0,
+            "y": 684.59,
+            "w": 29.44,
+            "h": 29.44,
+            "right": 641.56,
+            "bottom": 635.97
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "IMAGE",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "scaleMode": "FILL",
+              "imageRef": "ca468867dfa4a1eff88a3f26a2ee7a5fe019287d"
+            }
+          ],
+          "slot": "s4.badge",
+          "editable": false
+        },
+        {
+          "id": "1:50",
+          "name": "Ellipse 1",
+          "type": "ELLIPSE",
+          "box": {
+            "x": 134.0,
+            "y": 675.0,
+            "w": 47.93,
+            "h": 47.93,
+            "right": 898.07,
+            "bottom": 627.07
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#DA4F4F",
+              "alpha": 1.0,
+              "css": "#DA4F4F"
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#FFFFFF",
+              "alpha": 1.0,
+              "css": "#FFFFFF"
+            }
+          ],
+          "strokeWeight": 0.684684693813324,
+          "strokeAlign": "INSIDE",
+          "slot": "s4.avatar",
+          "editable": false
+        },
+        {
+          "id": "1:51",
+          "name": ".....",
+          "type": "TEXT",
+          "box": {
+            "x": 484.0,
+            "y": 1184.0,
+            "w": 113.0,
+            "h": 46.0,
+            "right": 483.0,
+            "bottom": 120.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "CENTER"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#858585",
+              "alpha": 1.0,
+              "css": "#858585"
+            }
+          ],
+          "text": {
+            "characters": ".....",
+            "lines": [
+              "....."
+            ],
+            "lineCount": 1,
+            "maxLineChars": 5,
+            "totalChars": 5,
+            "styledRuns": [
+              {
+                "styleKey": "0",
+                "start": 0,
+                "end": 1,
+                "text": ".",
+                "override": {}
+              },
+              {
+                "styleKey": "42",
+                "start": 1,
+                "end": 2,
+                "text": ".",
+                "override": {
+                  "fills": [
+                    {
+                      "type": "SOLID",
+                      "blendMode": "NORMAL",
+                      "opacity": 1.0,
+                      "visible": true,
+                      "color": "#FFFFFF",
+                      "alpha": 1.0,
+                      "css": "#FFFFFF"
+                    }
+                  ]
+                }
+              },
+              {
+                "styleKey": "0",
+                "start": 2,
+                "end": 5,
+                "text": "...",
+                "override": {}
+              }
+            ]
+          },
+          "typography": {
+            "fontFamily": "IvyOra Text",
+            "fontPostScriptName": "IvyOraText-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 42.325,
+            "lineHeightPx": 46.193,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": 7.1953,
+            "letterSpacingEm": 0.17,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "center-x",
+            "cx": 540.5,
+            "note": "caixa simetrica no frame; manter centralizada"
+          },
+          "slot": "s4.dots",
+          "editable": false,
+          "role": "indicador-de-posicao",
+          "dotsConfig": {
+            "total": 4,
+            "active": 4,
+            "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+          }
+        },
+        {
+          "id": "8:14",
+          "name": "CANTOS",
+          "type": "GROUP",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 946.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "slot": "s4.CANTOS",
+          "editable": false
+        },
+        {
+          "id": "8:15",
+          "name": "LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 71.0,
+            "y": 44.0,
+            "w": 104.0,
+            "h": 18.0,
+            "right": 905.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "LOREM IPSUM",
+            "lines": [
+              "LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 11,
+            "totalChars": 11
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "LEFT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "left",
+            "left": 71.0
+          },
+          "slot": "cantos.left",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 19
+        },
+        {
+          "id": "8:16",
+          "name": "@LOREM IPSUM",
+          "type": "TEXT",
+          "box": {
+            "x": 897.0,
+            "y": 44.0,
+            "w": 120.0,
+            "h": 18.0,
+            "right": 63.0,
+            "bottom": 1288.0
+          },
+          "opacity": 1.0,
+          "blendMode": "PASS_THROUGH",
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "type": "SOLID",
+              "blendMode": "NORMAL",
+              "opacity": 1.0,
+              "visible": true,
+              "color": "#767682",
+              "alpha": 1.0,
+              "css": "#767682"
+            }
+          ],
+          "text": {
+            "characters": "@LOREM IPSUM",
+            "lines": [
+              "@LOREM IPSUM"
+            ],
+            "lineCount": 1,
+            "maxLineChars": 12,
+            "totalChars": 12
+          },
+          "typography": {
+            "fontFamily": "Inter Display",
+            "fontPostScriptName": "InterDisplay-Medium",
+            "fontStyle": "Medium",
+            "fontWeight": 500,
+            "italic": false,
+            "fontSizePx": 16.805,
+            "lineHeightPx": 18.34,
+            "lineHeightRatio": 1.0914,
+            "letterSpacingPx": -0.8402,
+            "letterSpacingEm": -0.05,
+            "textAlignHorizontal": "RIGHT",
+            "textAlignVertical": "TOP",
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "textCase": "ORIGINAL"
+          },
+          "anchor": {
+            "mode": "right",
+            "right": 63.0
+          },
+          "slot": "cantos.right",
+          "editable": true,
+          "maxLines": 2,
+          "maxCharsPerLine": 20
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "z": 0,
+          "type": "IMAGE_SLOT",
+          "slot": "s4.image",
+          "fit": "cover",
+          "position": "center",
+          "size": "1080x1350"
+        },
+        {
+          "z": 1,
+          "type": "GRADIENT_SCRIM",
+          "css": "linear-gradient(180.0deg, rgba(0,0,0,0) 10.2963%, #000000 100.0%)",
+          "originalFigmaCss": "linear-gradient(180.0deg, #FFFFFF 10.2963%, #000000 100.0%)",
+          "angleDeg": 180.0
+        }
+      ]
+    }
+  ],
+  "slotIndex": {
+    "s1.Group 5": {
+      "figmaId": "1:3",
+      "role": "group",
+      "editable": false
+    },
+    "s1.title": {
+      "figmaId": "1:4",
+      "role": "text",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 23
+    },
+    "s1.body": {
+      "figmaId": "1:5",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 103
+    },
+    "s1.CANTOS": {
+      "figmaId": "1:7",
+      "role": "group",
+      "editable": false
+    },
+    "cantos.left": {
+      "figmaId": "8:15",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 19
+    },
+    "cantos.right": {
+      "figmaId": "8:16",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 20
+    },
+    "s1.Group 6": {
+      "figmaId": "1:10",
+      "role": "group",
+      "editable": false
+    },
+    "s1.handle": {
+      "figmaId": "1:11",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 22
+    },
+    "s1.badge": {
+      "figmaId": "1:12",
+      "role": "rectangle",
+      "editable": false
+    },
+    "s1.avatar": {
+      "figmaId": "1:13",
+      "role": "ellipse",
+      "editable": false
+    },
+    "s2.Group 5": {
+      "figmaId": "1:15",
+      "role": "group",
+      "editable": false
+    },
+    "s2.title": {
+      "figmaId": "1:16",
+      "role": "text",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 22
+    },
+    "s2.body": {
+      "figmaId": "1:17",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 93
+    },
+    "s2.Group 6": {
+      "figmaId": "1:21",
+      "role": "group",
+      "editable": false
+    },
+    "s2.handle": {
+      "figmaId": "1:22",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 22
+    },
+    "s2.badge": {
+      "figmaId": "1:23",
+      "role": "rectangle",
+      "editable": false
+    },
+    "s2.avatar": {
+      "figmaId": "1:24",
+      "role": "ellipse",
+      "editable": false
+    },
+    "s2.CANTOS": {
+      "figmaId": "8:6",
+      "role": "group",
+      "editable": false
+    },
+    "s3.Group 7": {
+      "figmaId": "1:30",
+      "role": "group",
+      "editable": false
+    },
+    "s3.Group 5": {
+      "figmaId": "1:31",
+      "role": "group",
+      "editable": false
+    },
+    "s3.title": {
+      "figmaId": "1:32",
+      "role": "text",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 24
+    },
+    "s3.body": {
+      "figmaId": "1:33",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 154
+    },
+    "s3.Group 6": {
+      "figmaId": "1:34",
+      "role": "group",
+      "editable": false
+    },
+    "s3.handle": {
+      "figmaId": "1:35",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 22
+    },
+    "s3.badge": {
+      "figmaId": "1:36",
+      "role": "rectangle",
+      "editable": false
+    },
+    "s3.avatar": {
+      "figmaId": "1:37",
+      "role": "ellipse",
+      "editable": false
+    },
+    "s3.CANTOS": {
+      "figmaId": "8:10",
+      "role": "group",
+      "editable": false
+    },
+    "s4.Group 7": {
+      "figmaId": "1:43",
+      "role": "group",
+      "editable": false
+    },
+    "s4.Group 5": {
+      "figmaId": "1:44",
+      "role": "group",
+      "editable": false
+    },
+    "s4.title": {
+      "figmaId": "1:45",
+      "role": "text",
+      "editable": true,
+      "maxLines": 3,
+      "maxCharsPerLine": 25
+    },
+    "s4.body": {
+      "figmaId": "1:46",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 185
+    },
+    "s4.Group 6": {
+      "figmaId": "1:47",
+      "role": "group",
+      "editable": false
+    },
+    "s4.handle": {
+      "figmaId": "1:48",
+      "role": "text",
+      "editable": true,
+      "maxLines": 2,
+      "maxCharsPerLine": 22
+    },
+    "s4.badge": {
+      "figmaId": "1:49",
+      "role": "rectangle",
+      "editable": false
+    },
+    "s4.avatar": {
+      "figmaId": "1:50",
+      "role": "ellipse",
+      "editable": false
+    },
+    "s4.CANTOS": {
+      "figmaId": "8:14",
+      "role": "group",
+      "editable": false
+    },
+    "s1.image": {
+      "figmaId": null,
+      "role": "imagem-fundo",
+      "editable": true,
+      "type": "image",
+      "size": "1080x1350"
+    },
+    "s2.image": {
+      "figmaId": null,
+      "role": "imagem-fundo",
+      "editable": true,
+      "type": "image",
+      "size": "1080x1350"
+    },
+    "s3.image": {
+      "figmaId": null,
+      "role": "imagem-fundo",
+      "editable": true,
+      "type": "image",
+      "size": "1080x1350"
+    },
+    "s4.image": {
+      "figmaId": null,
+      "role": "imagem-fundo",
+      "editable": true,
+      "type": "image",
+      "size": "1080x1350"
+    },
+    "s1.dots": {
+      "figmaId": "1:6",
+      "role": "indicador-de-posicao",
+      "editable": false,
+      "dotsConfig": {
+        "total": 4,
+        "active": 1,
+        "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+      }
+    },
+    "s2.dots": {
+      "figmaId": "1:25",
+      "role": "indicador-de-posicao",
+      "editable": false,
+      "dotsConfig": {
+        "total": 4,
+        "active": 2,
+        "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+      }
+    },
+    "s3.dots": {
+      "figmaId": "1:38",
+      "role": "indicador-de-posicao",
+      "editable": false,
+      "dotsConfig": {
+        "total": 4,
+        "active": 3,
+        "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+      }
+    },
+    "s4.dots": {
+      "figmaId": "1:51",
+      "role": "indicador-de-posicao",
+      "editable": false,
+      "dotsConfig": {
+        "total": 4,
+        "active": 4,
+        "note": "calculado, nao copiado do Figma (frames 3 e 4 do Figma original tem o mesmo estado, bug de autoria)"
+      }
+    }
+  },
+  "designSystem": {
+    "canvas": {
+      "w": 1080,
+      "h": 1350,
+      "aspect": "4:5"
+    },
+    "lineHeightRatio": {
+      "titulo": 1.005,
+      "corpo": 1.0914
+    },
+    "letterSpacingEm": {
+      "titulo": -0.06,
+      "corpo": -0.03,
+      "divider": 0.17,
+      "cantos": -0.05
+    },
+    "dynamicPattern": {
+      "note": "Template dinamico tipo tutorial. Slide 1 = capa. Slides 2+ = passos numerados com o bloco de titulo descendo progressivamente.",
+      "tituloY": {
+        "slide1": 702,
+        "slide2": 358,
+        "slide3": 536,
+        "slide4": 750
+      },
+      "continuacao": "para mais passos, repetir o layout de passo com o titulo em nova posicao Y"
+    },
+    "palette": {
+      "branco": "#FFFFFF",
+      "preto": "#000000",
+      "cinza_capa": "#AAAAAA",
+      "vermelho_avatar": "#DA4F4F",
+      "azul_badge": "#3897F0",
+      "cinza_corpo": "#A1A1A1",
+      "cinza_cantos": "#767682"
+    }
+  }
+}

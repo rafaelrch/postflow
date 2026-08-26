@@ -63,6 +63,7 @@ const STYLE_SET = {
   editorial: true,
   template01: true,
   template02: true,
+  template03: true,
 } as const satisfies Record<SlideStyle, true>;
 
 /** A mesma lista, na forma que a validação e a mensagem de erro consomem. */
@@ -413,6 +414,7 @@ const STYLE_LABELS: Record<SlideStyle, string> = {
   editorial: 'editorial — tom de reportagem, específico e factual',
   template01: 'template 1 — blocos de texto com caixa estreita e fixa',
   template02: 'template 2 — capa com destaque marcado e slides de apoio',
+  template03: 'template 3 — capa e passos numerados, um passo por slide',
 };
 
 /** Uma linha "campo: texto (máx N)" por campo refinável presente no slide. */

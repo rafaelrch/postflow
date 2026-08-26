@@ -1,4 +1,5 @@
 import { GlobalSettings, Slide, SlideStyle } from '@/types';
+import { template03ModelOf, template03SlotsForModel } from '@/lib/templates/template-03';
 
 /**
  * Blindagem da exportação contra a falha silenciosa do html-to-image.
@@ -20,10 +21,28 @@ import { GlobalSettings, Slide, SlideStyle } from '@/types';
 
 /** Uma URL que precisa ser baixada para entrar no PNG. */
 function isRemoteUrl(value: unknown): value is string {
-  return typeof value === 'string'
-    && value.length > 0
-    && !value.startsWith('data:')
-    && /^(https?:)?\/\//.test(value);
+  if (typeof value !== 'string' || value.length === 0 || value.startsWith('data:')) return false;
+  // Absoluta (http/https) ou protocol-relative (//host/x).
+  if (/^(https?:)?\/\//.test(value)) return true;
+  // Caminho do servidor (/uploads/x.png) — o upload do app grava assim; o
+  // fetch e o <img>.src a resolvem contra a origem, então conta como remota.
+  if (value.startsWith('/')) return true;
+  return false;
+}
+
+/**
+ * Resolve uma URL relativa (/uploads/x.png) contra a origem atual para a forma
+ * absoluta (http://host/uploads/x.png) que o browser aplica ao `src` de um
+ * <img>. O upload do app grava URL relativa; sem isso o mapa de embed fica
+ * chaveado pela relativa e o <img>.src (absoluto) não bate — o html-to-image
+ * tenta baixar, falha silencioso e o PNG sai sem a imagem.
+ */
+function toAbsoluteUrl(value: string): string {
+  if (value.startsWith('data:') || /^(https?:)?\/\//.test(value)) return value;
+  if (typeof window === 'undefined' || !window.location?.origin) return value;
+  if (value.startsWith('//')) return `${window.location.protocol}${value}`;
+  if (value.startsWith('/')) return `${window.location.origin}${value}`;
+  return value;
 }
 
 /**
@@ -58,7 +77,7 @@ export function slideImageUrls(
 ): string[] {
   const urls: string[] = [];
   const add = (v: unknown) => {
-    if (isRemoteUrl(v)) urls.push(v);
+    if (isRemoteUrl(v)) urls.push(toAbsoluteUrl(v as string));
   };
 
   if (style === 'profile') add(globalSettings.profileBadge?.photo);
@@ -66,11 +85,16 @@ export function slideImageUrls(
   for (const [i, slide] of slides.entries()) {
     if (somenteIndice !== undefined && i !== somenteIndice) continue;
 
-    if (style === 'template01' || style === 'template02') {
-      // Todo valor de slot que é URL. Ler os slots em vez de reconstruir a
-      // varredura do spec evita ficar fora de sincronia com o template quando
-      // ele ganhar um slot de imagem novo — texto não casa com `isRemoteUrl`.
-      for (const valor of Object.values(slide.templateSlots ?? {})) add(valor);
+    if (style === 'template01' || style === 'template02' || style === 'template03') {
+      if (style === 'template03') {
+        const model = template03ModelOf(slide, i);
+        for (const descriptor of template03SlotsForModel(model)) {
+          if (descriptor.kind === 'image') add(slide.templateSlots?.[descriptor.slot]);
+        }
+      } else {
+        // T1/T2 preservam a varredura de slots existente.
+        for (const valor of Object.values(slide.templateSlots ?? {})) add(valor);
+      }
       // O T1 ainda cai nos campos genéricos quando o slot está vazio (deck
       // salvo antes da regra do slot). O T2 nunca os lê.
       if (style === 'template01') {
@@ -173,7 +197,7 @@ export function applyEmbeddedImages(root: HTMLElement, mapa: Map<string, string>
     const bg = el.style?.backgroundImage;
     if (bg && bg.includes('url(')) {
       const novo = bg.replace(CSS_URL, (raw, aspas, url) => {
-        const data = mapa.get(url);
+        const data = mapa.get(toAbsoluteUrl(url));
         return data ? `url(${aspas}${data}${aspas})` : raw;
       });
       if (novo !== bg) {
@@ -185,7 +209,7 @@ export function applyEmbeddedImages(root: HTMLElement, mapa: Map<string, string>
 
     // O Perfil desenha a mídia do post num `<img>`, não num background.
     if (el instanceof HTMLImageElement) {
-      const data = mapa.get(el.src);
+      const data = mapa.get(toAbsoluteUrl(el.src));
       if (data) {
         const anterior = el.src;
         el.src = data;

@@ -17,6 +17,7 @@ import { duplicateCarouselPayload, duplicateSlidesPayload } from '@/lib/carousel
 import MinimalistSlide from '@/components/slides/MinimalistSlide';
 import Template01Slide from '@/components/slides/Template01Slide';
 import Template02Slide from '@/components/slides/Template02Slide';
+import Template03Slide from '@/components/slides/Template03Slide';
 import ProfileSlide from '@/components/slides/ProfileSlide';
 import Pagination from '@/components/ui/Pagination';
 import type { DashboardCarousel } from './page';
@@ -82,6 +83,13 @@ function SlideThumbnail({ carousel }: { carousel: DashboardCarousel }) {
               slide={slide}
               globalSettings={globalSettings}
               profileData={{ photo: globalSettings.profileBadge.photo || '', name: globalSettings.profileBadge.name || '', handle: normalizeHandle(globalSettings.profileBadge.handle) }}
+              slideIndex={0}
+              totalSlides={carousel.slides?.[0]?.count ?? 1}
+            />
+          ) : (carousel.style as SlideStyle) === 'template03' ? (
+            <Template03Slide
+              slide={slide}
+              globalSettings={globalSettings}
               slideIndex={0}
               totalSlides={carousel.slides?.[0]?.count ?? 1}
             />

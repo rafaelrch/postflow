@@ -97,10 +97,17 @@ export const PANEL_REGISTRY: Record<PanelId, PanelDef> = {
   // "Texto do slide" — a tipografia dele é fixa (ver `ProfileSlide`).
   destaquesDoTexto:  { id: 'destaquesDoTexto',  scope: 'slide',  icon: TextUnderlineIcon, label: 'Destaques no texto' },
   layoutDoSlide:     { id: 'layoutDoSlide',     scope: 'slide',  icon: LayoutPanelLeftIcon, label: 'Layout do slide' },
-  sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: ContrastIcon,    label: 'Sombra / Overlay' },
+  sombraOverlay:     { id: 'sombraOverlay',     scope: 'slide',  icon: ContrastIcon,    label: (ctx) => (ctx.style === 'template03' ? 'Overlay degradê' : 'Sombra / Overlay') },
   fundoDoSlide:      { id: 'fundoDoSlide',      scope: 'slide',  icon: PaletteIcon,     label: 'Fundo do slide' },
   cantos:            { id: 'cantos',            scope: 'global', icon: FrameIcon,       label: 'Cantos' },
-  cabecalho:         { id: 'cabecalho',         scope: 'slide',  icon: CaptionsIcon,    label: 'Cantos' },
+  // 🔴 Rótulo por ESTILO, não fixo. O `cantos` acima também se chama "Cantos",
+  // e no Template 3 os DOIS painéis existem no mesmo grupo: `cantos` é a
+  // assinatura no topo do slide, `cabecalho` é a barra de perfil (o @ ao lado
+  // do avatar), que fica junto do bloco de título e desce com ele. Dois painéis
+  // com o mesmo nome na mesma lista é rótulo que mente — exatamente o que a
+  // refatoração desta barra veio acabar. Nos outros estilos só um dos dois
+  // aparece, e ali o nome de sempre continua.
+  cabecalho:         { id: 'cabecalho',         scope: 'slide',  icon: CaptionsIcon,    label: (ctx) => (ctx.style === 'template03' ? 'Barra de perfil' : 'Cantos') },
   restaurarTemplate: { id: 'restaurarTemplate', scope: 'slide',  icon: RotateCcwIcon,   label: 'Restaurar estilo original deste slide' },
 };
 
@@ -171,6 +178,39 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
         'estiloDoTexto',
         'fundoDoSlide',
         'cabecalho',
+        // Sempre o ÚLTIMO do grupo: é o que desfaz tudo o que está acima.
+        'restaurarTemplate',
+      ],
+    },
+  ],
+
+  /**
+   * TEMPLATE 3 — "FlowLine".
+   *
+   * Um grupo só, no escopo do slide, como nos outros dois templates de spec.
+   * Dois painéis que o T2 não tem, e por quê:
+   *
+   * - `cabecalho` é a BARRA DE PERFIL (o @ ao lado do avatar), que fica junto do
+   *   bloco de título e desce com ele;
+   * - `cantos` é a assinatura no topo do slide (marca à esquerda, arroba à
+   *   direita). São coisas diferentes, em lugares diferentes do desenho, e
+   *   juntá-las num painel só daria um rótulo que mente.
+   *
+   * Todo modelo do FlowLine tem imagem de fundo, então `imagem` entra sem
+   * condição: não há o caso "modelo sem imagem" do T1, onde o painel some.
+   */
+  template03: [
+    {
+      scope: 'slide',
+      panels: [
+        'conteudoSlide',
+        'refinarTexto',
+        'imagem',
+        'estiloDoTexto',
+        'fundoDoSlide',
+        'sombraOverlay',
+        'cabecalho',
+        'cantos',
         // Sempre o ÚLTIMO do grupo: é o que desfaz tudo o que está acima.
         'restaurarTemplate',
       ],

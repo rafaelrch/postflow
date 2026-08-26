@@ -124,7 +124,7 @@ create table if not exists public.carousels (
   published_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02')),
+  constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02', 'template03')),
   constraint carousels_status_check check (status in ('draft', 'ready', 'published', 'archived')),
   constraint carousels_theme_check check (theme in ('dark', 'light'))
 );
@@ -141,7 +141,7 @@ alter table public.carousels add column if not exists archived_at timestamptz;
 alter table public.carousels add column if not exists published_at timestamptz;
 
 alter table public.carousels drop constraint if exists carousels_style_check;
-alter table public.carousels add constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02'));
+alter table public.carousels add constraint carousels_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02', 'template03'));
 alter table public.carousels drop constraint if exists carousels_status_check;
 alter table public.carousels add constraint carousels_status_check check (status in ('draft', 'ready', 'published', 'archived'));
 alter table public.carousels drop constraint if exists carousels_theme_check;
@@ -274,7 +274,7 @@ create table if not exists public.templates (
   updated_at timestamptz not null default now(),
   constraint templates_kind_check check (kind in ('carousel', 'slide', 'news')),
   constraint templates_visibility_check check (visibility in ('private', 'system')),
-  constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02'))
+  constraint templates_style_check check (style in ('minimalist', 'profile', 'editorial', 'template01', 'template02', 'template03'))
 );
 
 -- Asset library

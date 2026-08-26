@@ -101,9 +101,9 @@ describe('slideImageUrls — a coleta sai do ESTADO, não do DOM', () => {
     expect(slideImageUrls([s({ gridImageUrl: FOTO })], 'profile', settings)).toEqual([OUTRA, FOTO]);
   });
 
-  it('ignora data URL e caminho local — não há o que baixar', () => {
+  it('ignora data URL e nome de arquivo sem path — não há o que baixar', () => {
     const urls = slideImageUrls(
-      [s({ backgroundImageUrl: 'data:image/png;base64,AAAA' }), s({ contentImageUrl: '/local.png' })],
+      [s({ backgroundImageUrl: 'data:image/png;base64,AAAA' }), s({ contentImageUrl: 'arquivo-local.png' })],
       'minimalist',
       G
     );
@@ -199,6 +199,20 @@ vi.mock('@/lib/product-events', () => ({ trackProductEvent: vi.fn() }));
 
 import { useExport } from '@/hooks/useExport';
 
+const exportMocks = vi.hoisted(() => {
+  const toCanvas = vi.fn(async (element: HTMLDivElement) => {
+    exportMocksState.lastElement = element;
+    return {
+      toDataURL: () => 'data:image/png;base64,PNG',
+      toBlob: (done: (blob: Blob) => void) => done(new Blob(['png'], { type: 'image/png' })),
+    } as unknown as HTMLCanvasElement;
+  });
+  const exportMocksState: { lastElement: HTMLDivElement | null } = { lastElement: null };
+  return { toCanvas, exportMocksState };
+});
+
+vi.mock('html-to-image', () => ({ toCanvas: exportMocks.toCanvas }));
+
 function montaDeck(style: SlideStyle = 'minimalist') {
   useEditorStore.setState({
     slides: [s({ id: 'a', position: 0, backgroundImageUrl: FOTO })],
@@ -233,6 +247,23 @@ describe('a exportação falha VISÍVEL, sem entregar arquivo', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledTimes(1);
     expect(String(toastError.mock.calls[0][0])).toMatch(/imagem do carrossel não pôde ser carregada/i);
+  });
+
+  it('slide solo prefere o ref do slide visível ao clone oculto', async () => {
+    montaDeck();
+    redeOk();
+    const { result } = renderHook(() => useExport());
+    const hidden = document.createElement('div');
+    const visible = document.createElement('div');
+
+    act(() => {
+      result.current.registerSlideRef('a', hidden);
+      result.current.registerVisibleSlideRef('a', visible);
+    });
+
+    expect(result.current.registerVisibleSlideRef).toEqual(expect.any(Function));
+    await act(async () => { await result.current.downloadSlide(0); });
+    expect(exportMocks.exportMocksState.lastElement).toBe(visible);
   });
 
   it('ZIP: o mesmo, e o ZIP nem começa a ser montado', async () => {
