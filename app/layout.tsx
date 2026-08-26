@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
+import ToastProvider from '@/components/ui/toast';
 import './globals.css';
 
 // Fontes self-hosted (woff2 em app/fonts/). Evita o download de runtime do
@@ -92,7 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             "var(--font-inter-tight), 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

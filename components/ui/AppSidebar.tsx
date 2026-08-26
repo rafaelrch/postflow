@@ -37,6 +37,7 @@ import { REELS_ENABLED } from '@/lib/feature-flags';
 import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
+import { toastManager } from '@/components/ui/toast';
 
 interface NavItem {
   href: string;
@@ -215,9 +216,28 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
 
   const handleSignOut = async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.replace('/login');
-    router.refresh();
+    const signOut = supabase.auth.signOut();
+
+    try {
+      await toastManager.promise(signOut, {
+        loading: {
+          title: 'Saindo...',
+          description: 'Encerrando sua sessão.',
+        },
+        success: {
+          title: 'Sessão encerrada',
+          description: 'Até logo!',
+        },
+        error: (error) => ({
+          title: 'Não foi possível sair',
+          description: error instanceof Error ? error.message : 'Tente novamente.',
+        }),
+      });
+      router.replace('/login');
+      router.refresh();
+    } catch {
+      // O toast informa o erro; sem sucesso, a sessão permanece nesta tela.
+    }
   };
 
   const initial = (userName || userEmail || '?').trim().charAt(0).toUpperCase();
