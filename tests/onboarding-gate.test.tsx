@@ -169,6 +169,8 @@ describe('AuthProvider — gate de onboarding_completed', () => {
 
     // logout
     onAuthChange?.('SIGNED_OUT', null);
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login?next=%2Fdashboard'));
+    expect(mockReplace).toHaveBeenCalledTimes(1);
     primeira.unmount();
 
     // mesma conta volta a logar: como houve logout, a checagem roda de novo

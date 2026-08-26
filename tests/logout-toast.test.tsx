@@ -50,7 +50,7 @@ describe('logout com toast', () => {
     vi.clearAllMocks();
   });
 
-  it('exibe a confirmação e só redireciona depois da promise do toast resolver', async () => {
+  it('aciona o logout com toast sem competir com o redirect do AuthProvider', async () => {
     let resolveToast: (() => void) | undefined;
     const logout = Promise.resolve({ error: null });
     mockSignOut.mockReturnValue(logout);
@@ -64,15 +64,18 @@ describe('logout com toast', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
 
     await waitFor(() => expect(mockToastPromise).toHaveBeenCalledTimes(1));
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockToastPromise.mock.calls[0]?.[0]).toBe(logout);
     expect(mockToastPromise.mock.calls[0]?.[1]).toMatchObject({
       loading: { title: 'Saindo...' },
       success: { title: 'Sessão encerrada' },
     });
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
 
     resolveToast?.();
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login'));
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockToastPromise).toHaveBeenCalledTimes(1));
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });

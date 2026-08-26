@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import {
@@ -124,7 +124,6 @@ function SidebarNavItem({
  */
 export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -233,8 +232,6 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           description: error instanceof Error ? error.message : 'Tente novamente.',
         }),
       });
-      router.replace('/login');
-      router.refresh();
     } catch {
       // O toast informa o erro; sem sucesso, a sessão permanece nesta tela.
     }
