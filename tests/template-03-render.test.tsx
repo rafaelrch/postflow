@@ -113,6 +113,16 @@ function profileGroupStyle(html: string): Record<string, string> {
   return props;
 }
 
+function profileVisualStyle(html: string): Record<string, string> {
+  const m = /data-profile-visual[^>]*?style="([^"]*)"/.exec(html)!;
+  const props: Record<string, string> = {};
+  for (const decl of decode(m[1]).split(';')) {
+    const i = decl.indexOf(':');
+    if (i > 0) props[decl.slice(0, i).trim()] = decl.slice(i + 1).trim();
+  }
+  return props;
+}
+
 /** `style` do wrapper `data-profile-handle-layout` (handle + selo em fluxo). */
 function layoutStyle(html: string): Record<string, string> {
   const m = /data-profile-handle-layout[^>]*?style="([^"]*)"/.exec(html);
@@ -128,6 +138,27 @@ function layoutStyle(html: string): Record<string, string> {
 /** `style` do `<img data-slot="s1.badge">` — em fluxo, sem `left` absoluto. */
 function badgeStyleOf(html: string): string {
   return /<img[^>]*data-slot="s1\.badge"[^>]*style="([^"]*)"/.exec(html)?.[1] ?? '';
+}
+
+function effectiveProfileTop(html: string, innerTop = 0): number {
+  const group = profileGroupStyle(html);
+  const visual = profileVisualStyle(html);
+  return px(group.top) + px(visual.top) + innerTop;
+}
+
+function effectiveAvatarLeft(html: string): number {
+  const group = profileGroupStyle(html);
+  const visual = profileVisualStyle(html);
+  const scale = px(group.transform.match(/scale\(([^)]+)\)/)?.[1]);
+  return px(group.left) + scale * px(visual.left);
+}
+
+function effectiveHandleLeft(html: string): number {
+  const group = profileGroupStyle(html);
+  const visual = profileVisualStyle(html);
+  const avatar = styles(html)['s1.avatar'];
+  const scale = px(group.transform.match(/scale\(([^)]+)\)/)?.[1]);
+  return px(group.left) + scale * (px(visual.left) + px(avatar.width) + px(visual.gap));
 }
 
 /** Os círculos do SVG de dots, na ordem. */
@@ -223,12 +254,14 @@ describe('Template 3 — render por modelo', () => {
     expect(px(s['cantos.left'].left)).toBe(71);
     expect(px(s['cantos.left'].top)).toBe(44);
     expect(px(s['cantos.right'].right)).toBe(63);
-    // O @ vive no wrapper `data-profile-handle-layout`, ancorado exatamente na
-    // posição do spec (195/636); o selo acompanha em fluxo ao lado dele.
-    expect(px(layoutStyle(html).left)).toBe(195);
-    expect(px(layoutStyle(html).top)).toBe(636);
-    expect(px(s['s1.avatar'].left)).toBe(134);
-    expect(px(s['s1.avatar'].top)).toBe(627);
+    // O perfil é uma linha de fluxo: o avatar inicia no edge do visual, e o
+    // @/badge seguem por gaps derivados do spec.
+    expect(px(profileVisualStyle(html).left)).toBe(0);
+    expect(effectiveAvatarLeft(html)).toBe(134);
+    expect(effectiveProfileTop(html)).toBe(627);
+    expect(effectiveHandleLeft(html)).toBeCloseTo(195, 3);
+    expect(effectiveProfileTop(html, px(layoutStyle(html).top))).toBeCloseTo(636, 3);
+    expect(s['s1.avatar'].position).toBe('relative');
     // Badge em fluxo: sem left/top absoluto (era left:409px no spec).
     expect(badgeStyleOf(html)).not.toContain('left:409px');
     expect(badgeStyleOf(html)).not.toContain('top:');
@@ -527,9 +560,9 @@ describe('Template 3 — avatar e badge', () => {
     const badge = (html: string) => /<img[^>]*data-slot="s1\.badge"[^>]*style="([^"]*)"/.exec(html)?.[1] ?? '';
 
     expect(layout(short)).toContain('display:inline-flex');
-    expect(layout(short)).toContain('min-width:201px');
+    expect(layout(short)).not.toContain('min-width:201px');
     expect(layout(long)).toContain('display:inline-flex');
-    expect(layout(long)).toContain('min-width:201px');
+    expect(layout(long)).not.toContain('min-width:201px');
     expect(badge(short)).not.toContain('left:409px');
     expect(badge(long)).not.toContain('left:409px');
     expect(long).toContain('@username-muito-longo-que-nao-pode-sobrepor-o-badge');
@@ -571,10 +604,12 @@ describe('Template 3 — avatar e badge', () => {
     const s = styles(html);
     const group = profileGroupStyle(html);
     expect(group.transform).toBe('scale(1)');
-    expect(s['s1.avatar'].left).toBe('134px');
-    expect(s['s1.avatar'].top).toBe('627px');
+    expect(s['s1.avatar'].position).toBe('relative');
+    expect(effectiveAvatarLeft(html)).toBe(134);
+    expect(effectiveProfileTop(html)).toBe(627);
     // @ e selo vivem no wrapper em fluxo ancorado no spec (195/636); badge sem left absoluto.
-    expect(px(layoutStyle(html).left)).toBe(195);
+    expect(effectiveHandleLeft(html)).toBeCloseTo(195, 3);
+    expect(effectiveProfileTop(html, px(layoutStyle(html).top))).toBeCloseTo(636, 3);
     expect(badgeStyleOf(html)).not.toContain('left:409px');
   });
 
@@ -601,9 +636,9 @@ describe('Template 3 — avatar e badge', () => {
     expect(profileGroupStyle(withStyle)['transform-origin']).toBe('0px 0px');
     // A geometria interna continua sendo a do spec; é o grupo que transforma
     // avatar, @, badge e check juntos.
-    expect(styles(withStyle)['s1.avatar'].left).toBe('134px');
+    expect(styles(withStyle)['s1.avatar'].position).toBe('relative');
     // @/selo em fluxo ancorados no spec; badge sem left absoluto (era 409px).
-    expect(px(layoutStyle(withStyle).left)).toBe(195);
+    expect(effectiveHandleLeft(withStyle)).toBeCloseTo(134 + 1.2 * (195 - 134), 3);
     expect(badgeStyleOf(withStyle)).not.toContain('left:409px');
   });
 
@@ -681,8 +716,9 @@ describe('Template 3 — avatar e badge', () => {
     const photo = /data-avatar-photo[^>]*?style="([^"]*)"/.exec(html)![1];
     expect(photo).toContain('object-position:20% 75%');
     expect(photo).toContain('transform:scale(1.8)');
-    expect(styles(html)['s1.avatar'].left).toBe('134px');
-    expect(styles(html)['s1.avatar'].top).toBe('627px');
+    expect(styles(html)['s1.avatar'].position).toBe('relative');
+    expect(effectiveAvatarLeft(html)).toBe(134);
+    expect(effectiveProfileTop(html)).toBe(627);
     expect(profileGroupStyle(html).transform).toBe('scale(1)');
   });
 
@@ -696,7 +732,7 @@ describe('Template 3 — avatar e badge', () => {
     // E quando o passo desce no ciclo, ela desce junto.
     const s = styles(markup(TEMPLATE_03_MODEL_STEP, { position: 3, total: 5 }));
     expect(px(s.conteudo.top)).toBe(template03TituloY(2));
-    expect(px(s['s2.avatar'].top)).toBe(template03TituloY(2) - 75);
+    expect(effectiveProfileTop(markup(TEMPLATE_03_MODEL_STEP, { position: 3, total: 5 }))).toBe(template03TituloY(2) - 75);
   });
 });
 

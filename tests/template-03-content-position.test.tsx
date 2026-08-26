@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import Template03Slide, { TEMPLATE_03_DOTS_OFFSET_Y } from '@/components/slides/Template03Slide';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
-import { TEMPLATE_03_HEIGHT, template03SpecNode } from '@/lib/templates/template-03';
+import { TEMPLATE_03_HEIGHT, TEMPLATE_03_WIDTH, template03SpecNode } from '@/lib/templates/template-03';
 import { template03ContentPositionFor, template03ContentAlignFor } from '@/lib/templates/template-03/overrides';
 import { template03ProfileGeometry } from '@/lib/templates/template-03/profile';
 
@@ -44,11 +44,15 @@ function transformOriginX(style: string): number {
 function effectiveChildLeft(html: string, marker: string): number {
   const group = styleFor(html, 'data-profile-group');
   const visual = styleFor(html, 'data-profile-visual');
-  const child = styleFor(html, marker);
   const groupLeft = cssPx(group, 'left');
   const originX = transformOriginX(group);
   const scale = transformScale(group);
-  return groupLeft + originX + scale * (cssPx(visual, 'left') + cssPx(child, 'left') - originX);
+  const avatar = styleFor(html, /data-slot="s2\.avatar"/.test(html) ? 'data-slot="s2.avatar"' : 'data-slot="s1.avatar"');
+  const visualLeft = cssPx(visual, 'left');
+  const relativeLeft = marker === 'data-profile-handle-layout'
+    ? cssPx(avatar, 'width') + cssPx(visual, 'gap')
+    : 0;
+  return groupLeft + originX + scale * (visualLeft + relativeLeft - originX);
 }
 
 function effectiveProfilePartX(html: string, left: number): number {
@@ -61,6 +65,11 @@ function effectiveProfilePartX(html: string, left: number): number {
 }
 
 function effectiveVisualEdge(html: string, edge: 'left' | 'right'): number {
+  const visual = styleFor(html, 'data-profile-visual');
+  if (edge === 'right' && visual.includes('right: 0px')) return effectiveGroupRight(html);
+  if (edge === 'left' && visual.includes('left: 0px')) {
+    return cssPx(styleFor(html, 'data-profile-group'), 'left');
+  }
   const geometry = template03ProfileGeometry(2, 358, { profileScale: 100 });
   const parts = [geometry.avatar, geometry.handle, geometry.badge];
   const values = parts.map((part) => effectiveProfilePartX(
@@ -68,6 +77,35 @@ function effectiveVisualEdge(html: string, edge: 'left' | 'right'): number {
     edge === 'right' ? part.left + part.width : part.left,
   ));
   return edge === 'right' ? Math.max(...values) : Math.min(...values);
+}
+
+/**
+ * No layout de fluxo, o badge é o último filho real da barra. Em `direita`,
+ * portanto, seu edge efetivo é o edge transformado do visual ancorado ao fim
+ * do grupo — uma coordenada numérica, não uma asserção sobre a string CSS.
+ */
+function effectiveBadgeRight(html: string): number {
+  const visual = styleFor(html, 'data-profile-visual');
+  if (!visual.includes('right: 0px')) throw new Error('badge fora da âncora direita');
+  return effectiveGroupRight(html);
+}
+
+function effectiveGroupRight(html: string): number {
+  const group = styleFor(html, 'data-profile-group');
+  const groupLeft = cssPx(group, 'left');
+  const groupWidth = cssPx(group, 'width');
+  const originX = transformOriginX(group);
+  const scale = transformScale(group);
+  return groupLeft + originX + scale * (groupWidth - originX);
+}
+
+function effectiveGroupCenter(html: string): number {
+  const group = styleFor(html, 'data-profile-group');
+  const groupLeft = cssPx(group, 'left');
+  const groupWidth = cssPx(group, 'width');
+  const originX = transformOriginX(group);
+  const scale = transformScale(group);
+  return groupLeft + originX + scale * (groupWidth / 2 - originX);
 }
 
 function profileCoordinates(html: string): { avatarLeft: number; avatarTop: number; handleLeft: number; handleTop: number } {
@@ -188,7 +226,7 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
     expect(template03ContentAlignFor(t03Slide({ templateOverrides: { contentAlign: 'direita' } }), 1)).toBe('direita');
   });
 
-  it('move a coluna do passo para centro/direita, preservando a largura do spec', () => {
+  it('move a coluna do passo para as três âncoras reais, preservando a largura do spec', () => {
     const step = (contentAlign: 'esquerda' | 'centro' | 'direita') => render(
       <Template03Slide
         slide={t03Slide({ position: 1, templateModel: 2, templateOverrides: { contentAlign } })}
@@ -202,12 +240,18 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
     const left = (html: string) => Number(block(html).match(/left:\s*(\d+(?:\.\d+)?)px/)?.[1]);
     const width = (html: string) => Number(block(html).match(/width:\s*(\d+(?:\.\d+)?)px/)?.[1]);
 
-    expect(left(step('esquerda'))).toBe(134);
-    expect(left(step('centro'))).toBeGreaterThan(left(step('esquerda')));
+    const esquerda = left(step('esquerda'));
+    const centro = left(step('centro'));
+    const direita = left(step('direita'));
     const title = template03SpecNode('s2.title', 2)!;
-    const body = template03SpecNode('s2.body', 2)!;
-    const visualRight = Math.max(title.box.x + title.box.w, body.box.x + body.box.w);
-    expect(left(step('direita')) + width(step('direita'))).toBe(visualRight);
+    const expectedRight = TEMPLATE_03_WIDTH - title.box.x;
+
+    expect(esquerda).toBe(title.box.x);
+    expect(centro).toBe((TEMPLATE_03_WIDTH - width(step('centro'))) / 2);
+    expect(centro).toBeGreaterThan(esquerda);
+    expect(direita).toBe(expectedRight - width(step('direita')));
+    expect(direita).toBeGreaterThan(centro);
+    expect(direita + width(step('direita'))).toBe(expectedRight);
     expect(width(step('direita'))).toBe(width(step('esquerda')));
   });
 
@@ -253,15 +297,6 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
       />
     ).container.innerHTML;
     const geometry = template03ProfileGeometry(2, 358, { profileScale: 100 });
-    const boundsLeft = Math.min(geometry.avatar.left, geometry.handle.left, geometry.badge.left);
-    const boundsRight = Math.max(
-      geometry.avatar.left + geometry.avatar.width,
-      geometry.handle.left + geometry.handle.width,
-      geometry.badge.left + geometry.badge.width,
-    );
-    const profileWidth = boundsRight - boundsLeft;
-    const profileRelative = (left: number) => left - boundsLeft;
-
     for (const align of ['esquerda', 'centro', 'direita'] as const) {
       const html = renderAlign(align);
       const block = styleFor(html, 'data-block="conteudo"');
@@ -276,11 +311,6 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
       const groupCenter = groupLeft + originX + scale * (groupWidth / 2 - originX);
       const avatarLeft = effectiveChildLeft(html, /data-slot="s2\.avatar"/.test(html) ? 'data-slot="s2.avatar"' : 'data-slot="s1.avatar"');
       const handleLeft = effectiveChildLeft(html, 'data-profile-handle-layout');
-      const targetVisualLeft = align === 'esquerda'
-        ? blockLeft
-        : align === 'centro'
-          ? blockCenter - scale * profileWidth / 2
-          : blockLeft + blockWidth - scale * profileWidth;
 
       expect(groupLeft, `${align} wrapper left`).toBe(blockLeft);
       expect(groupWidth, `${align} wrapper width`).toBe(blockWidth);
@@ -288,19 +318,18 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
         expect(groupCenter, `${align} wrapper center`).toBeCloseTo(blockCenter, 4);
       }
       if (align === 'direita') {
-        expect(effectiveVisualEdge(html, 'right'), `${align} visual right`).toBeCloseTo(blockLeft + blockWidth, 4);
+        expect(effectiveBadgeRight(html), `${align} badge right`).toBeCloseTo(blockLeft + blockWidth, 4);
       }
       if (align === 'esquerda') {
         expect(effectiveVisualEdge(html, 'left'), `${align} visual left`).toBeCloseTo(blockLeft, 4);
       }
-      expect(avatarLeft, `${align} avatar efetivo`).toBeCloseTo(
-        targetVisualLeft + scale * profileRelative(geometry.avatar.left),
+      expect(handleLeft - avatarLeft, `${align} avatar/@ gap`).toBeCloseTo(
+        scale * (geometry.handle.left - geometry.avatar.left),
         4,
       );
-      expect(handleLeft, `${align} handle efetivo`).toBeCloseTo(
-        targetVisualLeft + scale * profileRelative(geometry.handle.left),
-        4,
-      );
+      if (align === 'direita') {
+        expect(effectiveVisualEdge(html, 'right'), `${align} visual right`).toBeCloseTo(blockLeft + blockWidth, 4);
+      }
     }
   });
 
@@ -330,13 +359,59 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
     const direita = renderAlign('direita');
 
     expect(effectiveVisualEdge(esquerda, 'left')).toBeCloseTo(rect(esquerda).left, 4);
-    expect(
-      (effectiveVisualEdge(centro, 'left') + effectiveVisualEdge(centro, 'right')) / 2,
-    ).toBeCloseTo(rect(centro).center, 4);
+    expect(effectiveGroupCenter(centro)).toBeCloseTo(rect(centro).center, 4);
     expect(effectiveVisualEdge(direita, 'right')).toBeCloseTo(rect(direita).right, 4);
   });
 
-  it('direita usa o limite visual dos nós title/body, não o fim técnico do data-block', () => {
+  it('mantém título, corpo e barra de perfil na mesma borda interna, com badge dentro dela', () => {
+    const rendered = render(
+      <Template03Slide
+        slide={t03Slide({
+          position: 1,
+          templateModel: 2,
+          templateOverrides: { contentAlign: 'direita' },
+        })}
+        globalSettings={DEFAULT_GLOBAL_SETTINGS}
+        slideIndex={1}
+        totalSlides={4}
+        forExport
+      />
+    );
+    const html = rendered.container.innerHTML;
+    const title = template03SpecNode('s2.title', 2)!;
+    const block = styleFor(html, 'data-block="conteudo"');
+    const titleStyle = styleFor(html, 'data-slot="s2.title"');
+    const bodyStyle = styleFor(html, 'data-slot="s2.body"');
+    const group = styleFor(html, 'data-profile-group');
+    const handleLayout = styleFor(html, 'data-profile-handle-layout');
+    const blockLeft = cssPx(block, 'left');
+    const blockWidth = cssPx(block, 'width');
+    const contentRight = TEMPLATE_03_WIDTH - title.box.x;
+
+    expect(blockLeft + blockWidth).toBe(contentRight);
+    expect(effectiveBadgeRight(html)).toBe(contentRight);
+    expect(titleStyle).toContain('text-align: right');
+    expect(bodyStyle).toContain('text-align: right');
+    expect(cssPx(group, 'left')).toBe(blockLeft);
+    expect(cssPx(group, 'width')).toBe(blockWidth);
+    expect(cssPx(group, 'left') + cssPx(group, 'width')).toBe(contentRight);
+    expect(rendered.container.querySelector('[data-profile-visual]')?.lastElementChild)
+      .toBe(rendered.container.querySelector('[data-profile-handle-layout]'));
+    expect(rendered.container.querySelector('[data-profile-handle-layout]')?.lastElementChild)
+      .toBe(rendered.container.querySelector('[data-badge-asset]'));
+    expect(cssPx(handleLayout, 'gap')).toBeCloseTo(
+      template03ProfileGeometry(2, 358).badge.left
+        - template03ProfileGeometry(2, 358).handle.left
+        - template03ProfileGeometry(2, 358).handle.width,
+      4,
+    );
+    expect(Number(rendered.container.querySelector('[data-badge-asset]')?.getAttribute('width')))
+      .toBeCloseTo(template03ProfileGeometry(2, 358).badge.width, 4);
+    expect(html).toContain('data-slot="s2.title"');
+    expect(html).toContain('data-slot="s2.body"');
+  });
+
+  it('direita usa a borda interna simétrica do frame, não o fim técnico do body do passo', () => {
     const html = render(
       <Template03Slide
         slide={t03Slide({
@@ -352,8 +427,7 @@ describe('T3 — alinhamento horizontal do conteúdo (contentAlign)', () => {
       />
     ).container.innerHTML;
     const title = template03SpecNode('s2.title', 2)!;
-    const body = template03SpecNode('s2.body', 2)!;
-    const visualRight = Math.max(title.box.x + title.box.w, body.box.x + body.box.w);
+    const visualRight = TEMPLATE_03_WIDTH - title.box.x;
 
     expect(effectiveVisualEdge(html, 'right')).toBeCloseTo(visualRight, 4);
   });

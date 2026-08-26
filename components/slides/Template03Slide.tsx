@@ -285,8 +285,9 @@ function SpecText({
         ...(inFlow ? {} : { position: 'absolute', top: geometry?.top ?? top }),
         ...horizontal,
         ...textStyle(node, ov),
-        // No fluxo o @ não deve quebrar: ele cresce e empurra o selo.
-        ...(inFlow ? { whiteSpace: 'nowrap' } : {}),
+        // No fluxo o @ não deve quebrar nem encolher: ele cresce e empurra o
+        // selo, que é o último limite real da barra.
+        ...(inFlow ? { whiteSpace: 'nowrap', flexShrink: 0 } : {}),
         ...(fixedProfile ? { color: TEMPLATE_03_PALETTE.branco } : {}),
         zIndex: 2,
       }}
@@ -391,22 +392,24 @@ function Avatar({
   geometry,
   url,
   profileStyle,
+  inFlow = false,
 }: {
   node: Template03Node;
   geometry: Template03ProfilePart;
   url?: string;
   profileStyle: Required<Template03ProfileStyle>;
+  inFlow?: boolean;
 }) {
   const stroke = node.strokes?.[0];
   return (
     <div
       data-slot={node.slot}
       style={{
-        position: 'absolute',
-        left: geometry.left,
-        top: geometry.top,
+        position: inFlow ? 'relative' : 'absolute',
+        ...(inFlow ? {} : { left: geometry.left, top: geometry.top }),
         width: geometry.width,
         height: geometry.height,
+        flexShrink: 0,
         borderRadius: '50%',
         zIndex: 3,
         overflow: 'hidden',
@@ -530,35 +533,17 @@ function ContentBlock({
   );
 }
 
-/**
- * Limite direito visual dos nós que o usuário vê, não da caixa técnica criada
- * para reflow. O alinhamento direita ancora nos bounds reais do título/corpo;
- * uma margem que o slot tenha gravado do lado direito é espaço não visual.
- */
-function contentVisualRightFor(
-  nodes: Template03Node[],
-  ov: Template03Overrides,
-): number {
-  const visible = nodes.filter((node) => isVisible(node, ov));
-  const candidates = (visible.length > 0 ? visible : nodes).map((node) => {
-    const margin = ov.slotStyles[node.slot ?? '']?.margin ?? 0;
-    const rightInset = node.anchor?.mode === 'right' ? margin : 0;
-    return node.box.x + node.box.w - rightInset;
-  });
-  return Math.max(...candidates);
-}
-
 function contentLeftFor(
   align: Template03ContentAlign,
   bodyWidth: number,
-  defaultLeft: number,
-  visualRight: number,
+  frameLeft: number,
+  frameRight: number,
 ): number {
   return align === 'centro'
     ? Math.round((TEMPLATE_03_WIDTH - bodyWidth) / 2)
     : align === 'direita'
-      ? Math.round(visualRight - bodyWidth)
-      : defaultLeft;
+      ? round(frameRight - bodyWidth)
+      : frameLeft;
 }
 
 // ─── Adaptação de formato ───────────────────────────────────────
@@ -710,28 +695,22 @@ export default function Template03Slide({
 
   const profileStyle = template03ProfileStyleFor(slide, model);
   // O wrapper renderizado tem a MESMA âncora e largura da coluna título+corpo.
-  // O visual interno conserva as coordenadas do spec; isso separa o referencial
-  // da barra da caixa que deve acompanhar o alinhamento do conteúdo.
+  // A margem interna direita é o espelho da margem esquerda do frame do spec;
+  // não pode ser inferida do `body.box.w`, que é menor nos passos e faria
+  // "direita" continuar no mesmo lugar de "esquerda".
   const profile = template03ProfileGeometry(model, blockTop, profileStyle);
-  const visualContentRight = contentVisualRightFor([titleNode, bodyNode], ov);
+  const contentFrameLeft = titleNode.box.x;
+  const contentFrameRight = TEMPLATE_03_WIDTH - contentFrameLeft;
   const contentLeft = contentLeftFor(
     contentAlign,
     bodyNode.box.w,
-    titleNode.box.x,
-    visualContentRight,
+    contentFrameLeft,
+    contentFrameRight,
   );
   const profileParts = [profile.avatar, profile.handle, profile.badge];
-  const profileBoundsLeft = Math.min(...profileParts.map((part) => part.left));
-  const profileBoundsRight = Math.max(...profileParts.map((part) => part.left + part.width));
   const profileBoundsTop = Math.min(...profileParts.map((part) => part.top));
   const profileBoundsBottom = Math.max(...profileParts.map((part) => part.top + part.height));
-  const profileWidth = profileBoundsRight - profileBoundsLeft;
   const profileHeight = profileBoundsBottom - profileBoundsTop;
-  const profileVisualOffsetX = contentAlign === 'esquerda'
-    ? 0
-    : contentAlign === 'direita'
-      ? bodyNode.box.w - profileWidth
-      : (bodyNode.box.w - profileWidth) / 2;
   const profileTransformOriginX = contentAlign === 'esquerda'
     ? 0
     : contentAlign === 'direita'
@@ -823,10 +802,17 @@ export default function Template03Slide({
           data-profile-visual
           style={{
             position: 'absolute',
-            left: profileVisualOffsetX - profileBoundsLeft,
-            top: -blockTop,
-            width: profileWidth,
+            ...(contentAlign === 'direita'
+              ? { right: 0 }
+              : contentAlign === 'centro'
+                ? { left: '50%', transform: 'translateX(-50%)' }
+                : { left: 0 }),
+            top: profileBoundsTop - blockTop,
+            width: 'max-content',
             height: profileHeight,
+            display: 'inline-flex',
+            alignItems: 'flex-start',
+            gap: profile.handle.left - profile.avatar.left - profile.avatar.width,
           }}
         >
           <Avatar
@@ -834,20 +820,18 @@ export default function Template03Slide({
             geometry={profile.avatar}
             url={avatar || undefined}
             profileStyle={profileStyle}
+            inFlow
           />
-          {/* Handle + selo verificado vivem em fluxo ancorado no @; ambos estão
-              dentro do mesmo visual para receber exatamente a mesma escala e
-              translação do avatar. */}
+          {/* Handle + selo verificado vivem em fluxo após o avatar; a largura
+              natural do @ entra na barra e o badge é seu último edge real. */}
           <div
             data-profile-handle-layout
             style={{
-              position: 'absolute',
-              top: profile.handle.top,
-              left: profile.handle.left,
+              position: 'relative',
+              top: profile.handle.top - profileBoundsTop,
               display: 'inline-flex',
-              minWidth: `${profile.handle.width}px`,
               alignItems: 'center',
-              gap: 6,
+              gap: profile.badge.left - profile.handle.left - profile.handle.width,
             }}
           >
             <SpecText

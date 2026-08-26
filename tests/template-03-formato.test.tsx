@@ -87,9 +87,26 @@ function layoutTop(html: string): number {
   return NaN;
 }
 
-/** O selo acompanha o @ no mesmo wrapper; seu `top` efetivo é o do wrapper. */
-function badgeTop(html: string): number {
-  return layoutTop(html);
+function profileCss(html: string, marker: string): Record<string, string> {
+  const m = new RegExp(`${marker}[^>]*?style="([^"]*)"`).exec(html);
+  const out: Record<string, string> = {};
+  if (!m) return out;
+  for (const decl of decode(m[1]).split(';')) {
+    const i = decl.indexOf(':');
+    if (i > 0) out[decl.slice(0, i).trim()] = decl.slice(i + 1).trim();
+  }
+  return out;
+}
+
+/** A posição efetiva soma os offsets do grupo, visual e fluxo interno. */
+function effectiveAvatarTop(html: string): number {
+  return px(profileCss(html, 'data-profile-group').top)
+    + px(profileCss(html, 'data-profile-visual').top);
+}
+
+/** O @ e o badge compartilham a linha vertical do wrapper de handle. */
+function effectiveHandleTop(html: string): number {
+  return effectiveAvatarTop(html) + layoutTop(html);
 }
 
 function specNode(model: number, name: string): Template03Node {
@@ -142,7 +159,10 @@ describe('TEMPLATE 3 — formato: o 4:5 é NO-OP', () => {
       const s = styles(markup(model, '4:5'));
       for (const name of ['avatar', 'cantos.left', 'cantos.right']) {
         const node = specNode(model, name);
-        expect(px(s[node.slot!].top), `${node.slot} no 4:5`).toBeCloseTo(node.box.y, 4);
+        const top = name === 'avatar'
+          ? effectiveAvatarTop(markup(model, '4:5'))
+          : px(s[node.slot!].top);
+        expect(top, `${node.slot} no 4:5`).toBeCloseTo(node.box.y, 4);
       }
       const dots = specNode(model, 'dots');
       expect(px(s[dots.slot!].top), `${dots.slot} no 4:5`).toBeCloseTo(
@@ -152,10 +172,10 @@ describe('TEMPLATE 3 — formato: o 4:5 é NO-OP', () => {
       // @ e selo vivem em fluxo no wrapper `data-profile-handle-layout`, ancorado
       // no `y` do spec — não têm mais `top` absoluto no slot.
       const html = markup(model, '4:5');
-      expect(layoutTop(html), `s${model}.handle no 4:5`).toBeCloseTo(specNode(model, 'handle').box.y, 4);
+      expect(effectiveHandleTop(html), `s${model}.handle no 4:5`).toBeCloseTo(specNode(model, 'handle').box.y, 4);
       // O selo vive em fluxo no mesmo wrapper do @, então sua altura é a do
       // handle (a ancoragem de 636.59 do spec do badge é absorvida pelo alinhamento).
-      expect(badgeTop(html), `s${model}.badge no 4:5`).toBeCloseTo(specNode(model, 'handle').box.y, 4);
+      expect(effectiveHandleTop(html), `s${model}.badge no 4:5`).toBeCloseTo(specNode(model, 'handle').box.y, 4);
       // O bloco em fluxo entra pelo `tituloY`, que no primeiro passo e na capa
       // é o próprio `y` do nó.
       expect(px(s.conteudo.top)).toBe(specNode(model, 'title').box.y);
@@ -279,7 +299,7 @@ describe('TEMPLATE 3 — formato: o bloco de título é PROPORCIONAL', () => {
       for (const format of FORMAT_IDS) {
         const s = styles(markup(model, format));
         const delta = specNode(model, 'title').box.y - specNode(model, 'avatar').box.y;
-        expect(px(s.conteudo.top) - px(s[specNode(model, 'avatar').slot!].top)).toBeCloseTo(
+        expect(px(s.conteudo.top) - effectiveAvatarTop(markup(model, format))).toBeCloseTo(
           delta,
           3
         );
