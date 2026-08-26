@@ -10,20 +10,20 @@ import React, {
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 
 const HORIZONTAL_IMAGES = [
-  "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&h=750&q=85",
-  "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&h=750&q=85",
+  "/parallax/parallax-01.webp",
+  "/parallax/parallax-02.webp",
+  "/parallax/parallax-03.webp",
+  "/parallax/parallax-04.webp",
+  "/parallax/parallax-05.webp",
+  "/parallax/parallax-06.webp",
+  "/parallax/parallax-07.webp",
+  "/parallax/parallax-08.webp",
+  "/parallax/parallax-09.webp",
+  "/parallax/parallax-10.webp",
+  "/parallax/parallax-11.webp",
+  "/parallax/parallax-12.webp",
+  "/parallax/parallax-13.webp",
+  "/parallax/parallax-14.webp",
 ];
 
 interface ImageCardProps {

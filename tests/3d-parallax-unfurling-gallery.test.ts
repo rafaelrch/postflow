@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const root = new URL("..", import.meta.url);
@@ -103,9 +103,31 @@ describe("3d parallax unfurling gallery", () => {
     const component = read("components/ui/3d-parallax-unfurling-gallery.tsx");
 
     expect(component).toContain("aspect-[16/10]");
-    expect(component).toContain("w=1200");
-    expect(component).toContain("h=750");
+    expect(component).toContain('"/parallax/parallax-01.webp"');
     expect(component).toContain("object-cover");
     expect(component).not.toContain("h-[200px] sm:h-[300px] md:h-[400px]");
+  });
+
+  it("uses 14 local WebP assets in a horizontal 16:10 format", () => {
+    const component = read("components/ui/3d-parallax-unfurling-gallery.tsx");
+    const assetRefs = [...component.matchAll(/"(\/parallax\/parallax-\d{2}\.webp)"/g)].map(
+      ([, asset]) => asset,
+    );
+
+    expect(component).not.toContain("images.unsplash.com");
+    expect(assetRefs).toHaveLength(14);
+    expect(new Set(assetRefs).size).toBe(14);
+
+    for (const assetRef of assetRefs) {
+      const assetUrl = new URL(`public${assetRef}`, root);
+      expect(existsSync(assetUrl)).toBe(true);
+
+      const data = readFileSync(assetUrl);
+      expect(data.subarray(0, 4).toString("ascii")).toBe("RIFF");
+      expect(data.subarray(8, 12).toString("ascii")).toBe("WEBP");
+      expect(data.subarray(12, 16).toString("ascii")).toBe("VP8 ");
+      expect(data.readUInt16LE(26)).toBe(1200);
+      expect(data.readUInt16LE(28)).toBe(750);
+    }
   });
 });
