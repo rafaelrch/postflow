@@ -9,7 +9,7 @@ import SettingsTabs from '@/components/settings/SettingsTabs';
  */
 export default function ConfiguracoesLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="p-8 max-w-2xl mx-auto w-full overflow-y-auto">
+    <div className="w-full min-w-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
       <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Configurações</h1>
       <SettingsTabs />
       {children}

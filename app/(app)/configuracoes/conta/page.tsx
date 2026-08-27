@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import ChangePasswordButton from '@/components/settings/ChangePasswordButton';
 import ChangeEmailButton from '@/components/settings/ChangeEmailButton';
+import ProfileSettingsForm from '@/components/settings/ProfileSettingsForm';
 
 /**
  * Aba "Conta": os dados que a conta REALMENTE tem, a troca de senha e a troca
@@ -41,10 +42,11 @@ export default async function ConfiguracoesContaPage() {
   // A linha de profiles pode não existir (conta antiga, trigger que falhou):
   // maybeSingle + optional chaining, nunca um throw que derruba a aba inteira.
   const { data: profile } = user
-    ? await supabase.from('profiles').select('name').eq('id', user.id).maybeSingle()
+    ? await supabase.from('profiles').select('name, first_name, last_name, professional_profile, referral_source, photo_url').eq('id', user.id).maybeSingle()
     : { data: null };
 
-  const nome = (profile as { name?: string } | null)?.name?.trim();
+  const profileValues = profile as { name?: string; first_name?: string; last_name?: string; professional_profile?: string; referral_source?: string | null; photo_url?: string } | null;
+  const nome = [profileValues?.first_name, profileValues?.last_name].filter(Boolean).join(' ').trim() || profileValues?.name?.trim();
 
   return (
     /*
@@ -57,18 +59,30 @@ export default async function ConfiguracoesContaPage() {
       lista de linhas inteiras deixava metade do cartão vazia à direita.
     */
     <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6">
-      <h2 className="text-lg font-semibold text-[var(--foreground)]">Dados da conta</h2>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.55fr)] lg:items-start">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Dados da conta</h2>
 
-      <dl className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        <Dado rotulo="E-mail" testId="conta-email" valor={user?.email ?? '—'} />
-        {/* Só aparece quando existe: uma linha "Nome —" não informa nada. */}
-        {nome ? <Dado rotulo="Nome" testId="conta-nome" valor={nome} /> : null}
-        <Dado rotulo="Conta criada em" testId="conta-criada-em" valor={fmtDate(user?.created_at)} />
-      </dl>
+          <dl className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <Dado rotulo="E-mail" testId="conta-email" valor={user?.email ?? '—'} />
+            {/* Só aparece quando existe: uma linha "Nome —" não informa nada. */}
+            {nome ? <Dado rotulo="Nome" testId="conta-nome" valor={nome} /> : null}
+            <Dado rotulo="Conta criada em" testId="conta-criada-em" valor={fmtDate(user?.created_at)} />
+          </dl>
 
-      {/* Mesma gramática visual do botão de cancelar assinatura na outra aba:
-          ação separada do conteúdo por uma linha, no rodapé do cartão. */}
-      <div className="mt-5 pt-4 border-t border-[var(--border)] flex flex-col items-start">
+          <ProfileSettingsForm initialValues={{
+            firstName: profileValues?.first_name ?? '',
+            lastName: profileValues?.last_name ?? '',
+            professionalProfile: profileValues?.professional_profile ?? '',
+            referralSource: profileValues?.referral_source ?? '',
+            photoUrl: profileValues?.photo_url ?? '',
+          }} />
+        </div>
+
+        {/* Mesma gramática visual do botão de cancelar assinatura na outra aba:
+            ação separada do conteúdo por uma linha no mobile e uma divisória
+            vertical no desktop, mantendo todas as ações acessíveis. */}
+        <div className="border-t border-[var(--border)] pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
         {/* `new_email` é o pedido de troca ainda não confirmado. Vem do
             servidor para sobreviver a recarga e a outro dispositivo. */}
         <ChangeEmailButton
@@ -77,6 +91,7 @@ export default async function ConfiguracoesContaPage() {
         />
         <div className="mt-3">
           <ChangePasswordButton />
+        </div>
         </div>
       </div>
     </section>

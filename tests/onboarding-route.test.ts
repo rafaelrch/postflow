@@ -49,6 +49,7 @@ beforeEach(() => {
   mockMaybeSingle.mockResolvedValue({ data: { onboarding_completed: false }, error: null });
   mockProjectSingle.mockResolvedValue({ data: null, error: null });
   mockWorkspaceMaybeSingle.mockResolvedValue({ data: null, error: null });
+  mockWorkspaceRpc.mockResolvedValue({ data: null, error: null });
   mockUpsert.mockResolvedValue({ error: null });
   mockBrandUpsert.mockResolvedValue({ error: null });
   mockInsert.mockResolvedValue({ error: null });
@@ -164,7 +165,43 @@ describe('PUT /api/onboarding', () => {
 
     expect(response.status).toBe(200);
     expect(mockUpsert).toHaveBeenCalledWith(expect.not.objectContaining({ brand_name: 'Marca A', workspace_name: 'Cliente A', niche: 'Educação' }));
-    expect(mockBrandUpsert).toHaveBeenCalledWith(expect.objectContaining({ workspace_id: 'workspace-a', brand_name: 'Marca A', niche: 'Educação' }));
+    expect(mockBrandUpsert).toHaveBeenCalledWith(expect.objectContaining({ workspace_id: 'workspace-a', brand_name: 'Marca A', niche: 'Educação' }), { onConflict: 'workspace_id' });
+  });
+
+  it('salva no workspace novo que está ativo, não no workspace antigo mais antigo', async () => {
+    mockExposeWorkspaceRpc.value = true;
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'usuario-da-sessao' } } });
+    mockWorkspaceRpc.mockResolvedValue({ data: 'workspace-novo', error: null });
+    mockWorkspaceMaybeSingle.mockResolvedValue({ data: { id: 'workspace-antigo' }, error: null });
+
+    const response = await (await route()).PUT(new Request('http://local/api/onboarding', {
+      method: 'PUT',
+      body: JSON.stringify({ complete: true, workspaceName: 'Cliente Novo', brandName: 'Marca Nova', logoUrl: 'https://cdn.example/workspace-logo.png', photoUrl: 'https://cdn.example/profile.png', niche: 'Tecnologia', instagramHandle: '@marca-nova' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mockBrandUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      workspace_id: 'workspace-novo',
+      brand_name: 'Marca Nova',
+      logo_url: 'https://cdn.example/workspace-logo.png',
+      niche: 'Tecnologia',
+    }), { onConflict: 'workspace_id' });
+    expect(mockBrandUpsert).not.toHaveBeenCalledWith(expect.objectContaining({ workspace_id: 'workspace-antigo' }));
+  });
+
+  it('não mascara uma falha real ao atualizar o contexto do workspace', async () => {
+    mockExposeWorkspaceRpc.value = true;
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'usuario-da-sessao' } } });
+    mockWorkspaceMaybeSingle.mockResolvedValue({ data: { id: 'workspace-ativo' }, error: null });
+    mockBrandUpsert.mockResolvedValue({ error: { code: '23505', message: 'duplicate key value violates unique constraint workspace_brand_context_workspace_id_key' } });
+
+    const response = await (await route()).PUT(new Request('http://local/api/onboarding', {
+      method: 'PUT',
+      body: JSON.stringify({ complete: true, brandName: 'Marca', instagramHandle: '@marca' }),
+    }));
+
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).toBe('Perfil salvo, mas o contexto da marca não pôde ser atualizado.');
   });
 
   it('mantém o fluxo legado quando a migration ainda não criou workspaces', async () => {
