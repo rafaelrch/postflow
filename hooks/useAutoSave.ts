@@ -103,7 +103,10 @@ export function useAutoSave(onCarouselCreated?: (id: string) => void) {
       // ── Substitui todos os slides (delete + insert) ────────────────────
       // Mapeamento completo em lib/slide-mapper — persiste também cores/fontes
       // por elemento, highlights, sombra custom, paddings e offsets editoriais.
-      const slidePayload = store.slides.map((slide, i) => mapSlideToDbRow(slide, id!, i));
+      // Um upload pode terminar enquanto o save do carrossel está em voo. Leia
+      // novamente para que o insert dos slides não serialize o snapshot
+      // anterior e apague a URL permanente recém-aplicada no editor.
+      const slidePayload = useEditorStore.getState().slides.map((slide, i) => mapSlideToDbRow(slide, id!, i));
 
       const { error: delError } = await supabase
         .from('slides')

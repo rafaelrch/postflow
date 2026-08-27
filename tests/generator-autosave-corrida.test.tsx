@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? mocks.idParam.value : null) }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 /**

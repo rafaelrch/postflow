@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import {
@@ -11,6 +11,8 @@ import {
   LayoutGridIcon,
   MapIcon,
   NewspaperIcon,
+  PlusIcon,
+  Refresh01Icon,
   Settings01Icon,
   ShieldCheckIcon,
   SidebarLeft01Icon,
@@ -38,6 +40,14 @@ import { useTheme } from '@/components/ThemeProvider';
 import { createClient } from '@/lib/supabase';
 import { useCreditsStore } from '@/hooks/useCreditsStore';
 import { toastManager } from '@/components/ui/toast';
+import WorkspaceSetupModal, { type WorkspaceSetupData } from '@/components/onboarding/WorkspaceSetupModal';
+import { notifyWorkspaceChanged, prepareWorkspaceChange } from '@/lib/workspace-events';
+import {
+  WorkspaceContent,
+  WorkspaceTrigger,
+  Workspaces,
+  type Workspace,
+} from '@/components/ui/workspaces';
 
 interface NavItem {
   href: string;
@@ -46,6 +56,34 @@ interface NavItem {
   animatedIcon?: AnimatedHeroiconComponent;
   /** Rotas extras que mantêm o item ativo (além do próprio href). */
   match?: string[];
+}
+
+type SidebarWorkspace = Workspace & {
+  slug: string;
+  role: string;
+  status: string;
+  workspaceStatus?: string;
+  avatar_url?: string;
+  logo?: string;
+};
+
+type WorkspaceListResponse = {
+  state?: string;
+  activeWorkspace?: { id?: unknown } | null;
+  workspaces?: Array<{
+    workspaceId?: unknown;
+    name?: unknown;
+    slug?: unknown;
+    avatar_url?: unknown;
+    status?: unknown;
+    role?: unknown;
+    workspaceStatus?: unknown;
+  }>;
+  error?: unknown;
+};
+
+function getWorkspaceError(body: WorkspaceListResponse | { error?: unknown } | null, fallback: string) {
+  return typeof body?.error === 'string' && body.error.trim() ? body.error : fallback;
 }
 
 const navItems: NavItem[] = [
@@ -124,6 +162,7 @@ function SidebarNavItem({
  */
 export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -139,6 +178,14 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const credits = useCreditsStore((s) => s.balance);
   const fetchCredits = useCreditsStore((s) => s.fetch);
   const [collapsed, setCollapsed] = useState(false);
+  const [workspaces, setWorkspaces] = useState<SidebarWorkspace[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>();
+  const [workspaceState, setWorkspaceState] = useState<'loading' | 'ready' | 'workspace_required' | 'error'>('loading');
+  const [workspaceLoadError, setWorkspaceLoadError] = useState('');
+  const [workspaceActionError, setWorkspaceActionError] = useState('');
+  const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
   const signOutAnimation = useNativeHoverAnimation();
   const themeAnimation = useNativeHoverAnimation();
 
@@ -167,6 +214,131 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
       }
       return next;
     });
+  };
+
+  const loadWorkspaces = async () => {
+    setWorkspaceState('loading');
+    setWorkspaceLoadError('');
+    setWorkspaceActionError('');
+    setWorkspaces([]);
+    setActiveWorkspaceId(undefined);
+    try {
+      const response = await fetch('/api/workspaces', {
+        headers: { Accept: 'application/json' },
+      });
+      const body = await response.json().catch(() => null) as WorkspaceListResponse | null;
+      if (!response.ok) throw new Error(getWorkspaceError(body, 'Não foi possível carregar os workspaces.'));
+
+      const allowedWorkspaces = (body?.workspaces ?? [])
+        .filter((workspace) => workspace.status === 'active' && (workspace.workspaceStatus ?? 'active') === 'active')
+        .filter((workspace): workspace is typeof workspace & { workspaceId: string; name: string } =>
+          typeof workspace.workspaceId === 'string' && typeof workspace.name === 'string' && workspace.name.trim().length > 0,
+        )
+        .map((workspace) => ({
+          id: workspace.workspaceId,
+          name: workspace.name,
+          slug: typeof workspace.slug === 'string' ? workspace.slug : '',
+          role: typeof workspace.role === 'string' ? workspace.role : 'viewer',
+          status: 'active',
+          workspaceStatus: 'active',
+          logo: typeof workspace.avatar_url === 'string' ? workspace.avatar_url : '',
+        }));
+      setWorkspaces(allowedWorkspaces);
+
+      const serverActiveId = typeof body?.activeWorkspace?.id === 'string'
+        ? body.activeWorkspace.id
+        : undefined;
+      const resolvedActiveId = allowedWorkspaces.some((workspace) => workspace.id === serverActiveId)
+        ? serverActiveId
+        : allowedWorkspaces[0]?.id;
+      setActiveWorkspaceId(resolvedActiveId);
+      setWorkspaceState(allowedWorkspaces.length > 0 ? 'ready' : 'workspace_required');
+    } catch (error) {
+      setWorkspaceState('error');
+      setWorkspaceLoadError(error instanceof Error ? error.message : 'Não foi possível carregar os workspaces.');
+    }
+  };
+
+  useEffect(() => {
+    void loadWorkspaces();
+  }, []);
+
+  const handleWorkspaceChange = async (workspace: SidebarWorkspace) => {
+    if (switchingWorkspaceId || workspace.id === activeWorkspaceId) return;
+
+    setSwitchingWorkspaceId(workspace.id);
+    setWorkspaceActionError('');
+    try {
+      if (!(await prepareWorkspaceChange(workspace.id))) {
+        throw new Error('Salve as alterações antes de trocar de workspace.');
+      }
+      const response = await fetch(`/api/workspaces/${encodeURIComponent(workspace.id)}/switch`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+      });
+      const body = await response.json().catch(() => null) as { workspaceId?: unknown; error?: unknown } | null;
+      if (!response.ok || body?.workspaceId !== workspace.id) {
+        throw new Error(getWorkspaceError(body, 'Não foi possível trocar o workspace.'));
+      }
+      setActiveWorkspaceId(workspace.id);
+      setWorkspaceState('ready');
+      await notifyWorkspaceChanged(workspace.id);
+      router.refresh();
+    } catch (error) {
+      setWorkspaceActionError(error instanceof Error ? error.message : 'Não foi possível trocar o workspace.');
+    } finally {
+      setSwitchingWorkspaceId(null);
+    }
+  };
+
+  const handleCreateWorkspace = async (setup: WorkspaceSetupData) => {
+    if (creatingWorkspace) return;
+    const name = setup.name.trim();
+    setCreatingWorkspace(true);
+    setWorkspaceActionError('');
+    try {
+      const response = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(setup),
+      });
+      const body = await response.json().catch(() => null) as { workspace?: { id?: unknown; name?: unknown; slug?: unknown; avatar_url?: unknown }; error?: unknown } | null;
+      const created = body?.workspace;
+      if (!response.ok || typeof created?.id !== 'string' || typeof created.name !== 'string') {
+        throw new Error(getWorkspaceError(body, 'Não foi possível criar o workspace.'));
+      }
+
+      const createdWorkspace: SidebarWorkspace = {
+        id: created.id,
+        name: created.name,
+        slug: typeof created.slug === 'string' ? created.slug : '',
+        role: 'owner',
+        status: 'active',
+        workspaceStatus: 'active',
+        avatar_url: typeof created.avatar_url === 'string' ? created.avatar_url : '',
+        logo: typeof created.avatar_url === 'string' ? created.avatar_url : '',
+      };
+      setWorkspaces((current) => [...current.filter((workspace) => workspace.id !== createdWorkspace.id), createdWorkspace]);
+
+      const switchResponse = await fetch(`/api/workspaces/${encodeURIComponent(createdWorkspace.id)}/switch`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+      });
+      const switchBody = await switchResponse.json().catch(() => null) as { workspaceId?: unknown; error?: unknown } | null;
+      if (!switchResponse.ok || switchBody?.workspaceId !== createdWorkspace.id) {
+        throw new Error('Workspace criado, mas não foi possível ativá-lo.');
+      }
+
+      setActiveWorkspaceId(createdWorkspace.id);
+      setWorkspaceState('ready');
+      setCreateWorkspaceOpen(false);
+      await notifyWorkspaceChanged(createdWorkspace.id);
+      router.refresh();
+    } catch (error) {
+      setWorkspaceActionError(error instanceof Error ? error.message : 'Não foi possível criar o workspace.');
+    } finally {
+      setCreatingWorkspace(false);
+    }
   };
 
   useEffect(() => {
@@ -311,6 +483,85 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           )}
         </button>
       </div>
+
+      {/* Workspace */}
+      <div
+        className={cn('shrink-0 border-b py-3', collapsed ? 'px-2' : 'px-3')}
+        style={{ borderColor: 'var(--line)' }}
+      >
+        {workspaceState === 'loading' ? (
+          <div data-testid="workspace-loading" className="text-muted-foreground px-3 py-2 text-sm">
+            Loading workspaces...
+          </div>
+        ) : workspaces.length > 0 ? (
+          <Workspaces
+            workspaces={workspaces}
+            selectedWorkspaceId={activeWorkspaceId}
+            onWorkspaceChange={handleWorkspaceChange}
+          >
+            <WorkspaceTrigger
+              data-testid="workspace-switcher-trigger"
+              disabled={Boolean(switchingWorkspaceId)}
+            />
+            <WorkspaceContent>
+              <button
+                type="button"
+                data-testid="workspace-create-action"
+                onClick={() => {
+                  setWorkspaceActionError('');
+                  setCreateWorkspaceOpen(true);
+                }}
+                className="text-muted-foreground flex w-full items-center justify-start gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                <HugeiconsIcon icon={PlusIcon} className="h-5 w-5" aria-hidden />
+                Create workspace
+              </button>
+            </WorkspaceContent>
+          </Workspaces>
+        ) : (
+          <button
+            type="button"
+            data-testid="workspace-switcher-trigger"
+            onClick={() => {
+              setWorkspaceActionError('');
+              setCreateWorkspaceOpen(true);
+            }}
+            className="text-muted-foreground flex h-12 w-full items-center justify-start rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+          >
+            Create workspace
+          </button>
+        )}
+        {workspaceLoadError ? (
+          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--danger)]" data-testid="workspace-error" role="alert">
+            <span className="min-w-0 flex-1">Não foi possível carregar os workspaces.</span>
+            <button
+              type="button"
+              data-testid="workspace-retry"
+              onClick={() => void loadWorkspaces()}
+              className="shrink-0 rounded-[var(--radius-sm)] p-1 hover:bg-[var(--accent-soft)]"
+              aria-label="Tentar carregar workspaces novamente"
+              title="Tentar novamente"
+            >
+              <HugeiconsIcon icon={Refresh01Icon} className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          </div>
+        ) : null}
+        {workspaceActionError && !createWorkspaceOpen ? (
+          <p className="mt-2 text-xs text-[var(--danger)]" data-testid="workspace-action-error" role="alert">
+            {workspaceActionError}
+          </p>
+        ) : null}
+      </div>
+
+      <WorkspaceSetupModal
+        open={createWorkspaceOpen}
+        loading={creatingWorkspace}
+        error={workspaceActionError}
+        onClose={() => {
+          if (!creatingWorkspace) setCreateWorkspaceOpen(false);
+        }}
+        onSubmit={handleCreateWorkspace}
+      />
 
       {/* Nav */}
       <nav

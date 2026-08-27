@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { imagePatch } from '@/hooks/useGenerateCarouselImages';
 import { useEditorStore } from '@/hooks/useEditorStore';
+import { mapSlideToDbRow } from '@/lib/slide-mapper';
 import {
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_IMAGE_POSITION,
@@ -10,9 +11,9 @@ import {
   Slide,
 } from '@/types';
 
-vi.mock('@/lib/upload-image', () => ({
-  uploadImageFile: vi.fn(async () => 'https://x/nova-imagem.png'),
-}));
+const uploadImageFile = vi.hoisted(() => vi.fn(async () => 'https://x/nova-imagem.png'));
+
+vi.mock('@/lib/upload-image', () => ({ uploadImageFile }));
 
 vi.mock('react-hot-toast', () => ({
   default: { loading: vi.fn(), success: vi.fn(), error: vi.fn() },
@@ -63,6 +64,14 @@ describe('inserção de imagem preenchendo a moldura — estilos genéricos', ()
     await waitFor(() =>
       expect(useEditorStore.getState().slides[0].imagePosition).toEqual(DEFAULT_IMAGE_POSITION)
     );
+    expect(useEditorStore.getState().slides[0].backgroundImageUrl).toBe(
+      'https://x/nova-imagem.png'
+    );
+    expect(useEditorStore.getState().slides[0].gridImageUrl).toBe('https://x/nova-imagem.png');
+    expect(mapSlideToDbRow(useEditorStore.getState().slides[0], 'carousel', 0)).toMatchObject({
+      background_image_url: 'https://x/nova-imagem.png',
+      grid_image_url: 'https://x/nova-imagem.png',
+    });
 
     fireEvent.change(inputs[1], { target: { files: [file] } });
     await waitFor(() =>
@@ -70,5 +79,12 @@ describe('inserção de imagem preenchendo a moldura — estilos genéricos', ()
         DEFAULT_IMAGE_POSITION
       )
     );
+    expect(useEditorStore.getState().slides[0].contentImageUrl).toBe(
+      'https://x/nova-imagem.png'
+    );
+    expect(mapSlideToDbRow(useEditorStore.getState().slides[0], 'carousel', 0)).toMatchObject({
+      content_image_url: 'https://x/nova-imagem.png',
+    });
+    expect(uploadImageFile).toHaveBeenCalledWith(file, 'slide-images');
   });
 });
