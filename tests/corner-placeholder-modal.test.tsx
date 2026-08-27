@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: () => null }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 vi.mock('@/hooks/useExport', () => ({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -951,28 +951,6 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   };
 
   /**
-   * Altura do modal, medida do conteúdo real. Fixá-la é o que permite ANIMAR a
-   * mudança de tamanho entre os passos; sem isso o modal saltaria de altura.
-   * O primeiro valor é aplicado sem transição (ver `.cw-box` + `cw-measured`).
-   */
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [boxHeight, setBoxHeight] = useState<number | null>(null);
-
-  useLayoutEffect(() => {
-    const el = boxRef.current;
-    // jsdom não implementa ResizeObserver: sem ele o modal fica com altura
-    // automática, que é exatamente o comportamento anterior.
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    // offsetHeight, não getBoundingClientRect: durante a animação de entrada o
-    // modal está sob um `scale()`, e o rect viria escalado (altura errada).
-    const medir = () => setBoxHeight(el.offsetHeight);
-    medir();
-    const ro = new ResizeObserver(medir);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  /**
    * Habilita o botão primário. Só o step de conteúdo barra: a IA precisa de
    * prompt e o JSON precisa de texto (a validação de forma roda no clique,
    * pra não parsear o JSON a cada tecla).
@@ -1515,31 +1493,27 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
       style={{ background: 'rgba(0,0,0,0.55)' }}
     >
       {/*
-        A altura acompanha o conteúdo do passo atual, medida por ResizeObserver
-        e animada. Como o overlay centraliza por flex, crescer e encolher
-        acontece a partir do CENTRO — o modal não salta para o topo — e o
-        respiro de `p-4` continua uniforme em volta.
+        O shell mantém a geometria estável; somente o conteúdo interno rola.
       */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="cw-title"
         className={cn(
-          'cw-modal cw-box w-full overflow-hidden rounded-[18px]',
+          'cw-modal cw-box flex h-[min(560px,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-[18px]',
           // O grid 2×2 de templates é o único passo que precisa de largura.
-          step === 2 ? 'max-w-[600px]' : 'max-w-[440px]',
+          step === 2 ? 'h-[min(720px,calc(100dvh-2rem))] max-w-[600px]' : 'max-w-[440px]',
         )}
         style={{
           background: 'var(--paper)',
           border: '1.5px solid var(--ink)',
           boxShadow: 'var(--sh-2)',
-          ...(boxHeight ? { height: boxHeight } : {}),
         }}
       >
-      <div ref={boxRef} className="flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center gap-3.5 px-6 pt-6 pb-4">
+        <div className="flex shrink-0 items-center gap-3.5 px-6 pt-6 pb-4">
           <span
             className="grid place-items-center rounded-[12px] shrink-0"
             style={{ width: 40, height: 40, background: 'var(--ink)', color: 'var(--paper)' }}
@@ -1562,10 +1536,10 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
         <ProgressBar step={step} total={totalSteps} />
 
-        {/* Body — sem scroll: cada step precisa caber inteiro no modal */}
+        {/* O conteúdo rola dentro do popup; o overlay permanece contido na viewport. */}
         <div
           key={step}
-          className={cn('px-6 pb-5', stepDir === 'fwd' ? 'cw-step-fwd' : 'cw-step-back')}
+          className={cn('min-h-0 flex-1 overflow-y-auto px-6 pb-5', stepDir === 'fwd' ? 'cw-step-fwd' : 'cw-step-back')}
         >
 
           {/* ── STEP 1: Formato do post ── */}
@@ -2087,7 +2061,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-3 px-6 pb-6">
+        <div className="flex shrink-0 items-center gap-3 px-6 pb-6">
           {step > 1 && (
             <button onClick={() => goTo(step - 1)} className="brand-btn outline pill sm">
               <HugeiconsIcon icon={ArrowLeft01Icon} className="w-3.5 h-3.5" aria-hidden />

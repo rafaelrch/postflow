@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import EditorSidebar from '@/components/editor/EditorSidebar';
 import SlideCanvas from '@/components/editor/SlideCanvas';
@@ -19,6 +19,7 @@ import { loadCarouselById } from '@/lib/carousel-load';
 import { findFactoryCorners, type CornerPlaceholderHit } from '@/lib/corner-placeholder';
 import toast from 'react-hot-toast';
 import GeneratorLoading from '@/components/editor/GeneratorLoading';
+import { registerWorkspaceChangeGuard, registerWorkspaceChangeListener } from '@/lib/workspace-events';
 
 /**
  * `carousels.updated_at` vira instante. Data ilegível volta `null` — a barra de
@@ -31,6 +32,7 @@ function parseSavedAt(raw?: string | null): number | null {
 }
 
 export default function GeneratorClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const carouselIdParam = searchParams.get('id');
 
@@ -69,6 +71,26 @@ export default function GeneratorClient() {
   // e o efeito abaixo iria ao banco justamente antes de os slides existirem.
   const { saveNow } = useAutoSave(setLoadedCarouselId);
   const { registerSlideRef, registerVisibleSlideRef, downloadSlide, downloadAll } = useExport();
+
+  // O workspace só muda depois que o deck atual foi salvo. Depois da troca,
+  // descarta o estado em memória e o id da URL: um carrossel do workspace
+  // anterior nunca pode aparecer no workspace novo.
+  const saveBeforeWorkspaceChange = useCallback(async () => {
+    if (useEditorStore.getState().saveStatus === 'saved') return true;
+    await saveNow();
+    return useEditorStore.getState().saveStatus === 'saved';
+  }, [saveNow]);
+
+  useEffect(() => registerWorkspaceChangeGuard(saveBeforeWorkspaceChange), [saveBeforeWorkspaceChange]);
+
+  useEffect(() => registerWorkspaceChangeListener((_workspaceId) => {
+    setLoadedCarouselId(null);
+    setFailedCarouselId(null);
+    setLoadError('');
+    setLoadFailureIsTransient(false);
+    useEditorStore.getState().resetEditor();
+    if (carouselIdParam) router.replace('/generator');
+  }), [carouselIdParam, router]);
 
   // ── Load carousel from URL param ──────────────────────────────────────────
   useEffect(() => {

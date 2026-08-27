@@ -340,7 +340,9 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const upload = async (file: File, apply: (url: string) => void, bucket = 'slide-images') => {
     const toastId = toast.loading('Enviando imagem…');
     try {
-      apply(await uploadImageFile(file, bucket));
+      const url = (await uploadImageFile(file, bucket)).trim();
+      if (!/^https?:\/\//i.test(url)) throw new Error('O upload não retornou uma URL permanente.');
+      apply(url);
       toast.success('Imagem adicionada', { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Falha no upload', { id: toastId });

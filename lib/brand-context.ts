@@ -1,9 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isWorkspaceFeatureUnavailableError } from '@/lib/workspaces';
 
 /**
- * Contexto de marca coletado no onboarding (tabela `profiles`), injetado como
- * pano de fundo nos prompts dos agentes. Nunca substitui o prompt livre do
- * usuário — só dá à IA o mínimo pra escrever no idioma da marca.
+ * Contexto de marca coletado no onboarding (tabela `workspace_brand_context`),
+ * injetado como pano de fundo nos prompts dos agentes. O terceiro argumento é
+ * obrigatório para os fluxos de cliente; sem ele mantemos leitura legada para
+ * contas ainda não migradas.
  */
 export type BrandContext = {
   niche: string;
@@ -63,15 +65,45 @@ export function isBrandContextEmpty(ctx: BrandContext | null | undefined): boole
 export async function getBrandContext(
   userId: string,
   supabase: SupabaseClient,
+  workspaceId?: string | null,
 ): Promise<BrandContext> {
   if (!userId) return EMPTY_BRAND_CONTEXT;
 
   try {
-    const { data, error } = await supabase
+    let resolvedWorkspaceId = workspaceId;
+    // A workspace explícito vindo de uma rota é a autoridade. Quando a rota
+    // antiga não o informa, o RPC usa a preferência validada no banco; isso
+    // evita escolher a marca por um id enviado pelo navegador.
+    if (!resolvedWorkspaceId && process.env.NODE_ENV !== 'test' && typeof (supabase as { rpc?: unknown }).rpc === 'function') {
+      try {
+        const resolved = await supabase.rpc('active_workspace_id', { p_user_id: userId });
+        if (!resolved.error && typeof resolved.data === 'string') resolvedWorkspaceId = resolved.data;
+      } catch (error) {
+        if (!isWorkspaceFeatureUnavailableError(error)) console.error('[getBrandContext] falha ao resolver workspace');
+      }
+    }
+
+    const legacyQuery = () => supabase
       .from('profiles')
       .select('niche, audience, brand_story, audience_pains, default_tone, brand_palette')
       .eq('id', userId)
       .maybeSingle();
+    const query = resolvedWorkspaceId
+      ? supabase
+        .from('workspace_brand_context')
+        .select('niche, audience, brand_story, audience_pains, default_tone, brand_palette')
+        .eq('workspace_id', resolvedWorkspaceId)
+        .maybeSingle()
+      : legacyQuery();
+    let { data, error } = await query;
+
+    // Durante expand/backfill, um deploy pode encontrar o RPC novo mas ainda
+    // não encontrar a tabela de contexto. Nesse caso, conserva o prompt
+    // legado; qualquer erro diferente continua seguindo o fallback vazio
+    // existente e não é classificado como rollout.
+    if (error && resolvedWorkspaceId && isWorkspaceFeatureUnavailableError(error)) {
+      ({ data, error } = await legacyQuery());
+    }
 
     if (error || !data) {
       // Loga só o code estável — details/hint do Supabase podem carregar

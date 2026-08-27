@@ -116,6 +116,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe('getBrandContext', () => {
@@ -187,6 +188,20 @@ describe('getBrandContext', () => {
 
     const comErro = await getBrandContext('user-A', fakeSupabase({ 'user-A': FULL_PROFILE }, { error: { message: 'boom' } }));
     expect(isBrandContextEmpty(comErro)).toBe(true);
+  });
+
+  it('mantém o contexto legado quando o RPC novo ainda não existe', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const supabase = fakeSupabase({ 'user-A': FULL_PROFILE }) as ReturnType<typeof fakeSupabase>;
+    (supabase as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST202', message: 'Could not find function public.active_workspace_id' },
+    });
+
+    const ctx = await getBrandContext('user-A', supabase);
+
+    expect(ctx.niche).toBe('Ecommerce de moda');
+    expect((supabase as unknown as { calls: Array<{ table: string }> }).calls.at(-1)?.table).toBe('profiles');
   });
 
   it('caso 4 — isolamento: userId A não recebe dados do userId B', async () => {

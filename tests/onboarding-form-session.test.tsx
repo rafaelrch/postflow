@@ -17,8 +17,8 @@ const USER_B = { user: { id: 'usuario-b' } };
 
 describe('OnboardingForm — troca de conta na mesma aba', () => {
   beforeEach(() => {
-    localStorage.setItem('onboarding-draft:usuario-a', JSON.stringify({ brandName: 'Marca A' }));
-    localStorage.setItem('onboarding-draft:usuario-b', JSON.stringify({ brandName: 'Marca B' }));
+    localStorage.setItem('onboarding-draft:usuario-a', JSON.stringify({ brandName: 'Marca A', step: 2, version: 2 }));
+    localStorage.setItem('onboarding-draft:usuario-b', JSON.stringify({ brandName: 'Marca B', step: 2, version: 2 }));
     mockGetSession.mockResolvedValue({ data: { session: USER_A } });
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ profile: null }), { status: 200 }))));
   });
@@ -38,5 +38,14 @@ describe('OnboardingForm — troca de conta na mesma aba', () => {
     onAuthChange?.('SIGNED_IN', USER_B);
 
     await waitFor(() => expect((screen.getByLabelText('Nome da marca') as HTMLInputElement).value).toBe('Marca B'));
+  });
+
+  it('restaura referral do rascunho sem depender do perfil remoto', async () => {
+    localStorage.setItem('onboarding-draft:usuario-a', JSON.stringify({ step: 1, referralSource: 'reddit' }));
+    mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
+    const { default: OnboardingForm } = await import('../components/onboarding/OnboardingForm');
+    const screen = render(<OnboardingForm />);
+
+    await waitFor(() => expect((screen.getByLabelText('Como você conheceu o Creatools?') as HTMLSelectElement).value).toBe('reddit'));
   });
 });

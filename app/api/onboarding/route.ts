@@ -1,8 +1,19 @@
 import { after, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { recordProductEventBestEffort } from '@/lib/product-events';
+import { createWorkspace, isWorkspaceFeatureUnavailableError } from '@/lib/workspaces';
+import { legacyChannelSelection, parseReferralSource, parseSelectedChannels, serializeProfessionalProfiles } from '@/lib/onboarding-options';
 
-const PROFILE_FIELDS = 'brand_name, workspace_name, photo_url, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, onboarding_completed';
+const PROFILE_FIELDS = 'brand_name, workspace_name, first_name, last_name, professional_profile, referral_source, photo_url, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, goals, onboarding_completed';
+const LEGACY_PROFILE_FIELDS = 'brand_name, workspace_name, photo_url, instagram_handle, news_instagram_handle, twitter_handle, brand_palette, niche, audience, brand_story, audience_pains, default_tone, goals, onboarding_completed';
+
+function isTask1ProfileColumnUnavailable(error: unknown) {
+  const value = error as { code?: unknown; message?: unknown } | null;
+  const code = typeof value?.code === 'string' ? value.code : '';
+  const message = typeof value?.message === 'string' ? value.message : String(error ?? '');
+  return ['42703', 'PGRST204'].includes(code)
+    && /first_name|last_name|professional_profile|referral_source/i.test(message);
+}
 
 function text(value: unknown, limit = 2000) {
   return typeof value === 'string' ? value.trim().slice(0, limit) : '';
@@ -14,12 +25,19 @@ function palette(value: unknown) {
   return colors.length ? colors : ['#0A0A0A', '#FAFAF7', '#E4572E'];
 }
 
+function hasOwn(value: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
 export async function GET() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
-  const { data, error } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', user.id).maybeSingle();
+  let { data, error } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', user.id).maybeSingle();
+  if (error && isTask1ProfileColumnUnavailable(error)) {
+    ({ data, error } = await supabase.from('profiles').select(LEGACY_PROFILE_FIELDS).eq('id', user.id).maybeSingle());
+  }
   if (error) return NextResponse.json({ error: 'Não foi possível carregar o onboarding.' }, { status: 500 });
   return NextResponse.json({ profile: data });
 }
@@ -37,10 +55,31 @@ export async function PUT(request: Request) {
   }
 
   const brandName = text(body.brandName, 120);
-  const instagramHandle = text(body.instagramHandle, 80).replace(/^@/, '');
+  const rawHandles = {
+    instagram_carousel: text(body.instagramHandle, 80).replace(/^@/, ''),
+    instagram_news: text(body.newsInstagramHandle, 80).replace(/^@/, ''),
+    twitter: text(body.twitterHandle, 80).replace(/^@/, ''),
+  };
+  const explicitChannels = hasOwn(body, 'selectedChannels');
+  const selectedChannels = explicitChannels
+    ? parseSelectedChannels(body.selectedChannels)
+    : legacyChannelSelection(undefined, rawHandles);
+  const instagramHandle = selectedChannels.includes('instagram_carousel') ? rawHandles.instagram_carousel : '';
+  const newsInstagramHandle = selectedChannels.includes('instagram_news') ? rawHandles.instagram_news : '';
+  const twitterHandle = selectedChannels.includes('twitter') ? rawHandles.twitter : '';
   const complete = body.complete === true;
-  if (complete && (!brandName || !instagramHandle)) {
-    return NextResponse.json({ error: 'Nome da marca e Instagram são obrigatórios.' }, { status: 422 });
+  if (complete && (!brandName || !selectedChannels.length)) {
+    return NextResponse.json({ error: 'Nome da marca e pelo menos um canal são obrigatórios.' }, { status: 422 });
+  }
+  if (complete) {
+    const missingChannel = selectedChannels.find((channel) => !({
+      instagram_carousel: instagramHandle,
+      instagram_news: newsInstagramHandle,
+      twitter: twitterHandle,
+    }[channel]));
+    if (missingChannel) {
+      return NextResponse.json({ error: 'Informe o @ de cada canal selecionado.' }, { status: 422 });
+    }
   }
 
   const photoUrl = text(body.photoUrl, 2048);
@@ -48,7 +87,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'URL da foto inválida.' }, { status: 422 });
   }
 
-  const newsInstagramHandle = text(body.newsInstagramHandle, 80).replace(/^@/, '') || instagramHandle;
+  const workspaceName = text(body.workspaceName, 120) || brandName || 'Meu workspace';
+  const parsedProfessionalProfile = serializeProfessionalProfiles(body.professionalProfile);
+  const referralWasProvided = hasOwn(body, 'referralSource');
+  const rawReferralSource = text(body.referralSource, 80);
+  const referralSource = parseReferralSource(rawReferralSource);
+  if (rawReferralSource && !referralSource) {
+    return NextResponse.json({ error: 'Origem do cadastro inválida.' }, { status: 422 });
+  }
   // Um autosave da página de edição não pode reabrir o gate de uma conta já concluída.
   const { data: currentProfile, error: currentProfileError } = await supabase
     .from('profiles')
@@ -57,15 +103,23 @@ export async function PUT(request: Request) {
     .maybeSingle();
   if (currentProfileError) return NextResponse.json({ error: 'Não foi possível validar o perfil.' }, { status: 500 });
   const onboardingCompleted = complete || Boolean(currentProfile?.onboarding_completed);
+  const workspaceFeatureEnabled = typeof (supabase as { rpc?: unknown }).rpc === 'function';
   const profile = {
     id: user.id,
-    workspace_name: brandName,
+    workspace_name: workspaceName,
+    first_name: text(body.firstName, 80),
+    last_name: text(body.lastName, 80),
+    // A coluna continua text para não exigir migração; os novos valores são
+    // canônicos e separados por vírgula, enquanto valores legados desconhecidos
+    // continuam intactos para não apagar dados existentes.
+    professional_profile: parsedProfessionalProfile || text(body.professionalProfile, 120),
+    ...(referralWasProvided ? { referral_source: referralSource } : {}),
     brand_name: brandName,
     photo_url: photoUrl,
     handle: instagramHandle,
     instagram_handle: instagramHandle,
     news_instagram_handle: newsInstagramHandle,
-    twitter_handle: text(body.twitterHandle, 80).replace(/^@/, ''),
+    twitter_handle: twitterHandle,
     brand_palette: palette(body.palette),
     niche: text(body.niche),
     audience: text(body.audience),
@@ -74,15 +128,104 @@ export async function PUT(request: Request) {
     default_tone: text(body.defaultTone, 200),
     onboarding_completed: onboardingCompleted,
   };
+  // Com a migration de workspaces ativa, os campos abaixo continuam no objeto
+  // de resposta para compatibilidade do cliente, mas não voltam para `profiles`.
+  // O perfil é do usuário; marca, canais, nicho e paleta são do workspace.
+  const profileToPersist = workspaceFeatureEnabled
+    ? {
+      id: user.id,
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      professional_profile: profile.professional_profile,
+      ...(referralWasProvided ? { referral_source: profile.referral_source } : {}),
+      photo_url: profile.photo_url,
+      onboarding_completed: profile.onboarding_completed,
+    }
+    : profile;
 
-  const { error: profileError } = await supabase.from('profiles').upsert(profile);
+  let { error: profileError } = await supabase.from('profiles').upsert(profileToPersist);
+  if (profileError && isTask1ProfileColumnUnavailable(profileError)) {
+    const { first_name: _firstName, last_name: _lastName, professional_profile: _professionalProfile, referral_source: _referralSource, ...legacyProfile } = profileToPersist;
+    ({ error: profileError } = await supabase.from('profiles').upsert(legacyProfile));
+  }
   if (profileError) return NextResponse.json({ error: 'Não foi possível salvar o perfil.' }, { status: 500 });
 
   // O projeto só é criado ao concluir. Assim rascunhos não criam dados extras.
+  let workspaceId: string | null = null;
+  if (workspaceFeatureEnabled) {
+    const brandContext = {
+      brandName,
+      logoUrl: photoUrl,
+      instagramHandle,
+      newsInstagramHandle,
+      twitterHandle: profile.twitter_handle,
+      palette: profile.brand_palette,
+      brandStory: profile.brand_story,
+      audiencePains: profile.audience_pains,
+      niche: profile.niche,
+      audience: profile.audience,
+      defaultTone: profile.default_tone,
+    };
+    let workspaceFeatureUnavailable = false;
+    let existingWorkspace: { id?: string } | null = null;
+    if (complete) {
+      const lookup = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      const { data: foundWorkspace, error: workspaceLookupError } = lookup;
+      existingWorkspace = foundWorkspace;
+      if (workspaceLookupError) {
+        if (isWorkspaceFeatureUnavailableError(workspaceLookupError)) workspaceFeatureUnavailable = true;
+        else return NextResponse.json({ error: 'Perfil salvo, mas o workspace não pôde ser validado.' }, { status: 500 });
+      }
+    } else {
+      const { data: activeId, error: activeIdError } = await supabase.rpc('active_workspace_id', { p_user_id: user.id });
+      if (!activeIdError && typeof activeId === 'string') existingWorkspace = { id: activeId };
+    }
+    if (!workspaceFeatureUnavailable && existingWorkspace?.id) {
+      workspaceId = existingWorkspace.id;
+      const { error: brandError } = await supabase.from('workspace_brand_context').upsert({
+          workspace_id: workspaceId,
+          brand_name: brandName,
+          logo_url: photoUrl,
+          instagram_handle: instagramHandle,
+          news_instagram_handle: newsInstagramHandle,
+          twitter_handle: profile.twitter_handle,
+          brand_palette: profile.brand_palette,
+          brand_story: profile.brand_story,
+          audience_pains: profile.audience_pains,
+          niche: profile.niche,
+          audience: profile.audience,
+          default_tone: profile.default_tone,
+      });
+      if (brandError) {
+        if (isWorkspaceFeatureUnavailableError(brandError)) {
+          workspaceFeatureUnavailable = true;
+          workspaceId = null;
+        }
+        else return NextResponse.json({ error: 'Perfil salvo, mas o contexto da marca não pôde ser atualizado.' }, { status: 500 });
+      }
+    }
+    if (complete && !workspaceFeatureUnavailable && !workspaceId) {
+      try {
+        const workspace = await createWorkspace(supabase, workspaceName, brandContext);
+        workspaceId = workspace.id;
+      } catch (error) {
+        if (isWorkspaceFeatureUnavailableError(error)) workspaceFeatureUnavailable = true;
+        else return NextResponse.json({ error: 'Perfil salvo, mas o workspace não pôde ser criado.' }, { status: 500 });
+      }
+    }
+  }
+
   if (complete) {
     const { data: existing } = await supabase.from('projects').select('id').eq('user_id', user.id).eq('name', brandName).maybeSingle();
     const project = {
       user_id: user.id,
+      ...(workspaceId ? { workspace_id: workspaceId } : {}),
       name: brandName,
       description: profile.brand_story,
       niche: profile.niche,
@@ -98,5 +241,5 @@ export async function PUT(request: Request) {
     catch { void recordProductEventBestEffort(user.id, 'onboarding_completed'); }
   }
 
-  return NextResponse.json({ profile });
+  return NextResponse.json({ profile, workspaceId });
 }

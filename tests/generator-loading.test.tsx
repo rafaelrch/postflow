@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: (key: string) => key === 'id' ? 'carousel-1' : null }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 vi.mock('@/lib/supabase', () => ({

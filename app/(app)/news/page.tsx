@@ -29,6 +29,9 @@ import {
 import { nomeDaNoticiaAvulsa, nomeDoCardDoLote, nomeDoZipDeNoticias } from '@/lib/export-filename';
 import Pagination from '@/components/ui/Pagination';
 import { trackProductEvent } from '@/lib/product-events';
+import { uploadImageFile } from '@/lib/upload-image';
+import { newsEntryPayload } from '@/lib/news-persistence';
+import { registerWorkspaceChangeGuard, registerWorkspaceChangeListener } from '@/lib/workspace-events';
 
 // ── Canvas export helpers ─────────────────────────────────────────────────────
 
@@ -385,6 +388,7 @@ export default function NewsPage() {
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | undefined>(undefined);
   const [brandLogoUploading, setBrandLogoUploading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [workspaceRefreshNonce, setWorkspaceRefreshNonce] = useState(0);
 
   // Load the user's saved brand logo (from profile) once on mount.
   useEffect(() => {
@@ -402,12 +406,11 @@ export default function NewsPage() {
       setUserId(user.id);
 
       // Perfil (logo) e templates em paralelo — eram 2 round-trips em série.
-      const [{ data: profile }, { data: tplRows }] = await Promise.all([
+      const [{ data: brandContext }, { data: tplRows }] = await Promise.all([
         supabase
-          .from('profiles')
-          .select('brand_logo_url')
-          .eq('id', user.id)
-          .single(),
+          .from('workspace_brand_context')
+          .select('logo_url')
+          .maybeSingle(),
         supabase
           .from('templates')
           .select('id, name, content_schema, created_at')
@@ -416,7 +419,7 @@ export default function NewsPage() {
       ]);
 
       if (!active) return;
-      const savedLogo = (profile?.brand_logo_url as string | undefined)?.trim();
+      const savedLogo = (brandContext?.logo_url as string | undefined)?.trim();
       if (savedLogo) setBrandLogoUrl(savedLogo);
 
       let templates: SavedTemplate[] = (tplRows || []).map((row: { id: string; name: string; content_schema: NewsTemplateStyle; created_at: string }) => ({
@@ -461,7 +464,7 @@ export default function NewsPage() {
     };
     load();
     return () => { active = false; };
-  }, []);
+  }, [workspaceRefreshNonce]);
 
   const createTemplateInDb = useCallback(async (style: NewsTemplateStyle): Promise<SavedTemplate | null> => {
     const supabase = createClient();
@@ -505,7 +508,8 @@ export default function NewsPage() {
   // ── Editor state ──────────────────────────────────────────────────────────
   const [items, setItems] = useState<NewsCardItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [localImages, setLocalImages] = useState<Record<number, string>>({});
+  const [uploadingImageIdx, setUploadingImageIdx] = useState<number | null>(null);
+  const [uploadingInsetIdx, setUploadingInsetIdx] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
@@ -566,13 +570,20 @@ export default function NewsPage() {
         return;
       }
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ brand_logo_url: publicUrl })
-        .eq('id', userId);
-      if (profileError) {
-        console.error('[brand-logo] profile update error', profileError);
-        toast.error(describe(profileError, 'profile'), { id: loadingId });
+      const { data: activeBrand, error: brandLookupError } = await supabase
+        .from('workspace_brand_context')
+        .select('workspace_id')
+        .maybeSingle();
+      if (brandLookupError || !activeBrand?.workspace_id) {
+        throw brandLookupError ?? new Error('Workspace ativo sem contexto de marca.');
+      }
+      const { error: brandError } = await supabase
+        .from('workspace_brand_context')
+        .update({ logo_url: publicUrl })
+        .eq('workspace_id', activeBrand.workspace_id);
+      if (brandError) {
+        console.error('[brand-logo] workspace update error', brandError);
+        toast.error(describe(brandError, 'profile'), { id: loadingId });
         return;
       }
 
@@ -596,10 +607,15 @@ export default function NewsPage() {
     }
     try {
       const supabase = createClient();
+      const { data: activeBrand } = await supabase
+        .from('workspace_brand_context')
+        .select('workspace_id')
+        .maybeSingle();
+      if (!activeBrand?.workspace_id) throw new Error('Workspace ativo sem contexto de marca.');
       const { error } = await supabase
-        .from('profiles')
-        .update({ brand_logo_url: '' })
-        .eq('id', userId);
+        .from('workspace_brand_context')
+        .update({ logo_url: '' })
+        .eq('workspace_id', activeBrand.workspace_id);
       if (error) throw error;
       setBrandLogoUrl(undefined);
       setItems(prev => prev.map(it => ({ ...it, logo_url: undefined })));
@@ -641,7 +657,6 @@ export default function NewsPage() {
     if (!saved) return;
     setItems(saved);
     setSelectedIdx(0);
-    setLocalImages({});
     setStep('editor');
     toast.success(`${saved.length} cards criados!`);
   };
@@ -659,7 +674,6 @@ export default function NewsPage() {
       if (!saved) return;
       setItems(saved);
       setSelectedIdx(0);
-      setLocalImages({});
       setStep('editor');
       toast.success(`${saved.length} cards carregados!`);
     } catch (err) {
@@ -702,16 +716,6 @@ export default function NewsPage() {
   // DELETE, e some junto com o card quando a lista recarrega.
   const [deletandoLote, setDeletandoLote] = useState<string | null>(null);
 
-  // blob: URLs morrem no reload — não vão para o banco.
-  const sanitizeForPayload = (item: NewsCardItem): Record<string, unknown> => {
-    const { dbId: _dbId, localImageUrl: _local, ...rest } = item;
-    const payload = { ...rest } as Record<string, unknown>;
-    if (typeof payload.inset_image_url === 'string' && (payload.inset_image_url as string).startsWith('blob:')) {
-      delete payload.inset_image_url;
-    }
-    return payload;
-  };
-
   /**
    * Insere um lote novo de cards e devolve os itens com dbId preenchido.
    * Retorna null quando o backstop de cota do banco recusa o INSERT — assim o
@@ -725,14 +729,7 @@ export default function NewsPage() {
         : `b_${Date.now()}`;
       const { data, error } = await supabase
         .from('news_entries')
-        .insert(built.map((it) => ({
-          title: it.titulo_card || '',
-          topic: it.tema || '',
-          image_url: it.imagem_url || '',
-          caption: it.legenda || '',
-          status: 'draft',
-          raw_payload: { batch_id: batchId, ...sanitizeForPayload(it) },
-        })))
+        .insert(built.map((it) => newsEntryPayload(it, batchId)))
         .select('id');
       if (error || !data) {
         console.error('[news] erro ao salvar lote:', error);
@@ -832,9 +829,9 @@ export default function NewsPage() {
   }, [step, loadBatches]);
 
   /** Salva (upsert) todos os cards do lote atual no banco. */
-  const saveAllCards = useCallback(async () => {
+  const saveAllCards = useCallback(async (): Promise<boolean> => {
     const current = itemsRef.current;
-    if (!current.length) return;
+    if (!current.length) return true;
     toast.loading('Salvando notícias…', { id: 'save-news' });
     try {
       const supabase = createClient();
@@ -844,19 +841,14 @@ export default function NewsPage() {
           : `b_${Date.now()}`;
       }
       const batchId = currentBatchIdRef.current;
-      const rowFor = (it: NewsCardItem) => ({
-        title: it.titulo_card || '',
-        topic: it.tema || '',
-        image_url: it.imagem_url || '',
-        caption: it.legenda || '',
-        status: 'draft',
-        raw_payload: { batch_id: batchId, ...sanitizeForPayload(it) },
-      });
+      const rowFor = (it: NewsCardItem) => newsEntryPayload(it, batchId);
 
-      await Promise.all(
+      const updates = await Promise.all(
         current.filter((it) => it.dbId).map((it) =>
           supabase.from('news_entries').update(rowFor(it)).eq('id', it.dbId!)),
       );
+      const updateError = updates.find((result) => result.error)?.error;
+      if (updateError) throw updateError;
 
       const missing = current.map((it, idx) => ({ it, idx })).filter((x) => !x.it.dbId);
       if (missing.length) {
@@ -877,15 +869,45 @@ export default function NewsPage() {
 
       toast.success('Notícias salvas!', { id: 'save-news' });
       loadBatches();
+      return true;
     } catch (err) {
       console.error('[news] erro ao salvar cards:', err);
       toast.error('Erro ao salvar notícias', { id: 'save-news' });
+      return false;
     }
   }, [loadBatches]);
+
+  // A troca só prossegue depois que o lote aberto está persistido. Depois dela
+  // todas as referências e dados visíveis são zerados antes da nova leitura,
+  // evitando que cards, templates ou logo do workspace anterior apareçam.
+  useEffect(() => registerWorkspaceChangeGuard(() => saveAllCards()), [saveAllCards]);
+  useEffect(() => registerWorkspaceChangeListener(async () => {
+    Object.values(saveTimersRef.current).forEach((timer) => clearTimeout(timer));
+    saveTimersRef.current = {};
+    itemsRef.current = [];
+    currentBatchIdRef.current = null;
+    currentBatchCreatedAtRef.current = null;
+    setItems([]);
+    setSelectedIdx(0);
+    setSavedBatches([]);
+    setBatchPage(1);
+    setBatchTotalPages(1);
+    setBatchTotalItems(0);
+    setSavedTemplates([]);
+    setNewsTemplate({ ...DEFAULT_TEMPLATE });
+    setBrandLogoUrl(undefined);
+    setJsonInput('');
+    setManualCards(Array.from({ length: 10 }, () => ({ tema: '', titulo_card: '', legenda: '' })));
+    setStep('choose');
+    setWorkspaceRefreshNonce((value) => value + 1);
+    await loadBatches(1);
+  }), [loadBatches]);
 
   // ── Item updater (com sync debounced pro banco) ───────────────────────────
 
   const updateItem = useCallback((idx: number, patch: Partial<NewsCardItem>) => {
+    const current = itemsRef.current[idx];
+    if (current) itemsRef.current[idx] = { ...current, ...patch };
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
 
     if (saveTimersRef.current[idx]) clearTimeout(saveTimersRef.current[idx]);
@@ -893,18 +915,10 @@ export default function NewsPage() {
       const item = itemsRef.current[idx];
       if (!item?.dbId) return;
       const supabase = createClient();
+      const payload = newsEntryPayload(item, currentBatchIdRef.current);
       const { error } = await supabase
         .from('news_entries')
-        .update({
-          title: item.titulo_card || '',
-          topic: item.tema || '',
-          image_url: item.imagem_url || '',
-          caption: item.legenda || '',
-          raw_payload: {
-            ...(currentBatchIdRef.current ? { batch_id: currentBatchIdRef.current } : {}),
-            ...sanitizeForPayload(item),
-          },
-        })
+        .update(payload)
         .eq('id', item.dbId);
       if (error) console.error('[news] erro ao sincronizar card:', error);
     }, 2000);
@@ -912,32 +926,48 @@ export default function NewsPage() {
 
   // ── Image upload per card ────────────────────────────────────────────────
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setLocalImages(prev => ({ ...prev, [selectedIdx]: url }));
-    updateItem(selectedIdx, { localImageUrl: url });
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    const idx = selectedIdx;
+    const loadingId = toast.loading('Enviando imagem…');
+    setUploadingImageIdx(idx);
+    try {
+      const permanentUrl = (await uploadImageFile(file, 'news-images')).trim();
+      if (!/^https?:\/\//i.test(permanentUrl)) throw new Error('O upload não retornou uma URL permanente.');
+      updateItem(idx, { imagem_url: permanentUrl, localImageUrl: undefined });
+      toast.success('Imagem salva', { id: loadingId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload da imagem', { id: loadingId });
+    } finally {
+      setUploadingImageIdx((current) => current === idx ? null : current);
+    }
   };
 
   const handleRemoveImage = () => {
-    setLocalImages(prev => {
-      const next = { ...prev };
-      delete next[selectedIdx];
-      return next;
-    });
-    updateItem(selectedIdx, { localImageUrl: undefined });
+    updateItem(selectedIdx, { imagem_url: '', localImageUrl: undefined });
   };
 
   // ── Inset image upload ─────────────────────────────────────────────────────
 
-  const handleInsetImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInsetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    updateItem(selectedIdx, { inset_image_url: url, inset_enabled: true });
-    if (insetFileRef.current) insetFileRef.current.value = '';
+    const idx = selectedIdx;
+    const loadingId = toast.loading('Enviando imagem circular…');
+    setUploadingInsetIdx(idx);
+    try {
+      const permanentUrl = (await uploadImageFile(file, 'news-insets')).trim();
+      if (!/^https?:\/\//i.test(permanentUrl)) throw new Error('O upload não retornou uma URL permanente.');
+      updateItem(idx, { inset_image_url: permanentUrl, inset_enabled: true });
+      toast.success('Imagem circular salva', { id: loadingId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload da imagem circular', { id: loadingId });
+    } finally {
+      setUploadingInsetIdx((current) => current === idx ? null : current);
+    }
   };
 
   const handleRemoveInsetImage = () => {
@@ -1128,7 +1158,6 @@ export default function NewsPage() {
     const handleOpenBatch = (batch: SavedNewsBatch) => {
       setItems(batch.items);
       setSelectedIdx(0);
-      setLocalImages({});
       currentBatchIdRef.current = batch.batchId;
       currentBatchCreatedAtRef.current = batch.createdAt;
       setStep('editor');
@@ -2276,22 +2305,22 @@ export default function NewsPage() {
             </div>
           </div>
 
-          {/* Local upload */}
-          {selected.localImageUrl ? (
+          {/* Upload persistido no Storage */}
+          {selected.imagem_url ? (
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg bg-cover bg-center border border-black/10 dark:border-white/10 shrink-0"
-                style={{ backgroundImage: `url(${selected.localImageUrl})` }} />
-              <span className="text-[10px] text-gray-900/50 dark:text-white/50 flex-1">Upload local</span>
-              <button onClick={handleRemoveImage}
+                style={{ backgroundImage: `url(${selected.imagem_url})` }} />
+              <span className="text-[10px] text-gray-900/50 dark:text-white/50 flex-1">Imagem carregada</span>
+              <button onClick={handleRemoveImage} disabled={uploadingImageIdx === selectedIdx}
                 className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-gray-900/40 dark:text-white/40 transition-colors">
                 <X className="w-3 h-3" />
               </button>
             </div>
           ) : (
-            <button onClick={() => fileInputRef.current?.click()}
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploadingImageIdx === selectedIdx}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-black/15 dark:border-white/15 text-[10px] text-gray-900/40 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30 hover:text-gray-900/60 dark:hover:text-white/60 transition-colors">
               <Upload className="w-3 h-3" />
-              Substituir por upload local
+              {uploadingImageIdx === selectedIdx ? 'Enviando…' : 'Adicionar imagem por upload'}
             </button>
           )}
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -2438,6 +2467,7 @@ export default function NewsPage() {
               <span className="text-[10px] text-gray-900/50 dark:text-white/50 flex-1">Imagem carregada</span>
               <button
                 onClick={handleRemoveInsetImage}
+                disabled={uploadingInsetIdx === selectedIdx}
                 className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-gray-900/40 dark:text-white/40 transition-colors"
               >
                 <X className="w-3 h-3" />
@@ -2446,10 +2476,11 @@ export default function NewsPage() {
           ) : (
             <button
               onClick={() => insetFileRef.current?.click()}
+              disabled={uploadingInsetIdx === selectedIdx}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-black/15 dark:border-white/15 text-[10px] text-gray-900/40 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30 hover:text-gray-900/60 dark:hover:text-white/60 transition-colors"
             >
               <Upload className="w-3 h-3" />
-              Adicionar imagem circular
+              {uploadingInsetIdx === selectedIdx ? 'Enviando…' : 'Adicionar imagem circular'}
             </button>
           )}
           <input ref={insetFileRef} type="file" accept="image/*" className="hidden" onChange={handleInsetImageUpload} />
