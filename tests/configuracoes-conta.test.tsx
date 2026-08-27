@@ -128,6 +128,16 @@ describe('/configuracoes/conta', () => {
     expect(screen.queryByText('Trocar a senha')).toBeNull();
   });
 
+  it('organiza dados e ações em duas colunas no desktop e mantém tudo no DOM', async () => {
+    const screen = await renderAba();
+    const columns = screen.container.querySelector('section > div');
+
+    expect(columns?.className).toContain('lg:grid-cols-');
+    expect(screen.getByTestId('botao-email-stub')).toBeTruthy();
+    expect(screen.getByTestId('botao-senha-stub')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Dados pessoais' })).toBeTruthy();
+  });
+
   it('nenhum campo de senha existe antes do clique', async () => {
     const screen = await renderAba();
 

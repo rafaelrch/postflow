@@ -95,3 +95,22 @@ describe('abas', () => {
     expect(outra.getByTestId('aba-assinatura').getAttribute('aria-current')).toBeNull();
   });
 });
+
+describe('moldura das Configurações', () => {
+  it('usa a largura disponível sem limitar a página ao max-w-2xl', async () => {
+    const { default: ConfiguracoesLayout } = await import(
+      '../app/(app)/configuracoes/layout'
+    );
+    const screen = render(
+      <ConfiguracoesLayout>
+        <div data-testid="conteudo-configuracoes" />
+      </ConfiguracoesLayout>,
+    );
+    const wrapper = screen.getByTestId('conteudo-configuracoes').parentElement;
+
+    expect(wrapper?.className).toContain('w-full');
+    expect(wrapper?.className).not.toContain('max-w-2xl');
+    expect(wrapper?.className).not.toContain('mx-auto');
+    expect(wrapper?.className).toContain('overflow-y-auto');
+  });
+});

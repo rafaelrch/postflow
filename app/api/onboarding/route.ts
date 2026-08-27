@@ -82,8 +82,8 @@ export async function PUT(request: Request) {
     }
   }
 
-  const photoUrl = text(body.photoUrl, 2048);
-  if (photoUrl && !/^https:\/\//.test(photoUrl)) {
+  const submittedPhotoUrl = text(body.photoUrl, 2048);
+  if (submittedPhotoUrl && !/^https:\/\//.test(submittedPhotoUrl)) {
     return NextResponse.json({ error: 'URL da foto inválida.' }, { status: 422 });
   }
 
@@ -96,24 +96,40 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Origem do cadastro inválida.' }, { status: 422 });
   }
   // Um autosave da página de edição não pode reabrir o gate de uma conta já concluída.
-  const { data: currentProfile, error: currentProfileError } = await supabase
+  let { data: currentProfile, error: currentProfileError } = await supabase
     .from('profiles')
-    .select('onboarding_completed')
+    .select('onboarding_completed, first_name, last_name, professional_profile, referral_source, photo_url')
     .eq('id', user.id)
     .maybeSingle();
+  if (currentProfileError && isTask1ProfileColumnUnavailable(currentProfileError)) {
+    ({ data: currentProfile, error: currentProfileError } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle());
+  }
   if (currentProfileError) return NextResponse.json({ error: 'Não foi possível validar o perfil.' }, { status: 500 });
   const onboardingCompleted = complete || Boolean(currentProfile?.onboarding_completed);
   const workspaceFeatureEnabled = typeof (supabase as { rpc?: unknown }).rpc === 'function';
+  const globalFieldsProvided = ['firstName', 'lastName', 'professionalProfile', 'referralSource', 'photoUrl']
+    .some((key) => hasOwn(body, key));
+  const firstName = hasOwn(body, 'firstName') ? text(body.firstName, 80) : text(currentProfile?.first_name, 80);
+  const lastName = hasOwn(body, 'lastName') ? text(body.lastName, 80) : text(currentProfile?.last_name, 80);
+  const professionalProfile = hasOwn(body, 'professionalProfile')
+    ? (parsedProfessionalProfile || text(body.professionalProfile, 120))
+    : text(currentProfile?.professional_profile, 120);
+  const photoUrl = hasOwn(body, 'photoUrl') ? submittedPhotoUrl : text(currentProfile?.photo_url, 2048);
+  const logoUrl = text(body.logoUrl, 2048);
   const profile = {
     id: user.id,
     workspace_name: workspaceName,
-    first_name: text(body.firstName, 80),
-    last_name: text(body.lastName, 80),
+    first_name: firstName,
+    last_name: lastName,
     // A coluna continua text para não exigir migração; os novos valores são
     // canônicos e separados por vírgula, enquanto valores legados desconhecidos
     // continuam intactos para não apagar dados existentes.
-    professional_profile: parsedProfessionalProfile || text(body.professionalProfile, 120),
-    ...(referralWasProvided ? { referral_source: referralSource } : {}),
+    professional_profile: professionalProfile,
+    referral_source: referralWasProvided ? referralSource : (currentProfile?.referral_source ?? null),
     brand_name: brandName,
     photo_url: photoUrl,
     handle: instagramHandle,
@@ -134,12 +150,14 @@ export async function PUT(request: Request) {
   const profileToPersist = workspaceFeatureEnabled
     ? {
       id: user.id,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      professional_profile: profile.professional_profile,
-      ...(referralWasProvided ? { referral_source: profile.referral_source } : {}),
-      photo_url: profile.photo_url,
       onboarding_completed: profile.onboarding_completed,
+      ...(globalFieldsProvided ? {
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        professional_profile: profile.professional_profile,
+        referral_source: profile.referral_source,
+        photo_url: profile.photo_url,
+      } : {}),
     }
     : profile;
 
@@ -155,7 +173,7 @@ export async function PUT(request: Request) {
   if (workspaceFeatureEnabled) {
     const brandContext = {
       brandName,
-      logoUrl: photoUrl,
+      logoUrl,
       instagramHandle,
       newsInstagramHandle,
       twitterHandle: profile.twitter_handle,
@@ -168,7 +186,7 @@ export async function PUT(request: Request) {
     };
     let workspaceFeatureUnavailable = false;
     let existingWorkspace: { id?: string } | null = null;
-    if (complete) {
+    if (complete && !workspaceFeatureUnavailable) {
       const lookup = await supabase
         .from('workspaces')
         .select('id')
@@ -182,16 +200,27 @@ export async function PUT(request: Request) {
         if (isWorkspaceFeatureUnavailableError(workspaceLookupError)) workspaceFeatureUnavailable = true;
         else return NextResponse.json({ error: 'Perfil salvo, mas o workspace não pôde ser validado.' }, { status: 500 });
       }
-    } else {
-      const { data: activeId, error: activeIdError } = await supabase.rpc('active_workspace_id', { p_user_id: user.id });
-      if (!activeIdError && typeof activeId === 'string') existingWorkspace = { id: activeId };
+    }
+    // Uma troca explícita salva a preferência antes de abrir o onboarding. O
+    // contexto ativo é a autoridade para um Workspace já criado. A consulta
+    // ordenada acima também reconhece instalações sem a migration antes de
+    // chamar a RPC, mantendo o fallback legado seguro.
+    if (!workspaceFeatureUnavailable && (!complete || existingWorkspace?.id)) {
+      const { data: activeWorkspaceId, error: activeWorkspaceError } = await supabase.rpc('active_workspace_id', { p_user_id: user.id });
+      if (!activeWorkspaceError && typeof activeWorkspaceId === 'string') {
+        existingWorkspace = { id: activeWorkspaceId };
+      } else if (activeWorkspaceError && isWorkspaceFeatureUnavailableError(activeWorkspaceError)) {
+        workspaceFeatureUnavailable = true;
+      } else if (activeWorkspaceError) {
+        return NextResponse.json({ error: 'Perfil salvo, mas o workspace ativo não pôde ser validado.' }, { status: 500 });
+      }
     }
     if (!workspaceFeatureUnavailable && existingWorkspace?.id) {
       workspaceId = existingWorkspace.id;
       const { error: brandError } = await supabase.from('workspace_brand_context').upsert({
           workspace_id: workspaceId,
           brand_name: brandName,
-          logo_url: photoUrl,
+          logo_url: logoUrl,
           instagram_handle: instagramHandle,
           news_instagram_handle: newsInstagramHandle,
           twitter_handle: profile.twitter_handle,
@@ -201,7 +230,7 @@ export async function PUT(request: Request) {
           niche: profile.niche,
           audience: profile.audience,
           default_tone: profile.default_tone,
-      });
+      }, { onConflict: 'workspace_id' });
       if (brandError) {
         if (isWorkspaceFeatureUnavailableError(brandError)) {
           workspaceFeatureUnavailable = true;
@@ -222,7 +251,8 @@ export async function PUT(request: Request) {
   }
 
   if (complete) {
-    const { data: existing } = await supabase.from('projects').select('id').eq('user_id', user.id).eq('name', brandName).maybeSingle();
+    const existingProjectQuery = supabase.from('projects').select('id, workspace_id').eq('user_id', user.id).eq('name', brandName);
+    const { data: existing } = await existingProjectQuery.maybeSingle();
     const project = {
       user_id: user.id,
       ...(workspaceId ? { workspace_id: workspaceId } : {}),
@@ -233,7 +263,8 @@ export async function PUT(request: Request) {
       default_tone: profile.default_tone,
       brand_voice: { instagramHandle, newsInstagramHandle, twitterHandle: profile.twitter_handle, palette: profile.brand_palette, audiencePains: profile.audience_pains, story: profile.brand_story },
     };
-    const { error: projectError } = existing?.id
+    const canUpdateExistingProject = existing?.id && (!workspaceId || existing.workspace_id === workspaceId);
+    const { error: projectError } = canUpdateExistingProject
       ? await supabase.from('projects').update(project).eq('id', existing.id)
       : await supabase.from('projects').insert(project);
     if (projectError) return NextResponse.json({ error: 'Perfil salvo, mas o projeto não pôde ser atualizado.' }, { status: 500 });

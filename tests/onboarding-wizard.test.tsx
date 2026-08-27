@@ -24,7 +24,7 @@ describe('OnboardingForm — etapas do wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Voltar' }));
 
     await waitFor(() => expect(screen.getByTestId('onboarding-step').textContent).toBe('3'));
-    expect(JSON.parse(localStorage.getItem('onboarding-draft:usuario-wizard') ?? '{}')).toEqual(expect.objectContaining({ step: 3, version: 2 }));
+    expect(JSON.parse(localStorage.getItem('onboarding-draft:usuario-wizard') ?? '{}')).toEqual(expect.objectContaining({ step: 3, version: 3 }));
   });
 
   it('segue a ordem final, coleta identidade/referral e envia canais independentes', async () => {
@@ -100,5 +100,18 @@ describe('OnboardingForm — etapas do wizard', () => {
     await waitFor(() => expect(screen.getByTestId('onboarding-step').textContent).toBe('5'));
     expect(screen.getByRole('heading', { name: 'Revise e conclua' })).not.toBeNull();
     expect(screen.queryByText('Sobre a marca')).toBeNull();
+  });
+
+  it('mantém o onboarding inicial com os dados globais antes do primeiro workspace', async () => {
+    localStorage.setItem('onboarding-draft:usuario-wizard', JSON.stringify({ step: 1 }));
+    const { default: OnboardingForm } = await import('../components/onboarding/OnboardingForm');
+    const screen = render(<OnboardingForm compact />);
+
+    await waitFor(() => expect(screen.getByTestId('onboarding-step').textContent).toBe('1'));
+    expect(screen.getByLabelText('Seu nome')).toBeTruthy();
+    expect(screen.getByLabelText('Seu sobrenome')).toBeTruthy();
+    expect(screen.getByLabelText('Perfil profissional')).toBeTruthy();
+    expect(screen.getByLabelText('Como você conheceu o Creatools?')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeTruthy();
   });
 });
