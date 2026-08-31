@@ -1159,6 +1159,22 @@ export function isTemplate01Model(value: unknown): value is number {
   return typeof value === 'number' && TEMPLATE_01_MODELS.includes(value);
 }
 
+/**
+ * Quais modelos carregam o VÉU de legibilidade (degradê preto por cima do fundo).
+ *
+ * Decisão do Rafael em 31/08/2026: só os modelos 1 e 2. Eles são os que têm foto
+ * no desenho do spec (IMAGE_SLOT + GRADIENT_SCRIM), e o véu é o que segura o
+ * texto legível sobre a imagem. Do 3 em diante o fundo é CHAPADO (#050416,
+ * #FFFFFF, #FFFFFF, #0D39E4) e o véu só sujava — nos modelos 4 e 5, de fundo
+ * branco, aparecia como uma faixa preta em degradê embaixo.
+ */
+export const TEMPLATE_01_SCRIM_SLIDES: readonly number[] = [1, 2];
+
+/** O modelo leva o véu de legibilidade? Fonte única do gate — preview e export. */
+export function template01HasScrim(model: number): boolean {
+  return TEMPLATE_01_SCRIM_SLIDES.includes(model);
+}
+
 /** Só o que interessa do slide para resolver o modelo. */
 export interface Template01Modeled {
   templateModel?: number;
