@@ -6,18 +6,36 @@ import { useEditorStore } from '@/hooks/useEditorStore';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, Slide } from '@/types';
 import {
   TEMPLATE_01_MODELS,
+  TEMPLATE_01_SCRIM_SLIDES,
   template01SpecBackground,
 } from '@/lib/templates/template-01';
 import Template01Slide from '@/components/slides/Template01Slide';
+import {
+  PANEL_REGISTRY,
+  TEMPLATE_SIDEBAR_CONFIG,
+  visiblePanels,
+  type PanelContext,
+} from '@/components/editor/sidebar/panels';
 
 /**
  * COR DE FUNDO DO SLIDE no TEMPLATE 1 — pedido do Rafael (decisão final).
  *
  * No T1 o "Fundo do slide" grava `backgroundColor` + marca `background` (fundo
- * CHAPADO, igual aos outros templates). Por cima dele o T1 traz um DEGRADÊ
- * PRETO de legibilidade, FIXO e INQUEBRÁVEL — sempre presente, sempre preto,
- * independente da cor escolhida no fundo ou do que o usuário mexe no painel
- * "Sombra / Overlay".
+ * CHAPADO, igual aos outros templates). Por cima dele os MODELOS 1 E 2 trazem um
+ * DEGRADÊ PRETO de legibilidade — e SÓ eles.
+ *
+ * 🔴 O véu vale apenas nos modelos de `TEMPLATE_01_SCRIM_SLIDES` ([1, 2]) —
+ * decisão do Rafael em 31/08/2026. Os modelos 1 e 2 são os que têm foto no
+ * desenho do spec, e o véu é o que segura o texto legível sobre a imagem. Do 3
+ * em diante o fundo é chapado e o véu só sujava (nos modelos 4 e 5, de fundo
+ * branco, virava uma faixa preta em degradê embaixo).
+ *
+ * NOS MODELOS 1 E 2 o véu continua FIXO e INQUEBRÁVEL: sempre presente, sempre
+ * preto, independente da cor escolhida no fundo ou de um `slide.shadow` gravado.
+ *
+ * O painel "Sombra / Overlay" NÃO existe mais na barra do T1 (pedido do Rafael):
+ * não há o que ajustar num véu que é fixo. Saiu só a EDIÇÃO — os outros estilos
+ * continuam com o painel.
  *
  * O que estes testes travam:
  *   1. sem a MARCA, o fundo é o do spec — é isso que faz o carrossel recém
@@ -25,9 +43,16 @@ import Template01Slide from '@/components/slides/Template01Slide';
  *   2. ao mexer no "Fundo do slide" do T1, a cor vira o FUNDO (chapado) e NÃO
  *      substitui o degradê preto de legibilidade, que continua presente por cima;
  *   3. a marca é `background`, nunca `shadow`;
- *   4. o degradê de legibilidade (rgba(0,0,0,...)) aparece SEMPRE — com ou sem
- *      a marca de fundo, e não importa a cor escolhida;
- *   5. restaurar apaga a marca e o spec volta a mandar.
+ *   4. o véu de legibilidade (rgba(0,0,0,...)) aparece nos modelos 1 e 2 SEMPRE
+ *      — com ou sem a marca de fundo, e não importa a cor escolhida — e NUNCA
+ *      nos modelos 3 a 6, cujo fundo chapado do spec fica limpo;
+ *   5. restaurar apaga a marca e o spec volta a mandar;
+ *   6. a barra do T1 NÃO tem painel "Sombra / Overlay" — nem o rótulo na tela,
+ *      nem o id nos `visiblePanels`.
+ *
+ * A ausência do véu é medida na CAMADA (o div `inset:0` com o gradiente preto,
+ * ver `camadasDeVeu`), nunca por grep de `rgba(0,0,0` no HTML: texto, SVG e
+ * cantos são legitimamente pretos e acusariam véu onde não há.
  *
  * Os modelos 1 e 2 têm DEGRADÊ no desenho do spec: mesmo neles, ao escolher uma
  * cor o fundo vira chapado e o degradê PRETO de legibilidade é composto por cima.
@@ -63,8 +88,6 @@ const MODELO_AZUL = 6;
 const AZUL_DO_SPEC = '#0D39E4';
 /** Os únicos dois modelos com degradê no desenho do spec. */
 const MODELOS_DEGRADE = [1, 2];
-/** rgb do preto, para conferir o overlay de legibilidade. */
-const PRETO_RGB = 'rgba(0,0,0';
 
 /** Um slide de template01 sem imagem — o fundo tem de vir do spec, não da foto. */
 function slideDoModelo(model: number, extra: Partial<Slide> = {}): Slide {
@@ -110,6 +133,42 @@ function htmlCompleto(slide: Slide): string {
     />
   );
 }
+
+/** Os modelos que NÃO levam véu — o complemento de TEMPLATE_01_SCRIM_SLIDES. */
+const MODELOS_SEM_VEU = TEMPLATE_01_MODELS.filter((m) => !TEMPLATE_01_SCRIM_SLIDES.includes(m));
+
+/**
+ * As camadas do VÉU de legibilidade do slide renderizado.
+ *
+ * 🔴 Mede a CAMADA, não um grep de `rgba(0,0,0` no HTML inteiro: texto, SVG e
+ * cantos podem legitimamente ser pretos, e um grep solto acusaria véu onde não
+ * há. O véu é filho DIRETO da raiz `.t01-slide`, `position:absolute; inset:0`,
+ * pintado com um `linear-gradient` preto. (O jsdom normaliza para
+ * `rgba(0, 0, 0, …)`, com espaços — daí a regex.)
+ */
+function camadasDeVeu(slide: Slide): string[] {
+  const { container } = render(
+    <Template01Slide
+      slide={slide}
+      globalSettings={DEFAULT_GLOBAL_SETTINGS}
+      slideIndex={slide.position}
+      totalSlides={TEMPLATE_01_MODELS.length}
+    />
+  );
+  const raiz = container.querySelector('.t01-slide') as HTMLElement;
+  expect(raiz, 'a raiz .t01-slide não renderizou').toBeTruthy();
+  return Array.from(raiz.children)
+    .map((el) => el.getAttribute('style') ?? '')
+    .filter(
+      (st) =>
+        /position:\s*absolute/.test(st) &&
+        /inset:\s*0px/.test(st) &&
+        /background:\s*linear-gradient\([^;]*rgba\(0,\s*0,\s*0/.test(st)
+    );
+}
+
+/** O slide renderizado tem véu de legibilidade? */
+const temVeu = (slide: Slide) => camadasDeVeu(slide).length > 0;
 
 /** Deck de 6 slides, um por modelo, com o `active` selecionado. */
 function montaDeck(active: number, slideExtra: Partial<Slide> = {}) {
@@ -171,13 +230,17 @@ describe('sem a marca, o fundo é o do spec', () => {
     expect(bg.swatch).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 
-  it.each(TEMPLATE_01_MODELS)('o degradê de legibilidade PRETO está presente no modelo %i sem marca', (model) => {
-    expect(htmlCompleto(slideDoModelo(model))).toContain(PRETO_RGB);
+  it.each(TEMPLATE_01_SCRIM_SLIDES)('o véu PRETO de legibilidade está presente no modelo %i sem marca', (model) => {
+    expect(camadasDeVeu(slideDoModelo(model))).toHaveLength(1);
+  });
+
+  it.each(MODELOS_SEM_VEU)('o modelo %i NÃO tem véu nenhum — o fundo chapado do spec fica limpo', (model) => {
+    expect(camadasDeVeu(slideDoModelo(model))).toHaveLength(0);
   });
 });
 
 describe('no T1 a cor do Fundo do slide vira o FUNDO (chapado) + degradê preto por cima', () => {
-  it.each(TEMPLATE_01_MODELS)('modelo %i: fundo vira a cor escolhida e o degradê preto continua', (model) => {
+  it.each(TEMPLATE_01_MODELS)('modelo %i: fundo vira a cor escolhida, e o véu segue a regra do modelo', (model) => {
     montaDeck(model - 1);
     const fundo = abrePainel('fundoDoSlide');
     fireEvent.change(campoHex(fundo), { target: { value: VERMELHO } });
@@ -190,8 +253,10 @@ describe('no T1 a cor do Fundo do slide vira o FUNDO (chapado) + degradê preto 
     const html = htmlCompleto(ativo());
     // O fundo (raiz) virou a cor escolhida, chapada.
     expect(fundoRenderizado(ativo())).toBe(VERMELHO);
-    // O degradê PRETO de legibilidade continua por cima — não virou a cor.
-    expect(html).toContain(PRETO_RGB);
+    // Escolher cor NÃO cria nem apaga véu: quem manda é o modelo.
+    expect(camadasDeVeu(ativo())).toHaveLength(
+      TEMPLATE_01_SCRIM_SLIDES.includes(model) ? 1 : 0
+    );
     // A cor escolhida NUNCA aparece como overlay rgba (só no fundo chapado).
     expect(html).not.toContain('rgba(244,21,21');
   });
@@ -202,44 +267,85 @@ describe('no T1 a cor do Fundo do slide vira o FUNDO (chapado) + degradê preto 
     fireEvent.change(campoHex(fundo), { target: { value: VERMELHO } });
     // O fundo (raiz) é a cor escolhida, não o degradê do spec.
     expect(fundoRenderizado(ativo())).toBe(VERMELHO);
-    // Mas o degradê de legibilidade preto persiste.
-    expect(htmlCompleto(ativo())).toContain(PRETO_RGB);
+    // Mas o véu de legibilidade preto persiste — o modelo 1 é um dos dois que o levam.
+    expect(camadasDeVeu(ativo())).toHaveLength(1);
   });
 
-  it('render direto: escolher vermelho deixa fundo vermelho + overlay preto', () => {
+  it('render direto no modelo 6: fundo vermelho e NENHUM véu por cima', () => {
     const slide = slideDoModelo(MODELO_AZUL, {
       backgroundColor: VERMELHO,
       templateOverrides: { background: true },
     });
     expect(fundoRenderizado(slide)).toBe(VERMELHO);
-    const html = htmlCompleto(slide);
-    expect(html).toContain(PRETO_RGB);
-    expect(html).not.toContain('rgba(244,21,21');
+    expect(camadasDeVeu(slide)).toHaveLength(0);
+    expect(htmlCompleto(slide)).not.toContain('rgba(244,21,21');
+  });
+
+  it('render direto no modelo 2: fundo vermelho + véu preto por cima', () => {
+    const slide = slideDoModelo(2, {
+      backgroundColor: VERMELHO,
+      templateOverrides: { background: true },
+    });
+    expect(fundoRenderizado(slide)).toBe(VERMELHO);
+    expect(camadasDeVeu(slide)).toHaveLength(1);
+    expect(htmlCompleto(slide)).not.toContain('rgba(244,21,21');
   });
 });
 
-describe('o degradê de legibilidade é INQUEBRÁVEL', () => {
-  it('aparece sempre, com ou sem marca de fundo', () => {
+describe('nos modelos 1 e 2 o véu é INQUEBRÁVEL', () => {
+  it.each(TEMPLATE_01_SCRIM_SLIDES)('modelo %i: aparece com ou sem marca de fundo', (model) => {
     // Sem marca nenhuma.
-    expect(htmlCompleto(slideDoModelo(3))).toContain(PRETO_RGB);
+    expect(camadasDeVeu(slideDoModelo(model))).toHaveLength(1);
     // Com marca de fundo de uma cor qualquer.
-    const marcado = slideDoModelo(3, {
+    const marcado = slideDoModelo(model, {
       backgroundColor: VERDE,
       templateOverrides: { background: true },
     });
-    expect(htmlCompleto(marcado)).toContain(PRETO_RGB);
+    expect(camadasDeVeu(marcado)).toHaveLength(1);
   });
 
-  it('a cor do overlay é SEMPRE preta, ignorando slide.shadow.color', () => {
-    // Se alguém gravou uma cor de sombra (ex.: via API/legacy), o T1 ainda
-    // renderiza o overlay PRETO, nunca essa cor.
-    const comCorEstranha = slideDoModelo(3, {
+  it.each(TEMPLATE_01_SCRIM_SLIDES)(
+    'modelo %i: a cor do véu é SEMPRE preta, ignorando slide.shadow.color',
+    (model) => {
+      // Se alguém gravou uma cor de sombra (ex.: via API/legacy), o T1 ainda
+      // renderiza o véu PRETO, nunca essa cor.
+      const comCorEstranha = slideDoModelo(model, {
+        shadow: { ...DEFAULT_SLIDE.shadow, color: VERMELHO },
+        templateOverrides: { shadow: true },
+      });
+      expect(camadasDeVeu(comCorEstranha)).toHaveLength(1);
+      expect(htmlCompleto(comCorEstranha)).not.toContain('rgba(244,21,21');
+    }
+  );
+});
+
+describe('do modelo 3 em diante NÃO há véu — nem com marca, nem com shadow gravado', () => {
+  it.each(MODELOS_SEM_VEU)('modelo %i: marca de fundo não ressuscita o véu', (model) => {
+    expect(camadasDeVeu(slideDoModelo(model))).toHaveLength(0);
+    const marcado = slideDoModelo(model, {
+      backgroundColor: VERDE,
+      templateOverrides: { background: true },
+    });
+    expect(camadasDeVeu(marcado)).toHaveLength(0);
+  });
+
+  it.each(MODELOS_SEM_VEU)('modelo %i: nem um slide.shadow gravado ressuscita o véu', (model) => {
+    const comSombra = slideDoModelo(model, {
       shadow: { ...DEFAULT_SLIDE.shadow, color: VERMELHO },
       templateOverrides: { shadow: true },
     });
-    const html = htmlCompleto(comCorEstranha);
-    expect(html).toContain(PRETO_RGB);
-    expect(html).not.toContain('rgba(244,21,21');
+    expect(camadasDeVeu(comSombra)).toHaveLength(0);
+  });
+
+  it('o gate é o MODELO, não a posição: modelo 6 na posição 0 continua sem véu', () => {
+    // Deck reordenado / com modelo repetido não pode enganar o gate.
+    const slide = { ...slideDoModelo(6), position: 0 } as Slide;
+    expect(camadasDeVeu(slide)).toHaveLength(0);
+  });
+
+  it('o gate é o MODELO, não a posição: modelo 2 na posição 5 continua COM véu', () => {
+    const slide = { ...slideDoModelo(2), position: 5 } as Slide;
+    expect(camadasDeVeu(slide)).toHaveLength(1);
   });
 });
 
@@ -368,16 +474,35 @@ describe('o painel na barra lateral', () => {
     expect(within(abrePainel('fundoDoSlide')).queryByText(/degradê/)).toBeNull();
   });
 
-  it('o painel "Sombra / Overlay" trava a cor em preto e não tem liga/desliga no T1', () => {
+  it.each(TEMPLATE_01_MODELS)('o painel "Sombra / Overlay" NÃO aparece na barra do T1 (modelo %i)', (model) => {
+    montaDeck(model - 1);
+    // Só a EDIÇÃO sai: o degradê preto de legibilidade continua renderizando
+    // (os testes de render acima seguem provando isso).
+    expect(screen.queryByText('Sombra / Overlay')).toBeNull();
+    expect(document.querySelector('[data-panel="sombraOverlay"]')).toBeNull();
+  });
+
+  it('o id sombraOverlay não está mais nos visiblePanels do T1 — mas continua nos outros estilos', () => {
     montaDeck(MODELO_AZUL - 1);
-    const painel = abrePainel('sombraOverlay');
-    // Sem toggle de "Exibir sombra" (sempre ligado).
-    expect(within(painel).queryByText('Exibir sombra')).toBeNull();
-    // A cor aparece travada em preto, sem picker.
-    expect(within(painel).getByText('preto fixo (legibilidade)')).toBeTruthy();
-    // Sliders de opacidade/tamanho/distância continuam disponíveis.
-    expect(within(painel).getByText('Opacidade')).toBeTruthy();
-    expect(within(painel).getByText('Tamanho')).toBeTruthy();
-    expect(within(painel).getByText('Distância')).toBeTruthy();
+    const ctx: PanelContext = {
+      style: 'template01',
+      slide: ativo(),
+      activeSlideIndex: useEditorStore.getState().activeSlideIndex,
+      globalSettings: useEditorStore.getState().globalSettings,
+      template01Model: ativo().templateModel ?? null,
+      template02Model: null,
+      isEditorialCover: false,
+    };
+    expect(visiblePanels(ctx).flatMap((g) => g.ids)).not.toContain('sombraOverlay');
+
+    // O PanelId e o registro em PANEL_REGISTRY ficam de pé: T3, editorial e
+    // minimalist ainda editam o overlay. (O T2 nunca teve esse painel.)
+    expect(PANEL_REGISTRY.sombraOverlay).toBeTruthy();
+    for (const estilo of ['template03', 'editorial', 'minimalist'] as const) {
+      const ids = TEMPLATE_SIDEBAR_CONFIG[estilo].flatMap((g) =>
+        g.panels.map((p) => (typeof p === 'string' ? p : p.id))
+      );
+      expect(ids, `${estilo} perdeu o painel do overlay`).toContain('sombraOverlay');
+    }
   });
 });

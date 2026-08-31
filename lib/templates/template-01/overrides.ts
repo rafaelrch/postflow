@@ -204,10 +204,16 @@ export function template01Overrides(
     // DEGRADÊ DE LEGIBILIDADE (preto, fixo) — só no Template 1.
     //
     // O "Fundo do slide" do T1 grava `backgroundColor` (fundo chapado, igual aos
-    // outros templates). Para o texto continuar legível sobre QUALQUER cor o
-    // Rafael decidiu, o T1 traz um véu degradê PRETO por cima — e ele é
-    // INQUEBRÁVEL: está sempre presente e a cor é SEMPRE preta, independente do
-    // que o usuário escolhe no "Fundo do slide" ou no painel "Sombra / Overlay".
+    // outros templates). Onde o véu existe, ele é INQUEBRÁVEL: a cor é SEMPRE
+    // preta, independente do que o usuário escolhe no "Fundo do slide" ou de um
+    // `shadow` gravado por deck legado.
+    //
+    // 🔴 ONDE ele existe é decisão do Rafael de 31/08/2026: SÓ nos modelos de
+    // `TEMPLATE_01_SCRIM_SLIDES` ([1, 2]) — não mais em todos os seis. Este campo
+    // segue devolvendo o gradiente para qualquer slide, de propósito: aqui é o
+    // leitor do que o usuário marcou, e QUEM DECIDE PINTAR é o render
+    // (`Template01Slide.tsx`, via `template01HasScrim(specSlide.index)`), ponto
+    // único por onde passam preview e exportação.
     //
     // Por isso ignoramos `shadow.color` (trava em preto) e desligamos o `style:
     // 'none'` (trava ligado). A opacidade/tamanho/distância vêm do spec de fábrica

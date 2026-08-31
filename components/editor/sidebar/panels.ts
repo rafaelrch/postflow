@@ -153,10 +153,11 @@ export const TEMPLATE_SIDEBAR_CONFIG: Record<SlideStyle, SidebarGroupConfig[]> =
         { id: 'imagem', when: (c) => c.template01Model != null && c.template01Model !== 6 },
         'estiloDoTexto',
         'fundoDoSlide',
-        // Degradê de legibilidade (preto, fixo) — o usuário ajusta só
-        // opacidade/tamanho/distância; a cor fica travada em preto (ver overrides).
-        'sombraOverlay',
-        // O painel fica no grupo do slide porque cor e visibilidade são deste
+        // Sem 'sombraOverlay' aqui de propósito: o degradê preto de legibilidade
+        // do T1 é FIXO e continua renderizando — não há o que editar. Os outros
+        // estilos seguem com o painel; o PanelId e o PANEL_REGISTRY ficam.
+
+        // `cantos` fica no grupo do slide porque cor e visibilidade são deste
         // slide — mas o TEXTO do canto vale para o deck inteiro. Nos estilos
         // legados o mesmo painel continua global nas configs abaixo.
         'cantos',

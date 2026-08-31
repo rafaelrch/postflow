@@ -18,6 +18,7 @@ import {
   template01BaseType,
   template01Nodes,
   template01FallbackImage,
+  template01HasScrim,
   template01ModelOf,
   template01SpecSlideOf,
   SpecBox,
@@ -496,7 +497,16 @@ export default function Template01Slide({ slide, globalSettings, slideIndex }: T
       {bgImageUrl && scrim && (
         <div style={{ position: 'absolute', inset: 0, background: scrim }} />
       )}
-      {ov.shadow && <div style={{ position: 'absolute', inset: 0, background: ov.shadow }} />}
+      {/*
+        VÉU DE LEGIBILIDADE — só nos modelos de `TEMPLATE_01_SCRIM_SLIDES` ([1, 2]),
+        decisão do Rafael em 31/08/2026. Este é o ÚNICO ponto que pinta o véu, e
+        preview e exportação passam os dois por aqui: o export rasteriza o DOM
+        deste mesmo componente (`HiddenSlides` → `useExport.captureSlide`), não um
+        segundo render. Gate pelo MODELO do spec, nunca pela posição no deck.
+      */}
+      {template01HasScrim(specSlide.index) && ov.shadow && (
+        <div style={{ position: 'absolute', inset: 0, background: ov.shadow }} />
+      )}
 
       {nodes.map((node) => {
         // GROUP não gera caixa: os filhos já vêm achatados no spec.
