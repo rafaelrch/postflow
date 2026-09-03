@@ -5,35 +5,13 @@ import { cn } from '@/lib/utils';
 import { inputCls, labelCls, numericCls } from './sidebar/tokens';
 import {
   Template02SlotDescriptor,
-  template02HighlightTerms,
   template02Measure,
   template02ModelOf,
   template02TextSlotsForModel,
 } from '@/lib/templates/template-02';
-
-interface HeadlineWord {
-  display: string;
-  value: string;
-  normalized: string;
-}
-
-function cleanHeadlineWord(word: string): string {
-  return word.replace(/^[^\p{L}\p{N}@#]+|[^\p{L}\p{N}@#]+$/gu, '') || word;
-}
-
-function normalizeHeadlineWord(word: string): string {
-  return cleanHeadlineWord(word).toLocaleLowerCase('pt-BR');
-}
-
-function headlineWords(headline: string): HeadlineWord[] {
-  return headline
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((display) => {
-      const value = cleanHeadlineWord(display);
-      return { display, value, normalized: normalizeHeadlineWord(value) };
-    });
-}
+// As pastilhas saíram daqui para serem reusadas no wizard — mesmo componente,
+// mesma aparência. Ver components/editor/sidebar/HighlightWordChips.
+import HighlightWordChips from './sidebar/HighlightWordChips';
 
 /** Conteúdo de texto do Template 2, um controle por slot do modelo ativo. */
 export default function Template02Slots() {
@@ -52,27 +30,6 @@ export default function Template02Slots() {
   const highlightDescriptor = textSlots.find((descriptor) => descriptor.slot === 'cover.highlight');
   const headline = slots['cover.headline'] ?? headlineDescriptor?.defaultValue ?? '';
   const highlight = slots['cover.highlight'] ?? highlightDescriptor?.defaultValue ?? '';
-  const words = headlineWords(headline);
-  const selectedWords = new Set(
-    template02HighlightTerms(highlight)
-      .flatMap((term) => term.split(/\s+/))
-      .filter(Boolean)
-      .map(normalizeHeadlineWord)
-  );
-
-  const toggleHighlight = (word: HeadlineWord) => {
-    const nextSelected = new Set(selectedWords);
-    if (nextSelected.has(word.normalized)) nextSelected.delete(word.normalized);
-    else nextSelected.add(word.normalized);
-
-    const seen = new Set<string>();
-    const ordered = words.flatMap((candidate) => {
-      if (!nextSelected.has(candidate.normalized) || seen.has(candidate.normalized)) return [];
-      seen.add(candidate.normalized);
-      return [candidate.value];
-    });
-    setSlot('cover.highlight', ordered.join(', '));
-  };
 
   const counter = (descriptor: Template02SlotDescriptor, value: string) => {
     const measurement = template02Measure(value, descriptor);
@@ -103,31 +60,11 @@ export default function Template02Slots() {
           return (
             <div key={descriptor.slot} className="space-y-2">
               <span className={labelCls}>{descriptor.label}</span>
-              <div
-                role="group"
-                aria-label="Palavras em destaque"
-                className="flex flex-wrap gap-1.5"
-              >
-                {words.map((word, index) => {
-                  const selected = selectedWords.has(word.normalized);
-                  return (
-                    <button
-                      key={`${word.display}-${index}`}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => toggleHighlight(word)}
-                      className={cn(
-                        'rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors',
-                        selected
-                          ? 'border-[#C9D900] bg-[#EFFF00] text-black'
-                          : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink-dim)] hover:border-[var(--ink)]'
-                      )}
-                    >
-                      {word.display}
-                    </button>
-                  );
-                })}
-              </div>
+              <HighlightWordChips
+                headline={headline}
+                highlight={highlight}
+                onChange={(next) => setSlot('cover.highlight', next)}
+              />
             </div>
           );
         }

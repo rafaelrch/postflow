@@ -20,6 +20,7 @@ import {
   Upload01Icon,
 } from '@hugeicons/core-free-icons';
 import Button from '@/components/ui/Button';
+import HighlightWordChips from '@/components/editor/sidebar/HighlightWordChips';
 import { cn, normalizeHandle } from '@/lib/utils';
 import { uploadImageFile } from '@/lib/upload-image';
 import {
@@ -1891,7 +1892,19 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                           <span className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>{f.label}</span>
                           {f.hint && <span className="font-mono text-[9px]" style={{ color: 'var(--ink-muted)' }}>{f.hint}</span>}
                         </span>
-                        {f.multiline ? (
+                        {f.key === 'cover.highlight' ? (
+                          /* DESTAQUE DA CAPA DO RADAR — pedido do Rafael: as
+                             palavras do título digitado viram pastilhas para
+                             ele escolher, em vez de um campo onde precisava
+                             reescrever o termo exatamente igual (e descobrir
+                             sozinho que errar o acento não pinta nada). É o
+                             MESMO componente da barra do editor. */
+                          <HighlightWordChips
+                            headline={manualSlides[manualIndex]?.['cover.headline'] ?? ''}
+                            highlight={manualSlides[manualIndex]?.[f.key] ?? ''}
+                            onChange={(next) => updateManualSlide(manualIndex, f.key, next)}
+                          />
+                        ) : f.multiline ? (
                           <textarea
                             className="brand-textarea"
                             style={{ minHeight: 52, fontSize: 12, padding: '7px 10px' }}
