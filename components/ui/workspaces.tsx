@@ -283,7 +283,7 @@ function WorkspaceContent({
         <div className="border-b px-3 py-2">
           <input
             type="text"
-            placeholder="Search workspaces..."
+            placeholder="Buscar workspaces..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="placeholder:text-muted-foreground w-full border-none bg-transparent text-sm outline-none"
@@ -294,7 +294,7 @@ function WorkspaceContent({
       <div className="max-h-[300px] overflow-y-auto">
         {filteredWorkspaces.length === 0 ? (
           <div className="text-muted-foreground px-3 py-2 text-center text-sm">
-            No workspaces found
+            Nenhum workspace encontrado
           </div>
         ) : (
           <div className="p-1">

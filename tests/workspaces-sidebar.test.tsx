@@ -201,7 +201,7 @@ describe('troca de workspace na sidebar', () => {
 
     await renderSidebar();
     const trigger = await screen.findByTestId('workspace-switcher-trigger');
-    expect(trigger.textContent).toContain('Create workspace');
+    expect(trigger.textContent).toContain('Criar workspace');
     fireEvent.click(trigger);
     expect(screen.getByTestId('workspace-create-modal')).toBeTruthy();
   });

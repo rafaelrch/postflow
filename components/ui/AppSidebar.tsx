@@ -491,7 +491,7 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
       >
         {workspaceState === 'loading' ? (
           <div data-testid="workspace-loading" className="text-muted-foreground px-3 py-2 text-sm">
-            Loading workspaces...
+            Carregando workspaces...
           </div>
         ) : workspaces.length > 0 ? (
           <Workspaces
@@ -514,7 +514,7 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
                 className="text-muted-foreground flex w-full items-center justify-start gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
               >
                 <HugeiconsIcon icon={PlusIcon} className="h-5 w-5" aria-hidden />
-                Create workspace
+                Criar workspace
               </button>
             </WorkspaceContent>
           </Workspaces>
@@ -528,7 +528,7 @@ export default function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             }}
             className="text-muted-foreground flex h-12 w-full items-center justify-start rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
           >
-            Create workspace
+            Criar workspace
           </button>
         )}
         {workspaceLoadError ? (
