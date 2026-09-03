@@ -7,6 +7,7 @@ import { cornerGrowthTop, cornerTop } from '@/lib/utils';
 import { getImageLayerStyle } from '@/lib/utils';
 import {
   TEMPLATE_02_COLORS,
+  TEMPLATE_02_EXTENSIONS,
   TEMPLATE_02_GRID,
   TEMPLATE_02_HEADER_MARGIN_X,
   TEMPLATE_02_HEADER_Y,
@@ -258,6 +259,73 @@ function ImageBlock({
 }
 
 /**
+ * O título dos internos com os termos marcados.
+ *
+ * Reusa `template02HighlightParts`, o MESMO divisor da capa — o marcador não é
+ * uma segunda implementação, é o mesmo mecanismo apontado para outro slot.
+ *
+ * A diferença com a capa é uma só, e é consequência do texto: a headline quebra
+ * por `\n` ESCRITO e por isso é pintada linha a linha; o `content.title` quebra
+ * SOZINHO no fluxo, então o span marcado atravessa a virada e o navegador o
+ * desenha como dois retângulos, um por linha. Decisão do Rafael (02/09/2026):
+ * é assim que marca-texto funciona, e é o que a capa também faz quando um termo
+ * aparece em duas linhas.
+ *
+ * Sem termo marcado devolve a string crua — nada de span vazio no DOM de quem
+ * nunca usou o destaque.
+ */
+function ContentHighlightText({
+  title,
+  highlight,
+  ov,
+}: {
+  title: string;
+  highlight: string;
+  ov: Template02Overrides;
+}) {
+  const termos = template02HighlightTerms(highlight);
+  if (termos.length === 0) return <>{title}</>;
+
+  const marca = template02TypeFor('content.highlight', TEMPLATE_02_COLORS.ink, ov);
+  const fundo = marca.background ?? TEMPLATE_02_HIGHLIGHT_COLOR;
+  // A cor do texto é automática para nunca perder contraste com o marcador —
+  // inclusive quando o usuário troca o fundo no seletor da barra lateral.
+  const corDoTexto = template02HighlightTextColor(fundo);
+
+  return (
+    <>
+      {template02HighlightParts(title, termos).map((part, i) =>
+        part.marked ? (
+          <span
+            key={i}
+            data-slot="content.highlight"
+            style={{
+              background: fundo,
+              color: corDoTexto,
+              ...(marca.font
+                ? {
+                    fontFamily: marca.font.fontFamily,
+                    fontWeight: marca.font.fontWeight,
+                    fontStyle: marca.font.fontStyle,
+                  }
+                : {}),
+              padding: `0 ${TEMPLATE_02_EXTENSIONS.contentHighlight.paddingX}px`,
+              margin: '0 -2px',
+              boxDecorationBreak: 'clone',
+              WebkitBoxDecorationBreak: 'clone',
+            }}
+          >
+            {part.text}
+          </span>
+        ) : (
+          <span key={i}>{part.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
  * Coluna de texto dos slides internos.
  *
  * `justify-content: center` no container de conteúdo É a regra de centralização
@@ -268,6 +336,7 @@ function ImageBlock({
 function TextColumn({
   x,
   title,
+  highlight,
   body,
   top,
   height,
@@ -276,6 +345,8 @@ function TextColumn({
 }: {
   x: number;
   title: string;
+  /** Termos marcados no título, separados por vírgula. Ver TEMPLATE_02_EXTENSIONS. */
+  highlight: string;
   body: string;
   top: number;
   height: number;
@@ -306,7 +377,7 @@ function TextColumn({
         data-slot="content.title"
         style={textStyle('content.title', template02SlotColor('content.title', model), ov)}
       >
-        {title}
+        <ContentHighlightText title={title} highlight={highlight} ov={ov} />
       </div>
       <div style={{ height: gap, flex: 'none' }} />
       <div
@@ -589,6 +660,7 @@ export default function Template02Slide({ slide, globalSettings, slideIndex }: T
       <TextColumn
         x={template02ElementX(model, 'content.title')}
         title={value('content.title')}
+        highlight={value('content.highlight')}
         body={value('content.body')}
         top={box.top}
         height={box.height}

@@ -1044,7 +1044,10 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           // O seletor abre mostrando o que ESTÁ na tela: o número do spec
           // daquele bloco, nunca um padrão do editor.
           const specColor = t02Model != null ? template02SlotColor(d.slot, t02Model) : '#000000';
-          const isHighlight = d.slot === 'cover.highlight';
+          // O seletor de cor do marcador vale para a capa E para os internos —
+          // foi justamente o argumento do Rafael ao pedir o destaque nos
+          // internos, e é a saída dele caso o lime sobre o creme não agrade.
+          const isHighlight = d.slot === 'cover.highlight' || d.slot === 'content.highlight';
           return (
             <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
               <span className={labelCls}>{d.label}</span>
