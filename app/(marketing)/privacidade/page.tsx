@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { SUPORTE_WHATSAPP_LABEL, SUPORTE_WHATSAPP_URL } from '@/lib/suporte';
 
 export const metadata = {
   title: 'Política de Privacidade — Creatools',
@@ -7,14 +8,22 @@ export const metadata = {
 };
 
 /**
- * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
- * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp.
+ * Canais oficiais de atendimento. O suporte é por WHATSAPP (decisão do Rafael,
+ * 02/09/2026: "qualquer contato que qualquer usuário quiser ter vai ser direto
+ * no WhatsApp"). Substitui o e-mail, que era o canal desde 30/07/2026; o
+ * Instagram continua como alternativa.
  *
  * ATENÇÃO, quem for mexer na seção 1: aqui o canal tem peso LEGAL (LGPD art. 41
- * — contato do encarregado/DPO e via para o titular exercer direitos). O e-mail
- * é o que sustenta esta seção: por Instagram, só exerce direitos quem TEM conta
- * na plataforma, e o titular sem conta ficaria sem via. Por isso o e-mail vem
- * primeiro e o DM fica como alternativa, nunca como caminho único.
+ * — contato do encarregado/DPO e via para o titular exercer direitos). Quem
+ * sustenta esta seção agora é o WHATSAPP, e a razão que o e-mail cumpria
+ * continua de pé: ele é uma via ABERTA, que não exige conta na plataforma nem
+ * no Instagram — por Instagram, só exerce direitos quem tem conta lá, e o
+ * titular sem conta ficaria sem caminho. Por isso o WhatsApp vem primeiro e o
+ * DM fica como alternativa, nunca como via única.
+ *
+ * 🔴 A troca do e-mail pelo WhatsApp foi decisão INFORMADA do Rafael
+ * (02/09/2026): o risco de mexer numa cláusula que existe por causa do art. 41
+ * foi levantado com ele antes, e ele reafirmou. Não é omissão de quem escreveu.
  *
  * O texto abaixo publica os canais que existem e NÃO afirma que há encarregado
  * nomeado, nem declara conformidade com o art. 41 — não temos nome de
@@ -23,19 +32,22 @@ export const metadata = {
  */
 const SUPORTE_URL = 'https://instagram.com/creatools';
 const SUPORTE_HANDLE = '@creatools';
-const SUPORTE_EMAIL = 'contato@creatools.com';
 
 /**
- * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
- * texto manda cancelar, pedir reembolso ou exercer direitos de dados, o e-mail
- * deixa registro escrito dos dois lados e não exige conta no Instagram. O DM
- * continua oferecido — é mais rápido —, nunca como via única.
+ * Os DOIS canais oficiais, sempre juntos. WhatsApp primeiro: é o canal que o
+ * Rafael atende, e a conversa fica registrada com data dos dois lados. O DM do
+ * Instagram continua oferecido, nunca como via única.
  */
 function Canais() {
   return (
     <>
-      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
-        {SUPORTE_EMAIL}
+      <a
+        href={SUPORTE_WHATSAPP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_WHATSAPP_LABEL}
       </a>{' '}
       ou no Instagram{' '}
       <a
@@ -57,8 +69,9 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
       <p>
         O Creatools é o controlador dos dados pessoais tratados nesta plataforma, nos termos da Lei
         Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD). Para dúvidas e solicitações sobre
-        dados pessoais (acesso, correção, exclusão etc.), fale com a gente pelo e-mail{' '}
-        <Canais />.
+        dados pessoais (acesso, correção, exclusão etc.), fale com a gente pelo WhatsApp{' '}
+        <Canais />. É por esse canal que você exerce esses direitos, tenha ou não conta na
+        plataforma.
       </p>
     ),
   },
