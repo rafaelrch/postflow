@@ -33,6 +33,7 @@ import {
   ProfileData,
   TextPosition,
 } from '@/types';
+import { ATELIER_ENABLED } from '@/lib/feature-flags';
 import { FORMAT_LIST, getFormat } from '@/lib/formats';
 import { freeFormSlideFields } from '@/lib/generated-slide-fields';
 import SlidePreview from '@/components/editor/SlidePreview';
@@ -239,12 +240,15 @@ const FORMAT_META: Record<SlideFormat, {
 };
 
 /**
- * Os quatro templates do wizard, na ordem do grid 2×2.
+ * Catálogo dos templates do wizard, na ordem do grid 2×2.
  *
  * O estilo `minimalist` continua existindo no editor e em carrosséis antigos —
  * ele só não é oferecido aqui, por decisão de produto.
+ *
+ * Esta lista é o catálogo COMPLETO e não encolhe quando um template é
+ * desativado: quem decide o que aparece é `TEMPLATES`, logo abaixo.
  */
-const TEMPLATES: {
+const ALL_TEMPLATES: {
   value: SlideStyle;
   label: string;
   /** Uma linha, dentro do card. */
@@ -284,6 +288,19 @@ const TEMPLATES: {
       'Forma fixa do Figma, deck aberto: capa e slides de conteúdo independentes.',
   },
 ];
+
+/**
+ * Os templates realmente OFERECIDOS na criação.
+ *
+ * O Atelier (`editorial`) está desligado por `ATELIER_ENABLED`
+ * (lib/feature-flags.ts): a entrada dele continua no catálogo acima, só não
+ * chega ao grid. Carrossel Atelier já salvo não é afetado — isto aqui é a
+ * oferta de criar um novo, nada mais. Com 4 cards o grid `grid-cols-2` fecha
+ * um 2×2 exato, que é a forma para a qual ele foi desenhado.
+ */
+const TEMPLATES = ALL_TEMPLATES.filter(
+  (tpl) => tpl.value !== 'editorial' || ATELIER_ENABLED,
+);
 
 /** Templates cuja forma vem do spec — o step de ID visual respeita isso. */
 const FIXED_VISUAL_STYLES: SlideStyle[] = ['profile', 'template01', 'template02', 'template03'];

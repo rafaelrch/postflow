@@ -21,6 +21,25 @@ vi.mock('react-hot-toast', () => ({
   default: { loading: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/lib/upload-image', () => ({ uploadImageFile: vi.fn() }));
+
+/**
+ * A chave ATELIER_ENABLED (lib/feature-flags.ts) está `false` desde 02/09/2026
+ * — o Atelier saiu do grid do wizard. Este arquivo a fixa em `true` DE
+ * PROPÓSITO: ele exercita o caminho de forma LIVRE da criação (o passo 4,
+ * "Identidade visual"), e o Atelier é o único template desse tipo que o wizard
+ * lista — todos os outros estão em `FIXED_VISUAL_STYLES`. Sem fixar a chave, a
+ * cobertura desse caminho sumiria junto com a oferta, e o código dele
+ * apodreceria calado até o Atelier voltar. Desativar não é remover: o caminho
+ * continua de pé e continua testado.
+ *
+ * Quem prova o que o grid mostra em cada estado da chave — e que carrossel
+ * Atelier salvo continua abrindo com ela desligada — é
+ * tests/atelier-feature-flag.test.tsx.
+ */
+vi.mock('@/lib/feature-flags', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/feature-flags')>()),
+  ATELIER_ENABLED: true,
+}));
 vi.mock('@/hooks/useEditorStore', () => ({ useEditorStore: () => ({ loadCarousel }) }));
 vi.mock('@/lib/supabase', () => ({
   createClient: () => ({
