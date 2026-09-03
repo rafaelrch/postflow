@@ -242,6 +242,48 @@ export const TEMPLATE_02_DESIGN_TWEAKS = {
   },
 
   /**
+   * Fundo chapado da CAPA.
+   *
+   * spec (`tokens.color.ink`): `#000000`.
+   *
+   * Pedido do Rafael (02/09/2026), palavras dele: *"hoje o fundo da capa do
+   * Radar está totalmente preto, a pessoa está vendo o fundo preto e não
+   * consegue ver o degradê. Ao invés de ser o fundo preto, eu quero que seja o
+   * fundo cinza."* A ordem das camadas que ele pediu — fundo cinza, degradê
+   * padrão por cima, textos acima de tudo — é a que já existia; o que faltava
+   * era o fundo deixar o degradê APARECER.
+   *
+   * MEDIDO, e é a razão de a queixa proceder: o scrim vai de transparente até
+   * PRETO SÓLIDO na base. Sobre um fundo `#000000` ele existe e é invisível —
+   * preto sobre preto. Com foto o problema não aparece, porque a imagem fica
+   * entre o fundo e o scrim; sem foto, a capa é um retângulo preto liso.
+   *
+   * POR QUE `#2E2E2E` e não outro cinza:
+   *   · nenhum cinza de `tokens.color` serve. `imagePlaceholder` (#CBC9BF) é
+   *     claro demais e é a caixa de imagem faltando; `textMuted` (#727272) e
+   *     `textHeader` (#767682) são cores de TEXTO — usar token de texto como
+   *     fundo é o tipo de troca que envelhece mal.
+   *   · o CABEÇALHO da capa (`#767682`) fica no topo, onde o scrim é
+   *     transparente: ele é desenhado direto sobre este fundo. Clarear o fundo
+   *     baixa o contraste dele. `#2E2E2E` é o cinza MAIS CLARO que ainda o
+   *     mantém em 3.03:1 — acima do mínimo 3:1 de texto grande. Em `#333333`
+   *     cairia para 2.82:1.
+   *   · contra o preto da base do scrim dá 1.55:1, o bastante para a rampa ser
+   *     vista numa área desse tamanho.
+   *
+   * ⚠️ CUSTO, para o Rafael saber: o contraste do cabeçalho cai de 4.68:1 para
+   * 3.03:1. Ainda passa em texto grande, mas é uma perda real — consequência
+   * inevitável do pedido, porque o cabeçalho mora na metade limpa do scrim.
+   * Querer os dois exigiria mexer também na cor do cabeçalho, o que é decisão
+   * dele e não foi pedida aqui.
+   */
+  coverBackground: {
+    spec: TEMPLATE_02_SPEC.tokens.color.ink.value, // '#000000'
+    value: '#2E2E2E',
+    motivo: 'Rafael, 02/09/2026 — sobre preto o degradê da capa era invisível.',
+  },
+
+  /**
    * Limites de texto que substituem os de `regrasDeGeracao.limitesDeTexto`.
    *
    * 🔴 Não são chute: cada número saiu de MEDIÇÃO no Chromium, com a face, o
@@ -478,9 +520,18 @@ export function template02ElementX(model: number, elementId: string): number {
   return typeof el?.x === 'number' ? el.x : 0;
 }
 
-/** Fundo chapado do modelo: preto na capa, creme nos internos. */
+/**
+ * Fundo chapado do modelo: CINZA na capa, creme nos internos.
+ *
+ * A capa era preta (`tokens.color.ink`) e o degradê sumia em cima dela. O cinza
+ * é desvio deliberado, com a medição e o custo anotados em
+ * `TEMPLATE_02_DESIGN_TWEAKS.coverBackground` — é de lá que o valor sai, nunca
+ * escrito à mão aqui.
+ */
 export function template02Background(model: number): string {
-  return model === 1 ? TEMPLATE_02_COLORS.ink : TEMPLATE_02_COLORS.paper;
+  return model === 1
+    ? TEMPLATE_02_DESIGN_TWEAKS.coverBackground.value
+    : TEMPLATE_02_COLORS.paper;
 }
 
 // ─── Adaptação de formato ───────────────────────────────────────

@@ -401,10 +401,14 @@ describe('TEMPLATE 2 — capa', () => {
     }
   });
 
-  it('sem imagem o fundo cai para preto sólido e o scrim continua ali', () => {
+  it('sem imagem o fundo é o CINZA do ajuste, e o scrim continua ali', () => {
+    // Era `TEMPLATE_02_COLORS.ink`. O preto tornava o scrim invisível — ele
+    // termina em preto sólido —, e foi exatamente essa a queixa do Rafael em
+    // 02/09/2026. O valor agora vem de TEMPLATE_02_DESIGN_TWEAKS.coverBackground.
     const html = markup(1);
     expect(styles(html)['cover.scrim'].background).toContain('linear-gradient(180deg');
-    expect(html).toContain(`background:${TEMPLATE_02_COLORS.ink}`);
+    expect(html).toContain(`background:${TEMPLATE_02_DESIGN_TWEAKS.coverBackground.value}`);
+    expect(html).not.toContain(`background:${TEMPLATE_02_COLORS.ink}`);
     expect(html).not.toContain('data-slot="cover.image"');
   });
 
@@ -599,7 +603,9 @@ describe('TEMPLATE 2 — integração no editor', () => {
   });
 
   it('o fundo do slide é o do modelo', () => {
-    expect(markup(1)).toContain(`background:${TEMPLATE_02_COLORS.ink}`);
+    // A capa desviou do spec (cinza no lugar do `ink`) a pedido do Rafael; os
+    // internos seguem no creme do spec, intocados.
+    expect(markup(1)).toContain(`background:${TEMPLATE_02_DESIGN_TWEAKS.coverBackground.value}`);
     expect(markup(2)).toContain(`background:${TEMPLATE_02_COLORS.paper}`);
     expect(markup(3)).toContain(`background:${TEMPLATE_02_COLORS.paper}`);
   });
