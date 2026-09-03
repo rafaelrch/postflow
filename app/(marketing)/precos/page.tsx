@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Check, ArrowLeft } from 'lucide-react';
 import CheckoutButton from '@/components/billing/CheckoutButton';
 import { PLANS } from '@/lib/plans';
+import { SUPORTE_WHATSAPP_LABEL, SUPORTE_WHATSAPP_URL } from '@/lib/suporte';
 
 export const metadata = {
   title: 'Planos e preços — Creatools',
@@ -9,26 +10,29 @@ export const metadata = {
 };
 
 /**
- * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
- * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
- * não existe portal de autoatendimento. Estes valores se repetem nas 5 páginas
- * públicas: mudou aqui, muda nas cinco.
+ * Canais oficiais de atendimento. O suporte é por WHATSAPP (decisão do Rafael,
+ * 02/09/2026 — substitui o e-mail, que era o canal desde 30/07/2026); o
+ * Instagram continua como alternativa.
+ *
+ * O número do WhatsApp NÃO mora aqui: vem de `lib/suporte.ts`, fonte única.
  */
 const SUPORTE_URL = 'https://instagram.com/creatools';
 const SUPORTE_HANDLE = '@creatools';
-const SUPORTE_EMAIL = 'contato@creatools.com';
 
 /**
- * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
- * texto manda cancelar ou pedir reembolso, ele deixa registro escrito dos dois
- * lados e não exige conta no Instagram. O DM continua oferecido — é mais
- * rápido —, nunca como via única.
+ * Os DOIS canais oficiais, sempre juntos. WhatsApp primeiro: é o canal que o
+ * Rafael atende. O DM do Instagram continua oferecido, nunca como via única.
  */
 function Canais() {
   return (
     <>
-      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
-        {SUPORTE_EMAIL}
+      <a
+        href={SUPORTE_WHATSAPP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_WHATSAPP_LABEL}
       </a>{' '}
       ou no Instagram{' '}
       <a
@@ -134,7 +138,7 @@ export default function PrecosPage() {
 
         <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
           Pagamento em cartão de crédito, processado com segurança. Para cancelar ou trocar de plano,
-          fale com a gente pelo e-mail <Canais />. Ao assinar, você concorda com os{' '}
+          fale com a gente no WhatsApp <Canais />. Ao assinar, você concorda com os{' '}
           <Link href="/termos" className="underline underline-offset-4">
             Termos de Uso
           </Link>

@@ -10,6 +10,7 @@ import { BlurReveal } from '@/components/ui/blur-reveal';
 import ParallaxGallery from '@/components/ui/3d-parallax-unfurling-gallery';
 import SphereImageGrid, { type ImageData } from '@/components/ui/img-sphere';
 import LeadCaptureModal from '@/components/billing/LeadCaptureModal';
+import { SUPORTE_WHATSAPP_LABEL, SUPORTE_WHATSAPP_URL } from '@/lib/suporte';
 import { ChevronRight, Plus, X, Menu, Heart, MessageCircle, Repeat2, Check } from 'lucide-react';
 
 /* ────────────────────────────────────────────────────────────────
@@ -20,27 +21,32 @@ import { ChevronRight, Plus, X, Menu, Heart, MessageCircle, Repeat2, Check } fro
    ──────────────────────────────────────────────────────────────── */
 
 /**
- * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
- * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
- * não existe portal de autoatendimento. Estes valores se repetem nas 5 páginas
- * públicas: mudou aqui, muda nas cinco.
+ * Canais oficiais de atendimento. O suporte é por WHATSAPP (decisão do Rafael,
+ * 02/09/2026 — substitui o e-mail, que era o canal desde 30/07/2026); o
+ * Instagram continua como alternativa.
+ *
+ * O número do WhatsApp NÃO mora aqui: vem de `lib/suporte.ts`, fonte única.
+ * Foi a duplicação deste bloco pelas 5 páginas públicas que deixou um endereço
+ * de e-mail errado espalhado sem ninguém notar.
  */
 // Frase que manda a pessoa agir precisa dizer ONDE.
 const SUPORTE_URL = 'https://instagram.com/creatools';
 const SUPORTE_HANDLE = '@creatools';
-const SUPORTE_EMAIL = 'contato@creatools.com';
 
 /**
- * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
- * texto manda cancelar ou pedir reembolso, ele deixa registro escrito dos dois
- * lados e não exige conta no Instagram. O DM continua oferecido — é mais
- * rápido —, nunca como via única.
+ * Os DOIS canais oficiais, sempre juntos. WhatsApp primeiro: é o canal que o
+ * Rafael atende. O DM do Instagram continua oferecido, nunca como via única.
  */
 function Canais() {
   return (
     <>
-      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
-        {SUPORTE_EMAIL}
+      <a
+        href={SUPORTE_WHATSAPP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_WHATSAPP_LABEL}
       </a>{' '}
       ou no Instagram{' '}
       <a
@@ -1612,7 +1618,7 @@ function Pricing() {
 
         <FadeUp delay={0.15}>
           <p className="mt-5 text-center text-[13.5px]" style={{ color: 'var(--lp-gray)' }}>
-            Precisa de ajuda? Fale com a gente pelo e-mail <Canais />. Respondemos rápido.
+            Precisa de ajuda? Fale com a gente no WhatsApp <Canais />. Respondemos rápido.
           </p>
         </FadeUp>
 
@@ -1659,7 +1665,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
     q: 'Preciso de ajuda com minha assinatura, como faço?',
     a: (
       <>
-        Você gerencia tudo com a gente pelo e-mail <Canais />: trocar de plano, atualizar forma
+        Você gerencia tudo com a gente no WhatsApp <Canais />: trocar de plano, atualizar forma
         de pagamento ou cancelar. Respondemos rápido pra qualquer dúvida.
       </>
     ),
