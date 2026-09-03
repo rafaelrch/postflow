@@ -601,10 +601,12 @@ function Truth() {
 const STEPS = [
   {
     title: 'Diga o tema',
-    // Os quatro nomes são os do wizard (TEMPLATES em CreateWizard.tsx). O
-    // `minimalist` existe no editor mas NÃO é oferecido na criação — não pode
-    // aparecer aqui como opção.
-    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o template: Profile, Atelier, Manifesto ou Radar.',
+    // Os quatro nomes são os do wizard (TEMPLATES em CreateWizard.tsx), e a
+    // lista aqui tem de ser a OFERTA REAL. O `minimalist` existe no editor mas
+    // não é oferecido na criação; o Atelier saiu da oferta em 02/09/2026 pela
+    // chave ATELIER_ENABLED (bugs abertos) e deu o lugar ao FlowLine, que
+    // sempre existiu no wizard e nunca tinha aparecido aqui.
+    desc: 'Digite uma frase simples, como “5 erros de quem começa a treinar”, e escolha o template: Profile, FlowLine, Manifesto ou Radar.',
   },
   {
     title: 'A IA monta tudo',
@@ -719,11 +721,13 @@ function MockNews() {
  * Os QUATRO templates que o wizard realmente oferece, na ordem do grid 2×2 de
  * components/editor/CreateWizard.tsx (`TEMPLATES`). O estilo `minimalist` segue
  * existindo no editor, mas não é oferecido na criação — por isso ele não
- * aparece aqui nem na copy. Os números de fonte saem de `FONT_PAIRS` no mesmo
- * arquivo: 7 pares, 13 fontes distintas (Inter se repete em dois pares).
+ * aparece aqui nem na copy. O Atelier saiu da oferta em 02/09/2026
+ * (ATELIER_ENABLED) e quem entrou no lugar foi o FlowLine. Os números de fonte
+ * saem de `FONT_PAIRS` no mesmo arquivo: 7 pares, 13 fontes distintas (Inter se
+ * repete em dois pares).
  */
 function MockTemplates() {
-  const templates = ['Profile', 'Atelier', 'Manifesto', 'Radar'];
+  const templates = ['Profile', 'FlowLine', 'Manifesto', 'Radar'];
   return (
     <div className="w-full max-w-[260px]">
       <div className="grid grid-cols-2 gap-3">
@@ -889,7 +893,7 @@ const FEATURES: Feature[] = [
     title: (<>Carrosséis completos <span style={{ color: '#8B8B87' }}>a partir de uma frase</span></>),
     body: 'Você digita o tema, a IA escreve título, subtítulo e o texto de cada slide, com gancho de abertura e CTA de fechamento. Tudo editável num editor visual, slide por slide.',
     bullets: [
-      '4 templates prontos: Profile (cara de thread do X), Atelier, Manifesto e Radar',
+      '4 templates prontos: Profile (cara de thread do X), FlowLine, Manifesto e Radar',
       'Gancho, desenvolvimento e CTA escritos pela IA',
       'Editor visual completo pra ajustar tudo antes de exportar',
     ],
@@ -913,7 +917,7 @@ const FEATURES: Feature[] = [
     title: (<>Templates prontos, <span style={{ color: '#8B8B87' }}>identidade sempre igual</span></>),
     body: 'Quatro templates pra escolher e 13 fontes em 7 pares calibrados. Todo post sai com a mesma cara: consistência visual de quem está crescendo de verdade.',
     bullets: [
-      'Profile, Atelier, Manifesto e Radar',
+      'Profile, FlowLine, Manifesto e Radar',
       '13 fontes em 7 pares calibrados por designers',
       'Mesmo padrão em todos os posts, sem esforço',
     ],
@@ -1285,20 +1289,34 @@ function Results() {
         </FadeUp>
 
         <div className="mt-14 grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-          {/* Atelier */}
+          {/* FlowLine (valor interno `template03`). Ocupou o lugar do Atelier em
+              02/09/2026: o Atelier saiu da oferta pela chave ATELIER_ENABLED, e
+              esta seção promete "o tipo de post que você VAI criar" — vender um
+              template que o wizard não lista é prometer o que o produto não
+              entrega. O FlowLine já existia no wizard e nunca tinha aparecido aqui.
+
+              O card é ESCURO COM DEGRADÊ porque é isso que o template é: o
+              FlowLine desenha foto de fundo com um véu que vai de transparente a
+              preto (`linear-gradient(180deg, rgba(0,0,0,0) 0%, #000000 100%)`,
+              o overlay do spec dele). Sem foto, o degradê sozinho é o que
+              caracteriza. O `#3A3A3A` do topo é o cinza da capa do spec
+              (`cinza_capa` clareado o bastante para a rampa aparecer) e a base é
+              o `preto` da paleta. É o que distingue este card do preto CHAPADO
+              que o Atelier tinha e do creme do Radar, ao lado. */}
           <FadeUp delay={0}>
-            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#0A0A0A', color: '#fff' }}>
-              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase opacity-45">Atelier</span>
-              <p className="lp-h text-[19px] md:text-[22px]">5 erros que travam seu crescimento</p>
+            <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: 'linear-gradient(180deg, #3A3A3A 0%, #000000 100%)', color: '#fff' }}>
+              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase opacity-45">FlowLine</span>
+              <p className="lp-h text-[19px] md:text-[22px]">Do zero ao primeiro cliente, passo a passo</p>
               <span className="text-[10px] opacity-35">@orafaelrocha_</span>
             </div>
           </FadeUp>
-          {/* Radar (valor interno `template02`). A seção promete "o tipo de post que
-              você VAI criar", então todo rótulo aqui tem que ser um template que o
-              wizard oferece — o `minimalist` não é. Dos quatro reais, este card é o
-              Radar: o creme é o token `paper` do spec (#EEE5D9, fundo dos slides
-              internos), e é o único creme entre os templates de verdade. O Atelier
-              já é o card ao lado e o Profile é o card de thread, à direita. */}
+          {/* Radar (valor interno `template02`). Todo rótulo desta grade tem que
+              ser um template que o wizard oferece — o `minimalist` não é, e o
+              Atelier deixou de ser. Dos quatro reais, este card é o Radar: o
+              creme é o token `paper` do spec (#EEE5D9, fundo dos slides
+              internos), e é o único creme entre os templates de verdade. O
+              FlowLine é o card escuro ao lado e o Profile é o card de thread,
+              à direita. */}
           <FadeUp delay={0.07}>
             <div className="aspect-[4/5] rounded-[20px] p-6 flex flex-col justify-between text-left" style={{ background: '#EEE5D9' }}>
               <span className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: '#B5B5B0' }}>Radar</span>
