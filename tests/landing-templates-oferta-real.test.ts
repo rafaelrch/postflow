@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ATELIER_ENABLED } from '@/lib/feature-flags';
 
 /**
  * A VITRINE DA LANDING SÓ PODE MOSTRAR TEMPLATE QUE O WIZARD OFERECE.
@@ -15,17 +16,23 @@ import { describe, expect, it } from 'vitest';
  * landing têm de sair da lista `TEMPLATES` de `CreateWizard.tsx`, que é a oferta
  * real. Desligar um template sem mexer na landing passa a derrubar a suíte.
  *
- * ⚠️ O QUE ESTE TESTE AINDA NÃO CONSEGUE FAZER, e por que:
- * a chave `ATELIER_ENABLED` não existe nesta branch — ela nasceu na T2
- * (`chore/disable-atelier`), que não está no main. Aqui o `TEMPLATES` do wizard
- * ainda é a lista literal com os cinco, incluindo o Atelier. Então amarrar a
- * landing à chave é impossível hoje sem inventar um import que não compila.
+ * 🔴 ATUALIZADO NA INTEGRAÇÃO (integra/ciclo-2, 02/09/2026). A versão anterior
+ * deste comentário dizia que amarrar à chave `ATELIER_ENABLED` era impossível,
+ * porque ela vivia noutra branch. Agora as duas convivem, então a amarração é a
+ * de verdade: a oferta é o catálogo `ALL_TEMPLATES` com o mesmo filtro que o
+ * wizard aplica.
  *
- * A amarração escrita abaixo é a que funciona nos DOIS estados: enquanto o
- * Atelier estiver na lista, ele é um nome válido (e o teste do Atelier ausente
- * cobre a copy); quando a T2 entrar e o filtro tirá-lo de `TEMPLATES`, a mesma
- * asserção passa a barrar qualquer landing que ainda o cite. O dia em que o
- * PRÓXIMO template for desligado, é este arquivo que avisa.
+ * E foi a integração que provou o dente deste teste sem ninguém pedir: a branch
+ * do Atelier RENOMEOU `TEMPLATES` para `ALL_TEMPLATES` (deixando `TEMPLATES`
+ * como a lista derivada), o `indexOf('const TEMPLATES')` passou a casar com a
+ * linha do filtro, e a leitura caiu num bloco vizinho devolvendo rótulos de
+ * FORMATO. O teste quebrou na primeira vez que as duas mudanças existiram no
+ * mesmo lugar — que é exatamente quando ele tinha de falar.
+ *
+ * LIÇÃO, que vale para todo teste que lê FONTE em vez de importar: ele depende
+ * da FORMA do arquivo, e a forma muda sem aviso. Por isso a leitura abaixo
+ * ancora no catálogo pelo nome exato e falha alto se ele sumir, em vez de casar
+ * com o primeiro `const TEMPLATES` que aparecer.
  */
 
 const raiz = (caminho: string) => readFileSync(join(process.cwd(), caminho), 'utf8');
@@ -45,11 +52,22 @@ function semComentarios(src: string): string {
  * mudaria o componente por causa da suíte; ler o texto não mexe em produção.
  */
 function rotulosDoWizard(): string[] {
-  const inicio = wizard.indexOf('const TEMPLATES');
-  expect(inicio, 'a lista TEMPLATES sumiu do wizard').toBeGreaterThan(-1);
+  // O CATÁLOGO completo, pelo nome exato. `ALL_TEMPLATES` é o literal com todos
+  // os templates; `TEMPLATES` passou a ser a lista DERIVADA (o filtro da flag),
+  // e casar com ela devolveria zero rótulo — ou, pior, os do bloco seguinte.
+  const inicio = wizard.indexOf('const ALL_TEMPLATES');
+  expect(inicio, 'o catálogo ALL_TEMPLATES sumiu do wizard').toBeGreaterThan(-1);
   const fim = wizard.indexOf('\n];', inicio);
   const bloco = wizard.slice(inicio, fim);
-  return Array.from(bloco.matchAll(/label: '([^']+)'/g)).map((m) => m[1]);
+  const catalogo = Array.from(bloco.matchAll(/value: '([^']+)',\s*\n\s*label: '([^']+)'/g))
+    .map((m) => ({ value: m[1], label: m[2] }));
+  expect(catalogo.length, 'não consegui ler o catálogo de templates').toBeGreaterThan(0);
+
+  // O MESMO filtro que o wizard aplica. A oferta é o catálogo menos o que a
+  // flag desliga — é isso que a landing tem direito de vender.
+  return catalogo
+    .filter((tpl) => tpl.value !== 'editorial' || ATELIER_ENABLED)
+    .map((tpl) => tpl.label);
 }
 
 /** Os nomes de template citados na vitrine da landing. */
