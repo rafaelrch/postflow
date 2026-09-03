@@ -608,7 +608,19 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
 
   const t03HeaderSlotNames = t03HeaderSlots.map((d) => d.slot);
   const t03CornerSlotNames = t03CornerSlots.map((d) => d.slot);
-  const t03HeaderVisible = t03HeaderSlotNames.every(
+  /**
+   * A BARRA DE PERFIL segue a mesma regra dos cantos (o porquê está por extenso
+   * no comentário de `t01HeaderVisible`, acima): o mestre responde "o BLOCO
+   * mostra alguma coisa?", não "todos os slots estão visíveis".
+   *
+   * Hoje a troca não muda comportamento nenhum: a barra tem UM slot de texto
+   * por modelo (o @ — o avatar é slot de imagem e não entra aqui), e sobre uma
+   * lista de um elemento `every` e `some` são a mesma função. Ela vale pelo dia
+   * em que a barra ganhar um segundo campo: com `every`, desmarcar um fecharia
+   * o painel inteiro e levaria junto a linha do outro, que é exatamente o bug
+   * que os cantos tinham. Ver a guarda em tests/barra-de-perfil-slot-a-slot.
+   */
+  const t03HeaderVisible = t03HeaderSlotNames.some(
     (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
   );
   // Mesma regra dos outros dois: o mestre fala do bloco, não de cada slot.
