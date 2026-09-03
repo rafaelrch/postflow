@@ -5,6 +5,7 @@ import {
   TEMPLATE_02_COLORS,
   TEMPLATE_02_DEFAULT_MODELS,
   TEMPLATE_02_DESIGN_TWEAKS,
+  TEMPLATE_02_EXTENSIONS,
   TEMPLATE_02_GRID,
   TEMPLATE_02_HEADER_MARGIN_X,
   TEMPLATE_02_MODELS,
@@ -183,18 +184,41 @@ describe('TEMPLATE 2 — modelo é dado, não posição', () => {
 });
 
 describe('TEMPLATE 2 — slots', () => {
+  /**
+   * As chaves do SPEC, sem inventar nome — e as EXTENSÕES declaradas à parte.
+   *
+   * A guarda continua com o mesmo dente: nenhum slot pode aparecer por acaso.
+   * O que mudou é que agora há duas origens legítimas, e a lista de cada uma é
+   * exata. Um slot novo que não esteja em nenhuma das duas ainda derruba isto.
+   */
+  const SLOTS_DO_SPEC = [
+    'header.category',
+    'header.handle',
+    'cover.image',
+    'cover.headline',
+    'cover.highlight',
+    'cover.cta',
+    'content.image',
+    'content.title',
+    'content.body',
+  ];
+  const SLOTS_DE_EXTENSAO: string[] = Object.values(TEMPLATE_02_EXTENSIONS).map((e) => e.slot);
+
   it('usa exatamente as chaves do spec, sem inventar nome', () => {
-    expect(TEMPLATE_02_SLOTS).toEqual([
-      'header.category',
-      'header.handle',
-      'cover.image',
-      'cover.headline',
-      'cover.highlight',
-      'cover.cta',
-      'content.image',
-      'content.title',
-      'content.body',
-    ]);
+    // Tudo o que NÃO é extensão tem de ser, exatamente, o spec.
+    expect(TEMPLATE_02_SLOTS.filter((s) => !SLOTS_DE_EXTENSAO.includes(s))).toEqual(SLOTS_DO_SPEC);
+  });
+
+  it('o que não vem do spec está declarado como EXTENSÃO, nunca solto', () => {
+    // `content.highlight` existe no produto e não no gabarito: é extensão, e
+    // por isso mora em TEMPLATE_02_EXTENSIONS, com tudo explícito.
+    expect(SLOTS_DE_EXTENSAO).toEqual(['content.highlight']);
+    for (const slot of TEMPLATE_02_SLOTS) {
+      expect(
+        SLOTS_DO_SPEC.includes(slot) || SLOTS_DE_EXTENSAO.includes(slot),
+        `${slot} não é do spec nem está declarado como extensão`,
+      ).toBe(true);
+    }
   });
 
   it('cada modelo expõe os seus slots mais o cabeçalho editável do card', () => {
@@ -208,11 +232,14 @@ describe('TEMPLATE 2 — slots', () => {
       'cover.cta',
     ]);
     for (const model of [2, 3]) {
+      // `content.highlight` entra logo depois do título que ele marca — é a
+      // extensão pedida pelo Rafael em 02/09/2026, não um slot do gabarito.
       expect(template02SlotsForModel(model).map((d) => d.slot)).toEqual([
         'header.category',
         'header.handle',
         'content.image',
         'content.title',
+        'content.highlight',
         'content.body',
       ]);
     }

@@ -26,10 +26,33 @@ export default function Template02Slots() {
   const setSlot = (slot: string, value: string) =>
     updateActiveSlide({ templateSlots: { ...slots, [slot]: value } });
 
-  const headlineDescriptor = textSlots.find((descriptor) => descriptor.slot === 'cover.headline');
-  const highlightDescriptor = textSlots.find((descriptor) => descriptor.slot === 'cover.highlight');
-  const headline = slots['cover.headline'] ?? headlineDescriptor?.defaultValue ?? '';
-  const highlight = slots['cover.highlight'] ?? highlightDescriptor?.defaultValue ?? '';
+  /**
+   * O destaque existe na CAPA (`cover.highlight`, do spec) e nos INTERNOS
+   * (`content.highlight`, extensão — ver TEMPLATE_02_EXTENSIONS). São slots
+   * diferentes marcando títulos diferentes, com a MESMA interface: as palavras
+   * do título viram pastilhas clicáveis.
+   *
+   * O par é derivado do modelo em vez de escrito duas vezes: assim o dia em que
+   * um terceiro modelo ganhar destaque não vira um terceiro `if`.
+   *
+   * 🔴 RESOLUÇÃO DE MERGE (integra/ciclo-2, 02/09/2026). Duas branches mexeram
+   * neste mesmo bloco: a do wizard EXTRAIU as pastilhas para
+   * `sidebar/HighlightWordChips` (para o wizard reusar), e a do destaque nos
+   * internos GENERALIZOU o bloco para dois slots. As duas sobrevivem: fica o
+   * componente extraído, alimentado pelo par derivado abaixo. Por isso os
+   * helpers de palavra (`words`, `selectedWords`, `toggleHighlight`) sumiram
+   * daqui — eles moram dentro do componente agora, e duplicá-los era o jeito
+   * errado de resolver este conflito.
+   */
+  const HIGHLIGHT_PAIRS: { titulo: string; destaque: string }[] = [
+    { titulo: 'cover.headline', destaque: 'cover.highlight' },
+    { titulo: 'content.title', destaque: 'content.highlight' },
+  ];
+  const par = HIGHLIGHT_PAIRS.find((p) => textSlots.some((d) => d.slot === p.destaque));
+  const headlineDescriptor = textSlots.find((descriptor) => descriptor.slot === par?.titulo);
+  const highlightDescriptor = textSlots.find((descriptor) => descriptor.slot === par?.destaque);
+  const headline = (par && slots[par.titulo]) ?? headlineDescriptor?.defaultValue ?? '';
+  const highlight = (par && slots[par.destaque]) ?? highlightDescriptor?.defaultValue ?? '';
 
   const counter = (descriptor: Template02SlotDescriptor, value: string) => {
     const measurement = template02Measure(value, descriptor);
@@ -56,14 +79,14 @@ export default function Template02Slots() {
   return (
     <>
       {textSlots.map((descriptor) => {
-        if (descriptor.slot === 'cover.highlight') {
+        if (descriptor.slot === par?.destaque) {
           return (
             <div key={descriptor.slot} className="space-y-2">
               <span className={labelCls}>{descriptor.label}</span>
               <HighlightWordChips
                 headline={headline}
                 highlight={highlight}
-                onChange={(next) => setSlot('cover.highlight', next)}
+                onChange={(next) => par && setSlot(par.destaque, next)}
               />
             </div>
           );

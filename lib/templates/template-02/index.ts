@@ -324,8 +324,96 @@ export function template02ScrimStops(): { pos: number; color: string }[] {
  * Fonte única — a barra lateral, a auditoria de estouro e o addendum da IA leem
  * todos daqui. Um deles lendo o spec cru mostraria número diferente dos outros.
  */
+/**
+ * EXTENSÕES — o que existe no PRODUTO e NÃO existe no spec.
+ *
+ * Ao contrário de `TEMPLATE_02_DESIGN_TWEAKS`, aqui NÃO há valor de spec para
+ * anotar ao lado, porque não há contraparte: o spec nunca desenhou isto. Um
+ * desvio muda um número que o gabarito já tinha; uma extensão acrescenta algo
+ * que ele não tem. Misturar os dois no mesmo objeto apagaria a distinção que
+ * faz o mecanismo de desvios valer — por isso a estrutura é separada e o nome
+ * diz o que ela é.
+ *
+ * 🔴 O `spec.json` continua sendo a RÉGUA e não é editado, igual na T8.
+ *
+ * ⚠️ REGRA DESTA ESTRUTURA: como o spec não conhece estes slots, ele não dá
+ * limite, nem default, nem cor, nem tipografia a eles — medido: `template02Limits`
+ * devolve `{}`, `template02SlotDefaults` devolve `undefined` e
+ * `template02SlotColor` cairia no preto por falta de elemento. Então TUDO tem de
+ * estar escrito aqui, explicitamente. Nada pode depender de fallback silencioso:
+ * fallback silencioso é o que produziu metade dos bugs deste ciclo.
+ */
+export const TEMPLATE_02_EXTENSIONS = {
+  /**
+   * Marcador de destaque nos slides INTERNOS (modelos 2 e 3).
+   *
+   * O spec só tem `cover.highlight`, com `models: [1]` — a capa. O Rafael pediu
+   * o mesmo destaque nos internos em 02/09/2026: *"o template ele já tem o
+   * destaque, tanto que na sidebar do editor o usuário consegue mudar a cor,
+   * então tem que ter esse destaque"*. O argumento dele sobre o seletor de cor
+   * procede, e por isso o seletor existe aqui também.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * 🔴 A COR É LIME DE PROPÓSITO. NÃO "CONSERTE" ISTO SEM LER.
+   *
+   * O marcador da capa é lime (`accent`) sobre fundo PRETO: 18.51:1, e a tarja
+   * salta. Nos internos o fundo é CREME (`paper`), e o mesmo lime dá 1.10:1
+   * contra ele. Isso foi MEDIDO antes de escolher, e as três saídas foram
+   * levadas ao Rafael com os números na mão:
+   *
+   *   · lime (accent #E1FF00) ....... tarja 1.10:1  ← ELE ESCOLHEU ESTA
+   *   · ink invertido (#000000) ..... tarja 16.85:1
+   *   · cinza (textMuted #727272) ... tarja  3.86:1
+   *
+   * Ele escolheu o lime priorizando a CONSISTÊNCIA VISUAL com a capa. Decisão
+   * informada do dono do produto, não descuido de quem escreveu — se daqui a
+   * seis meses alguém achar que é bug, é isto aqui que responde.
+   *
+   * O QUE ATENUA, e também foi medido: o 1.10:1 é a relação MARCADOR × FUNDO,
+   * ou seja a percepção da TARJA. A LEITURA da palavra não sofre — o texto
+   * sobre o marcador sai em 18.51:1, porque `template02HighlightTextColor`
+   * escolhe a cor do texto sozinha. É mais contraste do que o próprio título
+   * normal tem sobre o creme (16.85:1). E contraste WCAG mede LUMINÂNCIA: lime
+   * e creme diferem muito em MATIZ, então a tarja não é "invisível" — é fraca
+   * por luminância, some em escala de cinza e enfraquece em baixa visão.
+   *
+   * A saída, se ele não gostar ao ver no ar, já está na tela: o seletor de cor
+   * do destaque, na barra lateral, vale para os internos também.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  contentHighlight: {
+    slot: 'content.highlight',
+    models: [2, 3],
+    label: 'Destaque',
+    /** Nasce VAZIO: o spec não tem `conteudoExemplo` para um slot que não existe. */
+    default: '',
+    /**
+     * Sem limite de caracteres. Na capa o spec impõe "contido em 1 linha do
+     * headline" porque lá as linhas são escritas à mão (`\n`). No
+     * `content.title` a quebra é AUTOMÁTICA e o código não sabe onde ela cai —
+     * a regra seria inverificável. Decisão do Rafael: marcar a frase e deixar
+     * quebrar, virando dois retângulos, que é como marca-texto funciona.
+     */
+    limits: { regra: 'frase marcada pode quebrar entre linhas' },
+    /** Espelha o `cover.highlight` do spec: fill accent, texto ink, padding 14. */
+    fill: 'accent' as const,
+    textColor: 'ink' as const,
+    paddingX: 14,
+    /** Tipografia do slot que ele marca — como na capa o marcador segue a headline. */
+    style: 'slideTitle' as const,
+    motivo: 'Rafael, 02/09/2026 — os internos passam a ter destaque, no lime da capa.',
+  },
+} as const;
+
 export function template02Limits(slot: string): Template02Limits {
+  // A extensão entra PRIMEIRO e explicitamente: o spec não tem entrada para ela,
+  // e cair no `{}` faria o contador da barra lateral mentir em silêncio.
+  const extensao =
+    slot === TEMPLATE_02_EXTENSIONS.contentHighlight.slot
+      ? TEMPLATE_02_EXTENSIONS.contentHighlight.limits
+      : {};
   return {
+    ...extensao,
     ...(TEMPLATE_02_SPEC.regrasDeGeracao.limitesDeTexto[slot] ?? {}),
     ...(TEMPLATE_02_DESIGN_TWEAKS.limitesDeTexto[slot] ?? {}),
   };
@@ -678,6 +766,9 @@ const SLOT_DEFS: SlotDef[] = [
   { slot: 'cover.cta',       models: [1],       kind: 'text',  label: 'Chamada',         scope: 'slide', order: 5, multiline: false, style: 'ctaLabel' },
   { slot: 'content.image',   models: [2, 3],    kind: 'image', label: 'Imagem',          scope: 'slide', order: 2, multiline: false },
   { slot: 'content.title',   models: [2, 3],    kind: 'text',  label: 'Título',          scope: 'slide', order: 3, multiline: false, style: 'slideTitle' },
+  // EXTENSÃO, não spec: ver TEMPLATE_02_EXTENSIONS.contentHighlight. Fica logo
+  // depois do título que ele marca, como o `cover.highlight` fica depois da headline.
+  { slot: 'content.highlight', models: [2, 3],  kind: 'text',  label: 'Destaque',        scope: 'slide', order: 3.5, multiline: false, style: 'slideTitle' },
   { slot: 'content.body',    models: [2, 3],    kind: 'text',  label: 'Descrição',       scope: 'slide', order: 4, multiline: true,  style: 'slideBody' },
 ];
 
@@ -734,6 +825,10 @@ function defaultValueOf(slot: string, model: number): string {
   // do headline de fábrica: `inconsistenciasDetectadas` conta que no Figma o
   // lime cobria a linha 1 e só "NOVA TIPOGRAFIA" ficou com o texto em preto.
   if (slot === 'cover.highlight') return 'NOVA TIPOGRAFIA';
+  // Extensão: o spec não conhece o slot, então o default vem de lá, explícito.
+  if (slot === TEMPLATE_02_EXTENSIONS.contentHighlight.slot) {
+    return TEMPLATE_02_EXTENSIONS.contentHighlight.default;
+  }
   const id = SPEC_ELEMENT_ID[slot] ?? slot;
   const el = template02LayoutOf(model).elementos.find((e) => e.id === id);
   return el?.conteudoExemplo ?? '';
@@ -816,6 +911,10 @@ export function template02SlotFontName(slot: string): string | undefined {
  */
 export function template02SlotColor(slot: string, model: number): string {
   if (slot === 'cover.highlight') return TEMPLATE_02_COLORS.ink;
+  // Extensão: sem elemento no spec, cairia no preto por acidente. Aqui é escolha.
+  if (slot === TEMPLATE_02_EXTENSIONS.contentHighlight.slot) {
+    return TEMPLATE_02_COLORS[TEMPLATE_02_EXTENSIONS.contentHighlight.textColor];
+  }
   const id = SPEC_ELEMENT_ID[slot] ?? slot;
   const el =
     template02LayoutOf(model).elementos.find((e) => e.id === id) ??
