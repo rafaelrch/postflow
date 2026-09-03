@@ -15,6 +15,10 @@ import {
  * e-mails do produto (o Resend usa `creatools.com.br`), e ninguém notou —
  * porque não havia um lugar onde notar.
  *
+ * Desde 02/09/2026 as CINCO páginas estão no WhatsApp, com o número real: o
+ * Rafael decidiu que "qualquer contato que qualquer usuário quiser ter vai ser
+ * direto no WhatsApp", inclusive nas páginas jurídicas.
+ *
  * Agora o número vem de `lib/suporte.ts`. Estes testes leem o FONTE das páginas
  * em vez de renderizar: são Server Components de marketing, e o que precisa ser
  * garantido aqui é o destino do link e a ausência do `mailto:`, que se lê no
@@ -33,42 +37,50 @@ function blocoCanais(src: string): string {
   return src.slice(inicio, fim);
 }
 
-/** As páginas já migradas para o WhatsApp. */
+/** As 5 páginas públicas. Todas no WhatsApp desde 02/09/2026. */
 const MIGRADAS = [
   { nome: 'landing', caminho: 'app/(marketing)/page.tsx' },
   { nome: '/precos', caminho: 'app/(marketing)/precos/page.tsx' },
-] as const;
-
-/**
- * As páginas que AINDA NÃO migraram, e por quê.
- *
- * /termos, /privacidade e /reembolso são o item B3 do go-live (conteúdo
- * jurídico preliminar). Nelas o `<Canais />` aparece DENTRO de cláusula, atrás
- * da expressão "pelo e-mail", e duas cláusulas amarram a razão jurídica ao
- * e-mail especificamente:
- *
- *   - /reembolso §2: "Preferimos o e-mail: ele registra por escrito a data do
- *     pedido, que é o que conta para o prazo" — o valor probatório do e-mail
- *     dentro do prazo de arrependimento de 7 dias (CDC art. 49).
- *   - /privacidade §1: o canal é a via do titular exercer direitos (LGPD
- *     art. 41), e o comentário do arquivo registra que o e-mail está ali porque
- *     "por Instagram, só exerce direitos quem TEM conta na plataforma".
- *
- * Trocar o canal nessas duas exige reescrever texto de cláusula, o que a T3
- * proíbe sem decisão. Enquanto a decisão não vem, este bloco fixa o estado
- * atual: é tripwire, não aprovação. Quando a resposta chegar, a página migrada
- * SAI daqui e ENTRA em MIGRADAS — o teste vermelho é o lembrete.
- */
-const PENDENTES = [
   { nome: '/termos', caminho: 'app/(marketing)/termos/page.tsx' },
   { nome: '/privacidade', caminho: 'app/(marketing)/privacidade/page.tsx' },
   { nome: '/reembolso', caminho: 'app/(marketing)/reembolso/page.tsx' },
 ] as const;
 
+/**
+ * MENÇÕES A E-MAIL QUE NÃO SÃO CANAL DE SUPORTE — a rede contra troca
+ * automática demais.
+ *
+ * Migrar o suporte para o WhatsApp é trocar o CANAL, e nada além dele. Estas
+ * frases falam de outra coisa e continuam corretas: um `sed` esperto, ou a
+ * próxima pessoa com pressa, apagaria as quatro junto e ninguém veria.
+ */
+const EMAIL_QUE_FICA = [
+  {
+    nome: '/termos — aviso de alteração dos termos',
+    caminho: 'app/(marketing)/termos/page.tsx',
+    trecho: 'comunicadas por e-mail ou aviso na plataforma',
+  },
+  {
+    nome: '/privacidade — aviso de alteração da política',
+    caminho: 'app/(marketing)/privacidade/page.tsx',
+    trecho: 'e-mail ou aviso na plataforma antes de entrarem em vigor',
+  },
+  {
+    nome: '/privacidade — e-mail como DADO coletado',
+    caminho: 'app/(marketing)/privacidade/page.tsx',
+    trecho: 'nome, e-mail e telefone',
+  },
+  {
+    nome: '/reembolso — e-mail da conta, para identificar a assinatura',
+    caminho: 'app/(marketing)/reembolso/page.tsx',
+    trecho: 'informando o e-mail usado na assinatura',
+  },
+] as const;
+
 describe('lib/suporte.ts — a fonte única', () => {
   it('o link é um wa.me montado com os dígitos da constante', () => {
     expect(SUPORTE_WHATSAPP_URL).toBe(`https://wa.me/${SUPORTE_WHATSAPP_DIGITOS}`);
-    expect(SUPORTE_WHATSAPP_URL).toBe('https://wa.me/5571900000000');
+    expect(SUPORTE_WHATSAPP_URL).toBe('https://wa.me/5571992230643');
   });
 
   it('os dígitos são só dígitos, com DDI — é o que o wa.me aceita', () => {
@@ -84,8 +96,13 @@ describe('lib/suporte.ts — a fonte única', () => {
     );
   });
 
-  it('está marcada como PLACEHOLDER, para não virar número definitivo por esquecimento', () => {
-    expect(fonte('lib/suporte.ts')).toContain('PLACEHOLDER');
+  it('o número é o real, não o placeholder com que a lib nasceu', () => {
+    const src = fonte('lib/suporte.ts');
+    // O placeholder saiu em 02/09/2026, quando o Rafael mandou o número. Se a
+    // palavra voltar, alguém devolveu um número de mentira para produção.
+    expect(src).not.toContain('PLACEHOLDER');
+    expect(src).not.toContain('900000000');
+    expect(SUPORTE_WHATSAPP_LABEL).toBe('(71) 99223-0643');
   });
 });
 
@@ -117,21 +134,27 @@ describe.each(MIGRADAS)('$nome — suporte por WhatsApp', ({ caminho }) => {
     const src = fonte(caminho);
     // O bug que este teste existe para pegar: trocar o href e esquecer a frase,
     // deixando "fale com a gente pelo e-mail" apontando para o WhatsApp.
-    expect(src).not.toMatch(/e-mail\s*<Canais\s*\/>/);
-    expect(src).toMatch(/WhatsApp\s*<Canais\s*\/>/);
+    // Entre a palavra e o componente pode haver o `{' '}` do JSX, que é como as
+    // páginas jurídicas escrevem — por isso o espaço aceita as duas formas.
+    const espaco = "(\\{' '\\}|\\s)*";
+    expect(src).not.toMatch(new RegExp(`e-mail${espaco}<Canais\\s*/>`));
+    expect(src).toMatch(new RegExp(`WhatsApp${espaco}<Canais\\s*/>`));
   });
 });
 
-describe('páginas jurídicas — migração pendente de decisão (B3)', () => {
-  it.each(PENDENTES)(
-    '$nome ainda usa e-mail: aguarda decisão sobre o texto da cláusula',
-    ({ nome, caminho }) => {
-      const src = fonte(caminho);
-      expect(
-        src.includes('mailto:'),
-        `${nome} migrou para o WhatsApp: mova a página de PENDENTES para MIGRADAS ` +
-        'neste arquivo e confira se o texto da cláusula foi ajustado junto.',
-      ).toBe(true);
-    },
-  );
+describe('nenhum mailto: de suporte sobra em página pública nenhuma', () => {
+  it('as 5 páginas estão no WhatsApp', () => {
+    for (const { nome, caminho } of MIGRADAS) {
+      expect(fonte(caminho).includes('mailto:'), `${nome} ainda tem mailto:`).toBe(false);
+    }
+  });
+});
+
+describe('o e-mail que NÃO é suporte continua onde estava', () => {
+  it.each(EMAIL_QUE_FICA)('$nome', ({ caminho, trecho }) => {
+    // Se este teste cair numa mudança de canal, a troca passou do ponto:
+    // apagou uma frase que fala de notificação, de dado coletado ou do e-mail
+    // da conta — nenhuma delas é o canal de atendimento.
+    expect(fonte(caminho)).toContain(trecho);
+  });
 });

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { SUPORTE_WHATSAPP_LABEL, SUPORTE_WHATSAPP_URL } from '@/lib/suporte';
 
 export const metadata = {
   title: 'Política de Reembolso — Creatools',
@@ -7,27 +8,33 @@ export const metadata = {
 };
 
 /**
- * Canais oficiais de atendimento (decisão do Rafael, 30/07/2026): e-mail e
- * Instagram. São os ÚNICOS dois publicados — não há telefone nem WhatsApp, e
- * não existe portal de autoatendimento. Antes desta data as páginas mandavam
- * "falar com o suporte" sem dizer onde, e o canal não existia.
- * Estes valores se repetem nas 5 páginas públicas: mudou aqui, muda nas cinco.
+ * Canais oficiais de atendimento. O suporte é por WHATSAPP (decisão do Rafael,
+ * 02/09/2026: "qualquer contato que qualquer usuário quiser ter vai ser direto
+ * no WhatsApp"). Substitui o e-mail, que era o canal desde 30/07/2026; o
+ * Instagram continua como alternativa.
+ *
+ * O número NÃO mora aqui: vem de `lib/suporte.ts`, fonte única. Foi a
+ * duplicação deste bloco pelas 5 páginas que deixou um e-mail errado espalhado
+ * sem ninguém notar.
  */
 const SUPORTE_URL = 'https://instagram.com/creatools';
 const SUPORTE_HANDLE = '@creatools';
-const SUPORTE_EMAIL = 'contato@creatools.com';
 
 /**
- * Os DOIS canais oficiais, sempre juntos. E-mail primeiro de propósito: onde o
- * texto manda cancelar, pedir reembolso ou exercer direitos de dados, o e-mail
- * deixa registro escrito dos dois lados e não exige conta no Instagram. O DM
- * continua oferecido — é mais rápido —, nunca como via única.
+ * Os DOIS canais oficiais, sempre juntos. WhatsApp primeiro: é o canal que o
+ * Rafael atende, e a conversa fica registrada com data dos dois lados. O DM do
+ * Instagram continua oferecido, nunca como via única.
  */
 function Canais() {
   return (
     <>
-      <a href={`mailto:${SUPORTE_EMAIL}`} className="underline underline-offset-4">
-        {SUPORTE_EMAIL}
+      <a
+        href={SUPORTE_WHATSAPP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4"
+      >
+        {SUPORTE_WHATSAPP_LABEL}
       </a>{' '}
       ou no Instagram{' '}
       <a
@@ -60,11 +67,11 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '2. Como solicitar',
     body: (
       <p>
-        O pedido deve ser feito pelo e-mail{' '}
+        O pedido deve ser feito pelo WhatsApp{' '}
         <Canais />, informando o e-mail usado na assinatura e o pedido de reembolso/desistência
-        dentro dos 7 dias. Preferimos o e-mail: ele registra por escrito a data do pedido, que é o
-        que conta para o prazo. Confirmamos o recebimento e avisamos assim que o reembolso for
-        iniciado.
+        dentro dos 7 dias. O que conta para o prazo é a DATA do pedido, e a conversa de WhatsApp
+        fica registrada com data nos dois aparelhos — guarde a sua. Confirmamos o recebimento e
+        avisamos assim que o reembolso for iniciado.
       </p>
     ),
   },
@@ -84,7 +91,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         Passado o prazo de arrependimento, não há mais reembolso incondicional. Você pode cancelar
-        a renovação automática a qualquer momento pelo e-mail{' '}
+        a renovação automática a qualquer momento pelo WhatsApp{' '}
         <Canais /> — o cancelamento evita
         cobranças futuras, mas o acesso permanece ativo até o fim do ciclo já pago, sem reembolso
         proporcional do período em curso, salvo exigência legal em contrário.
@@ -95,7 +102,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: '5. Cancelamento da renovação automática',
     body: (
       <p>
-        Para cancelar a renovação, fale com a gente pelo e-mail{' '}
+        Para cancelar a renovação, fale com a gente pelo WhatsApp{' '}
         <Canais />. O cancelamento é imediato
         para fins de renovação futura: você não será cobrado no
         próximo ciclo, mesmo mantendo acesso até o fim do período vigente.

@@ -9,19 +9,19 @@
  * `creatools.com.br`. Ninguém notou, porque não havia um lugar para notar.
  * Agora há: mudou aqui, mudou em todo lugar.
  *
- * ⚠️ O NÚMERO ABAIXO É PLACEHOLDER. O Rafael vai mandar o número real; quando
- * mandar, troque SÓ a constante `SUPORTE_WHATSAPP_DIGITOS` (e o rótulo). Nada
- * mais precisa ser tocado: o link e o texto exibido saem daqui.
+ * O número real entrou em 02/09/2026 (o Rafael mandou), no lugar do placeholder
+ * com que esta lib nasceu. Trocar de novo é mexer SÓ em
+ * `SUPORTE_WHATSAPP_DIGITOS` e no rótulo: o link e o texto exibido saem daqui.
  */
 
 /**
  * Só dígitos, com DDI — é o formato que o wa.me exige (nada de +, espaço,
  * parêntese ou hífen). 55 = Brasil, 71 = DDD, o resto é o número.
  */
-export const SUPORTE_WHATSAPP_DIGITOS = '5571900000000';
+export const SUPORTE_WHATSAPP_DIGITOS = '5571992230643';
 
 /** O número como a pessoa lê na tela. */
-export const SUPORTE_WHATSAPP_LABEL = '(71) 90000-0000';
+export const SUPORTE_WHATSAPP_LABEL = '(71) 99223-0643';
 
 /**
  * O link que abre a conversa. O wa.me é o encurtador oficial do WhatsApp e
