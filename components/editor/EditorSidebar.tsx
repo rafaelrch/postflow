@@ -575,10 +575,26 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const t01HasVisibility = t01CornerSlotNames.some(
     (slot) => slide.templateSlotStyles?.[slot]?.visible != null
   );
+  /**
+   * O mestre "Exibir cantos" responde "o BLOCO de cantos mostra alguma coisa?"
+   * — e não "todos os cantos estão visíveis".
+   *
+   * Era um `every`, e isso quebrava o painel: o corpo do CornersPanel só é
+   * desenhado com o mestre ligado (`{show && …}`), então desmarcar UM canto
+   * derrubava o mestre e fechava o painel inteiro, levando junto a linha do
+   * canto que continuava visível. Pior, o estado "um ligado, outro desligado"
+   * virava inalcançável — reabrir só pelo mestre, que reacende TODOS os slots e
+   * ressuscita o canto recém-desligado (bug relatado pelo Rafael, 02/09/2026).
+   *
+   * Com `some` os dois níveis convivem: o checkbox de cada linha mexe só no seu
+   * canto, e o switch continua derrubando o bloco inteiro de uma vez. O mestre
+   * só cai sozinho quando não sobra nenhum canto visível — aí o bloco de fato
+   * não mostra nada.
+   */
   const t01HeaderVisible = t01HasVisibility
-    ? t01CornerSlotNames.every((slot) => slide.templateSlotStyles?.[slot]?.visible !== false)
+    ? t01CornerSlotNames.some((slot) => slide.templateSlotStyles?.[slot]?.visible !== false)
     : corners.show !== false;
-  const t02HeaderVisible = t02HeaderSlotNames.every(
+  const t02HeaderVisible = t02HeaderSlotNames.some(
     (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
   );
   const t01HeaderStyle = {
@@ -595,7 +611,8 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   const t03HeaderVisible = t03HeaderSlotNames.every(
     (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
   );
-  const t03CornersVisible = t03CornerSlotNames.every(
+  // Mesma regra dos outros dois: o mestre fala do bloco, não de cada slot.
+  const t03CornersVisible = t03CornerSlotNames.some(
     (slot) => slide.templateSlotStyles?.[slot]?.visible !== false
   );
   const t03CornerStyle = {
