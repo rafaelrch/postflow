@@ -626,6 +626,66 @@ function makeDefaultManualSlides(count: number): ManualSlide[] {
   return Array.from({ length: count }, () => ({}));
 }
 
+/**
+ * A grade de quantidade de slides. UM componente para os dois modos: o de IA
+ * escolhe quantos slides pedir, o manual escolhe o tamanho do deck. Duplicar a
+ * grade deixaria os dois com a mesma aparência só até o primeiro ajuste.
+ */
+function SlideCountPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
+        Slides · <span style={{ color: 'var(--ink)' }}>{value}</span>
+      </span>
+      <div className="grid grid-cols-10 gap-1" role="group" aria-label="Número de slides">
+        {SLIDE_COUNT_OPTIONS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            aria-pressed={value === n}
+            className="cw-pill rounded-[6px] text-[10px] font-semibold"
+            style={{
+              height: 24,
+              border: '1.5px solid ' + (value === n ? 'var(--ink)' : 'var(--line-strong)'),
+              background: value === n ? 'var(--ink)' : 'var(--paper)',
+              color: value === n ? 'var(--paper)' : 'var(--ink-dim)',
+            }}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Um slide manual sem NENHUM campo preenchido — só espaço em branco não conta. */
+function manualSlideIsEmpty(slide: ManualSlide): boolean {
+  return Object.values(slide).every((v) => (v ?? '').trim() === '');
+}
+
+/**
+ * Redimensiona a lista manual SEM nunca apagar texto digitado.
+ *
+ * Crescer é trivial: entra slide vazio no fim. Encolher é o caso perigoso — o
+ * código antigo fazia `slice(0, n)` e levava junto o que o usuário tinha
+ * escrito, calado e sem desfazer. Aqui o corte só come slides VAZIOS, do fim
+ * para o começo, e para no primeiro que tem conteúdo. Quem quer mesmo tirar um
+ * slide escrito usa "Remover este slide", que é um ato deliberado sobre um
+ * slide que ele está vendo.
+ *
+ * Devolve a lista nova; quem chama lê o `length` dela para saber onde parou.
+ */
+function resizeManualSlides(prev: ManualSlide[], n: number): ManualSlide[] {
+  if (n > prev.length) return [...prev, ...makeDefaultManualSlides(n - prev.length)];
+  let next = prev;
+  while (next.length > n && manualSlideIsEmpty(next[next.length - 1])) {
+    next = next.slice(0, next.length - 1);
+  }
+  return next;
+}
+
 interface ParsedJSONSlide {
   title: string;
   description: string;
@@ -886,14 +946,35 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
 
-  // Sync manual slides count with slideCount slider
+  /**
+   * A quantidade pedida à IA. A lista manual acompanha, mas nunca perdendo
+   * texto: ver `resizeManualSlides`. Antes daqui saía um `slice(0, n)` que
+   * apagava em silêncio o que já estava escrito.
+   */
   const updateSlideCount = (n: number) => {
     setSlideCount(n);
     setManualSlides((prev) => {
-      if (n > prev.length) {
-        return [...prev, ...makeDefaultManualSlides(n - prev.length)];
-      }
-      return prev.slice(0, n);
+      const next = resizeManualSlides(prev, n);
+      // O slide aberto no pager pode ter deixado de existir.
+      setManualIndex((i) => Math.min(i, next.length - 1));
+      return next;
+    });
+  };
+
+  /**
+   * A quantidade do deck MANUAL. É `manualSlides.length` que vale na geração
+   * manual (o `slideCount` é o pedido da IA), então o seletor do modo manual
+   * fala com esta função e lê aquele comprimento.
+   *
+   * O `slideCount` é alinhado ao resultado para os dois modos contarem a mesma
+   * história quando o usuário troca de um para o outro.
+   */
+  const updateManualSlideCount = (n: number) => {
+    setManualSlides((prev) => {
+      const next = resizeManualSlides(prev, n);
+      setManualIndex((i) => Math.min(i, next.length - 1));
+      setSlideCount(next.length);
+      return next;
     });
   };
 
@@ -908,7 +989,12 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
   const removeManualSlide = (i: number) => {
     if (manualSlides.length <= 1) return;
-    setManualSlides((prev) => prev.filter((_, idx) => idx !== i));
+    setManualSlides((prev) => {
+      const next = prev.filter((_, idx) => idx !== i);
+      // Removendo o último, o pager apontaria para um slide que não existe mais.
+      setManualIndex((idx) => Math.min(idx, next.length - 1));
+      return next;
+    });
   };
 
   // O TEMPLATE 1 tem uma dramaturgia de 6 slides (capa → contexto → problema →
@@ -1724,30 +1810,7 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                       Deck fixo de {TEMPLATE_01_SLIDE_COUNT} slides.
                     </p>
                   ) : style === 'profile' && twitterFormat === 'A' ? null : (
-                    <div>
-                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-dim)' }}>
-                        Slides · <span style={{ color: 'var(--ink)' }}>{slideCount}</span>
-                      </span>
-                      <div className="grid grid-cols-10 gap-1" role="group" aria-label="Número de slides">
-                        {SLIDE_COUNT_OPTIONS.map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => updateSlideCount(n)}
-                            aria-pressed={slideCount === n}
-                            className="cw-pill rounded-[6px] text-[10px] font-semibold"
-                            style={{
-                              height: 24,
-                              border: '1.5px solid ' + (slideCount === n ? 'var(--ink)' : 'var(--line-strong)'),
-                              background: slideCount === n ? 'var(--ink)' : 'var(--paper)',
-                              color: slideCount === n ? 'var(--paper)' : 'var(--ink-dim)',
-                            }}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <SlideCountPicker value={slideCount} onChange={updateSlideCount} />
                   )}
                 </>
               )}
@@ -1755,6 +1818,31 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
               {/* ─ Manualmente ─ (um slide por vez: o modal não rola) */}
               {contentMode === 'manual' && (
                 <>
+                  {/* Nº de slides no MANUAL — pedido do Rafael: a opção existia
+                      só no modo de IA. Mesmas exceções do outro ramo: o
+                      Manifesto é deck fechado e o post único do Profile é 1.
+                      O valor lido é `manualSlides.length`, não `slideCount`,
+                      porque é ele que vira o carrossel na geração manual. */}
+                  {isFixedDeck ? (
+                    <p className="text-[11px]" style={{ color: 'var(--ink-dim)' }}>
+                      Deck fixo de {TEMPLATE_01_SLIDE_COUNT} slides.
+                    </p>
+                  ) : style === 'profile' && twitterFormat === 'A' ? null : (
+                    <>
+                      <SlideCountPicker
+                        value={manualSlides.length}
+                        onChange={updateManualSlideCount}
+                      />
+                      {/* Reduzir só remove slides VAZIOS. Sem esta linha, a
+                          grade pararia num número diferente do clicado e a
+                          pessoa não saberia por quê. */}
+                      <p className="text-[10px]" style={{ color: 'var(--ink-dim)' }}>
+                        Slides já preenchidos não são removidos por aqui — use
+                        “Remover este slide”.
+                      </p>
+                    </>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
