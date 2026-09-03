@@ -13,12 +13,39 @@
 -- pagamento criou usuário e assinatura REAIS, e eles estão contaminando os
 -- números do /admin (total de usuários, assinaturas ativas, receita).
 --
--- COMO USAR — a regra que dá segurança a este arquivo:
---   1. rode o PASSO 0 inteiro e confira o alvo;
---   2. em cada bloco, rode PRIMEIRO o SELECT de conferência;
---   3. olhe a contagem e as linhas. Se vier algo que você não reconhece como
---      lixo de QA, PARE;
---   4. só então rode o DELETE daquele bloco.
+-- ╔═══════════════════════════════════════════════════════════════════════╗
+-- ║  🚫 NÃO COLE ESTE ARQUIVO INTEIRO NO SQL EDITOR.                      ║
+-- ║                                                                       ║
+-- ║  Colar tudo de uma vez é o modo ERRADO de usar, e já falhou: em       ║
+-- ║  02/09/2026 o lote inteiro abortou num erro 42P01 numa LEITURA do     ║
+-- ║  passo 0. Não se perdeu nada por sorte — o erro caiu antes dos        ║
+-- ║  DELETEs. Se tivesse caído no meio deles, metade da limpeza estaria   ║
+-- ║  feita e a outra metade não, sem ninguém saber qual metade.           ║
+-- ║                                                                       ║
+-- ║  O JEITO CERTO — um bloco por vez, lendo o resultado antes do         ║
+-- ║  próximo:                                                             ║
+-- ║    1. PASSO -1  → o mapa de existência. Diz o que existe de verdade.  ║
+-- ║    2. PASSO 0   → o inventário. Mostra o alvo e o tamanho do lixo.    ║
+-- ║    3. ENSAIO    → BEGIN … blocos 1 a 10 … VERIFICAÇÃO … ROLLBACK.     ║
+-- ║                   Nada é gravado. Confira os números.                 ║
+-- ║    4. VALENDO   → repita trocando ROLLBACK por COMMIT.                ║
+-- ║    5. PASSO 11  → o usuário no auth, pelo painel.                     ║
+-- ║    6. PASSO 12  → a pasta do storage.                                 ║
+-- ╚═══════════════════════════════════════════════════════════════════════╝
+--
+-- DENTRO DE CADA BLOCO a regra é a mesma:
+--   · rode PRIMEIRO o SELECT de conferência;
+--   · olhe a contagem e as linhas. Se vier algo que você não reconhece como
+--     lixo de QA, PARE;
+--   · só então rode o DELETE daquele bloco.
+--
+-- ⚠️ POR QUE O PASSO -1 EXISTE (a lição de 02/09): a primeira versão deste
+--    arquivo consultava `public.user_entitlements`, que NÃO EXISTE. Ela foi
+--    criada em 20260724_free_plan_entitlement.sql e DESTRUÍDA depois em
+--    20260812_asaas_migration.sql, quando o plano Free saiu — eu li o CREATE e
+--    não vi o DROP posterior. O schema tem uma LINHA DO TEMPO: só a leitura na
+--    ordem das migrations diz o que existe hoje. O passo -1 pergunta isso ao
+--    banco, em vez de deduzir de arquivo.
 --
 -- ⚠️ POR QUE TANTA CERIMÔNIA: no ciclo anterior um agente apagou um carrossel
 --    REAL durante um teste de exclusão, porque desligou uma proteção e não
@@ -38,6 +65,59 @@
 -- conta real usa. O UUID do LOG está abreviado ("3e3af9ee"), então o PASSO 0
 -- resolve o UUID completo a partir do e-mail — em vez de você digitar um UUID
 -- pela metade e acertar outro usuário.
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PASSO -1 — MAPA DE EXISTÊNCIA. Rode ISTO antes de tudo.
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- `to_regclass` devolve NULL em vez de estourar quando a tabela não existe —
+-- é o mesmo padrão que 20260812_asaas_migration.sql usa para conferir a
+-- migração (linhas 50 e 592). Esta consulta NUNCA falha, seja qual for o
+-- estado do banco.
+--
+-- COMO LER: `null` na coluna = a tabela NÃO existe aqui. Anote quais deram
+-- null e PULE os blocos correspondentes mais adiante.
+
+select
+  to_regclass('public.profiles')                   as profiles,
+  to_regclass('public.projects')                   as projects,
+  to_regclass('public.carousels')                  as carousels,
+  to_regclass('public.slides')                     as slides,
+  to_regclass('public.news_entries')               as news_entries,
+  to_regclass('public.templates')                  as templates,
+  to_regclass('public.assets')                     as assets,
+  to_regclass('public.scheduled_posts')            as scheduled_posts,
+  to_regclass('public.content_relations')          as content_relations;
+
+select
+  to_regclass('public.workspaces')                 as workspaces,
+  to_regclass('public.workspace_members')          as workspace_members,
+  to_regclass('public.workspace_brand_context')    as workspace_brand_context,
+  to_regclass('public.user_workspace_preferences') as user_workspace_prefs,
+  -- Criada em supabase/reels-schema.sql, que NÃO está em migrations/: pode
+  -- nunca ter sido aplicada neste projeto. Esperado dar null.
+  to_regclass('public.reels')                      as reels;
+
+select
+  to_regclass('public.subscriptions')              as subscriptions,
+  to_regclass('public.payment_customers')          as payment_customers,
+  to_regclass('public.payment_transactions')       as payment_transactions,
+  to_regclass('public.payment_checkout_refs')      as payment_checkout_refs,
+  to_regclass('public.payment_webhook_events')     as payment_webhook_events,
+  to_regclass('public.leads')                      as leads,
+  to_regclass('public.paid_signup_intents')        as paid_signup_intents,
+  -- ☠️ ESTA TEM DE DAR NULL. Foi dropada em 20260812_asaas_migration.sql
+  -- quando o plano Free saiu. Se vier NÃO-null, alguém a recriou e este
+  -- script precisa ser revisto antes de rodar.
+  to_regclass('public.user_entitlements')          as user_entitlements_MORTA;
+
+select
+  to_regclass('public.credit_ledger')              as credit_ledger,
+  to_regclass('public.product_events')             as product_events,
+  to_regclass('public.ai_generation_events')       as ai_generation_events,
+  to_regclass('public.roadmap_cards')              as roadmap_cards,
+  to_regclass('public.roadmap_votes')              as roadmap_votes;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -62,36 +142,85 @@ where email ilike '%+qa%' or email ilike '%teste%' or email ilike '%test%'
 order by created_at desc;
 
 -- 0.4 — O QUE ESSE USUÁRIO TEM, TABELA POR TABELA.
--- Este é o retrato do lixo. Guarde o resultado: é contra ele que a verificação
--- final vai comparar.
-with alvo as (
-  select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com'
-)
-select 'profiles'                  as tabela, count(*) from public.profiles                  where id      in (select id from alvo)
-union all select 'projects',                  count(*) from public.projects                  where user_id in (select id from alvo)
-union all select 'carousels',                 count(*) from public.carousels                 where user_id in (select id from alvo)
-union all select 'slides (via carousels)',    count(*) from public.slides s where s.carousel_id in (select id from public.carousels where user_id in (select id from alvo))
-union all select 'news_entries',              count(*) from public.news_entries              where user_id in (select id from alvo)
-union all select 'templates',                 count(*) from public.templates                 where user_id in (select id from alvo)
-union all select 'assets',                    count(*) from public.assets                    where user_id in (select id from alvo)
-union all select 'scheduled_posts',           count(*) from public.scheduled_posts           where user_id in (select id from alvo)
-union all select 'content_relations',         count(*) from public.content_relations         where user_id in (select id from alvo)
-union all select 'workspaces (owner)',        count(*) from public.workspaces                where owner_id in (select id from alvo)
-union all select 'workspace_members',         count(*) from public.workspace_members         where user_id in (select id from alvo)
-union all select 'user_workspace_preferences',count(*) from public.user_workspace_preferences where user_id in (select id from alvo)
-union all select 'subscriptions',             count(*) from public.subscriptions             where user_id in (select id from alvo)
-union all select 'user_entitlements',         count(*) from public.user_entitlements         where user_id in (select id from alvo)
-union all select 'credit_ledger',             count(*) from public.credit_ledger             where user_id in (select id from alvo)
-union all select 'product_events',            count(*) from public.product_events            where user_id in (select id from alvo)
-union all select 'ai_generation_events',      count(*) from public.ai_generation_events      where user_id in (select id from alvo)
-union all select 'payment_customers',         count(*) from public.payment_customers         where user_id in (select id from alvo)
-union all select 'payment_transactions',      count(*) from public.payment_transactions      where user_id in (select id from alvo)
-union all select 'paid_signup_intents',       count(*) from public.paid_signup_intents       where user_id in (select id from alvo)
-union all select 'roadmap_votes',             count(*) from public.roadmap_votes             where user_id in (select id from alvo)
-union all select 'roadmap_cards (autor)',     count(*) from public.roadmap_cards             where author_id in (select id from alvo)
--- Se `public.reels` não existir no projeto, remova a linha abaixo:
-union all select 'reels',                     count(*) from public.reels                     where user_id in (select id from alvo)
-order by 1;
+--
+-- 🔴 POR QUE ISTO É UM BLOCO `DO` E NÃO UM `UNION` BONITO:
+--    o UNION da primeira versão morria inteiro se UMA tabela faltasse, e foi
+--    exatamente o que aconteceu. E `to_regclass` sozinho não resolve: o
+--    PostgreSQL resolve as relações no PARSE, antes de executar, então
+--    `where to_regclass(...) is not null and exists(select from x)` falha
+--    igual — a tabela `x` precisa existir para a consulta sequer compilar.
+--    A saída é SQL DINÂMICO: dentro do `EXECUTE format(...)` a relação só é
+--    resolvida na hora, e o `to_regclass` antes dele decide se chega lá.
+--    Resultado: tabela ausente vira um aviso e o inventário continua.
+--
+-- COMO LER: o resultado sai no painel de MENSAGENS/NOTICES do SQL Editor
+-- (não na grade de resultados). Guarde: é contra ele que a verificação final
+-- vai comparar.
+
+do $$
+declare
+  v_email text := 'rafaelrocha250304+qa02set@gmail.com';
+  v_uid   uuid;
+  r       record;
+  n       bigint;
+  total   bigint := 0;
+begin
+  select id into v_uid from auth.users where email = v_email;
+
+  if v_uid is null then
+    raise notice '── ALVO NÃO ENCONTRADO para % — PARE e confira o e-mail.', v_email;
+    return;
+  end if;
+
+  raise notice '── ALVO: % (uuid %)', v_email, v_uid;
+
+  for r in
+    select * from (values
+      ('public.profiles',                   'id'),
+      ('public.projects',                   'user_id'),
+      ('public.carousels',                  'user_id'),
+      ('public.news_entries',               'user_id'),
+      ('public.templates',                  'user_id'),
+      ('public.assets',                     'user_id'),
+      ('public.scheduled_posts',            'user_id'),
+      ('public.content_relations',          'user_id'),
+      ('public.workspaces',                 'owner_id'),
+      ('public.workspace_members',          'user_id'),
+      ('public.user_workspace_preferences', 'user_id'),
+      ('public.subscriptions',              'user_id'),
+      ('public.credit_ledger',              'user_id'),
+      ('public.product_events',             'user_id'),
+      ('public.ai_generation_events',       'user_id'),
+      ('public.payment_customers',          'user_id'),
+      ('public.payment_transactions',       'user_id'),
+      ('public.paid_signup_intents',        'user_id'),
+      ('public.roadmap_votes',              'user_id'),
+      ('public.roadmap_cards',              'author_id'),
+      ('public.reels',                      'user_id')
+    ) as t(tabela, coluna)
+  loop
+    if to_regclass(r.tabela) is null then
+      raise notice '  % TABELA NÃO EXISTE — bloco correspondente deve ser PULADO', rpad(r.tabela, 34);
+      continue;
+    end if;
+    execute format('select count(*) from %s where %I = $1', r.tabela, r.coluna)
+      into n using v_uid;
+    total := total + n;
+    raise notice '  % %', rpad(r.tabela, 34), n;
+  end loop;
+
+  -- Slides são filhos de carousels, então a contagem passa pelo pai.
+  if to_regclass('public.slides') is not null and to_regclass('public.carousels') is not null then
+    execute 'select count(*) from public.slides s
+             where s.carousel_id in (select id from public.carousels where user_id = $1)'
+      into n using v_uid;
+    total := total + n;
+    raise notice '  % %', rpad('public.slides (via carousels)', 34), n;
+  end if;
+
+  raise notice '── TOTAL DE LINHAS DE LIXO: %', total;
+end $$;
+
 
 -- 0.5 — O QUE NÃO ESTÁ LIGADO AO USUÁRIO POR CHAVE, e por isso NÃO some sozinho.
 -- `leads` não tem user_id nenhum: ele se liga ao usuário só pelo E-MAIL.
@@ -273,14 +402,29 @@ where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02
 -- `public.reels` é criada por supabase/reels-schema.sql e tem user_id com
 -- CASCADE de auth.users. A funcionalidade está desligada por REELS_ENABLED,
 -- mas a TABELA existe e pode ter recebido linha em algum teste antigo.
--- Se a tabela não existir no seu projeto, este SELECT dá erro — pode ignorar e
--- pular o bloco.
-select id, name, handle, video_path, created_at
-from public.reels
-where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
+-- ⚠️ `reels-schema.sql` NÃO está em migrations/, então pode nunca ter sido
+--    aplicado neste projeto — o passo -1 diz. Por isso este bloco é blindado:
+--    se a tabela não existir, ele avisa e segue, em vez de abortar o lote.
+do $$
+declare
+  v_uid uuid;
+  n     bigint;
+begin
+  select id into v_uid from auth.users
+   where email = 'rafaelrocha250304+qa02set@gmail.com';
 
-delete from public.reels
-where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
+  if to_regclass('public.reels') is null then
+    raise notice 'reels: tabela não existe neste projeto — bloco pulado.';
+    return;
+  end if;
+
+  execute 'select count(*) from public.reels where user_id = $1' into n using v_uid;
+  raise notice 'reels: % linha(s) do usuário de QA. Apagando…', n;
+
+  execute 'delete from public.reels where user_id = $1' using v_uid;
+  get diagnostics n = row_count;
+  raise notice 'reels: % linha(s) apagada(s).', n;
+end $$;
 
 
 -- ───────────────────────────────────────────────────────────────────────────
@@ -299,7 +443,7 @@ delete from public.ai_generation_events where user_id = (select id from auth.use
 
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 7. ASSINATURA, DIREITOS E PAGAMENTO
+-- 7. ASSINATURA E PAGAMENTO
 -- ───────────────────────────────────────────────────────────────────────────
 --
 -- 🔴 APAGAR A LINHA AQUI NÃO CANCELA NADA NO ASAAS.
@@ -313,9 +457,6 @@ select s.id as assinatura_no_asaas, s.status, s.email, s.current_period_end
 from public.subscriptions s
 where s.user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
 
-select * from public.user_entitlements
-where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
-
 -- payment_transactions NÃO cascateia (SET NULL): sem este DELETE a transação
 -- fica órfã e continua somando na financeira do /admin.
 select provider_payment_id, status, gross_value, created_at
@@ -327,7 +468,12 @@ delete from public.payment_transactions
 where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com')
    or lead_id in (select id from public.leads where email = 'rafaelrocha250304+qa02set@gmail.com');
 
-delete from public.user_entitlements where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
+-- ☠️ `public.user_entitlements` NÃO EXISTE MAIS e por isso NÃO aparece aqui.
+--    A primeira versão deste script a consultava e derrubou o lote do Rafael
+--    com 42P01 em 02/09/2026. Ela foi criada em 20260724_free_plan_entitlement
+--    e DROPADA em 20260812_asaas_migration.sql quando o plano Free saiu.
+--    Se o passo -1 mostrar que ela voltou a existir, PARE: alguém a recriou e
+--    este script precisa ser revisto antes de rodar.
 delete from public.payment_customers  where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
 delete from public.subscriptions      where user_id = (select id from auth.users where email = 'rafaelrocha250304+qa02set@gmail.com');
 
