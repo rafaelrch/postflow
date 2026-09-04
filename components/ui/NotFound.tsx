@@ -10,9 +10,11 @@ interface NotFoundProps {
   description?: string;
 }
 
-/* Botão do componente original (originui). As classes são as mesmas do cva
-   de lá — variante e tamanho default — só com as cores escritas por extenso,
-   porque os tokens --primary/--secondary/--input não existem no globals.css.
+/* Forma do componente original (originui): mesmas classes do cva de lá,
+   variante e tamanho default. As cores vêm dos tokens da marca, que já
+   invertem sozinhos no html.dark — por isso não há variante dark: aqui.
+   O hover troca de token em vez de usar alpha (`/90`), que o Tailwind não
+   aplica sobre var(); é o mesmo gesto do `.brand-btn.primary:hover`.
    Fica local neste arquivo: o Button do projeto é outro desenho e continua
    intocado. */
 const buttonBase =
@@ -22,12 +24,12 @@ const buttonBase =
   '[&_svg]:pointer-events-none [&_svg]:shrink-0';
 
 const buttonPrimary =
-  'bg-[#18181B] text-[#FAFAFA] hover:bg-[#18181B]/90 focus-visible:outline-[#18181B]/70 ' +
-  'dark:bg-[#FAFAFA] dark:text-[#18181B] dark:hover:bg-[#FAFAFA]/90 dark:focus-visible:outline-[#FAFAFA]/70';
+  'bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--ink-2)] ' +
+  'focus-visible:outline-[var(--foreground)]';
 
 const buttonSecondary =
-  'bg-[#F4F4F5] text-[#18181B] hover:bg-[#F4F4F5]/80 focus-visible:outline-[#18181B]/70 ' +
-  'dark:bg-[#27272A] dark:text-[#FAFAFA] dark:hover:bg-[#27272A]/80 dark:focus-visible:outline-[#FAFAFA]/70';
+  'bg-[var(--surface-elevated)] text-[var(--foreground)] hover:bg-[var(--line)] ' +
+  'focus-visible:outline-[var(--foreground)]';
 
 export function Illustration(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
@@ -48,10 +50,10 @@ export function NotFound({
 
   return (
     <div className="relative z-[1] w-full text-center">
-      <h1 className="mt-4 text-balance text-5xl font-semibold tracking-tight text-[#18181B] dark:text-[#FAFAFA] sm:text-7xl">
+      <h1 className="mt-4 text-balance text-5xl font-semibold tracking-tight text-[var(--foreground)] sm:text-7xl">
         {title}
       </h1>
-      <p className="mt-6 text-pretty text-lg font-medium text-[#71717A] dark:text-[#A1A1AA] sm:text-xl/8">
+      <p className="mt-6 text-pretty text-lg font-medium text-[var(--text-secondary)] sm:text-xl/8">
         {description}
       </p>
       <div className="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-center gap-y-3 gap-x-6">
