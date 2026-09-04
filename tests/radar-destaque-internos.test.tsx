@@ -252,17 +252,24 @@ describe('a barra lateral expõe as palavras do título dos internos', () => {
     );
   }
 
-  /** O painel de conteúdo do slide, aberto. */
-  function abreConteudo(): HTMLElement {
-    const painel = document.querySelector('[data-panel="conteudoSlide"]') as HTMLElement;
-    expect(painel, 'o painel de conteúdo não está na barra').toBeTruthy();
+  /**
+   * O painel de ESTILO do texto, aberto.
+   *
+   * Era o de conteúdo até 03/09/2026, quando as pastilhas mudaram de painel por
+   * ordem do Rafael (ver tests/radar-destaque-no-painel-de-estilo.test.tsx).
+   * O que estes casos afirmam — quais palavras viram pastilha e o que o clique
+   * grava — não mudou; só o painel onde elas moram.
+   */
+  function abreEstilo(): HTMLElement {
+    const painel = document.querySelector('[data-panel="estiloDoTexto"]') as HTMLElement;
+    expect(painel, 'o painel de estilo não está na barra').toBeTruthy();
     fireEvent.click(within(painel).getByRole('button', { expanded: false }));
     return painel;
   }
 
   it('num slide interno, as palavras do título viram pastilhas', () => {
     montaBarra(1);
-    abreConteudo();
+    abreEstilo();
 
     const chips = screen.getByRole('group', { name: 'Palavras em destaque' });
     expect(Array.from(chips.querySelectorAll('button')).map((b) => b.textContent)).toEqual([
@@ -272,7 +279,7 @@ describe('a barra lateral expõe as palavras do título dos internos', () => {
 
   it('clicar numa palavra grava o termo em content.highlight', () => {
     montaBarra(1);
-    abreConteudo();
+    abreEstilo();
 
     const chips = screen.getByRole('group', { name: 'Palavras em destaque' });
     fireEvent.click(within(chips).getByText('ERROS'));

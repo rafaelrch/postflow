@@ -1791,10 +1791,17 @@ const FOOTER_COLS = [
     { label: 'Recursos', href: '#recursos' },
     { label: 'Planos', href: '#planos' },
   ]},
+  // O terceiro item desta coluna, que levava ao /login, saiu por ordem do
+  // Rafael (03/09/2026): o login já tem entrada na navbar, e ali no rodapé ele
+  // não era suporte de nada. O rótulo dele não aparece nem em comentário, para
+  // o teste poder varrer o arquivo inteiro atrás da frase.
+  //
+  // `external` marca o que sai do site: o link do WhatsApp precisa de nova aba
+  // e de `rel="noopener noreferrer"` (sem noopener, a página aberta ganha
+  // `window.opener` e pode mexer nesta). Os âncoras internos não levam nada.
   { title: 'Suporte', links: [
     { label: 'FAQ', href: '#faq' },
-    { label: 'Suporte', href: '#faq' },
-    { label: 'Ativar acesso', href: '/login' },
+    { label: 'Suporte', href: SUPORTE_WHATSAPP_URL, external: true },
   ]},
   { title: 'Legal', links: [
     { label: 'Termos de uso', href: '/termos' },
@@ -1838,7 +1845,14 @@ function Footer() {
                 <ul className="mt-4 space-y-2.5">
                   {col.links.map((l) => (
                     <li key={l.label}>
-                      <a href={l.href} className="text-[13.5px] hover:text-black transition-colors" style={{ color: 'var(--lp-gray)' }}>
+                      <a
+                        href={l.href}
+                        {...('external' in l && l.external
+                          ? { target: '_blank', rel: 'noopener noreferrer' }
+                          : {})}
+                        className="text-[13.5px] hover:text-black transition-colors"
+                        style={{ color: 'var(--lp-gray)' }}
+                      >
                         {l.label}
                       </a>
                     </li>

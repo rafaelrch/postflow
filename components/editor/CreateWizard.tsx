@@ -252,41 +252,41 @@ const FORMAT_META: Record<SlideFormat, {
 const ALL_TEMPLATES: {
   value: SlideStyle;
   label: string;
-  /** Uma linha, dentro do card. */
+  /**
+   * Uma linha, dentro do card — o único texto descritivo do passo.
+   *
+   * Havia também um `detail`, uma faixa cinza abaixo do grid com a frase longa
+   * do template selecionado. Saiu em 03/09/2026 por ordem do Rafael: *"eu removo
+   * essa parte de baixo (…) eu quero que tenha esse negócio só pra ter a escolha
+   * de templates."* O passo é a ESCOLHA; o `short` dentro do card já diz o que
+   * cada um é, e a faixa repetia isso mais comprido, fora do card.
+   */
   short: string;
-  /** Faixa de detalhe abaixo do grid, só do selecionado. */
-  detail: string;
 }[] = [
   {
     value: 'profile',
     label: 'Profile',
     short: 'Post social, focado em texto',
-    detail: 'Estética de post no Twitter/X, com o seu perfil.',
   },
   {
     value: 'editorial',
     label: 'Atelier',
     short: 'Revista para creators',
-    detail: 'Revista: metadados no topo, imagem e texto. Fontes e cores são suas.',
   },
   {
     value: 'template01',
     label: 'Manifesto',
     short: 'Deck fechado de 6 slides',
-    detail: `Forma fixa do Figma, ${TEMPLATE_01_SLIDE_COUNT} slides. Você troca só texto e imagens.`,
   },
   {
     value: 'template02',
     label: 'Radar',
     short: 'Deck aberto: quantos slides você quiser',
-    detail: 'Forma fixa do Figma, deck aberto: os 3 modelos se alternam.',
   },
   {
     value: 'template03',
     label: 'FlowLine',
     short: 'Deck aberto: capa e conteúdo independente',
-    detail:
-      'Forma fixa do Figma, deck aberto: capa e slides de conteúdo independentes.',
   },
 ];
 
@@ -1597,16 +1597,38 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
       style={{ background: 'rgba(0,0,0,0.55)' }}
     >
       {/*
-        O shell mantém a geometria estável; somente o conteúdo interno rola.
+        A ALTURA ACOMPANHA O CONTEÚDO DO PASSO — ordem do Rafael (03/09/2026):
+        *"é para ele ficar do tamanho exato do conteúdo que tem dentro. Se o
+        conteúdo é grande, o papel é um pouco maior; se o conteúdo é menor, o
+        papel é menor."*
+
+        MEDIDO, e é o que fazia a queixa proceder: o shell tinha ALTURA FIXA —
+        `h-[min(560px,calc(100dvh-2rem))]`, e `h-[min(720px,…)]` no passo dos
+        templates. Não era mínimo nem teto: era o número exato, sempre. Daí o
+        papel vazio nos passos curtos (o de formato tem 3 cartões) e a rolagem
+        nos longos. Sem nenhuma classe de `height`, a caixa passa a medir o que
+        o passo pede.
+
+        As duas armadilhas do pedido, e como cada uma fica resolvida:
+         · TETO — `max-h-[calc(100dvh-2rem)]` já existia e continua. Em tela
+           baixa a caixa para de crescer ali e o corpo (`min-h-0 flex-1
+           overflow-y-auto`, logo abaixo) rola por dentro, como antes. O que
+           mudou é que agora ele é o TETO, não a medida.
+         · SOLAVANCO — `.cw-box` já animava `height`; o que faltava era poder
+           interpolar de e para `auto`, que é o que `interpolate-size` liga (ver
+           globals.css). Onde o navegador não suporta, a altura troca a seco: o
+           passo aparece certo, sem transição. Nada quebra.
+
+        A largura continua decidida pelo passo: só o grid 2×2 precisa de 600px.
       */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="cw-title"
         className={cn(
-          'cw-modal cw-box flex h-[min(560px,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-[18px]',
+          'cw-modal cw-box flex w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-[18px]',
           // O grid 2×2 de templates é o único passo que precisa de largura.
-          step === 2 ? 'h-[min(720px,calc(100dvh-2rem))] max-w-[600px]' : 'max-w-[440px]',
+          step === 2 ? 'max-w-[600px]' : 'max-w-[440px]',
         )}
         style={{
           background: 'var(--paper)',
@@ -1698,42 +1720,33 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
 
           {/* ── STEP 2: Template ── */}
           {step === 2 && (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                {TEMPLATES.map((tpl) => (
-                  <OptionCard
-                    key={tpl.value}
-                    selected={style === tpl.value}
-                    onClick={() => {
-                      setStyle(tpl.value);
-                      // O deck padrão do TEMPLATE 2 é a `sequenciaPadrao` do
-                      // spec (5 slides). Continua ajustável no passo seguinte.
-                      if (tpl.value === 'template02') updateSlideCount(TEMPLATE_02_DEFAULT_MODELS.length);
-                    }}
-                    className="flex flex-col items-center gap-2 px-3 pt-3 pb-2.5"
-                  >
-                    <TemplateThumb style={tpl.value} format={format} />
-                    <span className="w-full text-center">
-                      <span className="block text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>
-                        {tpl.label}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: 'var(--ink-dim)' }}>
-                        {tpl.short}
-                      </span>
+            /* Sem o wrapper `flex-col` de antes: com a faixa de detalhe fora, o
+               grid é o passo inteiro, e uma coluna de um filho só era `gap`
+               reservando altura para nada. */
+            <div className="grid grid-cols-2 gap-3">
+              {TEMPLATES.map((tpl) => (
+                <OptionCard
+                  key={tpl.value}
+                  selected={style === tpl.value}
+                  onClick={() => {
+                    setStyle(tpl.value);
+                    // O deck padrão do TEMPLATE 2 é a `sequenciaPadrao` do
+                    // spec (5 slides). Continua ajustável no passo seguinte.
+                    if (tpl.value === 'template02') updateSlideCount(TEMPLATE_02_DEFAULT_MODELS.length);
+                  }}
+                  className="flex flex-col items-center gap-2 px-3 pt-3 pb-2.5"
+                >
+                  <TemplateThumb style={tpl.value} format={format} />
+                  <span className="w-full text-center">
+                    <span className="block text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>
+                      {tpl.label}
                     </span>
-                  </OptionCard>
-                ))}
-              </div>
-              <p
-                className="rounded-[10px] px-3.5 py-2.5 text-[11px] leading-relaxed"
-                style={{
-                  color: 'var(--ink-dim)',
-                  background: 'var(--paper-2)',
-                  border: '1.5px solid var(--line-strong)',
-                }}
-              >
-                {TEMPLATES.find((t) => t.value === style)?.detail}
-              </p>
+                    <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: 'var(--ink-dim)' }}>
+                      {tpl.short}
+                    </span>
+                  </span>
+                </OptionCard>
+              ))}
             </div>
           )}
 
@@ -1833,34 +1846,12 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                 </>
               )}
 
-              {/* ─ Manualmente ─ (um slide por vez: o modal não rola) */}
+              {/* ─ Manualmente ─ (um slide por vez, para o passo não virar uma
+                  lista comprida). A nota antiga dizia "o modal não rola": desde
+                  03/09/2026 ele rola sim, quando o conteúdo passa do teto de
+                  tela — a altura acompanha o passo. Ver o shell do modal. */}
               {contentMode === 'manual' && (
                 <>
-                  {/* Nº de slides no MANUAL — pedido do Rafael: a opção existia
-                      só no modo de IA. Mesmas exceções do outro ramo: o
-                      Manifesto é deck fechado e o post único do Profile é 1.
-                      O valor lido é `manualSlides.length`, não `slideCount`,
-                      porque é ele que vira o carrossel na geração manual. */}
-                  {isFixedDeck ? (
-                    <p className="text-[11px]" style={{ color: 'var(--ink-dim)' }}>
-                      Deck fixo de {TEMPLATE_01_SLIDE_COUNT} slides.
-                    </p>
-                  ) : style === 'profile' && twitterFormat === 'A' ? null : (
-                    <>
-                      <SlideCountPicker
-                        value={manualSlides.length}
-                        onChange={updateManualSlideCount}
-                      />
-                      {/* Reduzir só remove slides VAZIOS. Sem esta linha, a
-                          grade pararia num número diferente do clicado e a
-                          pessoa não saberia por quê. */}
-                      <p className="text-[10px]" style={{ color: 'var(--ink-dim)' }}>
-                        Slides já preenchidos não são removidos por aqui — use
-                        “Remover este slide”.
-                      </p>
-                    </>
-                  )}
-
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
@@ -1942,6 +1933,40 @@ export default function CreateWizard({ onClose }: CreateWizardProps) {
                         </button>
                       )}
                     </div>
+                  )}
+                  {/* Nº de slides no MANUAL — POR ÚLTIMO, na mesma posição
+                      relativa que ocupa no ramo da IA. Ordem do Rafael
+                      (03/09/2026): *"na parte de criar manualmente o slide, a
+                      quantidade de slide tem que ficar na parte de baixo. Mesma
+                      coisa, do mesmo jeito que está em criar com IA."*
+
+                      Ele estava no TOPO deste ramo desde a T7, que foi quem o
+                      trouxe para o manual — no ramo da IA ele sempre foi o
+                      último bloco, depois do prompt e do idioma. Duas posições
+                      diferentes para o mesmo controle, no mesmo passo.
+
+                      As exceções são as mesmas do outro ramo: o Manifesto é deck
+                      fechado e o post único do Profile é 1. O valor lido é
+                      `manualSlides.length`, não `slideCount`, porque é ele que
+                      vira o carrossel na geração manual. */}
+                  {isFixedDeck ? (
+                    <p className="text-[11px]" style={{ color: 'var(--ink-dim)' }}>
+                      Deck fixo de {TEMPLATE_01_SLIDE_COUNT} slides.
+                    </p>
+                  ) : style === 'profile' && twitterFormat === 'A' ? null : (
+                    <>
+                      <SlideCountPicker
+                        value={manualSlides.length}
+                        onChange={updateManualSlideCount}
+                      />
+                      {/* Reduzir só remove slides VAZIOS. Sem esta linha, a
+                          grade pararia num número diferente do clicado e a
+                          pessoa não saberia por quê. */}
+                      <p className="text-[10px]" style={{ color: 'var(--ink-dim)' }}>
+                        Slides já preenchidos não são removidos por aqui — use
+                        “Remover este slide”.
+                      </p>
+                    </>
                   )}
                 </>
               )}

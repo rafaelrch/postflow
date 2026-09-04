@@ -258,29 +258,43 @@ export const TEMPLATE_02_DESIGN_TWEAKS = {
    * preto sobre preto. Com foto o problema não aparece, porque a imagem fica
    * entre o fundo e o scrim; sem foto, a capa é um retângulo preto liso.
    *
-   * POR QUE `#2E2E2E` e não outro cinza:
-   *   · nenhum cinza de `tokens.color` serve. `imagePlaceholder` (#CBC9BF) é
-   *     claro demais e é a caixa de imagem faltando; `textMuted` (#727272) e
-   *     `textHeader` (#767682) são cores de TEXTO — usar token de texto como
-   *     fundo é o tipo de troca que envelhece mal.
-   *   · o CABEÇALHO da capa (`#767682`) fica no topo, onde o scrim é
-   *     transparente: ele é desenhado direto sobre este fundo. Clarear o fundo
-   *     baixa o contraste dele. `#2E2E2E` é o cinza MAIS CLARO que ainda o
-   *     mantém em 3.03:1 — acima do mínimo 3:1 de texto grande. Em `#333333`
-   *     cairia para 2.82:1.
-   *   · contra o preto da base do scrim dá 1.55:1, o bastante para a rampa ser
-   *     vista numa área desse tamanho.
+   * ⚠️ SEGUNDA ORDEM DELE (03/09/2026), que SUBSTITUI o `#2E2E2E`: *"a capa do
+   * radar pode ter o fundo mais claro, use a cor #B5B5B5."* Cor escolhida por
+   * ele, não derivada de token — a escolha é dele e está registrada aqui.
    *
-   * ⚠️ CUSTO, para o Rafael saber: o contraste do cabeçalho cai de 4.68:1 para
-   * 3.03:1. Ainda passa em texto grande, mas é uma perda real — consequência
-   * inevitável do pedido, porque o cabeçalho mora na metade limpa do scrim.
-   * Querer os dois exigiria mexer também na cor do cabeçalho, o que é decisão
-   * dele e não foi pedida aqui.
+   * POR QUE o `#2E2E2E` existiu, e o que a troca custa: o `#2E2E2E` era o cinza
+   * MAIS CLARO que ainda mantinha o CABEÇALHO (`#767682`) em 3.03:1, o piso de
+   * 3:1 de texto grande. O cabeçalho mora em `headerY` = 44, na metade de cima,
+   * onde o scrim é 100% transparente — ele é desenhado direto sobre este fundo.
+   *
+   * ⚠️ CUSTO MEDIDO DO `#B5B5B5`, calculado em 03/09/2026 e comunicado ao
+   * Rafael ANTES de a troca entrar:
+   *   · CABEÇALHO `#767682` sobre o fundo: 3.03:1 → **2.19:1**. Passa a NÃO
+   *     cumprir o piso de 3:1 de texto grande. A cor de cabeçalho mais clara
+   *     que voltaria a passar, preservando a matiz do `#767682`, é `#606069`
+   *     (3.03:1); `#4A4A52` daria 4.28:1, com folga. NÃO aplicadas — a decisão
+   *     é do Rafael e ele não pediu.
+   *   · HEADLINE BRANCA, achado NOVO que o pedido não previa: ela pendura pela
+   *     base a partir de y=755 (55.9% da altura), onde o scrim ainda está em
+   *     9.5% de opacidade. Composto sobre o fundo novo, o topo do bloco cai de
+   *     14.35:1 para **2.49:1** — também abaixo de 3:1. Na base do bloco
+   *     (y≈1089, scrim a 51.7%) ainda dá 7.23:1. Ou seja: a primeira linha da
+   *     headline fica difícil de ler numa capa SEM foto. Com foto o problema
+   *     não aparece, porque a imagem entra entre o fundo e o scrim.
+   *   · contra o preto da base do scrim dá 10.24:1 — o degradê, que era a
+   *     queixa original, agora se vê com sobra.
+   *
+   * O Rafael já demonstrou preferir o efeito visual ao contraste (o mesmo caso
+   * do lime sobre o creme nos internos). A troca está feita por ordem dele, com
+   * os números registrados aqui para ninguém "consertar" isso sem saber o que
+   * está desfazendo.
    */
   coverBackground: {
     spec: TEMPLATE_02_SPEC.tokens.color.ink.value, // '#000000'
-    value: '#2E2E2E',
-    motivo: 'Rafael, 02/09/2026 — sobre preto o degradê da capa era invisível.',
+    value: '#B5B5B5',
+    motivo:
+      'Rafael, 03/09/2026 — fundo mais claro, cor escolhida por ele. ' +
+      'Custo: cabeçalho 3.03:1 → 2.19:1 e topo da headline 14.35:1 → 2.49:1.',
   },
 
   /**
@@ -858,6 +872,38 @@ export function template02SlotsForModel(model: number): Template02SlotDescriptor
  */
 export function template02TextSlotsForModel(model: number): Template02SlotDescriptor[] {
   return template02SlotsForModel(model).filter((d) => d.kind === 'text' && d.scope === 'slide');
+}
+
+/**
+ * Os pares TÍTULO → DESTAQUE do Template 2.
+ *
+ * O destaque existe na CAPA (`cover.highlight`, do spec) e nos INTERNOS
+ * (`content.highlight`, extensão — ver TEMPLATE_02_EXTENSIONS). São slots
+ * diferentes marcando títulos diferentes, com a MESMA interface: as palavras do
+ * título viram pastilhas clicáveis.
+ *
+ * 🔴 Mora aqui, e não dentro de um componente, porque DOIS lados da barra
+ * lateral dependem dele desde 03/09/2026 e precisam concordar: o painel de
+ * "Conteúdo do slide" usa a lista para ESCONDER o slot de destaque, e o de
+ * "Estilo do texto" usa para saber de qual título tirar as palavras. Se as duas
+ * pontas tivessem cada uma a sua cópia, o dia em que um terceiro modelo ganhar
+ * destaque produziria um slot que some de um painel sem aparecer no outro.
+ */
+export const TEMPLATE_02_HIGHLIGHT_PAIRS: readonly { titulo: string; destaque: string }[] = [
+  { titulo: 'cover.headline', destaque: 'cover.highlight' },
+  { titulo: 'content.title', destaque: 'content.highlight' },
+] as const;
+
+/** O par de destaque presente numa lista de slots, ou `undefined` se não há. */
+export function template02HighlightPair(
+  slots: Template02SlotDescriptor[]
+): { titulo: string; destaque: string } | undefined {
+  return TEMPLATE_02_HIGHLIGHT_PAIRS.find((p) => slots.some((d) => d.slot === p.destaque));
+}
+
+/** `true` se o slot é um marcador de destaque (capa ou interno). */
+export function template02IsHighlightSlot(slot: string): boolean {
+  return TEMPLATE_02_HIGHLIGHT_PAIRS.some((p) => p.destaque === slot);
 }
 
 /** Os slots do cabeçalho, na ordem em que aparecem no slide. */

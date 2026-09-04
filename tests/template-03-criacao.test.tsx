@@ -254,9 +254,9 @@ describe('TEMPLATE 3 — o wizard', () => {
     expect(wizard).toContain("value: 'template03'");
     expect(wizard).toContain("label: 'FlowLine'");
     expect(wizard).toContain("short: 'Deck aberto: capa e conteúdo independente'");
-    expect(wizard).toContain(
-      'Forma fixa do Figma, deck aberto: capa e slides de conteúdo independentes.'
-    );
+    // O `detail` do catálogo (a frase longa da faixa cinza) foi REMOVIDO em
+    // 03/09/2026 junto com a faixa que o exibia — ele não tinha outro uso.
+    expect(wizard).not.toContain('detail:');
   });
 
   it('o preview 4:5 aponta para o arquivo que existe', () => {

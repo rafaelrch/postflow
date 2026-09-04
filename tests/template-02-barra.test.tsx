@@ -104,12 +104,15 @@ describe('TEMPLATE 2 — painéis na tela', () => {
 });
 
 describe('TEMPLATE 2 — conteúdo do slide', () => {
-  it('a capa mostra título, destaque e chamada; o interno, título e descrição', () => {
+  it('a capa mostra título e chamada; o interno, título e descrição', () => {
+    // O DESTAQUE saiu deste painel em 03/09/2026 e foi para "Estilo do texto",
+    // por ordem do Rafael: conteúdo é o que a pessoa escreve. Quem prova onde
+    // ele foi parar é tests/radar-destaque-no-painel-de-estilo.test.tsx.
     montaDeck(0); // modelo 1 = capa
     abre('Conteúdo do slide');
     expect(screen.getByText('Título')).toBeTruthy();
-    expect(screen.getByText('Destaque')).toBeTruthy();
     expect(screen.getByText('Chamada')).toBeTruthy();
+    expect(screen.queryByText('Destaque')).toBeNull();
     cleanup();
 
     montaDeck(1); // modelo 2 = conteúdo
@@ -117,6 +120,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
     expect(screen.getByText('Título')).toBeTruthy();
     expect(screen.getByText('Descrição')).toBeTruthy();
     expect(screen.queryByText('Chamada')).toBeNull();
+    expect(screen.queryByText('Destaque')).toBeNull();
   });
 
   it('editar um campo grava no slot do slide ativo, e só nele', () => {
@@ -137,7 +141,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
         'cover.highlight': 'ERRAM A',
       },
     });
-    abre('Conteúdo do slide');
+    abre('Estilo do texto');
     const picker = screen.getByRole('group', { name: 'Palavras em destaque' });
     expect(within(picker).getAllByRole('button').map((button) => button.textContent)).toEqual([
       'STARTUPS',
@@ -157,7 +161,7 @@ describe('TEMPLATE 2 — conteúdo do slide', () => {
     montaDeck(0, {
       templateSlots: { 'cover.headline': 'STARTUPS ERRAM A\nIDENTIDADE', 'cover.highlight': 'ERRAM A' },
     });
-    abre('Conteúdo do slide');
+    abre('Estilo do texto');
     const picker = screen.getByRole('group', { name: 'Palavras em destaque' });
     fireEvent.click(within(picker).getByRole('button', { name: 'STARTUPS' }));
     expect(useEditorStore.getState().slides[0].templateSlots?.['cover.highlight']).toBe(

@@ -547,8 +547,18 @@ body {
 
 /* Caixa do modal — altura e largura animadas. O overlay centraliza por flex,
    então crescer/encolher acontece a partir do centro e a margem em volta
-   permanece uniforme. */
-.cw-box { transition: height 280ms var(--ease), max-width 280ms var(--ease); }
+   permanece uniforme.
+
+   Desde 03/09/2026 a altura da caixa é `auto`: ela mede o conteúdo do passo em
+   vez de um número fixo (ver o comentário do shell em CreateWizard). Uma
+   transição de `height` não interpola de e para `auto` por padrão — é para isso
+   que serve `interpolate-size`, e sem ele a troca de passo daria um salto seco.
+   Navegador que não conhece a propriedade ignora a linha e cai justamente nesse
+   salto: o passo aparece certo, só sem a animação. */
+.cw-box {
+  interpolate-size: allow-keywords;
+  transition: height 280ms var(--ease), max-width 280ms var(--ease);
+}
 
 /* Barra de progresso. A largura e a bolinha animam de um passo ao outro E
    quando o TOTAL muda (4 → 3 nos templates de forma fixa). */

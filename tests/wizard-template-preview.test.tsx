@@ -299,12 +299,15 @@ describe('seleção e acessibilidade continuam de pé', () => {
     }
   });
 
-  it('a faixa de detalhe abaixo do grid segue o template selecionado', () => {
+  it('não há mais faixa de detalhe abaixo do grid — só os cards', () => {
+    // Ela saiu em 03/09/2026 por ordem do Rafael: o passo é a ESCOLHA, e o
+    // `short` dentro de cada card já diz o que cada template é (o caso logo
+    // abaixo guarda esses textos). Ver tests/wizard-ajustes-03set.test.tsx.
     abreWizard();
     fireEvent.click(cardDe('Radar'));
-    expect(screen.getByText(/os 3 modelos se alternam/i)).toBeTruthy();
+    expect(screen.queryByText(/os 3 modelos se alternam/i)).toBeNull();
     fireEvent.click(cardDe('Atelier'));
-    expect(screen.getByText(/metadados no topo/i)).toBeTruthy();
+    expect(screen.queryByText(/metadados no topo/i)).toBeNull();
   });
 
   it('o texto dos cards não mudou', () => {
