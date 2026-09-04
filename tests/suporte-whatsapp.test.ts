@@ -78,12 +78,22 @@ const EMAIL_QUE_FICA = [
 ] as const;
 
 describe('lib/suporte.ts — a fonte única', () => {
-  it('o link é um wa.me montado com os dígitos da constante', () => {
-    expect(SUPORTE_WHATSAPP_URL).toBe(`https://wa.me/${SUPORTE_WHATSAPP_DIGITOS}`);
-    expect(SUPORTE_WHATSAPP_URL).toBe('https://wa.me/5571992230643');
+  it('o link é o wa.link canônico, o mesmo canal em forma de link curto', () => {
+    // Ordem do Rafael (03/09/2026): o endereço do suporte passa a ser o link
+    // curto oficial do WhatsApp. Ele NÃO é derivado dos dígitos — o slug é
+    // gerado pela Meta e não tem relação calculável com o número.
+    expect(SUPORTE_WHATSAPP_URL).toBe('https://wa.link/eftqk2');
   });
 
-  it('os dígitos são só dígitos, com DDI — é o que o wa.me aceita', () => {
+  it('não sobrou nenhum wa.me: dois endereços para o mesmo canal, nunca', () => {
+    // O ponto do pedido: um canal, uma URL. Se um wa.me reaparecer em qualquer
+    // arquivo do produto, um dos dois vai envelhecer sozinho e ninguém notará.
+    for (const caminho of ['lib/suporte.ts', ...MIGRADAS.map((m) => m.caminho)]) {
+      expect(fonte(caminho), `${caminho} voltou a usar wa.me`).not.toContain('wa.me');
+    }
+  });
+
+  it('os dígitos são só dígitos, com DDI — é deles que sai o rótulo', () => {
     // Um '+' , espaço, parêntese ou hífen aqui quebra o link silenciosamente:
     // o WhatsApp abre uma página de erro em vez da conversa.
     expect(SUPORTE_WHATSAPP_DIGITOS).toMatch(/^\d+$/);
@@ -117,7 +127,7 @@ describe.each(MIGRADAS)('$nome — suporte por WhatsApp', ({ caminho }) => {
     expect(fonte(caminho)).not.toContain('mailto:');
   });
 
-  it('o link de contato aponta para o wa.me da constante', () => {
+  it('o link de contato aponta para a URL da constante', () => {
     const canais = blocoCanais(fonte(caminho));
     expect(canais).toContain('SUPORTE_WHATSAPP_URL');
     expect(canais).toContain('SUPORTE_WHATSAPP_LABEL');
@@ -125,7 +135,7 @@ describe.each(MIGRADAS)('$nome — suporte por WhatsApp', ({ caminho }) => {
 
   it('abre em nova aba, com rel de link externo', () => {
     const canais = blocoCanais(fonte(caminho));
-    // O wa.me é externo: sem noopener, a página aberta ganha window.opener.
+    // O WhatsApp é externo: sem noopener, a página aberta ganha window.opener.
     expect(canais).toContain('target="_blank"');
     expect(canais).toContain('rel="noopener noreferrer"');
   });
