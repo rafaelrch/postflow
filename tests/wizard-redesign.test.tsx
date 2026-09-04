@@ -126,10 +126,14 @@ describe('CreateWizard — 4 etapas', () => {
     // O Minimalista foi retirado do wizard de propósito.
     expect(screen.queryByText(/Minimalista/i)).toBeNull();
 
-    // A faixa de detalhe acompanha o selecionado (profile é o padrão).
-    expect(screen.getByText(/Estética de post no Twitter\/X/i)).toBeTruthy();
+    // A faixa de detalhe abaixo do grid saiu em 03/09/2026, por ordem do
+    // Rafael: o passo é só a escolha. O que descreve cada template agora é o
+    // `short` DENTRO do card, e ele fica — ver
+    // tests/wizard-passo-template-sem-faixa.test.tsx.
+    expect(screen.queryByText(/Estética de post no Twitter\/X/i)).toBeNull();
+    expect(screen.getByText('Post social, focado em texto')).toBeTruthy();
     fireEvent.click(screen.getByText('Radar'));
-    expect(screen.getByText(/os 3 modelos se alternam/i)).toBeTruthy();
+    expect(screen.queryByText(/os 3 modelos se alternam/i)).toBeNull();
   });
 
   it('a barra de progresso não tem contorno — só preenchimento', () => {
