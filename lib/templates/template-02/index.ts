@@ -1073,17 +1073,105 @@ export function template02HeaderSlots(brandName?: string, handle?: string): Temp
 export const TEMPLATE_02_HIGHLIGHT_COLOR = TEMPLATE_02_COLORS.accent;
 
 /**
- * Os termos escritos no campo Destaque, separados por VÍRGULA.
+ * Os termos escritos no campo Destaque, separados por VÍRGULA — já sem o
+ * sufixo de ocorrência.
  *
  * Pedido do Rafael: *"eu quero que o usuário consiga colocar o destaque da
  * palavra… talvez escrevendo naquele campo, separando por vírgula"*. Vazios são
  * descartados, então "A, ,B" vira ["A","B"] e o campo tolera vírgula sobrando.
+ *
+ * Quem precisa saber QUAL ocorrência usa `template02HighlightTermsParsed`; aqui
+ * o que volta é só o texto procurado, que é o que os leitores de "esse termo
+ * existe na headline?" querem.
  */
-export function template02HighlightTerms(highlight?: string): string[] {
+export function template02HighlightTerms(highlight?: string, texto?: string): string[] {
+  return template02HighlightTermsParsed(highlight, texto).map((t) => t.texto);
+}
+
+/**
+ * Os termos CRUS, com o sufixo `::N` intacto.
+ *
+ * 🔴 É esta que o render usa, e a distinção não é cosmética: passar os termos
+ * já limpos para `template02HighlightParts` JOGA FORA a ocorrência antes de ela
+ * chegar a quem decide o que pintar, e o marcador volta silenciosamente para a
+ * primeira ocorrência. Foi o primeiro jeito que eu escrevi isto, e o teste do
+ * `::` literal foi quem pegou.
+ */
+export function template02HighlightTermsRaw(highlight?: string): string[] {
   return (highlight ?? '')
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean);
+}
+
+/** Um termo do campo Destaque: o texto e QUAL ocorrência dele marcar. */
+export interface Template02HighlightTerm {
+  texto: string;
+  /** 1-based. Sem sufixo no campo, é sempre 1 — a primeira. */
+  ocorrencia: number;
+}
+
+/**
+ * O sufixo de ocorrência: `::` seguido SÓ de dígitos, no fim do termo.
+ *
+ * 🔴 POR QUE `::` E NÃO `#N`, que foi a primeira ideia: `#` colide. O
+ * `cleanHeadlineWord` (ver HighlightWordChips) PRESERVA o `#` de propósito,
+ * porque hashtag faz parte da palavra — e headline de marketing tem hashtag
+ * ("#MARCA", "#2026"). O `::` é o mesmo separador que o `selKey` daquele
+ * componente já usa internamente para juntar palavra e índice, então nem é
+ * convenção nova no repo.
+ */
+const SUFIXO_DE_OCORRENCIA = /^(.+)::(\d+)$/;
+
+/**
+ * O campo Destaque, com a ocorrência de cada termo resolvida.
+ *
+ * FORMATO: `"PARAR, FEED::2"` — o sufixo `::N` é OPCIONAL e diz qual ocorrência
+ * marcar. **SEM sufixo = primeira ocorrência = exatamente o comportamento de
+ * antes de 04/09/2026.** É essa regra que faz deck salvo e saída da IA
+ * continuarem valendo sem nenhuma migração no banco e sem tocar no prompt: o
+ * slot segue sendo a mesma string em `Record<string, string>`, e o formato novo
+ * é um superconjunto do antigo.
+ *
+ * Pedido do Rafael (04/09/2026): *"se aparecer a palavra FEED duas vezes e ele
+ * selecionou UM desses FEED, é só pra destacar aquele que ele selecionou. Não é
+ * pra selecionar ambas."*
+ *
+ * ⚠️ `texto` (a headline) é o DESEMPATADOR do caso patológico. Se o termo
+ * inteiro, `::N` incluído, existe literalmente no texto como palavra inteira —
+ * uma headline que por acaso diga "LEIA O CAP::2" —, então ele é TEXTO, não
+ * sufixo, e a ocorrência volta a ser 1. Sem esse desempate, um título com `::`
+ * viraria um índice por acidente. Quem não passa `texto` não tem como
+ * desambiguar e o sufixo vale sempre; todos os chamadores de dentro do produto
+ * passam.
+ */
+export function template02HighlightTermsParsed(
+  highlight?: string,
+  texto?: string,
+): Template02HighlightTerm[] {
+  return (highlight ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((cru) => {
+      const m = SUFIXO_DE_OCORRENCIA.exec(cru);
+      if (!m) return { texto: cru, ocorrencia: 1 };
+      if (texto != null && template02IndexOfWholeWord(texto, cru) >= 0) {
+        return { texto: cru, ocorrencia: 1 };
+      }
+      return { texto: m[1], ocorrencia: Math.max(1, parseInt(m[2], 10)) };
+    });
+}
+
+/** Quantas vezes o termo aparece em `texto` como palavra inteira. */
+export function template02CountWholeWord(texto: string, termo: string): number {
+  if (!termo) return 0;
+  let n = 0;
+  for (let at = template02IndexOfWholeWord(texto, termo); at >= 0; ) {
+    n++;
+    at = template02IndexOfWholeWord(texto, termo, at + 1);
+  }
+  return n;
 }
 
 /**
@@ -1137,7 +1225,10 @@ export function template02IndexOfWholeWord(line: string, term: string, from = 0)
  * ou cabe numa linha, ou não aparece. Com vários termos, a regra vale POR TERMO.
  */
 export function template02HighlightLine(headline: string, highlight?: string): number {
-  const termos = template02HighlightTerms(highlight);
+  // A headline entra como desempatador do `::` literal, e o que sai são os
+  // TEXTOS: para "em que linha está o marcador?", a ocorrência não muda a
+  // resposta de existir — só de qual delas se pinta.
+  const termos = template02HighlightTerms(highlight, headline);
   if (!termos.length) return -1;
   const linhas = headline.split('\n');
   for (let i = 0; i < linhas.length; i++) {
@@ -1157,10 +1248,12 @@ export function template02HighlightLine(headline: string, highlight?: string): n
  */
 export function template02MissingHighlightTerms(headline: string, highlight?: string): string[] {
   const linhas = headline.split('\n');
+  // Mesmo desempatador do render: sem a headline, "CAP::2" escrito no título
+  // seria lido como sufixo e o termo apareceria como faltando sem estar.
   // Mesma regra do render: um termo que só existe DENTRO de outra palavra
   // está faltando, e o aviso tem de dizer isso — senão ele soma a um
   // marcador que não aparece, que é o pior estado possível para o usuário.
-  return template02HighlightTerms(highlight).filter(
+  return template02HighlightTerms(highlight, headline).filter(
     (t) => !linhas.some((l) => template02IndexOfWholeWord(l, t) >= 0),
   );
 }
@@ -1174,18 +1267,48 @@ export interface Template02HighlightPart {
 /**
  * Quebra UMA linha do headline nos pedaços marcados e não marcados.
  *
- * Cada termo marca a PRIMEIRA ocorrência dele na linha, não todas: marcar todas
- * transformaria um termo curto ("A") em tarja em cima de meia frase. Vários
- * termos na mesma linha funcionam — a varredura pega sempre a ocorrência mais à
- * esquerda entre os termos que ainda não foram usados.
+ * Cada termo marca UMA ocorrência — a que o campo pedir. Sem sufixo `::N` é a
+ * PRIMEIRA, que é o comportamento de sempre; com sufixo, exatamente aquela.
+ * Marcar todas transformaria um termo curto ("A") em tarja em cima de meia
+ * frase, e foi por isso que a regra nasceu assim.
  *
  * "Ocorrência" quer dizer PALAVRA INTEIRA desde 03/09/2026 — ver
- * `template02IndexOfWholeWord`, que é onde a fronteira mora. O resto desta
- * função não mudou: a escolha da mais à esquerda, o desempate pelo termo mais
- * longo e o "cada termo é usado uma vez só" continuam exatamente como estavam.
+ * `template02IndexOfWholeWord`, que é onde a fronteira mora.
+ *
+ * 🔴 A CONTAGEM É DA HEADLINE INTEIRA, NÃO DESTA LINHA. É o que `linhasAntes`
+ * existe para dizer: o texto que vem antes desta linha. Sem ele, a "segunda
+ * ocorrência de FEED" significaria coisas diferentes para o render (que trabalha
+ * linha a linha) e para as pastilhas da barra lateral (que numeram sobre a
+ * headline toda) — as duas pontas voltariam a discordar, que é exatamente o bug
+ * que esta mudança veio fechar.
  */
-export function template02HighlightParts(line: string, terms: string[]): Template02HighlightPart[] {
-  const restantes = terms.filter(Boolean);
+export function template02HighlightParts(
+  line: string,
+  terms: string[],
+  linhasAntes = '',
+): Template02HighlightPart[] {
+  // O texto completo serve de desempatador do `::` literal — ver
+  // `template02HighlightTermsParsed`.
+  const restantes = template02HighlightTermsParsed(
+    terms.filter(Boolean).join(','),
+    linhasAntes ? `${linhasAntes}\n${line}` : line,
+  );
+
+  /**
+   * Onde a ocorrência PEDIDA deste termo cai nesta linha, ou -1 se ela está
+   * noutra linha (ou não existe). O alvo é fixo: não depende de por onde a
+   * varredura já passou, só de contar do começo da headline.
+   */
+  const alvoDe = (termo: Template02HighlightTerm): number => {
+    let vistas = template02CountWholeWord(linhasAntes, termo.texto);
+    for (let at = template02IndexOfWholeWord(line, termo.texto); at >= 0; ) {
+      if (++vistas === termo.ocorrencia) return at;
+      at = template02IndexOfWholeWord(line, termo.texto, at + 1);
+    }
+    return -1;
+  };
+
+  const alvos = restantes.map(alvoDe);
   const usados = new Set<number>();
   const parts: Template02HighlightPart[] = [];
   let cursor = 0;
@@ -1193,20 +1316,22 @@ export function template02HighlightParts(line: string, terms: string[]): Templat
   for (;;) {
     let melhor = -1;
     let indice = -1;
-    restantes.forEach((t, i) => {
-      if (usados.has(i)) return;
-      const at = template02IndexOfWholeWord(line, t, cursor);
-      if (at < 0) return;
+    alvos.forEach((at, i) => {
+      if (usados.has(i) || at < cursor) return;
       // Empate na mesma posição: vence o termo mais longo, que é o que o
       // usuário quis marcar ("MARCA" antes de "MAR").
-      if (melhor < 0 || at < melhor || (at === melhor && t.length > restantes[indice].length)) {
+      if (
+        melhor < 0 ||
+        at < melhor ||
+        (at === melhor && restantes[i].texto.length > restantes[indice].texto.length)
+      ) {
         melhor = at;
         indice = i;
       }
     });
     if (melhor < 0) break;
     usados.add(indice);
-    const termo = restantes[indice];
+    const termo = restantes[indice].texto;
     if (melhor > cursor) parts.push({ text: line.slice(cursor, melhor), marked: false });
     parts.push({ text: termo, marked: true });
     cursor = melhor + termo.length;
