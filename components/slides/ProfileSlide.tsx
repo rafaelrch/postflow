@@ -23,7 +23,45 @@ export interface ProfileSlideProps {
 }
 
 const CONTENT_WIDTH = 864;
-const AVATAR_SIZE = 84;
+
+/**
+ * O CABEÇALHO INTEIRO ESCALA JUNTO — avatar incluído.
+ *
+ * Queixa do Rafael (04/09/2026), palavras dele: *"quando eu aumento e diminuo,
+ * só aumenta e diminui o texto: o nome, o @ e o verificado. A imagem fica
+ * parada. É pra imagem também, a foto de perfil, aumentar junto com o resto."*
+ *
+ * MEDIDO: o avatar era `const AVATAR_SIZE = 84`, número FIXO, enquanto o nome,
+ * o @ e o selo saíam todos de `headerFontSize`. Um escalava, o outro não — e
+ * como o texto crescia ao lado de um círculo parado, era o desalinhamento que
+ * ele viu, não só o tamanho.
+ *
+ * 🔴 A ÂNCORA É 26, E ISSO PRECISOU SER MEDIDO. Havia TRÊS "padrões" para
+ * `headerFontSize` discordando no repo:
+ *   · `DEFAULT_PROFILE_BADGE.headerFontSize` = 26 (types/index.ts) — o objeto
+ *     de verdade;
+ *   · o slider da barra lateral, que exibe `?? 26`;
+ *   · o fallback que ESTE arquivo usava ao desenhar: `?? 30`.
+ * O valor real é 26: `slide-mapper` monta `profileBadge` a partir do que está
+ * gravado ou, na falta, de `DEFAULT_GLOBAL_SETTINGS.profileBadge` — que traz a
+ * chave preenchida com 26. Um `headerFontSize` ausente é quase impossível de
+ * produzir, então o `?? 30` era um caminho morto que só servia para o render
+ * discordar do slider.
+ *
+ * Ancorar em 30 teria sido o erro caro: com os 26 que os decks REAIS têm, o
+ * avatar cairia de 84 para 73 em todo carrossel de Profile já salvo. Ancorando
+ * em 26, `Math.round` devolve exatamente 84 e 22 — os números de sempre — e o
+ * fallback foi unificado em 26 para que o caminho raro também caia em 84. Quem
+ * nunca mexeu no tamanho não vê diferença nenhuma, nos dois caminhos, e é isso
+ * que o teste de não-regressão trava.
+ *
+ * O GAP entra na conta junto: ele é o respiro entre o avatar e a coluna de
+ * texto. Fixo em 22 enquanto o avatar dobra, ele viraria um aperto — a queixa
+ * dele de novo, num lugar diferente.
+ */
+const HEADER_FONT_SIZE_PADRAO = 26;
+const AVATAR_TO_HEADER_RATIO = 84 / HEADER_FONT_SIZE_PADRAO;
+const AVATAR_TEXT_GAP_RATIO = 22 / HEADER_FONT_SIZE_PADRAO;
 const VERIFIED_BLUE = '#1d9bf0';
 const MEDIA_HEIGHT = 510;
 const MAX_BODY_FONT = 40;
@@ -79,7 +117,7 @@ export default function ProfileSlide({
   const titleDescGap = slide.titleDescriptionGap ?? 16;
   const avatarFallback = (profileData.name || 'P').trim().charAt(0).toUpperCase();
   const bodyFontSize = Math.min(slide.fontSize.title, MAX_BODY_FONT);
-  const headerFontSize = globalSettings.profileBadge.headerFontSize ?? 30;
+  const headerFontSize = globalSettings.profileBadge.headerFontSize ?? HEADER_FONT_SIZE_PADRAO;
   const badgeSize = Math.round(headerFontSize * 1.05);
   const handleFontSize = Math.round(headerFontSize * 0.82);
   const isEditable = Boolean(onUpdateProfile || onUpdateText) && !forExport;
@@ -87,11 +125,15 @@ export default function ProfileSlide({
   // Alturas do header em pixels fixos — html2canvas diverge do browser ao
   // centralizar flex vertical, então a coluna de texto é posicionada por
   // offset calculado em vez de alignItems/justifyContent.
+  // Tudo o que forma o cabeçalho sai daqui: o círculo, o respiro ao lado dele,
+  // e (logo acima) o selo e o @. Nenhum número solto sobrou.
+  const avatarSize = Math.round(headerFontSize * AVATAR_TO_HEADER_RATIO);
+  const avatarTextGap = Math.round(headerFontSize * AVATAR_TEXT_GAP_RATIO);
   const nameRowH = Math.round(headerFontSize * 1.1);
   const handleGap = 6;
   const handleRowH = Math.round(handleFontSize * 1.1);
   const textBlockH = nameRowH + handleGap + handleRowH;
-  const textPadTop = Math.max(0, Math.round((AVATAR_SIZE - textBlockH) / 2));
+  const textPadTop = Math.max(0, Math.round((avatarSize - textBlockH) / 2));
 
   // Theme colours
   const C = globalSettings.theme === 'dark' ? DARK : LIGHT;
@@ -166,15 +208,15 @@ export default function ProfileSlide({
       >
         {/* Profile header — posições absolutas em pixels (sem centralização
             flex vertical) para o html2canvas renderizar igual ao preview */}
-        <div style={{ position: 'relative', height: AVATAR_SIZE }}>
+        <div style={{ position: 'relative', height: avatarSize }}>
           {/* Avatar */}
           <div
             style={{
               position: 'absolute',
               left: 0,
               top: 0,
-              width: AVATAR_SIZE,
-              height: AVATAR_SIZE,
+              width: avatarSize,
+              height: avatarSize,
               borderRadius: '50%',
               overflow: 'hidden',
               backgroundColor: C.avatarBg,
@@ -203,7 +245,7 @@ export default function ProfileSlide({
           </div>
 
           {/* Name + handle column — top fixo calculado para centralizar no avatar */}
-          <div style={{ position: 'absolute', left: AVATAR_SIZE + 22, top: textPadTop }}>
+          <div style={{ position: 'absolute', left: avatarSize + avatarTextGap, top: textPadTop }}>
             {/* Row 1: name + spacer + badge, explicit height so html2canvas centers cleanly */}
             <div
               style={{
@@ -275,14 +317,20 @@ export default function ProfileSlide({
             cursor: isEditable && onUpdateText ? 'text' : 'default',
           }}
         >
-          {/* Destaques por palavra — é o que permite deixar ALGUMAS palavras em
-              negrito (o destaque carrega a face escolhida), e não o bloco todo.
-              Com o texto em edição inline os destaques continuam valendo: o
-              `onBlur` só lê o `innerText`, que ignora os spans. */}
-          {renderTextWithHighlights(slide.title, highlights, '', accentColor, {})}
+          {/* Destaques por palavra — deixar ALGUMAS palavras em negrito, e não
+              o bloco todo. Com o texto em edição inline os destaques continuam
+              valendo: o `onBlur` só lê o `innerText`, que ignora os spans.
+
+              O modo `bold` é ordem do Rafael (04/09/2026): aqui marcar uma
+              palavra deixa ela em NEGRITO e mais nada — sem cor, sem face
+              própria, sem sublinhado. O `accentColor` continua sendo passado
+              porque a assinatura o pede, mas neste modo ele não é aplicado a
+              nada; o Editorial e o Minimalista, que dividem esta função,
+              seguem no modo `color`. */}
+          {renderTextWithHighlights(slide.title, highlights, '', accentColor, {}, 'bold')}
           {descText && (
             <span style={{ display: 'block', marginTop: titleDescGap }}>
-              {renderTextWithHighlights(descText, highlights, '', accentColor, {})}
+              {renderTextWithHighlights(descText, highlights, '', accentColor, {}, 'bold')}
             </span>
           )}
         </div>

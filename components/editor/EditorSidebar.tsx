@@ -1289,10 +1289,14 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
       </>
     ),
 
-    /* PERFIL — negrito parcial e cor por palavra. É o mesmo picker do Editorial
-       e do Minimalista; o que faltava era o estilo `profile` oferecê-lo e o
-       `ProfileSlide` ler `slide.highlights` (ver `lib/text-highlights.tsx`).
-       A fonte padrão é a do template, que é fixa. */
+    /* PERFIL — marcar a palavra a deixa em NEGRITO, e só.
+       Ordem do Rafael (04/09/2026): *"no template de Profile o destaque é só
+       pra deixar a fonte BOLD. Não é pra mudar a cor, não é pra mudar nada."*
+
+       Por isso `mode="bold"`: o MESMO picker do Editorial e do Minimalista, sem
+       os controles de cor, fonte e sublinhado — que lá continuam. O
+       `accentColor` segue sendo passado porque a assinatura o exige, e neste
+       modo ele não alimenta nada. */
     destaquesDoTexto: (
       <>
         <WordHighlightPicker
@@ -1305,6 +1309,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           }}
           accentColor={accentColor}
           defaultFontName={defaultTitleFontName}
+          mode="bold"
         />
         {slide.description && (
           <WordHighlightPicker
@@ -1317,6 +1322,7 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
             }}
             accentColor={accentColor}
             defaultFontName={defaultBodyFontName}
+            mode="bold"
           />
         )}
       </>

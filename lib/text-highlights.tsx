@@ -30,12 +30,34 @@ interface IndexedHighlight extends TextHighlight {
   wordIdx?: number;
 }
 
+/**
+ * O QUE marcar uma palavra faz, por estilo.
+ *
+ * - `color` — o comportamento de sempre: a palavra ganha a cor gravada no
+ *   destaque, mais a face e o sublinhado se houver. É o do Editorial e o do
+ *   Minimalista, e continua sendo o padrão de quem não pede nada.
+ * - `bold` — a palavra ganha NEGRITO e nada mais. Ordem do Rafael para o
+ *   PROFILE (04/09/2026), palavras dele: *"no template de Profile o destaque é
+ *   só pra deixar a fonte BOLD. Não é pra mudar a cor, não é pra mudar nada. É
+ *   só pra deixar a fonte bold."*
+ *
+ * 🔴 POR QUE UM PARÂMETRO, e não um `if (style === 'profile')` aqui dentro:
+ * esta função é COMPARTILHADA pelos três estilos que têm destaque (ProfileSlide,
+ * MinimalistSlide, EditorialSlide — medido, são esses três). O Rafael falou só
+ * do Profile. Mudar o corpo da função mudaria os três de uma vez; duplicá-la
+ * para o Profile devolveria a divergência silenciosa que a extração dela veio
+ * acabar (o cabeçalho deste arquivo conta essa história). Quem decide é o
+ * CHAMADOR, que é quem sabe de que template ele é.
+ */
+export type HighlightMode = 'color' | 'bold';
+
 export function renderTextWithHighlights(
   text: string,
   highlights: TextHighlight[],
   fallbackWord: string,
   fallbackColor: string,
   style: React.CSSProperties,
+  mode: HighlightMode = 'color',
 ): React.ReactNode {
   const effective = (highlights.length > 0
     ? highlights
@@ -80,6 +102,23 @@ export function renderTextWithHighlights(
       {tokens.map((token, i) => {
         if (!token.isWord) return token.raw;
         const hl = getHl(token.raw, wordOccurrences[i]);
+
+        // MODO NEGRITO: o destaque é só peso de fonte. A cor, a face e o
+        // sublinhado GRAVADOS no highlight são ignorados de propósito — decks
+        // de Profile salvos antes de 04/09/2026 têm `color` no objeto, e a
+        // regra nova é que ele deixe de ser aplicado, não que o deck quebre.
+        // O sublinhado do BLOCO (`style.textDecoration`) é outra coisa: é do
+        // bloco, não do destaque, e continua valendo nos dois modos.
+        if (mode === 'bold') {
+          if (!hl && !underlineAll) return token.raw;
+          return (
+            <span key={i} style={{
+              ...(hl ? { fontWeight: 700 } : {}),
+              ...(underlineAll ? UNDERLINE_STYLE : {}),
+            }}>{token.raw}</span>
+          );
+        }
+
         const underlined = hl?.underline || underlineAll;
         if (!hl && !underlined) return token.raw;
         const hlFontCSS = hl?.font ? getElementFontCSS(hl.font as ElementFont) : null;

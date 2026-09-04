@@ -97,14 +97,24 @@ describe('7 — negrito parcial no Perfil', () => {
     expect(container.textContent).toContain('Negrito só em algumas palavras');
   });
 
-  it('a cor do destaque também vale', () => {
+  it('a cor do destaque NÃO vale mais — no Perfil o destaque é só negrito', () => {
+    // INVERTIDO em 04/09/2026 por ordem do Rafael: *"no template de Profile o
+    // destaque é só pra deixar a fonte BOLD. Não é pra mudar a cor, não é pra
+    // mudar nada."* Antes este caso afirmava o contrário, e era ele que
+    // guardava o comportamento que ele mandou tirar.
+    //
+    // A cor GRAVADA continua no objeto: decks salvos não quebram ao abrir, ela
+    // só deixa de ser aplicada. Quem cobre isso em detalhe é
+    // tests/profile-destaque-negrito-e-avatar.test.tsx.
     const { container } = renderPerfil(
       slidePerfil({ highlights: [{ text: 'algumas', color: '#FF0000' }] }),
     );
     const destaque = Array.from(container.querySelectorAll('span')).find(
       (s) => s.textContent === 'algumas',
     );
-    expect(destaque!.style.color).toBe('rgb(255, 0, 0)');
+    expect(destaque!.style.color).toBe('');
+    expect(destaque!.style.fontWeight).toBe('700');
+    expect(container.textContent).toContain('Negrito só em algumas palavras');
   });
 
   it('a barra lateral do Perfil oferece o controle de destaques', () => {
