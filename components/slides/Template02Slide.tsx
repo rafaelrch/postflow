@@ -23,7 +23,7 @@ import {
   template02LayoutOf,
   template02ModelOf,
   template02HighlightParts,
-  template02HighlightTerms,
+  template02HighlightTermsRaw,
   template02HighlightTextColor,
   template02ScrimStops,
   template02SlotColor,
@@ -283,7 +283,9 @@ function ContentHighlightText({
   highlight: string;
   ov: Template02Overrides;
 }) {
-  const termos = template02HighlightTerms(highlight);
+  // CRUS, com o sufixo `::N`: quem resolve a ocorrência é o `Parts`, que tem
+  // a linha em mãos para desempatar. Limpar aqui perderia o índice.
+  const termos = template02HighlightTermsRaw(highlight);
   if (termos.length === 0) return <>{title}</>;
 
   const marca = template02TypeFor('content.highlight', TEMPLATE_02_COLORS.ink, ov);
@@ -503,7 +505,9 @@ function CoverHeadline({
   // O destaque tem exatamente dois ajustes: fundo e fonte. A cor do texto é
   // sempre automática para nunca perder contraste com o marcador.
   const corDoTexto = template02HighlightTextColor(fundo);
-  const termos = template02HighlightTerms(highlight);
+  // CRUS, com o sufixo `::N`: quem resolve a ocorrência é o `Parts`, que tem
+  // a linha em mãos para desempatar. Limpar aqui perderia o índice.
+  const termos = template02HighlightTermsRaw(highlight);
 
   return (
     <div
@@ -518,11 +522,15 @@ function CoverHeadline({
         zIndex: 2,
       }}
     >
-      {text.split('\n').map((line, i) => (
+      {text.split('\n').map((line, i, linhas) => (
         <div key={i}>
           {line === ''
             ? '\u00A0'
-            : template02HighlightParts(line, termos).map((part, j) =>
+            /* `linhasAntes` faz a contagem de ocorrências ser da HEADLINE
+               inteira, não desta linha: a 2ª ocorrência de FEED é a 2ª do
+               texto todo, que é como as pastilhas da barra lateral numeram.
+               Sem isto as duas pontas discordariam de novo. */
+            : template02HighlightParts(line, termos, linhas.slice(0, i).join('\n')).map((part, j) =>
                 part.marked ? (
                   <span
                     key={j}

@@ -10,6 +10,7 @@ import {
 } from '@/lib/templates/template-02';
 import {
   headlineWords,
+  highlightWordKey,
   selectedHighlightWords,
 } from '@/components/editor/sidebar/HighlightWordChips';
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_SLIDE, type Slide } from '@/types';
@@ -196,9 +197,12 @@ describe('VARREDURA: as pastilhas do editor sofrem do mesmo problema?', () => {
    * tinha uma ponta, não duas.
    */
   it('a pastilha de GANCHOS não acende quando o termo marcado é "O"', () => {
-    const selecionadas = selectedHighlightWords('PARAR, O, FEED');
+    // A chave ganhou a OCORRÊNCIA em 04/09/2026 (ver
+    // tests/radar-destaque-ocorrencia.test.tsx). O que este caso afirma não
+    // mudou: a palavra que contém o termo não acende.
+    const selecionadas = selectedHighlightWords('PARAR, O, FEED', HEADLINE_DO_RAFAEL);
     const acesas = headlineWords(HEADLINE_DO_RAFAEL)
-      .filter((w) => selecionadas.has(w.normalized))
+      .filter((w) => selecionadas.has(highlightWordKey(w.normalized, w.occurrence)))
       .map((w) => w.display);
 
     expect(acesas).toEqual(['PARAR', 'O', 'FEED']);
@@ -206,9 +210,10 @@ describe('VARREDURA: as pastilhas do editor sofrem do mesmo problema?', () => {
   });
 
   it('nem com palavra acentuada, que é onde uma checagem ASCII cairia', () => {
-    const selecionadas = selectedHighlightWords('A');
-    const acesas = headlineWords('UMA AÇÃO RÁPIDA A MAIS')
-      .filter((w) => selecionadas.has(w.normalized))
+    const headline = 'UMA AÇÃO RÁPIDA A MAIS';
+    const selecionadas = selectedHighlightWords('A', headline);
+    const acesas = headlineWords(headline)
+      .filter((w) => selecionadas.has(highlightWordKey(w.normalized, w.occurrence)))
       .map((w) => w.display);
 
     expect(acesas).toEqual(['A']);
