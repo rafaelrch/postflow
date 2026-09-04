@@ -8,12 +8,20 @@ import { ElementFont, TextHighlight } from '@/types';
 import ColorPicker from './ColorPicker';
 import ElementFontPicker from './ElementFontPicker';
 import { labelCls } from './tokens';
+import type { HighlightMode } from '@/lib/text-highlights';
 
 /**
  * Destaque de palavras do texto do slide.
  *
  * Cada OCORRÊNCIA é independente: a mesma palavra repetida pode ter destaques
  * diferentes, e é por isso que o highlight guarda `wordIdx` além do texto.
+ *
+ * 🔴 COMPONENTE COMPARTILHADO. Ele serve o Editorial, o Minimalista e o
+ * Profile. Desde 04/09/2026 o destaque do PROFILE é só negrito (ordem do
+ * Rafael), então lá os controles de cor, fonte e sublinhado não têm mais o que
+ * fazer — mas nos outros dois continuam valendo. Por isso `mode`: apagar os
+ * controles daqui teria tirado do Editorial uma feature que ninguém pediu para
+ * tirar.
  */
 
 interface IndexedHighlight extends TextHighlight {
@@ -42,6 +50,7 @@ export default function WordHighlightPicker({
   onChange,
   accentColor,
   defaultFontName,
+  mode = 'color',
 }: {
   label: string;
   text: string;
@@ -50,7 +59,15 @@ export default function WordHighlightPicker({
   accentColor: string;
   /** Fonte herdada do bloco enquanto o destaque não tem uma fonte própria. */
   defaultFontName: string;
+  /**
+   * `color` (padrão) oferece cor, fonte e sublinhado. `bold` não oferece nada
+   * disso: marcar a palavra JÁ é o efeito inteiro, então a caixa de controles
+   * fica só com Concluir e Remover. O mesmo nome do modo do render — ver
+   * `HighlightMode` em lib/text-highlights.
+   */
+  mode?: HighlightMode;
 }) {
+  const estilizavel = mode === 'color';
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingColor, setPendingColor] = useState(accentColor);
   const [pendingFont, setPendingFont] = useState<ElementFont | undefined>(undefined);
@@ -141,7 +158,12 @@ export default function WordHighlightPicker({
               )}
               style={
                 hl && !isSelected
-                  ? { borderColor: hl.color + '80', backgroundColor: hl.color + '15', color: hl.color }
+                  ? estilizavel
+                    ? { borderColor: hl.color + '80', backgroundColor: hl.color + '15', color: hl.color }
+                    // No modo negrito a pastilha mostra o que o slide mostra: a
+                    // palavra em negrito. Pintar a cor gravada aqui anunciaria
+                    // um efeito que o render não aplica mais.
+                    : { fontWeight: 800, borderColor: 'var(--ink)', color: 'var(--ink)' }
                   : {}
               }
             >
@@ -157,19 +179,24 @@ export default function WordHighlightPicker({
             {selected.size} palavra{selected.size > 1 ? 's' : ''} selecionada
             {selected.size > 1 ? 's' : ''}
           </span>
-          <ColorPicker
-            label="Cor"
-            value={pendingColor}
-            onChange={(c) => { setPendingColor(c); applyLive(selected, c, pendingFont, pendingUnderline); }}
-          />
-          <div>
-            <span className={cn(labelCls, 'block mb-1.5')}>Fonte</span>
-            <ElementFontPicker
-              value={pendingFont}
-              defaultFontName={defaultFontName}
-              onChange={(f) => { setPendingFont(f); applyLive(selected, pendingColor, f, pendingUnderline); }}
+          {estilizavel && (
+            <ColorPicker
+              label="Cor"
+              value={pendingColor}
+              onChange={(c) => { setPendingColor(c); applyLive(selected, c, pendingFont, pendingUnderline); }}
             />
-          </div>
+          )}
+          {estilizavel && (
+            <div>
+              <span className={cn(labelCls, 'block mb-1.5')}>Fonte</span>
+              <ElementFontPicker
+                value={pendingFont}
+                defaultFontName={defaultFontName}
+                onChange={(f) => { setPendingFont(f); applyLive(selected, pendingColor, f, pendingUnderline); }}
+              />
+            </div>
+          )}
+          {estilizavel && (
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <div
               onClick={() => {
@@ -191,6 +218,7 @@ export default function WordHighlightPicker({
             </div>
             <span className="text-[11px] text-[var(--ink-dim)]">Sublinhado</span>
           </label>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => setSelected(new Set())}
@@ -214,9 +242,13 @@ export default function WordHighlightPicker({
             <div
               key={i}
               className="flex items-center gap-1 px-1.5 py-1 rounded-lg border text-[10px] font-medium"
-              style={{ borderColor: hl.color + '50', background: hl.color + '12' }}
+              style={
+                estilizavel
+                  ? { borderColor: hl.color + '50', background: hl.color + '12' }
+                  : { borderColor: 'var(--line)' }
+              }
             >
-              <span style={{ color: hl.color }}>{hl.text}</span>
+              <span style={estilizavel ? { color: hl.color } : { fontWeight: 800 }}>{hl.text}</span>
               <button
                 onClick={() => onChange(highlights.filter((_, j) => j !== i))}
                 className="text-[var(--ink-muted)] hover:text-red-400 transition-colors ml-0.5"
