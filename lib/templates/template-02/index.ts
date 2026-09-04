@@ -874,6 +874,38 @@ export function template02TextSlotsForModel(model: number): Template02SlotDescri
   return template02SlotsForModel(model).filter((d) => d.kind === 'text' && d.scope === 'slide');
 }
 
+/**
+ * Os pares TÍTULO → DESTAQUE do Template 2.
+ *
+ * O destaque existe na CAPA (`cover.highlight`, do spec) e nos INTERNOS
+ * (`content.highlight`, extensão — ver TEMPLATE_02_EXTENSIONS). São slots
+ * diferentes marcando títulos diferentes, com a MESMA interface: as palavras do
+ * título viram pastilhas clicáveis.
+ *
+ * 🔴 Mora aqui, e não dentro de um componente, porque DOIS lados da barra
+ * lateral dependem dele desde 03/09/2026 e precisam concordar: o painel de
+ * "Conteúdo do slide" usa a lista para ESCONDER o slot de destaque, e o de
+ * "Estilo do texto" usa para saber de qual título tirar as palavras. Se as duas
+ * pontas tivessem cada uma a sua cópia, o dia em que um terceiro modelo ganhar
+ * destaque produziria um slot que some de um painel sem aparecer no outro.
+ */
+export const TEMPLATE_02_HIGHLIGHT_PAIRS: readonly { titulo: string; destaque: string }[] = [
+  { titulo: 'cover.headline', destaque: 'cover.highlight' },
+  { titulo: 'content.title', destaque: 'content.highlight' },
+] as const;
+
+/** O par de destaque presente numa lista de slots, ou `undefined` se não há. */
+export function template02HighlightPair(
+  slots: Template02SlotDescriptor[]
+): { titulo: string; destaque: string } | undefined {
+  return TEMPLATE_02_HIGHLIGHT_PAIRS.find((p) => slots.some((d) => d.slot === p.destaque));
+}
+
+/** `true` se o slot é um marcador de destaque (capa ou interno). */
+export function template02IsHighlightSlot(slot: string): boolean {
+  return TEMPLATE_02_HIGHLIGHT_PAIRS.some((p) => p.destaque === slot);
+}
+
 /** Os slots do cabeçalho, na ordem em que aparecem no slide. */
 export function template02HeaderSlotsForModel(model: number): Template02SlotDescriptor[] {
   return template02SlotsForModel(model).filter((d) => d.scope === 'header');

@@ -16,6 +16,7 @@ import { refinableFields } from '@/lib/refine-fields';
 import Slider from './Slider';
 import Template01Slots from './Template01Slots';
 import Template02Slots from './Template02Slots';
+import HighlightWordChips from './sidebar/HighlightWordChips';
 import Template03Slots from './Template03Slots';
 import SidebarGroup from './sidebar/SidebarGroup';
 import SidebarPanel from './sidebar/SidebarPanel';
@@ -74,6 +75,8 @@ import {
   template02SlotDefaults,
   template02SlotFontName,
   template02TextSlotsForModel,
+  template02HighlightPair,
+  template02IsHighlightSlot,
   template02Background,
   TEMPLATE_02_HIGHLIGHT_COLOR,
 } from '@/lib/templates/template-02';
@@ -296,6 +299,11 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
   // A capa tem imagem de FUNDO full-bleed; os internos, o bloco de 380x1089.
   const t02IsCover = t02Model === 1;
   const t02TextSlots = t02Model != null ? template02TextSlotsForModel(t02Model) : [];
+  // O par TÍTULO → DESTAQUE do modelo ativo. As pastilhas do painel de estilo
+  // tiram as palavras do `titulo` dele; a lib é a dona da lista, para o painel
+  // de conteúdo (que ESCONDE o destaque) e este aqui não discordarem.
+  const t02HighlightPair = template02HighlightPair(t02TextSlots);
+  const t02Slots = slide.templateSlots ?? {};
   const t02HeaderSlots = t02Model != null ? template02HeaderSlotsForModel(t02Model) : [];
 
   // ── TEMPLATE 3 ────────────────────────────────────────────────────────────
@@ -1076,12 +1084,30 @@ export default function EditorSidebar({ onDownloadSlide, onDownloadAll }: Editor
           // O seletor de cor do marcador vale para a capa E para os internos —
           // foi justamente o argumento do Rafael ao pedir o destaque nos
           // internos, e é a saída dele caso o lime sobre o creme não agrade.
-          const isHighlight = d.slot === 'cover.highlight' || d.slot === 'content.highlight';
+          const isHighlight = template02IsHighlightSlot(d.slot);
           return (
             <div key={d.slot} className="space-y-2 pt-3 border-t border-[var(--line)] first:border-t-0 first:pt-0">
               <span className={labelCls}>{d.label}</span>
               {isHighlight ? (
                 <>
+                  {/* AS PASTILHAS VIERAM DE "CONTEÚDO DO SLIDE" em 03/09/2026,
+                      por ordem do Rafael: o painel de conteúdo é só onde se
+                      ESCREVE (título, chamada), e escolher quais palavras ganham
+                      o marcador é decisão de aparência — mora junto da cor e da
+                      fonte do próprio marcador, que já estavam aqui.
+
+                      O componente é o MESMO de sempre (`HighlightWordChips`,
+                      compartilhado com o wizard), sem mudança de comportamento:
+                      só trocou de painel. O título de onde saem as palavras vem
+                      do PAR (`cover.headline` para a capa, `content.title` para
+                      os internos), nunca escrito à mão — vale para os dois. */}
+                  <HighlightWordChips
+                    headline={t02Slots[t02HighlightPair?.titulo ?? ''] ?? ''}
+                    highlight={t02Slots[d.slot] ?? ''}
+                    onChange={(next) =>
+                      updateActiveSlide({ templateSlots: { ...t02Slots, [d.slot]: next } })
+                    }
+                  />
                   <div className="flex items-center gap-2 flex-wrap">
                     <ColorPicker
                       label="Cor do marcador"
