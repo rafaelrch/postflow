@@ -75,6 +75,9 @@ afterEach(cleanup);
 
 describe('a capa não é mais preta', () => {
   it('o fundo chapado da capa é o cinza do tweak, não #000000', () => {
+    // A cor foi ESCOLHIDA pelo Rafael em 03/09/2026 (antes era #2E2E2E). Está
+    // travada no valor exato porque é ordem dele, não um número derivado.
+    expect(CINZA).toBe('#B5B5B5');
     expect(template02Background(1)).toBe(CINZA);
     expect(template02Background(1)).not.toBe('#000000');
     expect(template02Background(1)).not.toBe(TEMPLATE_02_COLORS.ink);
@@ -89,6 +92,8 @@ describe('a capa não é mais preta', () => {
     expect(tweak, 'o desvio do fundo da capa não está registrado').toBeTruthy();
     expect(tweak!.spec).toBe('#000000');
     expect(tweak!.motivo).toMatch(/Rafael/);
+    // O motivo carrega o custo medido, não só a autoria do pedido.
+    expect(tweak!.motivo).toMatch(/2\.19:1/);
   });
 
   it('o slide desenhado sai com o fundo cinza', () => {
@@ -129,35 +134,82 @@ describe('a ordem das camadas: fundo → degradê → textos', () => {
 
 describe('dá para ver o degradê — o critério de aceite de verdade', () => {
   /** Luminância relativa (WCAG). */
-  function lum(hex: string): number {
-    const canal = hex
-      .replace('#', '')
-      .match(/../g)!
-      .map((h) => parseInt(h, 16) / 255)
+  function lum(rgb: number[]): number {
+    const canal = rgb
+      .map((v) => v / 255)
       .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
     return 0.2126 * canal[0] + 0.7152 * canal[1] + 0.0722 * canal[2];
   }
-  const contraste = (a: string, b: string) => {
-    const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  const rgbHex = (hex: string) => hex.replace('#', '').match(/../g)!.map((h) => parseInt(h, 16));
+  const contraste = (a: string | number[], b: string | number[]) => {
+    const par = [a, b].map((c) => lum(typeof c === 'string' ? rgbHex(c) : c));
+    const [x, y] = par.sort((m, n) => n - m);
     return (x + 0.05) / (y + 0.05);
   };
+
+  /**
+   * O scrim composto sobre o fundo, na altura `p` (0 = topo, 1 = base).
+   *
+   * As paradas são as do tweak (`scrim.stops`): transparente até 50%, 45% em
+   * 78%, preto sólido na base. Medir a cor do TEXTO contra o hex do fundo puro
+   * mentiria: quem está atrás do texto é o fundo JÁ escurecido pelo scrim.
+   */
+  function fundoComScrim(hex: string, p: number): number[] {
+    const stops = TEMPLATE_02_DESIGN_TWEAKS.scrim.stops.map((s) => ({
+      pos: s.pos,
+      alpha: Number(s.color.match(/,\s*([\d.]+)\)$/)?.[1] ?? 1),
+    }));
+    let alpha = stops[stops.length - 1].alpha;
+    for (let i = 1; i < stops.length; i++) {
+      if (p <= stops[i].pos) {
+        const a = stops[i - 1];
+        const b = stops[i];
+        alpha = a.alpha + ((b.alpha - a.alpha) * (p - a.pos)) / (b.pos - a.pos);
+        break;
+      }
+    }
+    return rgbHex(hex).map((v) => Math.round(v * (1 - alpha)));
+  }
 
   it('o topo do degradê e a base dele são visivelmente diferentes', () => {
     // Antes: fundo #000 contra base do scrim #000 = 1.00:1, ou seja, NADA.
     expect(contraste('#000000', '#000000')).toBe(1);
-    // Agora há uma rampa de verdade entre o cinza e o preto da base.
-    expect(contraste(CINZA, '#000000')).toBeGreaterThan(1.4);
+    // Com o #B5B5B5 a rampa deixou de ser sutil: 10.24:1 entre o fundo e a base.
+    expect(contraste(CINZA, '#000000')).toBeGreaterThan(10);
   });
 
-  it('o cabeçalho da capa continua legível sobre o novo fundo', () => {
-    // Ele mora no topo, onde o scrim é transparente: é desenhado direto sobre o
-    // fundo. Clarear o fundo cobra este preço, e o piso é o 3:1 de texto
-    // grande. Se alguém clarear mais o cinza, este teste cai — de propósito.
-    expect(contraste(TEMPLATE_02_COLORS.textHeader, CINZA)).toBeGreaterThanOrEqual(3);
+  /**
+   * 🔴 OS DOIS TESTES ABAIXO REGISTRAM UMA PERDA ACEITA, NÃO UM ALVO.
+   *
+   * O Rafael escolheu o `#B5B5B5` em 03/09/2026 sabendo do custo — os números
+   * foram calculados e comunicados ANTES da troca. Eles ficam travados aqui
+   * para que ninguém "conserte" o fundo achando que é bug: se um dia alguém
+   * quiser o contraste de volta, o caminho é mudar a COR DO TEXTO, não o fundo,
+   * e a conversa é com ele.
+   */
+  it('CUSTO ACEITO: o cabeçalho da capa não cumpre mais o piso de 3:1', () => {
+    // Ele mora em headerY = 44, na metade limpa do scrim: é desenhado direto
+    // sobre o fundo. 3.03:1 sobre o #2E2E2E antigo → 2.19:1 sobre o #B5B5B5.
+    const atras = fundoComScrim(CINZA, 44 / 1350);
+    const medido = contraste(TEMPLATE_02_COLORS.textHeader, atras);
+    expect(medido).toBeLessThan(3);
+    expect(medido).toBeCloseTo(2.19, 1);
+    // A saída, se ele quiser o contraste de volta, é escurecer o CABEÇALHO:
+    // #606069 é a cor mais clara que passa preservando a matiz, e #4A4A52 sobra.
+    expect(contraste('#606069', atras)).toBeGreaterThanOrEqual(3);
+    expect(contraste('#4A4A52', atras)).toBeGreaterThan(4);
   });
 
-  it('a headline branca segue com folga', () => {
-    expect(contraste(TEMPLATE_02_COLORS.surface, CINZA)).toBeGreaterThan(7);
+  it('CUSTO ACEITO: o TOPO da headline branca também cai abaixo de 3:1', () => {
+    // Achado que o pedido não previa: a headline pendura pela base a partir de
+    // y=755 (55.9%), onde o scrim ainda está quase transparente. O topo do bloco
+    // cai de 14.35:1 para 2.49:1 — a base dele, mais fundo no degradê, segura.
+    const topo = contraste(TEMPLATE_02_COLORS.surface, fundoComScrim(CINZA, 755 / 1350));
+    expect(topo).toBeLessThan(3);
+    expect(topo).toBeCloseTo(2.49, 1);
+
+    const base = contraste(TEMPLATE_02_COLORS.surface, fundoComScrim(CINZA, 1089 / 1350));
+    expect(base).toBeGreaterThan(7);
   });
 });
 
