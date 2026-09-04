@@ -47,7 +47,7 @@ export function NotFound({
   const router = useRouter();
 
   return (
-    <div className="relative text-center z-[1] pt-52">
+    <div className="relative z-[1] w-full text-center">
       <h1 className="mt-4 text-balance text-5xl font-semibold tracking-tight text-[#18181B] dark:text-[#FAFAFA] sm:text-7xl">
         {title}
       </h1>
