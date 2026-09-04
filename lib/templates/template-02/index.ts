@@ -1087,6 +1087,49 @@ export function template02HighlightTerms(highlight?: string): string[] {
 }
 
 /**
+ * O termo casa em `line` a partir de `from` como PALAVRA INTEIRA — ou -1.
+ *
+ * 🔴 O BUG QUE ISTO CONSERTA (Rafael, 03/09/2026, palavras dele): *"eu
+ * selecionei a palavra 'O' e ele selecionou também o 'O' da palavra 'GANCHOS'.
+ * Isso não pode acontecer. Se eu selecionei aquilo, é só aquilo."* Em "10
+ * GANCHOS PARA A PRIMEIRA LINHA QUE FAZ PARAR O FEED", o termo "O" era
+ * procurado com `indexOf` puro e casava dentro de GANCHOS — o render pintava
+ * "GANCH[O]S". Termo curto casava dentro de qualquer palavra que o contivesse.
+ *
+ * A regra: o caractere imediatamente ANTES e o imediatamente DEPOIS do termo
+ * não podem ser letra, dígito nem marca de acento. Início e fim de linha
+ * contam como fronteira.
+ *
+ * ⚠️ POR QUE NÃO `\b`: o `\b` do JavaScript é ASCII. Numa palavra acentuada
+ * ele enxerga fronteira NO MEIO — em "AÇÃO" o `\b` marca antes e depois do "Ç"
+ * e do "Ã", então `/\bA\b/` casaria com o "A" inicial de "AÇÃO" e o bug
+ * voltaria disfarçado, só nas palavras com acento. Este produto é em português:
+ * a checagem é manual, com classe unicode (`\p{L}\p{N}\p{M}` + flag `u`).
+ *
+ * `\p{M}` entra junto com letra e dígito porque texto pode chegar decomposto
+ * (NFD), onde o acento é um caractere separado: sem ele, o termo "A" casaria
+ * com o "A" de um "Á" decomposto, que é a mesma classe de erro do "GANCHOS".
+ *
+ * A fronteira é do TERMO INTEIRO, não de cada palavra dele — por isso um termo
+ * de várias palavras ("PARAR O FEED") continua casando: o que se olha é o
+ * vizinho da esquerda do "P" e o da direita do último "D".
+ *
+ * Pontuação encostada não quebra: em "FEED." o "." não é letra nem dígito nem
+ * marca, então "FEED" casa — que é o que o usuário espera ao marcar a palavra.
+ */
+const CARACTERE_DE_PALAVRA = /[\p{L}\p{N}\p{M}]/u;
+
+export function template02IndexOfWholeWord(line: string, term: string, from = 0): number {
+  if (!term) return -1;
+  for (let at = line.indexOf(term, from); at >= 0; at = line.indexOf(term, at + 1)) {
+    const antes = at > 0 ? line[at - 1] : '';
+    const depois = line[at + term.length] ?? '';
+    if (!CARACTERE_DE_PALAVRA.test(antes) && !CARACTERE_DE_PALAVRA.test(depois)) return at;
+  }
+  return -1;
+}
+
+/**
  * Índice da linha do headline que contém o marcador, ou -1.
  *
  * A regra do spec é "o marcador nunca cruza duas linhas": como o destaque é
@@ -1098,7 +1141,10 @@ export function template02HighlightLine(headline: string, highlight?: string): n
   if (!termos.length) return -1;
   const linhas = headline.split('\n');
   for (let i = 0; i < linhas.length; i++) {
-    if (termos.some((t) => linhas[i].includes(t))) return i;
+    // `includes` puro traria de volta o bug do "O" dentro de "GANCHOS":
+    // esta função diria que a linha tem o marcador, e o render não pintaria
+    // nada nela. As duas pontas têm de usar a MESMA noção de casar.
+    if (termos.some((t) => template02IndexOfWholeWord(linhas[i], t) >= 0)) return i;
   }
   return -1;
 }
@@ -1111,7 +1157,12 @@ export function template02HighlightLine(headline: string, highlight?: string): n
  */
 export function template02MissingHighlightTerms(headline: string, highlight?: string): string[] {
   const linhas = headline.split('\n');
-  return template02HighlightTerms(highlight).filter((t) => !linhas.some((l) => l.includes(t)));
+  // Mesma regra do render: um termo que só existe DENTRO de outra palavra
+  // está faltando, e o aviso tem de dizer isso — senão ele soma a um
+  // marcador que não aparece, que é o pior estado possível para o usuário.
+  return template02HighlightTerms(highlight).filter(
+    (t) => !linhas.some((l) => template02IndexOfWholeWord(l, t) >= 0),
+  );
 }
 
 export interface Template02HighlightPart {
@@ -1127,6 +1178,11 @@ export interface Template02HighlightPart {
  * transformaria um termo curto ("A") em tarja em cima de meia frase. Vários
  * termos na mesma linha funcionam — a varredura pega sempre a ocorrência mais à
  * esquerda entre os termos que ainda não foram usados.
+ *
+ * "Ocorrência" quer dizer PALAVRA INTEIRA desde 03/09/2026 — ver
+ * `template02IndexOfWholeWord`, que é onde a fronteira mora. O resto desta
+ * função não mudou: a escolha da mais à esquerda, o desempate pelo termo mais
+ * longo e o "cada termo é usado uma vez só" continuam exatamente como estavam.
  */
 export function template02HighlightParts(line: string, terms: string[]): Template02HighlightPart[] {
   const restantes = terms.filter(Boolean);
@@ -1139,7 +1195,7 @@ export function template02HighlightParts(line: string, terms: string[]): Templat
     let indice = -1;
     restantes.forEach((t, i) => {
       if (usados.has(i)) return;
-      const at = line.indexOf(t, cursor);
+      const at = template02IndexOfWholeWord(line, t, cursor);
       if (at < 0) return;
       // Empate na mesma posição: vence o termo mais longo, que é o que o
       // usuário quis marcar ("MARCA" antes de "MAR").
