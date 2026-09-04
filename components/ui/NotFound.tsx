@@ -1,8 +1,33 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import Button from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
+
+interface NotFoundProps {
+  title?: string;
+  description?: string;
+}
+
+/* Botão do componente original (originui). As classes são as mesmas do cva
+   de lá — variante e tamanho default — só com as cores escritas por extenso,
+   porque os tokens --primary/--secondary/--input não existem no globals.css.
+   Fica local neste arquivo: o Button do projeto é outro desenho e continua
+   intocado. */
+const buttonBase =
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ' +
+  'h-9 px-4 py-2 shadow-sm shadow-black/5 transition-colors outline-offset-2 ' +
+  'focus-visible:outline focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-50 ' +
+  '[&_svg]:pointer-events-none [&_svg]:shrink-0';
+
+const buttonPrimary =
+  'bg-[#18181B] text-[#FAFAFA] hover:bg-[#18181B]/90 focus-visible:outline-[#18181B]/70 ' +
+  'dark:bg-[#FAFAFA] dark:text-[#18181B] dark:hover:bg-[#FAFAFA]/90 dark:focus-visible:outline-[#FAFAFA]/70';
+
+const buttonSecondary =
+  'bg-[#F4F4F5] text-[#18181B] hover:bg-[#F4F4F5]/80 focus-visible:outline-[#18181B]/70 ' +
+  'dark:bg-[#27272A] dark:text-[#FAFAFA] dark:hover:bg-[#27272A]/80 dark:focus-visible:outline-[#FAFAFA]/70';
 
 export function Illustration(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
@@ -15,11 +40,6 @@ export function Illustration(props: React.ComponentPropsWithoutRef<'svg'>) {
   );
 }
 
-interface NotFoundProps {
-  title?: string;
-  description?: string;
-}
-
 export function NotFound({
   title = 'Página não encontrada',
   description = 'Perdida, esta página está. Em outro sistema, talvez esteja.',
@@ -28,25 +48,29 @@ export function NotFound({
 
   return (
     <div className="relative text-center z-[1] pt-52">
-      <h1 className="mt-4 text-balance text-5xl font-semibold tracking-tight text-[var(--foreground)] sm:text-7xl">
+      <h1 className="mt-4 text-balance text-5xl font-semibold tracking-tight text-[#18181B] dark:text-[#FAFAFA] sm:text-7xl">
         {title}
       </h1>
-      <p className="mt-6 text-pretty text-lg font-medium text-[var(--text-secondary)] sm:text-xl/8">
+      <p className="mt-6 text-pretty text-lg font-medium text-[#71717A] dark:text-[#A1A1AA] sm:text-xl/8">
         {description}
       </p>
       <div className="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-center gap-y-3 gap-x-6">
-        <Button variant="secondary" className="group" onClick={() => router.back()}>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className={cn(buttonBase, buttonSecondary, 'group')}
+        >
           <ArrowLeft
-            className="opacity-60 transition-transform group-hover:-translate-x-0.5"
+            className="me-2 ms-0 opacity-60 transition-transform group-hover:-translate-x-0.5"
             size={16}
             strokeWidth={2}
-            aria-hidden
+            aria-hidden="true"
           />
           Voltar
-        </Button>
-        <Button className="-order-1 sm:order-none" onClick={() => router.push('/')}>
+        </button>
+        <Link href="/" className={cn(buttonBase, buttonPrimary, '-order-1 sm:order-none')}>
           Ir para o início
-        </Button>
+        </Link>
       </div>
     </div>
   );
