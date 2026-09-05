@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { adminDenialResponse, requireAdmin } from '@/lib/admin-auth';
+import { createAdminSupabaseClient } from '@/lib/supabase-admin';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const access = await requireAdmin();
+  if (!access.ok) return adminDenialResponse(access);
+
+  const supabase = createAdminSupabaseClient();
 
   const requiredTables = [
     'profiles',
@@ -29,7 +31,7 @@ export async function GET() {
     } else if (error) {
       return NextResponse.json({
         ok: false,
-        error: `Erro ao verificar ${table}: ${error.message}`,
+        error: `Erro ao verificar tabela: ${table}`,
       });
     }
   }
@@ -50,7 +52,7 @@ export async function GET() {
   if (profileColumnsError) {
     return NextResponse.json({
       ok: false,
-      error: `Colunas de onboarding ausentes em profiles: ${profileColumnsError.message}. Execute o SQL atualizado no Supabase.`,
+      error: 'Colunas de onboarding ausentes em profiles. Execute o SQL atualizado no Supabase.',
     });
   }
 

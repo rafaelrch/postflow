@@ -20,6 +20,25 @@ const nextConfig: NextConfig = {
     // de erro. Usado só pelo /admin — ver lib/admin-page-guard.ts.
     authInterrupts: true,
   },
+  // CSP fica para depois (Report-Only primeiro): o site carrega Google Fonts,
+  // Typekit, Supabase e imagens externas, e uma CSP mal calibrada quebra
+  // produção. HSTS já é aplicado fora do Next (proxy/plataforma).
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
